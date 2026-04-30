@@ -34,6 +34,7 @@
 #include <QComboBox>
 
 extern const QColor colors[CPN_MAX_CURVES];
+extern QString gAppTempPath;
 
 #define TMR_NUM_OPTION  (TMRMODE_COUNT+2*9+2*getCurrentFirmware()->getCapability(LogicalSwitches)-1)
 

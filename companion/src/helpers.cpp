@@ -44,6 +44,8 @@
 #include <QtGlobal>
 #include <QFile>
 
+QString gAppTempPath;
+
 using namespace Helpers;
 
 Stopwatch gStopwatch("global");
@@ -368,7 +370,7 @@ QString Helpers::concatPath(QString & str1, const QString & str2, bool onlyonese
 
 QString Helpers::getImagesCacheDir()
 {
-  return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) % "/IMAGES";
+  return gAppTempPath % "/IMAGES";
 }
 
 QString Helpers::getImagePath(const QString & filename)
