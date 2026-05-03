@@ -41,6 +41,13 @@ static lv_indev_t* rotaryDevice = nullptr;
 static lv_indev_t* keyboardDevice = nullptr;
 static lv_indev_t* touchDevice = nullptr;
 
+#if defined(LVGL_FAST_TOUCH_SCROLL)
+static constexpr uint32_t TOUCH_INDEV_READ_PERIOD_MS = 10;
+static constexpr uint32_t TOUCH_DISPLAY_REFRESH_PERIOD_MS = 20;
+static constexpr uint8_t TOUCH_SCROLL_LIMIT_PX = 4;
+static constexpr uint8_t TOUCH_SCROLL_THROW = 3;
+#endif
+
 static void reset_inactivity()
 {
   inactivity.counter = 0;
@@ -303,12 +310,28 @@ static void init_lvgl_drivers()
 {
   // Register the driver and save the created display object
   lcdInitDisplayDriver();
+
+#if defined(LVGL_FAST_TOUCH_SCROLL)
+  auto refrTimer = _lv_disp_get_refr_timer(nullptr);
+  if (refrTimer) {
+    lv_timer_set_period(refrTimer, TOUCH_DISPLAY_REFRESH_PERIOD_MS);
+  }
+#endif
  
   // Register the driver in LVGL and save the created input device object
   lv_indev_drv_init(&touchDriver);          /*Basic initialization*/
   touchDriver.type = LV_INDEV_TYPE_POINTER; /*See below.*/
   touchDriver.read_cb = touchDriverRead;      /*See below.*/
+#if defined(LVGL_FAST_TOUCH_SCROLL)
+  touchDriver.scroll_limit = TOUCH_SCROLL_LIMIT_PX;
+  touchDriver.scroll_throw = TOUCH_SCROLL_THROW;
+#endif
   touchDevice = lv_indev_drv_register(&touchDriver);
+#if defined(LVGL_FAST_TOUCH_SCROLL)
+  if (touchDriver.read_timer) {
+    lv_timer_set_period(touchDriver.read_timer, TOUCH_INDEV_READ_PERIOD_MS);
+  }
+#endif
 
 #if defined(ROTARY_ENCODER_NAVIGATION)
   lv_indev_drv_init(&rotaryDriver);
@@ -359,7 +382,7 @@ LvglWrapper* LvglWrapper::instance()
   return _instance;
 }
 
-void LvglWrapper::run()
+uint32_t LvglWrapper::run()
 {
   // Detect nested calls
   static bool updating = false;
@@ -367,8 +390,9 @@ void LvglWrapper::run()
   if (!updating) {
     // Normal UI loop - call lgvl timer handler
     updating = true;
-    lv_timer_handler();
+    uint32_t nextRun = lv_timer_handler();
     updating = false;
+    return nextRun;
   } else {
     // Used when running the loop manually from within
     // the LVGL timer handler (blocking UI code)
@@ -378,6 +402,8 @@ void LvglWrapper::run()
     while((indev = lv_indev_get_next(indev)) != nullptr) {
       lv_indev_read_timer_cb(indev->driver->read_timer);
     }
+
+    return 1;
   }
 }
 

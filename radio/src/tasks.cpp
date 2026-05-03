@@ -33,6 +33,9 @@
 #include "tasks/mixer_task.h"
 
 #if defined(COLORLCD)
+#if defined(LVGL_FAST_TOUCH_SCROLL) && defined(FREE_RTOS)
+#include "LvglWrapper.h"
+#endif
 #include "startup_shutdown.h"
 #endif
 
@@ -47,6 +50,35 @@ TASK_DEFINE_STACK(audioStack, AUDIO_STACK_SIZE);
 mutex_handle_t audioMutex;
 
 #define MENU_TASK_PERIOD (50)  // 50ms
+
+#if defined(LVGL_FAST_TOUCH_SCROLL) && defined(FREE_RTOS)
+static constexpr uint32_t LVGL_FAST_PUMP_MIN_SLEEP_MS = 1;
+static constexpr uint32_t LVGL_FAST_PUMP_MAX_SLEEP_MS = 10;
+
+static void pumpLvglUntilMenuDeadline(uint32_t cycleStart)
+{
+  while (time_get_ms() - cycleStart < MENU_TASK_PERIOD) {
+    uint32_t nextRun = LvglWrapper::instance()->run();
+
+    uint32_t elapsed = time_get_ms() - cycleStart;
+    if (elapsed >= MENU_TASK_PERIOD) break;
+
+    uint32_t sleepTime = nextRun;
+    if (sleepTime < LVGL_FAST_PUMP_MIN_SLEEP_MS) {
+      sleepTime = LVGL_FAST_PUMP_MIN_SLEEP_MS;
+    } else if (sleepTime > LVGL_FAST_PUMP_MAX_SLEEP_MS) {
+      sleepTime = LVGL_FAST_PUMP_MAX_SLEEP_MS;
+    }
+
+    uint32_t remaining = MENU_TASK_PERIOD - elapsed;
+    if (sleepTime > remaining) {
+      sleepTime = remaining;
+    }
+
+    sleep_ms(sleepTime);
+  }
+}
+#endif
 
 #if defined(COLORLCD) && defined(CLI)
 bool perMainEnabled = true;
@@ -75,18 +107,35 @@ static void menusTask()
 #else
   while (pwrCheck() != e_power_off) {
 #endif
+#if defined(LVGL_FAST_TOUCH_SCROLL) && defined(FREE_RTOS)
+    uint32_t menuCycleStart = time_get_ms();
+    bool runFastLvglPump = true;
+#else
     time_point_t next_tick = time_point_now();
+#endif
     DEBUG_TIMER_START(debugTimerPerMain);
 #if defined(COLORLCD) && defined(CLI)
     if (perMainEnabled) {
       perMain();
     }
+#if defined(LVGL_FAST_TOUCH_SCROLL) && defined(FREE_RTOS)
+    else {
+      runFastLvglPump = false;
+    }
+#endif
 #else
     perMain();
 #endif
     DEBUG_TIMER_STOP(debugTimerPerMain);
 
+#if defined(LVGL_FAST_TOUCH_SCROLL) && defined(FREE_RTOS)
+    if (runFastLvglPump)
+      pumpLvglUntilMenuDeadline(menuCycleStart);
+    else
+      sleep_ms(MENU_TASK_PERIOD);
+#else
     sleep_until(&next_tick, MENU_TASK_PERIOD);
+#endif
     resetForcePowerOffRequest();
   }
 

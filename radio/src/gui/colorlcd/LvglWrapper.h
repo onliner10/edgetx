@@ -29,7 +29,7 @@ class LvglWrapper
   static LvglWrapper* instance();
 
   // Called from UI task: executes the LVGL timer handler 
-  void run();
+  uint32_t run();
 
  protected:
   static LvglWrapper *_instance;
