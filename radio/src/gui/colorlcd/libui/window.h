@@ -286,12 +286,14 @@ class SetupLine : public Window
  public:
   SetupLine(Window* parent, coord_t y, coord_t col2, PaddingSize padding, const char* title,
     std::function<void(SetupLine*, coord_t, coord_t)> createEdit, coord_t lblYOffset = 0);
+  const std::string& getTitle() const { return titleText; }
 
   static coord_t showLines(Window* parent, coord_t y, coord_t col2, PaddingSize padding, const SetupLineDef* setupLines);
 
   Messaging setupMsg;
 
  protected:
+  std::string titleText;
 };
 
 //-----------------------------------------------------------------------------
