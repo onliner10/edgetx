@@ -43,6 +43,9 @@ runs:
       shell: pwsh
       run: ${{ github.action_path }}/setup-msvc.ps1
 
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v7
+
     - name: Build
       shell: bash
       env:

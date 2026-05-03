@@ -68,19 +68,14 @@ Since Python 3.11 enabled the "externally managed" flag, it is recommended that 
 brew install uv
 ```
 
-- Create the virtual environment (and use specific version of python for this environment):
+- Create the uv-managed environment:
 ```
-uv venv --python 3.14
-```
-
-- Activate the virtual environment (you will need to run this whenever you want to compile in the future from a new terminal session):
-```
-source .venv/bin/activate
+uv sync
 ```
 
-- Install the packages:
+- Build commands should be run through uv so CMake uses the Python dependencies from the project environment:
 ```
-uv pip install Pillow clang lz4 jinja2
+uv run python -c "import jinja2, PIL, lz4, pydantic"
 ```
 
 # Compile EdgeTX
@@ -92,7 +87,7 @@ mkdir -p build && cd build
 
 Configure build flags using `cmake` (in this case, for RadioMaster TX16S, [see here](https://github.com/EdgeTX/edgetx/blob/main/tools/build-common.sh) for other possible handset specific flags).
 ```
-cmake -DPCB=X10 -DPCBREV=TX16S \
+uv run cmake -DPCB=X10 -DPCBREV=TX16S \
    -DCMAKE_PREFIX_PATH=$QTDIR \
    -DARM_TOOLCHAIN_DIR=/Applications/ArmGNUToolchain/14.2.Rel1/arm-none-eabi/bin/ ..
 ```
@@ -105,12 +100,12 @@ cmake -DPCB=X10 -DPCBREV=TX16S \
 
 Configure the compiler for firmware building (parallel limits the number of CPU cores used - you can increase this if your machine can handle more):
 ```
-cmake --build . --target arm-none-eabi-configure --parallel 4
+uv run cmake --build . --target arm-none-eabi-configure --parallel 4
 ```
 
 Build the firmware!
 ```
-cmake --build . --target firmware
+uv run cmake --build . --target firmware
 ```
 
 # Troubleshooting

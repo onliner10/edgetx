@@ -13,5 +13,7 @@ runs:
         python-version: ${{ inputs.python-version }}
         cache: 'pip' # caching pip dependencies
 
-    - run: python3 -m pip install -r requirements.txt
+    - uses: astral-sh/setup-uv@v7
+
+    - run: uv sync
       shell: bash

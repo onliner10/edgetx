@@ -1,5 +1,51 @@
+EDGE16_SUPPORTED_TARGETS="tx16s tx16smk3"
+
+ensure_uv_build_env() {
+    if [[ "${EDGE16_UV_ACTIVE:-}" == "1" || "${EDGE16_SKIP_UV:-}" == "1" ]]; then
+        return 0
+    fi
+
+    if ! command -v uv >/dev/null 2>&1; then
+        echo "Edge16 build scripts run through uv by default." >&2
+        echo "Install uv, then rerun this command: https://docs.astral.sh/uv/getting-started/installation/" >&2
+        exit 1
+    fi
+
+    local original_script_path="$1"
+    local script_path="$1"
+    shift || true
+
+    if [[ "$script_path" != /* ]]; then
+        if [[ "$script_path" == */* ]]; then
+            script_path="$(cd "$(dirname "$script_path")" && pwd)/$(basename "$script_path")"
+        else
+            script_path="$(command -v "$script_path" || true)"
+        fi
+    fi
+
+    if [[ -z "$script_path" || ! -f "$script_path" ]]; then
+        echo "Unable to locate script for uv re-exec: $original_script_path" >&2
+        exit 1
+    fi
+
+    local repo_root
+    repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+    export EDGE16_UV_ACTIVE=1
+    exec uv run --with-requirements "${repo_root}/requirements.txt" bash "$script_path" "$@"
+}
+
 get_target_build_options() {
     local target_name=$1
+
+    case " ${EDGE16_SUPPORTED_TARGETS} " in
+        *" ${target_name} "*)
+            ;;
+        *)
+            echo "Unsupported Edge16 target: $target_name"
+            return 1
+            ;;
+    esac
 
     case $target_name in
         x9lite)

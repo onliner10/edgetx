@@ -268,10 +268,16 @@ QString OpenTxFirmware::getLanguage() const
 // Firmware registrations
 // NOTE: "recognized" build options are defined in /radio/util/fwoptions.py
 
+static bool isEdge16SupportedFirmwareId(const QString & id)
+{
+  return id == FIRMWAREID("tx16s") || id == FIRMWAREID("tx16smk3");
+}
+
 void registerOpenTxFirmware(OpenTxFirmware * firmware, bool deprecated = false)
 {
-  if (!deprecated)
+  if (!deprecated && isEdge16SupportedFirmwareId(firmware->getId())) {
     Firmware::addRegisteredFirmware(firmware);
+  }
 }
 
 void addOpenTxCommonOptions(OpenTxFirmware * firmware)

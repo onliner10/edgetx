@@ -131,6 +131,7 @@ else
     echo "Error: Could not find build-common.sh"
     exit 1
 fi
+ensure_uv_build_env "$0" "$@"
 
 # Auto-discover available languages from radio/src/CMakeLists.txt
 get_radio_languages() {
@@ -169,309 +170,30 @@ get_logographic_languages() {
 
 # Extract all firmware variants from build-common.sh
 get_all_targets() {
-    # Extract target names from the get_target_build_options function
-    local build_common_path=""
-    if [[ -f "$SCRIPT_DIR/tools/build-common.sh" ]]; then
-        build_common_path="$SCRIPT_DIR/tools/build-common.sh"
-    elif [[ -f "$SCRIPT_DIR/build-common.sh" ]]; then
-        build_common_path="$SCRIPT_DIR/build-common.sh"
-    else
-        echo "Error: Could not find build-common.sh" >&2
-        return 1
-    fi
-    
-    # Extract target names from case statement in get_target_build_options function
-    awk '
-    /^get_target_build_options\(\)/ { in_function=1; next }
-    in_function && /^}$/ { exit }
-    in_function && /^[[:space:]]*[a-z0-9_-]+\)/ { 
-        gsub(/^[[:space:]]*/, "")
-        gsub(/\).*$/, "")
-        if ($0 != "*" && $0 != "esac") print $0
-    }
-    ' "$build_common_path" | sort -u
+    tr ' ' '\n' <<< "$EDGE16_SUPPORTED_TARGETS"
 }
 
-# Auto-discover color screen targets by checking target CMakeLists.txt files - fully dynamic implementation
+# Edge16 supports only TX16S-class color LCD targets.
 get_color_screen_targets() {
-    local color_targets=""
-    local all_targets
-    
-    all_targets=$(get_all_targets)
-    
-    for target in $all_targets; do
-        # Get the PCB type for this target from build-common.sh
-        local pcb_line
-        pcb_line=$(awk -v target="$target" '
-        /^get_target_build_options\(\)/ { in_function=1; next }
-        in_function && /^}$/ { exit }
-        in_function && $0 ~ "^[[:space:]]*" target "\\)" {
-            found_target=1; next
-        }
-        found_target && /BUILD_OPTIONS.*-DPCB=/ {
-            print $0; exit
-        }
-        found_target && /;;/ { exit }
-        ' "$SCRIPT_DIR/build-common.sh" 2>/dev/null || true)
-        
-        if [[ -n "$pcb_line" ]]; then
-            # Extract PCB type (e.g., -DPCB=X10 -> X10)
-            local pcb_type
-            pcb_type=$(echo "$pcb_line" | grep -o '\-DPCB=[A-Z0-9+]*' | cut -d= -f2)
-            
-            if [[ -n "$pcb_type" ]]; then
-                # Dynamically determine target directory by parsing radio/src/CMakeLists.txt
-                local radio_cmake_file="../radio/src/CMakeLists.txt"
-                local target_dir=""
-                
-                if [[ -f "$SCRIPT_DIR/$radio_cmake_file" ]]; then
-                    # Parse the if/elseif chain to find which target directory corresponds to our PCB type
-                    target_dir=$(awk -v pcb="$pcb_type" '
-                    /^if\(PCB STREQUAL|^elseif\(PCB STREQUAL/ {
-                        condition_line = $0
-                        # Extract all PCB types from the condition
-                        gsub(/^[^(]*\(/, "", condition_line)  # Remove everything before first (
-                        gsub(/\).*$/, "", condition_line)     # Remove everything after last )
-                        gsub(/PCB STREQUAL /, "", condition_line)  # Remove "PCB STREQUAL "
-                        gsub(/ OR /, " ", condition_line)     # Replace " OR " with space
-                        
-                        # Check if our PCB type is in this condition
-                        if ((" " condition_line " ") ~ (" " pcb " ")) {
-                            found_pcb = 1
-                        }
-                    }
-                    found_pcb && /include\(targets\/.*\/CMakeLists\.txt\)/ {
-                        # Extract target directory from include(targets/horus/CMakeLists.txt)
-                        match($0, /targets\/([^\/]+)\//, arr)
-                        if (arr[1]) {
-                            print arr[1]
-                            exit
-                        }
-                    }
-                    /^else\(\)|^endif\(\)/ { found_pcb = 0 }
-                    ' "$SCRIPT_DIR/$radio_cmake_file")
-                fi
-                
-                if [[ -n "$target_dir" ]]; then
-                    # Check if this target directory has color screen support
-                    local target_cmake_file="../radio/src/targets/$target_dir/CMakeLists.txt"
-                    
-                    if [[ -f "$SCRIPT_DIR/$target_cmake_file" ]]; then
-                        # Look for color screen indicators: GUI_DIR with colorlcd, COLORLCD definitions, etc.
-                        if grep -q "GUI_DIR.*colorlcd\|COLORLCD\|set(GUI_DIR.*colorlcd" "$SCRIPT_DIR/$target_cmake_file"; then
-                            color_targets="$color_targets $target"
-                        fi
-                    fi
-                fi
-            fi
-        fi
-    done
-    
-    # Return unique sorted targets
-    echo "$color_targets" | tr ' ' '\n' | sort -u | tr '\n' ' '
+    echo "$EDGE16_SUPPORTED_TARGETS"
 }
 
-# Auto-discover STM32 processor types for targets - fully dynamic implementation
+# Return STM32 processor types for Edge16-supported targets.
 get_stm32_processor_type() {
     local target=$1
-    
-    # Hard-coded case for x9dp (will be phased out)
-    if [[ "$target" == "x9dp" ]]; then
-        echo "F2"
-        return 0
-    fi
-    
-    # Get the PCB configuration for this target from build-common.sh
-    local pcb_line
-    pcb_line=$(awk -v target="$target" '
-    /^get_target_build_options\(\)/ { in_function=1; next }
-    in_function && /^}$/ { exit }
-    in_function && $0 ~ "^[[:space:]]*" target "\\)" {
-        found_target=1; next
-    }
-    found_target && /BUILD_OPTIONS.*-DPCB=/ {
-        print $0
-        exit
-    }
-    found_target && /;;/ { exit }
-    ' "$SCRIPT_DIR/build-common.sh" 2>/dev/null || true)
-    
-    if [[ -z "$pcb_line" ]]; then
-        echo "UNKNOWN"
-        return 1
-    fi
-    
-    # Extract PCB type and PCBREV from BUILD_OPTIONS+="-DPCB=X7 -DPCBREV=T8"
-    local pcb_type
-    local pcb_rev
-    pcb_type=$(echo "$pcb_line" | grep -o '\-DPCB=[A-Z0-9+]*' | cut -d= -f2)
-    pcb_rev=$(echo "$pcb_line" | grep -o '\-DPCBREV=[A-Z0-9+]*' | cut -d= -f2 || true)
-    
-    if [[ -z "$pcb_type" ]]; then
-        echo "UNKNOWN"
-        return 1
-    fi
-    
-    # Dynamically determine target directory by parsing radio/src/CMakeLists.txt
-    local radio_cmake_file="../radio/src/CMakeLists.txt"
-    local target_dir=""
-    
-    if [[ -f "$SCRIPT_DIR/$radio_cmake_file" ]]; then
-        # Parse the if/elseif chain to find which target directory corresponds to our PCB type
-        target_dir=$(awk -v pcb="$pcb_type" '
-        /^if\(PCB STREQUAL|^elseif\(PCB STREQUAL/ {
-            condition_line = $0
-            # Extract all PCB types from the condition
-            gsub(/^[^(]*\(/, "", condition_line)  # Remove everything before first (
-            gsub(/\).*$/, "", condition_line)     # Remove everything after last )
-            gsub(/PCB STREQUAL /, "", condition_line)  # Remove "PCB STREQUAL "
-            gsub(/ OR /, " ", condition_line)     # Replace " OR " with space
-            
-            # Check if our PCB type is in this condition
-            if ((" " condition_line " ") ~ (" " pcb " ")) {
-                found_pcb = 1
-            }
-        }
-        found_pcb && /include\(targets\/.*\/CMakeLists\.txt\)/ {
-            # Extract target directory from include(targets/horus/CMakeLists.txt)
-            match($0, /targets\/([^\/]+)\//, arr)
-            if (arr[1]) {
-                print arr[1]
-                exit
-            }
-        }
-        /^else\(\)|^endif\(\)/ { found_pcb = 0 }
-        ' "$SCRIPT_DIR/$radio_cmake_file")
-    fi
-    
-    if [[ -z "$target_dir" ]]; then
-        echo "UNKNOWN"
-        return 1
-    fi
-    
-    # Simulate the CMake logic to determine CPU_TYPE_FULL based on PCB and PCBREV
-    local target_cmake_file="../radio/src/targets/$target_dir/CMakeLists.txt"
-    
-    if [[ -f "$SCRIPT_DIR/$target_cmake_file" ]]; then
-        # Parse the target CMakeLists.txt to determine CPU_TYPE_FULL
-        # We need to simulate the if/elseif logic for PCB and PCBREV
-        local cpu_type_full
-        
-        # First, try to find CPU_TYPE_FULL within the specific PCBREV block if PCBREV is specified
-        if [[ -n "$pcb_rev" ]]; then
-            cpu_type_full=$(awk -v pcb="$pcb_type" -v pcbrev="$pcb_rev" '
-            BEGIN { in_pcb_block = 0; in_pcbrev_block = 0; cpu_found = 0 }
-            
-            # Look for PCB conditions
-            /^if\(PCB STREQUAL|^elseif\(PCB STREQUAL/ {
-                condition_line = $0
-                gsub(/^[^(]*\(/, "", condition_line)
-                gsub(/\).*$/, "", condition_line)
-                gsub(/PCB STREQUAL /, "", condition_line)
-                gsub(/ OR /, " ", condition_line)
-                
-                # Check if our PCB type is in this condition (use index for exact matching)
-                if (index(" " condition_line " ", " " pcb " ") > 0) {
-                    in_pcb_block = 1
-                } else {
-                    in_pcb_block = 0
-                }
-                in_pcbrev_block = 0
-            }
-            
-            # Look for PCBREV conditions within PCB block
-            in_pcb_block && /\$\{PCBREV\} STREQUAL/ {
-                condition_line = $0
-                gsub(/.*\$\{PCBREV\} STREQUAL /, "", condition_line)
-                gsub(/\).*$/, "", condition_line)
-                gsub(/ .*$/, "", condition_line)
-                
-                if (condition_line == pcbrev) {
-                    in_pcbrev_block = 1
-                } else {
-                    in_pcbrev_block = 0
-                }
-            }
-            
-            # Accept CPU_TYPE_FULL within PCBREV block
-            in_pcbrev_block && /set\(CPU_TYPE_FULL STM32/ {
-                match($0, /STM32[FH][0-9RSx]+[A-Z]*/, arr)
-                if (arr[0] && !cpu_found) {
-                    print arr[0]
-                    cpu_found = 1
-                    exit
-                }
-            }
-            
-            # Reset PCBREV block when we hit another condition or endif
-            /^[[:space:]]*if\(|^[[:space:]]*elseif\(|^[[:space:]]*else\(|^[[:space:]]*endif\(/ && !/PCBREV/ {
-                if (in_pcb_block && in_pcbrev_block) {
-                    in_pcbrev_block = 0
-                }
-            }
-            
-            # Reset everything when we exit the PCB block
-            /^else\(\)|^endif\(\)/ && !(/PCBREV/) {
-                in_pcb_block = 0
-                in_pcbrev_block = 0
-            }
-            ' "$SCRIPT_DIR/$target_cmake_file")
-        fi
-        
-        # If no CPU_TYPE_FULL found in PCBREV block, or no PCBREV specified,
-        # look for CPU_TYPE_FULL within the specific PCB block
-        if [[ -z "$cpu_type_full" ]]; then
-            # Use sed to extract the specific PCB block, then look for CPU_TYPE_FULL
-            # For targets without PCBREV, we want the "else()" case, not the PCBREV-specific ones
-            local pcb_block_start_pattern="^elseif(PCB STREQUAL $pcb_type)\|^if(PCB STREQUAL.*$pcb_type"
-            local pcb_block_end_pattern="^elseif(PCB STREQUAL\|^else()\|^endif()"
-            
-            if [[ -z "$pcb_rev" ]]; then
-                # No PCBREV specified, first try to find CPU_TYPE_FULL in else() block for complex targets
-                cpu_type_full=$(sed -n "/$pcb_block_start_pattern/,/$pcb_block_end_pattern/p" "$SCRIPT_DIR/$target_cmake_file" | \
-                               awk '
-                               BEGIN { in_else_block = 0 }
-                               /else\(\)/ { in_else_block = 1; next }
-                               /endif\(\)/ { in_else_block = 0; next }
-                               /\$\{PCBREV\} STREQUAL/ { in_else_block = 0; next }
-                               in_else_block && /set\(CPU_TYPE_FULL STM32/ {
-                                   match($0, /STM32[FH][0-9RSx]+[A-Z]*/, arr)
-                                   if (arr[0]) { print arr[0]; exit }
-                               }
-                               # If no else() block, take any CPU_TYPE_FULL not in a PCBREV block
-                               !in_else_block && /set\(CPU_TYPE_FULL STM32/ && (prev_line !~ /\$\{PCBREV\} STREQUAL/) {
-                                   match($0, /STM32[FH][0-9RSx]+[A-Z]*/, arr)
-                                   if (arr[0] && !found_any) { found_any=1; print arr[0]; exit }
-                               }
-                               { prev_line = $0 }
-                               ')
-                
-                # If still not found (simple targets), use global CPU_TYPE_FULL
-                if [[ -z "$cpu_type_full" ]]; then
-                    cpu_type_full=$(grep "set(CPU_TYPE_FULL STM32" "$SCRIPT_DIR/$target_cmake_file" | head -1 | grep -o "STM32[FH][0-9RSx]*[A-Z]*")
-                fi
-            else
-                # PCBREV specified but no CPU_TYPE_FULL found in PCBREV block, use global CPU_TYPE_FULL
-                cpu_type_full=$(grep "set(CPU_TYPE_FULL STM32" "$SCRIPT_DIR/$target_cmake_file" | head -1 | grep -o "STM32[FH][0-9RSx]*[A-Z]*")
-            fi
-        fi
-        
-        if [[ -n "$cpu_type_full" ]]; then
-            # Convert CPU_TYPE_FULL to CPU_TYPE (F2, F4, H7, etc.)
-            local cpu_type
-            case "$cpu_type_full" in
-                STM32F2*) cpu_type="F2" ;;
-                STM32F4*) cpu_type="F4" ;;
-                STM32H7*) cpu_type="H7" ;;
-                *) cpu_type="UNKNOWN" ;;
-            esac
-            echo "$cpu_type"
-            return 0
-        fi
-    fi
-    
-    echo "UNKNOWN"
-    return 1
+
+    case "$target" in
+        tx16s)
+            echo "F4"
+            ;;
+        tx16smk3)
+            echo "H7"
+            ;;
+        *)
+            echo "UNKNOWN"
+            return 1
+            ;;
+    esac
 }
 
 # Function to get targets by STM32 processor type
@@ -802,24 +524,14 @@ show_usage() {
     echo "Examples:"
     echo "  $0                  # Build all languages for all targets"
     echo "  $0 tx16s            # Build all languages for TX16S"
-    echo "  $0 tx16s gx12 x9d   # Build all languages for multiple targets"
-    echo "  $0 x7               # Build non-logographic languages for X7 (B&W)"
-    echo "  $0 -f x7            # Force build ALL languages for X7 (including CN,JP,KO,TW)"
-    echo "  $0 -f tx16s st16 x9d # Force build ALL languages for multiple targets"
+    echo "  $0 tx16s tx16smk3   # Build all languages for multiple targets"
+    echo "  $0 -f tx16s tx16smk3 # Force build ALL languages for multiple targets"
     echo "  $0 --color-only     # Build all color screen targets with appropriate languages"
-    echo "  $0 --bw-only        # Build all B&W screen targets (excluding logographic)"
-    echo "  $0 --bw-only -f     # Build all B&W screen targets with ALL languages"
-    echo "  $0 --processor F2   # Build all F2 processor targets"
-    echo "  $0 --bw-only --processor F2  # Build F2 B&W targets only"
-    echo "  $0 --exclude-processor F2    # Build all targets except F2"
+    echo "  $0 --processor H7   # Build all H7 processor targets"
     echo "  $0 -l               # List all available targets"
-    echo "  $0 -l --filter-processor F4  # List only F4 targets"
     echo "  $0 -c --filter-processor H7  # List only H7 color screen targets"
-    echo "  $0 -b --filter-processor exclude-F2  # List B&W targets excluding F2"
     echo "  $0 --list-processors     # Show all targets grouped by processor type"
-    echo "  $0 -n x7            # Show what languages would be built for X7"
-    echo "  $0 -n tx16s gx12    # Show what would be built for multiple targets"
-    echo "  $0 --continue-on-failure x7  # Build all languages for X7 even if some fail"
+    echo "  $0 -n tx16s tx16smk3 # Show what would be built for multiple targets"
     echo "  $0 --continue-on-failure --color-only  # Build all color targets, continue on failures"
     echo
     echo "Language Rules:"

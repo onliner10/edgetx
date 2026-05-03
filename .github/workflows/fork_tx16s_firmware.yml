@@ -31,6 +31,9 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
       - name: Build TX16S firmware
         env:
           FLAVOR: tx16s

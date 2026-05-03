@@ -2,6 +2,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/build-common.sh"
+ensure_uv_build_env "$0" "$@"
 
 SRCDIR=$1
 OUTDIR=$2
@@ -193,8 +194,7 @@ build_plugin() {
         return 1
     fi
 
-    # FLAVOUR may differ from target name (e.g. x9dp2019 -> x9d+2019),
-    # so copy whatever .wasm was produced.
+    # FLAVOUR may differ from target name, so copy whatever .wasm was produced.
     cp ${BUILD_DIR}/edgetx-*-simulator.wasm "${OUTDIR}/" 2>/dev/null
 
     # Check for warnings and show summary if found
@@ -219,18 +219,7 @@ if [[ -n "$FLAVOR" ]]; then
     done
 else
     declare -a plugins=(
-        # monochrome
-        boxer bumblebee commando8
-        gx12 mt12 pocket t12max
-        t14 t20 t20v2 tpros tprov2
-        tx12mk2 zorro v12 v14
-        x7access x9dp2019 x9e
-        # colour
-        el18 nb4p nv14 st16 pa01
-        pl18 pl18ev pl18u
-        t15 t15pro t16 t18
-        tx15 tx16s tx16smk3 f16 v16
-        x10 x10express x12s
+        tx16s tx16smk3
     )
 fi
 

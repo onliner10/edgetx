@@ -2,6 +2,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/build-common.sh"
+ensure_uv_build_env "$0" "$@"
 
 SRCDIR=$1
 OUTDIR=$2
