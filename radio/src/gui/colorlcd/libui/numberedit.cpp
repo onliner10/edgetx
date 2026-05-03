@@ -240,8 +240,9 @@ NumberEdit::NumberEdit(Window* parent, const rect_t& rect, int vmin, int vmax,
     vmin(vmin),
     vmax(vmax)
 {
-  if (auto setupLine = dynamic_cast<SetupLine*>(parent)) {
-    editTitle = setupLine->getTitle();
+  if (parent) {
+    const char* title = parent->getFormFieldTitle();
+    if (title) editTitle = title;
   }
 
   if (rect.w == 0 || rect.w == LV_SIZE_CONTENT) setWidth(EdgeTxStyles::EDIT_FLD_WIDTH);
@@ -337,9 +338,9 @@ std::string NumberEdit::getEditVal() const
   }
 
   bool negative = value < 0;
-  uint32_t absValue = negative ? -value : value;
-  uint32_t whole = absValue / scale;
-  uint32_t fraction = absValue % scale;
+  int64_t absValue = negative ? -(int64_t)value : value;
+  int64_t whole = absValue / scale;
+  int64_t fraction = absValue % scale;
 
   auto text = std::string(negative ? "-" : "") + std::to_string(whole) + ".";
   if (scale == 100 && fraction < 10) text += "0";
@@ -358,7 +359,8 @@ void NumberEdit::setValueFromEditVal(const char* text)
   bool negative = false;
   bool afterDecimal = false;
   int decimalDigits = 0;
-  int32_t value = 0;
+  constexpr int64_t VALUE_LIMIT = 2147483647;
+  int64_t value = 0;
 
   if (*text == '-' || *text == '+') {
     negative = *text == '-';
@@ -375,16 +377,24 @@ void NumberEdit::setValueFromEditVal(const char* text)
 
     if (*text >= '0' && *text <= '9') {
       if (!afterDecimal) {
-        value = value * 10 + (*text - '0') * scale;
+        if (value < VALUE_LIMIT) {
+          value = value * 10 + (*text - '0') * scale;
+          if (value > VALUE_LIMIT) value = VALUE_LIMIT;
+        }
       } else if (decimalDigits < (scale == 100 ? 2 : scale == 10 ? 1 : 0)) {
-        value += (*text - '0') * (scale == 100 && decimalDigits == 0 ? 10 : 1);
+        int digitValue = (*text - '0') * (scale == 100 && decimalDigits == 0 ? 10 : 1);
+        if (value <= VALUE_LIMIT - digitValue)
+          value += digitValue;
+        else
+          value = VALUE_LIMIT;
         decimalDigits++;
       }
     }
     text++;
   }
 
-  setValue(negative ? -value : value);
+  int32_t parsedValue = (int32_t)value;
+  setValue(negative ? -parsedValue : parsedValue);
 }
 
 void NumberEdit::updateDisplay()
