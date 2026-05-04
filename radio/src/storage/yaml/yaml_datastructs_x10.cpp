@@ -347,7 +347,7 @@ static const struct YamlNode struct_QMFavorite[] = {
 };
 static const struct YamlNode struct_RadioTopbarUnsigned8[] = {
   YAML_IDX,
-  YAML_UNSIGNED( nullptr, 8 ),
+  YAML_UNSIGNED( "val", 8 ),
   YAML_END
 };
 static const struct YamlNode union_RadioTopbarWidgetOptionValue_elmts[] = {
