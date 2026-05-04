@@ -43,12 +43,54 @@ static lv_indev_t* rotaryDevice = nullptr;
 static lv_indev_t* keyboardDevice = nullptr;
 static lv_indev_t* touchDevice = nullptr;
 
-#if defined(LVGL_FAST_TOUCH_SCROLL)
 static constexpr uint32_t TOUCH_INDEV_READ_PERIOD_MS = 10;
 static constexpr uint32_t TOUCH_DISPLAY_REFRESH_PERIOD_MS = 20;
+static constexpr uint32_t UI_INPUT_ACTIVE_PERIOD_MS = 80;
 static constexpr uint8_t TOUCH_SCROLL_LIMIT_PX = 4;
 static constexpr uint8_t TOUCH_SCROLL_THROW = 3;
+
+static bool touchPressed = false;
+static uint32_t touchActiveUntil = 0;
+static uint32_t keyboardActiveUntil = 0;
+static uint32_t rotaryActiveUntil = 0;
+
+#if defined(ROTARY_ENCODER_NAVIGATION)
+static bool rotaryObserved = false;
+static rotenc_t observedRotaryValue = 0;
 #endif
+
+#if defined(LVGL_ADAPTIVE_UI_PUMP_STATS)
+LvglAdaptiveUiPumpStats lvglAdaptiveUiPumpStats = {};
+
+void lvglAdaptiveUiPumpRecordFlush()
+{
+  lvglAdaptiveUiPumpStats.flushCount++;
+}
+
+void lvglAdaptiveUiPumpRecordVblankWait(uint32_t durationMs)
+{
+  lvglAdaptiveUiPumpStats.vblankWaitCount++;
+  lvglAdaptiveUiPumpStats.vblankWaitMs += durationMs;
+  if (durationMs > lvglAdaptiveUiPumpStats.vblankWaitMaxMs) {
+    lvglAdaptiveUiPumpStats.vblankWaitMaxMs = durationMs;
+  }
+}
+#endif
+
+static bool time_reached(uint32_t now, uint32_t target)
+{
+  return (int32_t)(now - target) >= 0;
+}
+
+static void mark_active_until(uint32_t& activeUntil)
+{
+  activeUntil = time_get_ms() + UI_INPUT_ACTIVE_PERIOD_MS;
+}
+
+static bool active_until_pending(uint32_t now, uint32_t activeUntil)
+{
+  return !time_reached(now, activeUntil);
+}
 
 static void reset_inactivity()
 {
@@ -131,6 +173,8 @@ static void keyboardDriverRead(lv_indev_drv_t *drv, lv_indev_data_t *data)
   data->key = 0;
 
   if (isEvent()) { // event waiting
+    mark_active_until(keyboardActiveUntil);
+
     event_t evt = getEvent();
 
     if ((evt & _MSK_KEY_FLAGS) == _MSK_KEY_LONG_BRK) {
@@ -201,12 +245,14 @@ extern "C" void touchDriverRead(lv_indev_drv_t *drv, lv_indev_data_t *data)
     reset_inactivity();
     // assume press and wait for release
     data->state = LV_INDEV_STATE_PRESSED;
+    touchPressed = false;
     lv_indev_wait_release(touchDevice);
     return;
   }
 
   // no touch input if special function is used
   if (isFunctionActive(FUNCTION_DISABLE_TOUCH)) {
+    touchPressed = false;
     lv_indev_reset(touchDevice, nullptr);
     return;
   }
@@ -217,9 +263,13 @@ extern "C" void touchDriverRead(lv_indev_drv_t *drv, lv_indev_data_t *data)
     if(st.event == TE_DOWN || st.event == TE_SLIDE) {
       TRACE("TE_PRESSED");
       data->state = LV_INDEV_STATE_PRESSED;
+      touchPressed = true;
+      mark_active_until(touchActiveUntil);
     } else {
       TRACE("TE_RELEASED");
       data->state = LV_INDEV_STATE_RELEASED;
+      touchPressed = false;
+      mark_active_until(touchActiveUntil);
     }
     data->point.x = st.x;
     data->point.y = st.y;
@@ -248,6 +298,7 @@ static void rotaryDriverRead(lv_indev_drv_t *drv, lv_indev_data_t *data)
   int16_t diff = getEmuRotaryData();
 
   if(diff != 0) {
+    mark_active_until(rotaryActiveUntil);
     reset_inactivity();
     audioKeyPress();
 
@@ -276,6 +327,7 @@ static void rotaryDriverRead(lv_indev_drv_t *drv, lv_indev_data_t *data)
   data->state = LV_INDEV_STATE_RELEASED;
 
   if (diff != 0) {
+    mark_active_until(rotaryActiveUntil);
     prevPos = newPos;
     reset_inactivity();
 
@@ -313,27 +365,21 @@ static void init_lvgl_drivers()
   // Register the driver and save the created display object
   lcdInitDisplayDriver();
 
-#if defined(LVGL_FAST_TOUCH_SCROLL)
   auto refrTimer = _lv_disp_get_refr_timer(nullptr);
   if (refrTimer) {
     lv_timer_set_period(refrTimer, TOUCH_DISPLAY_REFRESH_PERIOD_MS);
   }
-#endif
  
   // Register the driver in LVGL and save the created input device object
   lv_indev_drv_init(&touchDriver);          /*Basic initialization*/
   touchDriver.type = LV_INDEV_TYPE_POINTER; /*See below.*/
   touchDriver.read_cb = touchDriverRead;      /*See below.*/
-#if defined(LVGL_FAST_TOUCH_SCROLL)
   touchDriver.scroll_limit = TOUCH_SCROLL_LIMIT_PX;
   touchDriver.scroll_throw = TOUCH_SCROLL_THROW;
-#endif
   touchDevice = lv_indev_drv_register(&touchDriver);
-#if defined(LVGL_FAST_TOUCH_SCROLL)
   if (touchDriver.read_timer) {
     lv_timer_set_period(touchDriver.read_timer, TOUCH_INDEV_READ_PERIOD_MS);
   }
-#endif
 
 #if defined(ROTARY_ENCODER_NAVIGATION)
   lv_indev_drv_init(&rotaryDriver);
@@ -392,7 +438,24 @@ uint32_t LvglWrapper::run()
   if (!updating) {
     // Normal UI loop - call lgvl timer handler
     updating = true;
+#if defined(LVGL_ADAPTIVE_UI_PUMP_STATS)
+    uint32_t start = time_get_ms();
+#endif
     uint32_t nextRun = lv_timer_handler();
+#if defined(LVGL_ADAPTIVE_UI_PUMP_STATS)
+    uint32_t duration = time_get_ms() - start;
+    lvglAdaptiveUiPumpStats.handlerCount++;
+    lvglAdaptiveUiPumpStats.handlerDurationMs += duration;
+    if (duration > lvglAdaptiveUiPumpStats.handlerMaxDurationMs) {
+      lvglAdaptiveUiPumpStats.handlerMaxDurationMs = duration;
+    }
+#endif
+    if (nextRun == LV_NO_TIMER_READY) {
+      nextRunKnown = false;
+    } else {
+      nextRunKnown = true;
+      nextRunAt = time_get_ms() + nextRun;
+    }
     updating = false;
     return nextRun;
   } else {
@@ -407,6 +470,57 @@ uint32_t LvglWrapper::run()
 
     return 1;
   }
+}
+
+uint32_t LvglWrapper::getNextRunDelay() const
+{
+  if (!nextRunKnown) return 0;
+
+  uint32_t now = time_get_ms();
+  if (time_reached(now, nextRunAt)) return 0;
+
+  return nextRunAt - now;
+}
+
+bool LvglWrapper::hasAdaptiveWork() const
+{
+  uint32_t now = time_get_ms();
+
+  if (isEvent() || active_until_pending(now, keyboardActiveUntil)) return true;
+
+#if defined(HARDWARE_TOUCH)
+  if (touchPressed || active_until_pending(now, touchActiveUntil)) return true;
+  if (isBacklightEnabled() && !isFunctionActive(FUNCTION_DISABLE_TOUCH) &&
+      touchPanelEventOccured()) {
+    return true;
+  }
+#endif
+
+#if defined(ROTARY_ENCODER_NAVIGATION)
+  rotenc_t rotaryValue = rotaryEncoderGetValue();
+  if (!rotaryObserved) {
+    observedRotaryValue = rotaryValue;
+    rotaryObserved = true;
+  } else if (rotaryValue != observedRotaryValue) {
+    observedRotaryValue = rotaryValue;
+    mark_active_until(rotaryActiveUntil);
+    return true;
+  }
+  if (active_until_pending(now, rotaryActiveUntil)) return true;
+#endif
+
+  if (lv_anim_count_running() > 0) return true;
+
+  lv_disp_t* disp = lv_disp_get_default();
+  if (disp && (disp->rendering_in_progress || disp->inv_p > 0)) return true;
+
+  lv_indev_t* indev = nullptr;
+  while((indev = lv_indev_get_next(indev)) != nullptr) {
+    if (lv_indev_get_scroll_obj(indev) != nullptr) return true;
+    if (lv_indev_get_scroll_dir(indev) != LV_DIR_NONE) return true;
+  }
+
+  return false;
 }
 
 void initLvgl()

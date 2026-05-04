@@ -45,7 +45,7 @@ class MainWindow: public Window
   }
 #endif
 
-  void run(bool trash = true);
+  uint32_t run(bool trash = true);
 
   bool setBackgroundImage(std::string& fileName);
 

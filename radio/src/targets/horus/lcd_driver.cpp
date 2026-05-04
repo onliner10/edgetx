@@ -32,6 +32,10 @@
 
 #include "lcd.h"
 #include <lvgl/lvgl.h>
+#if defined(LVGL_ADAPTIVE_UI_PUMP_STATS)
+#include "LvglWrapper.h"
+#include "os/time.h"
+#endif
 
 #if defined(RADIO_T18)
   #define HBP  43
@@ -120,6 +124,19 @@ static void _rotate_area_180(lv_area_t& area)
 
 static volatile uint8_t _frame_addr_reloaded = 0;
 
+static void waitFrameAddressReload()
+{
+#if defined(LVGL_ADAPTIVE_UI_PUMP_STATS)
+  uint32_t start = time_get_ms();
+#endif
+  while(_frame_addr_reloaded == 0) {
+    __WFI();
+  }
+#if defined(LVGL_ADAPTIVE_UI_PUMP_STATS)
+  lvglAdaptiveUiPumpRecordVblankWait(time_get_ms() - start);
+#endif
+}
+
 static void _update_frame_buffer_addr(uint16_t* addr)
 {
   LTDC_Layer1->CFBAR = (uint32_t)addr;
@@ -129,8 +146,7 @@ static void _update_frame_buffer_addr(uint16_t* addr)
   LTDC->SRCR = LTDC_SRCR_VBR;
 
   // wait for reload
-  // TODO: replace through some smarter mechanism without busy wait
-  while(_frame_addr_reloaded == 0);
+  waitFrameAddressReload();
 }
 
 static void startLcdRefresh(lv_disp_drv_t *disp_drv, uint16_t *buffer,

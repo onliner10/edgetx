@@ -57,9 +57,9 @@ void MainWindow::emptyTrash()
   trash.clear();
 }
 
-void MainWindow::run(bool trash)
+uint32_t MainWindow::run(bool trash)
 {
-  LvglWrapper::instance()->run();
+  uint32_t nextRun = LvglWrapper::instance()->run();
 
 #if defined(DEBUG_WINDOWS)
   auto start = time_get_ms();
@@ -91,6 +91,8 @@ void MainWindow::run(bool trash)
     TRACE_WINDOWS("MainWindow::run took %dms", delta);
   }
 #endif
+
+  return nextRun;
 }
 
 void MainWindow::shutdown()

@@ -32,11 +32,28 @@
 #include "hal.h"
 #include "lcd.h"
 #include "edgetx_types.h"
+#if defined(LVGL_ADAPTIVE_UI_PUMP_STATS)
+#include "LvglWrapper.h"
+#include "os/time.h"
+#endif
 
 static LTDC_HandleTypeDef hltdc;
 static void* initialFrameBuffer = nullptr;
 
 static volatile uint8_t _frame_addr_reloaded = 0;
+
+static void waitFrameAddressReload()
+{
+#if defined(LVGL_ADAPTIVE_UI_PUMP_STATS)
+  uint32_t start = time_get_ms();
+#endif
+  while (_frame_addr_reloaded == 0) {
+    __WFI();
+  }
+#if defined(LVGL_ADAPTIVE_UI_PUMP_STATS)
+  lvglAdaptiveUiPumpRecordVblankWait(time_get_ms() - start);
+#endif
+}
 
 static void startLcdRefresh(lv_disp_drv_t* disp_drv, uint16_t* buffer,
                             const rect_t& copy_area)
@@ -52,8 +69,7 @@ static void startLcdRefresh(lv_disp_drv_t* disp_drv, uint16_t* buffer,
   __HAL_LTDC_ENABLE_IT(&hltdc, LTDC_IT_LI);
 
   // wait for reload
-  // TODO: replace through some smarter mechanism without busy wait
-  while (_frame_addr_reloaded == 0);
+  waitFrameAddressReload();
 }
 
 uint32_t lcdPixelClock;

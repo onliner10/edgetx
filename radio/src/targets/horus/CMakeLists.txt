@@ -85,7 +85,6 @@ if (PCB STREQUAL X10)
   elseif (PCBREV STREQUAL TX16S)
     set(FLAVOUR tx16s)
     add_definitions(-DRADIO_FAMILY_T16)
-    add_definitions(-DLVGL_FAST_TOUCH_SCROLL)
 
 #   Uncomment the line below to enable bootloader support for SPI flash
 #    add_definitions(-DSPI_FLASH)

@@ -33,7 +33,7 @@
 #include "tasks/mixer_task.h"
 
 #if defined(COLORLCD)
-#if defined(LVGL_FAST_TOUCH_SCROLL) && defined(FREE_RTOS)
+#if defined(FREE_RTOS)
 #include "LvglWrapper.h"
 #endif
 #include "startup_shutdown.h"
@@ -51,32 +51,50 @@ mutex_handle_t audioMutex;
 
 #define MENU_TASK_PERIOD (50)  // 50ms
 
-#if defined(LVGL_FAST_TOUCH_SCROLL) && defined(FREE_RTOS)
-static constexpr uint32_t LVGL_FAST_PUMP_MIN_SLEEP_MS = 1;
-static constexpr uint32_t LVGL_FAST_PUMP_MAX_SLEEP_MS = 10;
+#if defined(COLORLCD) && defined(FREE_RTOS)
+static constexpr uint32_t LVGL_ADAPTIVE_PUMP_MIN_SLEEP_MS = 1;
+static constexpr uint32_t LVGL_ADAPTIVE_PUMP_MAX_SLEEP_MS = 10;
 
-static void pumpLvglUntilMenuDeadline(uint32_t cycleStart)
+static uint32_t clampLvglPumpSleep(uint32_t sleepTime, uint32_t remaining)
+{
+  if (sleepTime < LVGL_ADAPTIVE_PUMP_MIN_SLEEP_MS) {
+    sleepTime = LVGL_ADAPTIVE_PUMP_MIN_SLEEP_MS;
+  } else if (sleepTime > LVGL_ADAPTIVE_PUMP_MAX_SLEEP_MS) {
+    sleepTime = LVGL_ADAPTIVE_PUMP_MAX_SLEEP_MS;
+  }
+
+  if (sleepTime > remaining) {
+    sleepTime = remaining;
+  }
+
+  return sleepTime;
+}
+
+static void pumpAdaptiveLvglUntilMenuDeadline(uint32_t cycleStart)
 {
   while (time_get_ms() - cycleStart < MENU_TASK_PERIOD) {
-    uint32_t nextRun = LvglWrapper::instance()->run();
+    LvglWrapper* lvgl = LvglWrapper::instance();
+    uint32_t nextRun = lvgl->getNextRunDelay();
+
+    if (lvgl->hasAdaptiveWork()) {
+      nextRun = lvgl->run();
+    } else if (nextRun == 0) {
+      nextRun = LVGL_ADAPTIVE_PUMP_MAX_SLEEP_MS;
+    }
 
     uint32_t elapsed = time_get_ms() - cycleStart;
     if (elapsed >= MENU_TASK_PERIOD) break;
 
-    uint32_t sleepTime = nextRun;
-    if (sleepTime < LVGL_FAST_PUMP_MIN_SLEEP_MS) {
-      sleepTime = LVGL_FAST_PUMP_MIN_SLEEP_MS;
-    } else if (sleepTime > LVGL_FAST_PUMP_MAX_SLEEP_MS) {
-      sleepTime = LVGL_FAST_PUMP_MAX_SLEEP_MS;
-    }
-
     uint32_t remaining = MENU_TASK_PERIOD - elapsed;
-    if (sleepTime > remaining) {
-      sleepTime = remaining;
-    }
-
-    sleep_ms(sleepTime);
+    sleep_ms(clampLvglPumpSleep(nextRun, remaining));
   }
+
+#if defined(LVGL_ADAPTIVE_UI_PUMP_STATS)
+  uint32_t cycleMs = time_get_ms() - cycleStart;
+  if (cycleMs > lvglAdaptiveUiPumpStats.menuCycleMaxMs) {
+    lvglAdaptiveUiPumpStats.menuCycleMaxMs = cycleMs;
+  }
+#endif
 }
 #endif
 
@@ -107,9 +125,9 @@ static void menusTask()
 #else
   while (pwrCheck() != e_power_off) {
 #endif
-#if defined(LVGL_FAST_TOUCH_SCROLL) && defined(FREE_RTOS)
+#if defined(COLORLCD) && defined(FREE_RTOS)
     uint32_t menuCycleStart = time_get_ms();
-    bool runFastLvglPump = true;
+    bool runAdaptiveLvglPump = true;
 #else
     time_point_t next_tick = time_point_now();
 #endif
@@ -118,9 +136,9 @@ static void menusTask()
     if (perMainEnabled) {
       perMain();
     }
-#if defined(LVGL_FAST_TOUCH_SCROLL) && defined(FREE_RTOS)
+#if defined(COLORLCD) && defined(FREE_RTOS)
     else {
-      runFastLvglPump = false;
+      runAdaptiveLvglPump = false;
     }
 #endif
 #else
@@ -128,9 +146,14 @@ static void menusTask()
 #endif
     DEBUG_TIMER_STOP(debugTimerPerMain);
 
-#if defined(LVGL_FAST_TOUCH_SCROLL) && defined(FREE_RTOS)
-    if (runFastLvglPump)
-      pumpLvglUntilMenuDeadline(menuCycleStart);
+#if defined(COLORLCD) && defined(FREE_RTOS)
+#if defined(RTC_BACKUP_RAM)
+    if (UNEXPECTED_SHUTDOWN()) {
+      runAdaptiveLvglPump = false;
+    }
+#endif
+    if (runAdaptiveLvglPump)
+      pumpAdaptiveLvglUntilMenuDeadline(menuCycleStart);
     else
       sleep_ms(MENU_TASK_PERIOD);
 #else

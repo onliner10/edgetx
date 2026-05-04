@@ -26,6 +26,9 @@
 #include "bitmapbuffer.h"
 #include "board.h"
 #include "etx_lv_theme.h"
+#if defined(LVGL_ADAPTIVE_UI_PUMP_STATS)
+#include "LvglWrapper.h"
+#endif
 #if !LV_USE_GPU_STM32_DMA2D && !defined(SIMU)
 #include "dma2d.h"
 #endif
@@ -95,6 +98,9 @@ static void flushLcd(lv_disp_drv_t* disp_drv, const lv_area_t* area,
 #endif
 
   if (lcd_flush_cb) {
+#if defined(LVGL_ADAPTIVE_UI_PUMP_STATS)
+    lvglAdaptiveUiPumpRecordFlush();
+#endif
     refr_disp = disp_drv;
 
     rect_t copy_area = {area->x1, area->y1, area->x2 - area->x1 + 1,

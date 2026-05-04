@@ -31,9 +31,35 @@ class LvglWrapper
   // Called from UI task: executes the LVGL timer handler 
   uint32_t run();
 
+  // Called from UI task: true while input/scroll/animation work can benefit
+  // from servicing LVGL before the next 50 ms menu tick.
+  bool hasAdaptiveWork() const;
+  uint32_t getNextRunDelay() const;
+
  protected:
   static LvglWrapper *_instance;
 
   LvglWrapper();
   ~LvglWrapper() {}
+
+  uint32_t nextRunAt = 0;
+  bool nextRunKnown = false;
 };
+
+#if defined(LVGL_ADAPTIVE_UI_PUMP_STATS)
+struct LvglAdaptiveUiPumpStats
+{
+  volatile uint32_t handlerCount;
+  volatile uint32_t handlerDurationMs;
+  volatile uint32_t handlerMaxDurationMs;
+  volatile uint32_t flushCount;
+  volatile uint32_t vblankWaitCount;
+  volatile uint32_t vblankWaitMs;
+  volatile uint32_t vblankWaitMaxMs;
+  volatile uint32_t menuCycleMaxMs;
+};
+
+extern LvglAdaptiveUiPumpStats lvglAdaptiveUiPumpStats;
+void lvglAdaptiveUiPumpRecordFlush();
+void lvglAdaptiveUiPumpRecordVblankWait(uint32_t durationMs);
+#endif
