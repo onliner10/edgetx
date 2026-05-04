@@ -177,9 +177,9 @@ const lv_style_const_prop_t border_thin_props[] = {
 LV_STYLE_CONST_MULTI_INIT(EdgeTxStyles::border_thin, border_thin_props);
 
 static const lv_style_const_prop_t outline_props[] = {
-    LV_STYLE_CONST_OUTLINE_WIDTH(PAD_OUTLINE),
+    LV_STYLE_CONST_OUTLINE_WIDTH(PAD_OUTLINE + 1),
     LV_STYLE_CONST_OUTLINE_OPA(LV_OPA_COVER),
-    LV_STYLE_CONST_OUTLINE_PAD(1),
+    LV_STYLE_CONST_OUTLINE_PAD(PAD_TINY),
     LV_STYLE_PROP_INV,
 };
 LV_STYLE_CONST_MULTI_INIT(EdgeTxStyles::outline, outline_props);
@@ -355,7 +355,7 @@ void EdgeTxStyles::applyColors()
   lv_style_set_outline_color(&outline_color_normal,
                              makeLvColor(COLOR_THEME_SECONDARY2));
   lv_style_set_outline_color(&outline_color_focus,
-                             makeLvColor(COLOR_THEME_FOCUS));
+                             makeLvColor(COLOR_THEME_ACTIVE));
   lv_style_set_outline_color(&outline_color_edit,
                              makeLvColor(COLOR_THEME_EDIT));
 }
