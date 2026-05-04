@@ -49,7 +49,10 @@ TEST(Crossfire, crc8)
 }
 
 #if defined(HARDWARE_EXTERNAL_MODULE)
+#include "hal/module_port.h"
 #include "pulses/crossfire.h"
+#include "pulses/pulses.h"
+#include "telemetry/crossfire.h"
 
 struct crsf_frame_test {
   void* ctx = nullptr;
@@ -80,6 +83,26 @@ struct crsf_frame_test {
     }
   }
 };
+
+TEST(Crossfire, sendPulsesHonorsChannelCount)
+{
+  modulePortInit();
+
+  auto ctx = CrossfireDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  moduleState[EXTERNAL_MODULE].counter = CRSF_FRAME_MODELID_SENT;
+  crossfireModuleStatus[EXTERNAL_MODULE].queryCompleted = true;
+
+  uint8_t buffer[MODULE_BUFFER_SIZE] = {};
+  CrossfireDriver.sendPulses(ctx, buffer, nullptr, 0);
+  memset(buffer, 0, sizeof(buffer));
+  CrossfireDriver.sendPulses(ctx, buffer, nullptr, 0);
+
+  EXPECT_EQ(buffer[2], CHANNELS_ID);
+
+  CrossfireDriver.deinit(ctx);
+}
 
 static uint8_t incomplete_frame[] = {
     // first frame
@@ -278,4 +301,3 @@ TEST(Crossfire, frameParser_multipleJumboFrames)
 }
 #endif // HARDWARE_EXTERNAL_MODULE
 #endif
-
