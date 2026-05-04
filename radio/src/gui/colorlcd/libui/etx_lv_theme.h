@@ -271,6 +271,8 @@ class EdgeTxStyles
   static const lv_style_t border_transparent;
   static const lv_style_t border_thin;
   static const lv_style_t outline;
+  static const lv_style_t sunlight_focus;
+  static const lv_style_t sunlight_edit;
 
   EdgeTxStyles();
 
