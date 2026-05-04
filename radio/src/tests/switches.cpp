@@ -87,6 +87,12 @@ TEST(getSwitch, nullSW)
   EXPECT_TRUE(getSwitch(0));
 }
 
+TEST(getSwitch, OutOfRangeSwitchSourceIsFalse)
+{
+  MODEL_RESET();
+  EXPECT_FALSE(getSwitch(SWSRC_LAST + 1));
+}
+
 
 #if defined(PCBTARANIS)
 TEST(getSwitch, inputWithTrim)
