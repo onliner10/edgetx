@@ -1,0 +1,11 @@
+name: Edge16 firmware safety CodeQL
+
+queries:
+  - uses: ./.github/codeql/edge16-firmware-safety.qls
+
+paths:
+  - radio/src
+paths-ignore:
+  - radio/src/thirdparty/**
+  - radio/src/translations/**
+  - radio/src/tests/**

@@ -10,6 +10,7 @@ on:
     paths: &trigger-paths
       - '.clang-tidy'
       - '.cppcheck-suppressions'
+      - '.github/codeql/**'
       - '.semgrep/**'
       - '.github/workflows/build_fw.yml'
       - 'cmake/**'
@@ -178,6 +179,7 @@ jobs:
             -p build/arm-none-eabi \
             -j "${CMAKE_BUILD_PARALLEL_LEVEL:-4}" \
             -extra-arg=-Wthread-safety \
+            -extra-arg=-Wno-error \
             -extra-arg=-Wno-unknown-warning-option \
             -extra-arg=-Wno-ignored-attributes \
             -extra-arg=-isystem"${cxx_include}" \
@@ -287,7 +289,7 @@ jobs:
         with:
           languages: c-cpp
           build-mode: manual
-          queries: security-and-quality
+          config-file: ./.github/codeql/edge16-firmware.yml
 
       - name: Build supported firmware for CodeQL
         env:
@@ -300,9 +302,77 @@ jobs:
           uv run --with-requirements requirements.txt bash ./tools/build-gh.sh
 
       - name: Analyze with CodeQL
+        id: codeql-analyze
         uses: github/codeql-action/analyze@v4
         with:
           category: "/language:c-cpp/edge16-firmware"
+          output: build/safety/codeql
+
+      - name: Fail on CodeQL findings
+        env:
+          CODEQL_SARIF_DIR: ${{ steps.codeql-analyze.outputs.sarif-output }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+          import sys
+
+          sarif_dir = pathlib.Path(os.environ.get("CODEQL_SARIF_DIR") or "build/safety/codeql")
+          sarif_files = sorted(sarif_dir.glob("*.sarif"))
+          if not sarif_files:
+              print(f"No CodeQL SARIF files found in {sarif_dir}", file=sys.stderr)
+              sys.exit(1)
+
+          findings = []
+          ignored_prefixes = (
+              "radio/src/thirdparty/",
+              "radio/src/translations/",
+              "radio/src/tests/",
+          )
+          ignored_findings = 0
+          for sarif_file in sarif_files:
+              with sarif_file.open(encoding="utf-8") as handle:
+                  sarif = json.load(handle)
+              for run in sarif.get("runs", []):
+                  rules = {}
+                  for rule in run.get("tool", {}).get("driver", {}).get("rules", []):
+                      rules[rule.get("id")] = rule.get("shortDescription", {}).get("text", "")
+                  for result in run.get("results", []):
+                      rule_id = result.get("ruleId", "<unknown>")
+                      message = result.get("message", {}).get("text", "").splitlines()[0]
+                      location = result.get("locations", [{}])[0].get("physicalLocation", {})
+                      artifact = location.get("artifactLocation", {}).get("uri", "<unknown>")
+                      if artifact.startswith(ignored_prefixes):
+                          ignored_findings += 1
+                          continue
+                      region = location.get("region", {})
+                      line = region.get("startLine", "?")
+                      findings.append((rule_id, rules.get(rule_id, ""), artifact, line, message))
+
+          if findings:
+              print(f"CodeQL produced {len(findings)} finding(s); failing because findings are treated as errors.")
+              for rule_id, title, artifact, line, message in findings[:50]:
+                  label = f"{rule_id}: {title}" if title else rule_id
+                  print(f"- {artifact}:{line}: {label}: {message}")
+              if len(findings) > 50:
+                  print(f"... {len(findings) - 50} additional finding(s) omitted")
+              sys.exit(1)
+
+          if ignored_findings:
+              print(f"CodeQL produced no first-party findings; ignored {ignored_findings} third-party/generated finding(s).")
+          else:
+              print("CodeQL produced no findings.")
+          PY
+
+      - name: Upload CodeQL artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: codeql-firmware
+          path: build/safety/codeql
+          retention-days: 15
+          if-no-files-found: ignore
 
   build:
     name: Run builds

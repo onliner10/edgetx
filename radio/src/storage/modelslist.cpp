@@ -1153,7 +1153,10 @@ bool ModelsList::loadYaml()
       TRACE_LABELS("  Created a modelcell for %s, not in labels.yml",
                    filehash.name.c_str());
       model = new (std::nothrow) ModelCell(filehash.name.c_str());
-      if (!model) continue;
+      if (!model) {
+        fileHashInfo.clear();
+        return false;
+      }
       strncpy(model->modelFinfoHash, filehash.hash, FILE_HASH_LENGTH);
       model->modelFinfoHash[FILE_HASH_LENGTH] = '\0';
       modelslist.push_back(model);
@@ -1204,6 +1207,7 @@ bool ModelsList::load()
   if (loaded) return true;
 
   bool res = loadYaml();
+  if (!res) return false;
 
   if (!currentModel) {
     TRACE("ERROR no Current Model Found");
@@ -1220,6 +1224,8 @@ bool ModelsList::load()
       if (model) {
         modelslist.setCurrentModel(model);
         updateCurrentModelCell();
+      } else {
+        return false;
       }
     }
   }

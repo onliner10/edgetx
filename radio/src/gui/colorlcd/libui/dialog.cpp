@@ -26,6 +26,9 @@
 #include "static.h"
 #include "textedit.h"
 
+#include <algorithm>
+#include <new>
+
 //-----------------------------------------------------------------------------
 
 class BaseDialogForm : public Window
@@ -48,26 +51,32 @@ BaseDialog::BaseDialog(const char* title,
                        lv_coord_t maxHeight, bool flexLayout) :
     ModalWindow(closeIfClickedOutside)
 {
-  auto content = new Window(this, rect_t{});
+  form = this;
+
+  auto content = new (std::nothrow) Window(this, rect_t{});
+  if (!content) return;
   content->setWindowFlag(OPAQUE);
   content->padAll(PAD_ZERO);
   content->setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_ZERO, width, LV_SIZE_CONTENT);
   etx_solid_bg(content->getLvObj());
   lv_obj_center(content->getLvObj());
 
-  header = new StaticText(content, {0, 0, LV_PCT(100), 0}, title ? title : "", COLOR_THEME_PRIMARY2_INDEX);
-  etx_solid_bg(header->getLvObj(), COLOR_THEME_SECONDARY1_INDEX);
-  header->padAll(PAD_SMALL);
-  header->show(title != nullptr);
+  header = new (std::nothrow) StaticText(content, {0, 0, LV_PCT(100), 0}, title ? title : "", COLOR_THEME_PRIMARY2_INDEX);
+  if (header) {
+    etx_solid_bg(header->getLvObj(), COLOR_THEME_SECONDARY1_INDEX);
+    header->padAll(PAD_SMALL);
+    header->show(title != nullptr);
+  }
 
-  form = new BaseDialogForm(content, width, flexLayout);
-  if (maxHeight != LV_SIZE_CONTENT)
+  form = new (std::nothrow) BaseDialogForm(content, width, flexLayout);
+  if (!form) form = content;
+  if (form && maxHeight != LV_SIZE_CONTENT)
     lv_obj_set_style_max_height(form->getLvObj(), maxHeight - EdgeTxStyles::UI_ELEMENT_HEIGHT, LV_PART_MAIN);
 }
 
 void BaseDialog::setTitle(const char* title)
 {
-  header->setText(title);
+  if (header) header->setText(title);
 }
 
 //-----------------------------------------------------------------------------
@@ -76,20 +85,26 @@ ProgressDialog::ProgressDialog(const char* title,
                                std::function<void()> onClose) :
     BaseDialog(title, false), onClose(std::move(onClose))
 {
-  progress = new Progress(form, rect_t{0, 0, LV_PCT(100), 32});
-  updateProgress(0);
+  if (form) {
+    progress = new (std::nothrow) Progress(form, rect_t{0, 0, LV_PCT(100), 32});
+    if (progress) updateProgress(0);
+  }
 }
 
 void ProgressDialog::setTitle(std::string title)
 {
-  header->setText(title);
-  header->show();
+  if (header) {
+    header->setText(title);
+    header->show();
+  }
 }
 
 void ProgressDialog::updateProgress(int percentage)
 {
-  progress->setValue(percentage);
-  lv_refr_now(nullptr);
+  if (progress) {
+    progress->setValue(percentage);
+    lv_refr_now(nullptr);
+  }
 }
 
 void ProgressDialog::closeDialog()
@@ -105,12 +120,13 @@ MessageDialog::MessageDialog(const char* title,
                              LcdFlags messageFlags, LcdFlags infoFlags) :
     BaseDialog(title, true)
 {
-  messageWidget = new StaticText(form, {0, 0, LV_PCT(100), LV_SIZE_CONTENT},
-                                 message, COLOR_THEME_PRIMARY1_INDEX, messageFlags);
+  if (!form) return;
+  messageWidget = new (std::nothrow) StaticText(form, {0, 0, LV_PCT(100), LV_SIZE_CONTENT},
+                                                message, COLOR_THEME_PRIMARY1_INDEX, messageFlags);
 
   if (info) {
-    infoWidget = new StaticText(form, {0, 0, LV_PCT(100), LV_SIZE_CONTENT},
-                                info, COLOR_THEME_PRIMARY1_INDEX, infoFlags);
+    infoWidget = new (std::nothrow) StaticText(form, {0, 0, LV_PCT(100), LV_SIZE_CONTENT},
+                                               info, COLOR_THEME_PRIMARY1_INDEX, infoFlags);
   }
 }
 
@@ -123,11 +139,12 @@ DynamicMessageDialog::DynamicMessageDialog(
     const char* message, const int lineHeight, LcdColorIndex color, LcdFlags textFlags) :
     BaseDialog(title, true)
 {
-  messageWidget = new StaticText(form, {0, 0, LV_PCT(100), LV_SIZE_CONTENT},
-                                 message, COLOR_THEME_PRIMARY1_INDEX, CENTERED);
+  if (!form) return;
+  messageWidget = new (std::nothrow) StaticText(form, {0, 0, LV_PCT(100), LV_SIZE_CONTENT},
+                                                message, COLOR_THEME_PRIMARY1_INDEX, CENTERED);
 
-  infoWidget = new DynamicText(form, {0, 0, LV_PCT(100), LV_SIZE_CONTENT},
-                               textHandler, color, textFlags);
+  infoWidget = new (std::nothrow) DynamicText(form, {0, 0, LV_PCT(100), LV_SIZE_CONTENT},
+                                              textHandler, color, textFlags);
 }
 
 void DynamicMessageDialog::onClicked() { deleteLater(); }
@@ -142,22 +159,24 @@ ConfirmDialog::ConfirmDialog(const char* title,
     confirmHandler(std::move(confirmHandler)),
     cancelHandler(std::move(cancelHandler))
 {
+  if (!form) return;
   if (message) {
-    new StaticText(form, {0, 0, LV_PCT(100), 0}, message, COLOR_THEME_PRIMARY1_INDEX, CENTERED);
+    new (std::nothrow) StaticText(form, {0, 0, LV_PCT(100), 0}, message, COLOR_THEME_PRIMARY1_INDEX, CENTERED);
   }
 
-  auto box = new Window(form, rect_t{});
+  auto box = new (std::nothrow) Window(form, rect_t{});
+  if (!box) return;
   box->padAll(PAD_TINY);
   box->setFlexLayout(LV_FLEX_FLOW_ROW, 40, LV_PCT(100), LV_SIZE_CONTENT);
   lv_obj_set_flex_align(box->getLvObj(), LV_FLEX_ALIGN_CENTER,
                         LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_BETWEEN);
 
-  new TextButton(box, rect_t{0, 0, 96, 0}, STR_NO, [=]() -> int8_t {
+  new (std::nothrow) TextButton(box, rect_t{0, 0, 96, 0}, STR_NO, [=]() -> int8_t {
     onCancel();
     return 0;
   });
 
-  new TextButton(box, rect_t{0, 0, 96, 0}, STR_YES, [=]() -> int8_t {
+  new (std::nothrow) TextButton(box, rect_t{0, 0, 96, 0}, STR_YES, [=]() -> int8_t {
     this->deleteLater();
     this->confirmHandler();
     return 0;
@@ -176,41 +195,50 @@ LabelDialog::LabelDialog(const char *label, int length, const char* title,
             std::function<void(std::string)> _saveHandler) :
     ModalWindow(false), saveHandler(std::move(_saveHandler))
 {
-  strncpy(this->label, label, std::min(length, MAX_LABEL_LENGTH));
-  this->label[length] = '\0';
+  int labelLength = std::max(0, std::min(length, MAX_LABEL_LENGTH));
+  this->label[0] = '\0';
+  if (label && labelLength > 0) {
+    strncpy(this->label, label, labelLength);
+  }
+  this->label[labelLength] = '\0';
 
-  auto form = new Window(this, rect_t{});
+  auto form = new (std::nothrow) Window(this, rect_t{});
+  if (!form) return;
   form->padAll(PAD_ZERO);
   form->setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_ZERO, LCD_W * 0.8,
                       LV_SIZE_CONTENT);
   etx_solid_bg(form->getLvObj());
   lv_obj_center(form->getLvObj());
 
-  auto hdr = new StaticText(form, {0, 0, LV_PCT(100), 0}, title,
-                            COLOR_THEME_PRIMARY2_INDEX);
-  etx_solid_bg(hdr->getLvObj(), COLOR_THEME_SECONDARY1_INDEX);
-  hdr->padAll(PAD_MEDIUM);
+  auto hdr = new (std::nothrow) StaticText(form, {0, 0, LV_PCT(100), 0}, title,
+                                           COLOR_THEME_PRIMARY2_INDEX);
+  if (hdr) {
+    etx_solid_bg(hdr->getLvObj(), COLOR_THEME_SECONDARY1_INDEX);
+    hdr->padAll(PAD_MEDIUM);
+  }
 
-  auto box = new Window(form, rect_t{});
+  auto box = new (std::nothrow) Window(form, rect_t{});
+  if (!box) return;
   box->padAll(PAD_MEDIUM);
   box->setFlexLayout(LV_FLEX_FLOW_ROW, 40, LV_PCT(100), LV_SIZE_CONTENT);
   lv_obj_set_flex_align(box->getLvObj(), LV_FLEX_ALIGN_CENTER,
                         LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_BETWEEN);
 
-  new TextEdit(box, rect_t{0, 0, LV_PCT(100), 0}, this->label, length);
+  new (std::nothrow) TextEdit(box, rect_t{0, 0, LV_PCT(100), 0}, this->label, labelLength);
 
-  box = new Window(form, rect_t{});
+  box = new (std::nothrow) Window(form, rect_t{});
+  if (!box) return;
   box->padAll(PAD_MEDIUM);
   box->setFlexLayout(LV_FLEX_FLOW_ROW, 40, LV_PCT(100), LV_SIZE_CONTENT);
   lv_obj_set_flex_align(box->getLvObj(), LV_FLEX_ALIGN_CENTER,
                         LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_BETWEEN);
 
-  new TextButton(box, rect_t{0, 0, 96, 0}, STR_CANCEL, [=]() {
+  new (std::nothrow) TextButton(box, rect_t{0, 0, 96, 0}, STR_CANCEL, [=]() {
     deleteLater();
     return 0;
   });
 
-  new TextButton(box, rect_t{0, 0, 96, 0}, STR_SAVE, [=]() {
+  new (std::nothrow) TextButton(box, rect_t{0, 0, 96, 0}, STR_SAVE, [=]() {
     if (saveHandler != nullptr) saveHandler(this->label);
     deleteLater();
     return 0;

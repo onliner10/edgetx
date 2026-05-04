@@ -61,7 +61,7 @@ class ProgressDialog : public BaseDialog
 
  protected:
   uint32_t lastUpdate = 0;
-  Progress* progress;
+  Progress* progress = nullptr;
 
   std::function<void()> onClose;
 
@@ -79,8 +79,8 @@ class MessageDialog : public BaseDialog
                 LcdFlags infoFlags = CENTERED);
 
  protected:
-  StaticText* messageWidget;
-  StaticText* infoWidget;
+  StaticText* messageWidget = nullptr;
+  StaticText* infoWidget = nullptr;
 
 #if defined(DEBUG_WINDOWS)
   std::string getName() const override { return "MessageDialog"; }
@@ -102,8 +102,8 @@ class DynamicMessageDialog : public BaseDialog
   // Attn.: FONT(XXL) is not supported by DynamicMessageDialog
 
  protected:
-  StaticText* messageWidget;
-  DynamicText* infoWidget;
+  StaticText* messageWidget = nullptr;
+  DynamicText* infoWidget = nullptr;
 
 #if defined(DEBUG_WINDOWS)
   std::string getName() const override { return "DynamicMessageDialog"; }
