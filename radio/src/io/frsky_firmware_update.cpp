@@ -298,6 +298,10 @@ const char *FrskyDeviceFirmwareUpdate::doFlashFirmware(
 
   // TODO: what about S.PORT update power control? (RX?)
   auto mod_desc = modulePortGetModuleDescription(module);
+  if (!mod_desc) {
+    f_close(&file);
+    return STR_MODULE_NO_SERIAL_MODE;
+  }
   set_pwr = mod_desc->set_pwr;
 
   // ... and 57600 bps

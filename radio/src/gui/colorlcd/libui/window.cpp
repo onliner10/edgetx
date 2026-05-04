@@ -26,6 +26,8 @@
 #include "pagegroup.h"
 #include "static.h"
 
+#include <new>
+
 //-----------------------------------------------------------------------------
 
 class Layer
@@ -42,7 +44,7 @@ class Layer
   {
   }
 
-  ~Layer() { lv_group_del(group); }
+  ~Layer() { if (group) lv_group_del(group); }
 
   static void push(Window* window);
   static void pop(Window* window);
@@ -60,6 +62,7 @@ void Layer::push(Window* w)
 
   // create a new group
   auto g = lv_group_create();
+  if (!g) return;
   w->assignLvGroup(g, true);
 
   // and store
@@ -449,7 +452,7 @@ void Window::checkEvents()
 {
   auto copy = children;
   for (auto child : copy) {
-    if (!child->deleted()) {
+    if (child && !child->deleted()) {
       child->checkEvents();
     }
   }
@@ -482,6 +485,8 @@ bool Window::onLongPress()
 
 void Window::addChild(Window *window)
 {
+  if (!window) return;
+
   auto lv_parent = lv_obj_get_parent(window->lvobj);
   if (lv_parent && (lv_parent != lvobj)) {
     lv_obj_set_parent(window->lvobj, lvobj);
@@ -555,7 +560,7 @@ void Window::enable(bool enabled)
 #if defined(HARDWARE_TOUCH)
 void Window::addBackButton()
 {
-  new ButtonBase(
+  new (std::nothrow) ButtonBase(
       this, {0, 0, EdgeTxStyles::MENU_HEADER_HEIGHT, EdgeTxStyles::MENU_HEADER_HEIGHT},
       [=]() -> uint8_t {
         onCancel();
@@ -566,7 +571,7 @@ void Window::addBackButton()
 
 void Window::addCustomButton(coord_t x, coord_t y, std::function<void()> action)
 {
-  new ButtonBase(
+  new (std::nothrow) ButtonBase(
     this, {x, y, EdgeTxStyles::MENU_HEADER_HEIGHT, EdgeTxStyles::MENU_HEADER_HEIGHT},
     [=]() -> uint8_t {
       action();
@@ -697,7 +702,7 @@ SetupButtonGroup::SetupButtonGroup(Window* parent, const rect_t& rect, const cha
     x = xo + (n % cols) * xw;
     y = yo + (n / cols) * (btnHeight + PAD_MEDIUM);
 
-    new SetupTextButton(this, {x, y, buttonWidth, btnHeight}, pages[p]);
+    new (std::nothrow) SetupTextButton(this, {x, y, buttonWidth, btnHeight}, pages[p]);
     n += 1;
     remaining -= 1;
   }
@@ -722,13 +727,13 @@ SetupLine::SetupLine(Window* parent, coord_t y, coord_t col2, PaddingSize paddin
         titleH = EdgeTxStyles::UI_ELEMENT_HEIGHT + PAD_TINY + PAD_LARGE;
         editY = PAD_SMALL + 1;
       }
-      new StaticText(this, {PAD_TINY, titleY, lblWidth, titleH}, title);
+      new (std::nothrow) StaticText(this, {PAD_TINY, titleY, lblWidth, titleH}, title);
     }
     setHeight(h);
     createEdit(this, col2, editY);
   } else {
     setHeight(h);
-    new StaticText(this, {0, titleY, 0, titleH}, title, COLOR_THEME_PRIMARY1_INDEX, FONT(BOLD));
+    new (std::nothrow) StaticText(this, {0, titleY, 0, titleH}, title, COLOR_THEME_PRIMARY1_INDEX, FONT(BOLD));
   }
 }
 
@@ -738,10 +743,11 @@ coord_t SetupLine::showLines(Window* parent, coord_t y, coord_t col2, PaddingSiz
 
   for (int i = 0; setupLines[i].title || setupLines[i].createEdit; i += 1) {
 #if !defined(ALL_LANGS)
-    w = new SetupLine(parent, y, col2, padding, setupLines[i].title, setupLines[i].createEdit);
+    w = new (std::nothrow) SetupLine(parent, y, col2, padding, setupLines[i].title, setupLines[i].createEdit);
 #else
-    w = new SetupLine(parent, y, col2, padding, setupLines[i].title ? setupLines[i].title() : nullptr, setupLines[i].createEdit);
+    w = new (std::nothrow) SetupLine(parent, y, col2, padding, setupLines[i].title ? setupLines[i].title() : nullptr, setupLines[i].createEdit);
 #endif
+    if (!w) break;
     y += w->height() + padding;
   }
 

@@ -196,25 +196,44 @@ static std::string _keyToolNames[MAX_KEY_SHORTCUTS];
 void RadioData::setKeyToolName(event_t event, const std::string name)
 {
   int n = getKeyShortcutNum(event);
-  if (n >= 0) _keyToolNames[n] = name;
+  if (n >= 0 && n < MAX_KEY_SHORTCUTS) _keyToolNames[n] = name;
 }
 
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+// GCC -fanalyzer loses std::string initialization state for this local
+// static array return-by-value path; _keyToolNames is statically initialized.
+#pragma GCC diagnostic ignored "-Wanalyzer-use-of-uninitialized-value"
+#endif
 const std::string RadioData::getKeyToolName(event_t event)
 {
   int n = getKeyShortcutNum(event);
-  if (n >= 0) return _keyToolNames[n];
+  if (n >= 0 && n < MAX_KEY_SHORTCUTS) return _keyToolNames[n];
   return "";
 }
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 static std::string _favoriteToolNames[MAX_QM_FAVORITES];
 
 void RadioData::setFavoriteToolName(int fav, const std::string name)
 {
-  _favoriteToolNames[fav] = name;
+  if (fav >= 0 && fav < MAX_QM_FAVORITES) _favoriteToolNames[fav] = name;
 }
 
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+// GCC -fanalyzer loses std::string initialization state for this local
+// static array return-by-value path; _favoriteToolNames is statically initialized.
+#pragma GCC diagnostic ignored "-Wanalyzer-use-of-uninitialized-value"
+#endif
 const std::string RadioData::getFavoriteToolName(int fav)
 {
-  return _favoriteToolNames[fav];
+  if (fav >= 0 && fav < MAX_QM_FAVORITES) return _favoriteToolNames[fav];
+  return "";
 }
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 #endif

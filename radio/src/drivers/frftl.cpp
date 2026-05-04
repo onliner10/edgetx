@@ -691,11 +691,17 @@ static bool lockTTPages(FrFTL* ftl, uint16_t logicalPageNo)
   }
   ttBuffer =
       loadPhysicalPageInBuffer(ftl, ttPageNo, ttPageInfo.physicalPageNo);
+  if (!ttBuffer) {
+    return false;
+  }
   ttBuffer->lock = LOCKED;
   ttBuffer->pMode = RELOCATE_ERASE_PROGRAM;
   if (ttPageNo > 0) {
     // TT page not MTT page, need to lock MTT page as well
     ttBuffer = loadPhysicalPageInBuffer(ftl, 0, ftl->mttPhysicalPageNo);
+    if (!ttBuffer) {
+      return false;
+    }
     ttBuffer->lock = LOCKED;
     ttBuffer->pMode = RELOCATE_ERASE_PROGRAM;
   }

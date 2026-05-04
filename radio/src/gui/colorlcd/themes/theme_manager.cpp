@@ -32,6 +32,10 @@
 #include "topbar.h"
 #include "view_main.h"
 
+#include <cerrno>
+#include <climits>
+#include <cstdlib>
+
 #define SET_DIRTY() storageDirty(EE_GENERAL)
 
 #define MAX_FILES 9
@@ -40,14 +44,36 @@ constexpr const char* RGBSTRING = "RGB(";
 
 ThemePersistance ThemePersistance::themePersistance;
 
+static bool parse_rgb_component(const char*& pos, const char* end, int& value,
+                                char delimiter)
+{
+  errno = 0;
+  char* parseEnd = nullptr;
+  long parsed = strtol(pos, &parseEnd, 0);
+  if (parseEnd == pos || parseEnd >= end || *parseEnd != delimiter ||
+      errno == ERANGE || parsed < INT_MIN || parsed > INT_MAX) {
+    return false;
+  }
+
+  value = parsed;
+  pos = parseEnd + 1;
+  return true;
+}
+
 static uint32_t r_color(const YamlNode* node, const char* val, uint8_t val_len)
 {
-  if ((strncmp(val, RGBSTRING, strlen(RGBSTRING)) == 0) &&
+  if ((val_len > strlen(RGBSTRING)) &&
+      (strncmp(val, RGBSTRING, strlen(RGBSTRING)) == 0) &&
       (val[val_len - 1] == ')')) {
     int r, g, b;
-    int numTokens = sscanf(val, "RGB(%i,%i,%i)", &r, &g, &b);
+    const char* pos = val + strlen(RGBSTRING);
+    const char* end = val + val_len;
 
-    if (numTokens == 3) return RGB(r, g, b);
+    if (parse_rgb_component(pos, end, r, ',') &&
+        parse_rgb_component(pos, end, g, ',') &&
+        parse_rgb_component(pos, end, b, ')') && pos == end) {
+      return RGB(r, g, b);
+    }
 
   } else if (val_len > 2 && val[0] == '0' && (val[1] == 'x' || val[1] == 'X')) {
     val += 2;

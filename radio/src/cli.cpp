@@ -217,7 +217,7 @@ void cliPrompt()
 
 int toLongLongInt(const char ** argv, int index, long long int * val)
 {
-  if (*argv[index] == '\0') {
+  if (!argv || !argv[index] || *argv[index] == '\0') {
     return 0;
   }
   else {
@@ -232,7 +232,8 @@ int toLongLongInt(const char ** argv, int index, long long int * val)
     if (*endptr == '\0')
       return 1;
     else {
-      cliSerialPrint("%s: Invalid argument \"%s\"", argv[0], argv[index]);
+      cliSerialPrint("%s: Invalid argument \"%s\"",
+                     (argv[0] ? argv[0] : ""), argv[index]);
       return -1;
     }
   }
@@ -566,9 +567,9 @@ int cliTestSD(const char ** argv)
 int cliTestNew()
 {
   char * tmp = nullptr;
-  cliSerialPrint("Allocating 1kB with new()");
+  cliSerialPrint("Allocating 1kB with (std::nothrow) new()");
   sleep_ms(200);
-  tmp = new char[1024];
+  tmp = new (std::nothrow) char[1024];
   if (tmp) {
     cliSerialPrint("\tsuccess");
     delete[] tmp;
@@ -590,9 +591,9 @@ int cliTestNew()
     cliSerialPrint("\tsuccess, allocaton failed, tmp = 0");
   }
 
-  cliSerialPrint("Allocating 10MB with new()");
+  cliSerialPrint("Allocating 10MB with (std::nothrow) new()");
   sleep_ms(200);
-  tmp = new char[1024*1024*10];
+  tmp = new (std::nothrow) char[1024*1024*10];
   if (tmp) {
     cliSerialPrint("\tFAILURE, tmp = %p", tmp);
     delete[] tmp;
@@ -1182,6 +1183,11 @@ static void spModuleInit(int port_n, int baudrate)
 
   spModuleState =
       modulePortInitSerial(port_n, ETX_MOD_PORT_UART, &params, false);
+  if (!spModuleState) {
+    _sp_drv = nullptr;
+    _sp_ctx = nullptr;
+    return;
+  }
   _sp_drv = modulePortGetSerialDrv(spModuleState->rx);
   _sp_ctx = modulePortGetCtx(spModuleState->rx);
 }
@@ -1266,7 +1272,7 @@ int cliSerialPassthrough(const char **argv)
     // TODO:
     //  - external module (S.PORT?)
     default:
-      cliSerialPrint("%s: invalid port # '%i'", port_n);
+      cliSerialPrint("%s: invalid port # '%i'", argv[0], port_n);
       return -1;
     }
   } else if (!strcmp("gimbals", port_type)) {
@@ -1279,11 +1285,11 @@ int cliSerialPassthrough(const char **argv)
     initCB = spGimbalInit;
     deinitCB = spGimbalDeInit;
 #else
-    cliSerialPrint("%s: serial gimbals not supported");
+    cliSerialPrint("%s: serial gimbals not supported", argv[0]);
     return -1;
 #endif
   } else {
-    cliSerialPrint("%s: invalid port type '%s'", port_type);
+    cliSerialPrint("%s: invalid port type '%s'", argv[0], port_type);
     return -1;
   }
 
@@ -1577,7 +1583,7 @@ int cliRepeat(const char ** argv)
 {
   int interval = 0;
   int counter = 0;
-  if (toInt(argv, 1, &interval) > 0 && argv[2]) {
+  if (toInt(argv, 1, &interval) > 0 && argv[2][0] != '\0') {
     counter = interval;
 
     uint8_t c;
@@ -1860,7 +1866,9 @@ static int cliExecLine(char * line)
 {
   int len = strlen(line);
   const char * argv[CLI_COMMAND_MAX_ARGS];
-  memset(argv, 0, sizeof(argv));
+  for (int i = 0; i < CLI_COMMAND_MAX_ARGS; i++) {
+    argv[i] = "";
+  }
   int argc = 1;
   argv[0] = line;
   for (int i=0; i<len; i++) {

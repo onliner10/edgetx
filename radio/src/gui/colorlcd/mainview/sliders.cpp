@@ -26,6 +26,8 @@
 #include "edgetx.h"
 #include "switches.h"
 
+#include <new>
+
 SliderIcon::SliderIcon(Window* parent) :
     Window(parent, rect_t{0, 0, MainViewSlider::SLIDER_BAR_SIZE, MainViewSlider::SLIDER_BAR_SIZE})
 {
@@ -64,7 +66,7 @@ MainViewSlider::MainViewSlider(Window* parent, const rect_t& rect, uint8_t idx,
     }
   }
 
-  sliderIcon = new SliderIcon(this);
+  sliderIcon = new (std::nothrow) SliderIcon(this);
 
   setPos();
 }
@@ -103,7 +105,7 @@ MaskBitmap* MainViewSlider::getTicksMask()
     // Create vertical mask for tick lines
     int sliderTicksCount = h / SLIDER_TICK_SPACING;
     y = 0;
-    for (uint8_t i = 0; i <= sliderTicksCount; i++) {
+    for (int i = 0; i <= sliderTicksCount; i++) {
       if (i == 0 || i == sliderTicksCount / 2 || i == sliderTicksCount) {
         x = 0;
         l = w;
@@ -118,7 +120,7 @@ MaskBitmap* MainViewSlider::getTicksMask()
     // Create horizontal mask for tick lines
     int sliderTicksCount = w / SLIDER_TICK_SPACING;
     x = 0;
-    for (uint8_t i = 0; i <= sliderTicksCount; i++) {
+    for (int i = 0; i <= sliderTicksCount; i++) {
       if (i == 0 || i == sliderTicksCount / 2 || i == sliderTicksCount) {
         y = 0;
         l = h;
@@ -126,7 +128,7 @@ MaskBitmap* MainViewSlider::getTicksMask()
         y = PAD_TINY;
         l = h - PAD_TINY * 2;
       }
-      for (uint8_t n = y; n < y + l; n += 1)
+      for (coord_t n = y; n < y + l; n += 1)
         mask->data[n * w + x] = 0xFF;
       x += SLIDER_TICK_SPACING;
     }
@@ -148,7 +150,7 @@ void MainViewSlider::setPos()
     x = divRoundClosest((width() - SLIDER_BAR_SIZE) * (value + RESX),
                         2 * RESX);
   }
-  lv_obj_set_pos(sliderIcon->getLvObj(), x, y);
+  if (sliderIcon) lv_obj_set_pos(sliderIcon->getLvObj(), x, y);
 }
 
 void MainViewSlider::checkEvents()
@@ -192,11 +194,14 @@ MainView6POS::MainView6POS(Window* parent, uint8_t idx) :
     x += MULTIPOS_W_SPACING;
   }
 
-  posIcon = new SliderIcon(this);
+  posIcon = new (std::nothrow) SliderIcon(this);
+  if (!posIcon) return;
   posVal = etx_label_create(posIcon->getLvObj(), FONT_BOLD_INDEX);
-  lv_obj_set_pos(posVal, PAD_THREE, -PAD_TINY);
-  lv_obj_set_size(posVal, MULTIPOS_SZ, MULTIPOS_SZ);
-  etx_txt_color(posVal, COLOR_THEME_PRIMARY2_INDEX, LV_PART_MAIN);
+  if (posVal) {
+    lv_obj_set_pos(posVal, PAD_THREE, -PAD_TINY);
+    lv_obj_set_size(posVal, MULTIPOS_SZ, MULTIPOS_SZ);
+    etx_txt_color(posVal, COLOR_THEME_PRIMARY2_INDEX, LV_PART_MAIN);
+  }
 
   checkEvents();
 }
@@ -209,10 +214,10 @@ void MainView6POS::checkEvents()
     value = newValue;
 
     coord_t x = MULTIPOS_W_SPACING / 4 + MULTIPOS_W_SPACING * value;
-    lv_obj_set_pos(posIcon->getLvObj(), x, 0);
+    if (posIcon) lv_obj_set_pos(posIcon->getLvObj(), x, 0);
 
     char num[] = " ";
     num[0] = value + '1';
-    lv_label_set_text(posVal, num);
+    if (posVal) lv_label_set_text(posVal, num);
   }
 }

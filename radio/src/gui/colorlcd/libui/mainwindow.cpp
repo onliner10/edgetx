@@ -74,8 +74,10 @@ void MainWindow::run(bool trash)
   }
 
   auto copy = children;
-  for (auto child : copy) {
-    if (!child->deleted() && child->isBubblePopup()) {
+  for (auto it = copy.begin(); it != copy.end();) {
+    auto child = *it;
+    ++it;
+    if (child && !child->deleted() && child->isBubblePopup()) {
       child->checkEvents();
     }
   }

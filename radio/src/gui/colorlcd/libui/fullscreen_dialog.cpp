@@ -31,6 +31,8 @@
 #include "theme_manager.h"
 #include "view_main.h"
 
+#include <new>
+
 //-----------------------------------------------------------------------------
 
 FullScreenDialog::FullScreenDialog(
@@ -56,11 +58,13 @@ FullScreenDialog::FullScreenDialog(
 
 void FullScreenDialog::build()
 {
-  auto div = new Window(this, {0, ALERT_FRAME_TOP, LCD_W, ALERT_FRAME_HEIGHT});
-  div->setWindowFlag(NO_FOCUS);
-  etx_solid_bg(div->getLvObj(), COLOR_THEME_PRIMARY2_INDEX);
+  auto div = new (std::nothrow) Window(this, {0, ALERT_FRAME_TOP, LCD_W, ALERT_FRAME_HEIGHT});
+  if (div) {
+    div->setWindowFlag(NO_FOCUS);
+    etx_solid_bg(div->getLvObj(), COLOR_THEME_PRIMARY2_INDEX);
+  }
 
-  new StaticIcon(
+  new (std::nothrow) StaticIcon(
       this, ALERT_BITMAP_LEFT, ALERT_BITMAP_TOP,
       (type == WARNING_TYPE_INFO) ? ICON_BUSY : ICON_ERROR,
       COLOR_THEME_WARNING_INDEX);
@@ -76,46 +80,52 @@ void FullScreenDialog::build()
   } else if (!title.empty()) {
     t = title;
   }
-  new StaticText(this,
-                 rect_t{ALERT_TITLE_LEFT, ALERT_TITLE_TOP,
-                        LCD_W - ALERT_TITLE_LEFT - PAD_MEDIUM,
-                        LCD_H - ALERT_TITLE_TOP - PAD_MEDIUM},
-                 t.c_str(), COLOR_THEME_WARNING_INDEX, FONT(XL));
+  new (std::nothrow) StaticText(this,
+                                rect_t{ALERT_TITLE_LEFT, ALERT_TITLE_TOP,
+                                       LCD_W - ALERT_TITLE_LEFT - PAD_MEDIUM,
+                                       LCD_H - ALERT_TITLE_TOP - PAD_MEDIUM},
+                                t.c_str(), COLOR_THEME_WARNING_INDEX, FONT(XL));
 
   messageLabel =
-      new StaticText(this,
-                     rect_t{ALERT_MESSAGE_LEFT, ALERT_MESSAGE_TOP,
-                            LCD_W - ALERT_MESSAGE_LEFT - PAD_MEDIUM,
-                            LCD_H - ALERT_MESSAGE_TOP - PAD_MEDIUM},
-                     message.c_str(), COLOR_THEME_PRIMARY1_INDEX, FONT(BOLD));
+      new (std::nothrow) StaticText(this,
+                                    rect_t{ALERT_MESSAGE_LEFT, ALERT_MESSAGE_TOP,
+                                           LCD_W - ALERT_MESSAGE_LEFT - PAD_MEDIUM,
+                                           LCD_H - ALERT_MESSAGE_TOP - PAD_MEDIUM},
+                                    message.c_str(), COLOR_THEME_PRIMARY1_INDEX, FONT(BOLD));
 
   if (!action.empty()) {
-    auto btn = new TextButton(
+    auto btn = new (std::nothrow) TextButton(
         this, {(LCD_W - ONEBTN_W) / 2, LCD_H - ONEBTN_H - PAD_LARGE, ONEBTN_W, ONEBTN_H}, action.c_str(),
         [=]() {
           closeDialog();
           return 0;
         });
-    etx_bg_color(btn->getLvObj(), COLOR_THEME_SECONDARY3_INDEX);
-    etx_txt_color(btn->getLvObj(), COLOR_THEME_PRIMARY1_INDEX);
+    if (btn) {
+      etx_bg_color(btn->getLvObj(), COLOR_THEME_SECONDARY3_INDEX);
+      etx_txt_color(btn->getLvObj(), COLOR_THEME_PRIMARY1_INDEX);
+    }
   } else {
     if (type == WARNING_TYPE_CONFIRM) {
-      auto btn = new TextButton(
+      auto btn = new (std::nothrow) TextButton(
           this, {LCD_W / 3 - TWOBTN_W / 2, LCD_H - TWOBTN_H - PAD_LARGE, TWOBTN_W, TWOBTN_H}, STR_CANCEL,
           [=]() {
             deleteLater();
             return 0;
           });
-      etx_bg_color(btn->getLvObj(), COLOR_THEME_SECONDARY3_INDEX);
-      etx_txt_color(btn->getLvObj(), COLOR_THEME_PRIMARY1_INDEX);
-      btn = new TextButton(
+      if (btn) {
+        etx_bg_color(btn->getLvObj(), COLOR_THEME_SECONDARY3_INDEX);
+        etx_txt_color(btn->getLvObj(), COLOR_THEME_PRIMARY1_INDEX);
+      }
+      btn = new (std::nothrow) TextButton(
           this, {LCD_W * 2 / 3 - TWOBTN_W / 2, LCD_H - TWOBTN_H - PAD_LARGE, TWOBTN_W, TWOBTN_H}, STR_OK,
           [=]() {
             closeDialog();
             return 0;
           });
-      etx_bg_color(btn->getLvObj(), COLOR_THEME_SECONDARY3_INDEX);
-      etx_txt_color(btn->getLvObj(), COLOR_THEME_PRIMARY1_INDEX);
+      if (btn) {
+        etx_bg_color(btn->getLvObj(), COLOR_THEME_SECONDARY3_INDEX);
+        etx_txt_color(btn->getLvObj(), COLOR_THEME_PRIMARY1_INDEX);
+      }
     }
   }
 }
@@ -160,11 +170,13 @@ void raiseAlert(const char* title, const char* msg, const char* action,
   TRACE("raiseAlert('%s')", msg);
   AUDIO_ERROR_MESSAGE(sound);
   LED_ERROR_BEGIN();
-  auto dialog = new FullScreenDialog(WARNING_TYPE_ALERT, title ? title : "",
-                                     msg ? msg : "", action ? action : "");
-  MainWindow::instance()->blockUntilClose(true, [=]() {
-    return dialog->deleted();
-  });
+  auto dialog = new (std::nothrow) FullScreenDialog(WARNING_TYPE_ALERT, title ? title : "",
+                                                    msg ? msg : "", action ? action : "");
+  if (dialog) {
+    MainWindow::instance()->blockUntilClose(true, [=]() {
+      return dialog->deleted();
+    });
+  }
   LED_ERROR_END();
 }
 
@@ -173,9 +185,10 @@ bool confirmationDialog(const char* title, const char* msg, bool checkPwr,
                         const std::function<bool(void)>& closeCondition)
 {
   bool confirmed = false;
-  auto dialog = new FullScreenDialog(WARNING_TYPE_CONFIRM, title ? title : "",
-                                     msg ? msg : "", "",
-                                     [&confirmed]() { confirmed = true; });
+  auto dialog = new (std::nothrow) FullScreenDialog(WARNING_TYPE_CONFIRM, title ? title : "",
+                                                    msg ? msg : "", "",
+                                                    [&confirmed]() { confirmed = true; });
+  if (!dialog) return false;
 
   MainWindow::instance()->blockUntilClose(checkPwr, [&]() {
     if (dialog->deleted()) return true;

@@ -27,6 +27,7 @@
 #include "telemetry/telemetry_sensors.h"
 
 #include <cmath>
+#include <cstdlib>
 
 // Drawing functions used by Lua API
 
@@ -735,6 +736,10 @@ MaskBitmap *BitmapBuffer::to8bitMask(size_t *size) const
 
   *size = width() * height() + 4;
   MaskBitmap *mask = (MaskBitmap*)malloc(*size);
+  if (!mask) {
+    *size = 0;
+    return nullptr;
+  }
   mask->width = width();
   mask->height = height();
 

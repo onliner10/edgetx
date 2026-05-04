@@ -402,7 +402,7 @@ class LogicalSwitchButton : public ListLineButton
   {
     if (!loaded) return;
 
-    char s[20];
+    char s[20] = "";
 
     LogicalSwitchData* ls = lswAddress(index);
     uint8_t lsFamily = lswFamily(ls->func);
@@ -434,7 +434,6 @@ class LogicalSwitchButton : public ListLineButton
     }
 
     // CSW params - V2
-    strcat(s, " ");
     switch (lsFamily) {
       case LS_FAMILY_BOOL:
       case LS_FAMILY_STICKY:

@@ -52,14 +52,14 @@
 #define DATA_RESPONSE_WRITE_ERR(X) (((X) & 0x0E) == 0x0C)
 
 /* see sd spec. 5.1 OCR register */
-#define OCR_VOLTAGE_3_2_TO_3_3 (1L << 20)
-#define OCR_VOLTAGE_3_3_TO_3_4 (1L << 21)
+#define OCR_VOLTAGE_3_2_TO_3_3 (1UL << 20)
+#define OCR_VOLTAGE_3_3_TO_3_4 (1UL << 21)
 
 /* card capacity status (CCS=0: the card is SDSD; CCS=1: card is SDHC or SDXC) */
-#define OCR_CCS (1L << 30)
+#define OCR_CCS (1UL << 30)
 
 /* This bit is set to low if the card has not finished power up routine */
-#define OCR_POWER_UP_STATUS (1L << 31)
+#define OCR_POWER_UP_STATUS (1UL << 31)
 
 /* to ensure the voltage range check on init is done properly you need to
    define this according to your actual interface/wiring with the sd-card */

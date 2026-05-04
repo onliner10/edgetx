@@ -30,14 +30,14 @@ class PageHeader : public Window
   PageHeader(Window* parent, EdgeTxIcon icon);
   PageHeader(Window* parent, const char* iconFile);
 
-  void setTitle(std::string txt) { title->setText(std::move(txt)); }
+  void setTitle(std::string txt) { if (title) title->setText(std::move(txt)); }
   StaticText* setTitle2(std::string txt);
 
   static LAYOUT_VAL_SCALED(PAGE_TITLE_LEFT, 50)
   static constexpr coord_t PAGE_TITLE_TOP = PAD_TINY;
 
  protected:
-  StaticText* title;
+  StaticText* title = nullptr;
   StaticText* title2 = nullptr;
 };
 

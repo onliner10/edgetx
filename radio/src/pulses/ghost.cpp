@@ -194,16 +194,38 @@ static void ghostSendPulses(void* ctx, uint8_t* buffer, int16_t* channels, uint8
 
 #if defined(LUA)
   if (outputTelemetryBuffer.destination == TELEMETRY_ENDPOINT_SPORT) {
-    auto len = outputTelemetryBuffer.size;
-    auto f_data = outputTelemetryBuffer.data;
-    while (len >= 12) { // type(1B) + payload(10B) + crc(1B)
+    const uint8_t len = outputTelemetryBuffer.size;
+    if (len >= 12) {
       // insert address byte
       *p_data++ = getGhostModuleAddr();
       // and length
       *p_data++ = 12;
-      memcpy(p_data, f_data, 12);
-      p_data += 12; f_data += 12;
-      len -= 12;
+      memcpy(p_data, outputTelemetryBuffer.data, 12);
+      p_data += 12;
+    }
+    if (len >= 24) {
+      *p_data++ = getGhostModuleAddr();
+      *p_data++ = 12;
+      memcpy(p_data, outputTelemetryBuffer.data + 12, 12);
+      p_data += 12;
+    }
+    if (len >= 36) {
+      *p_data++ = getGhostModuleAddr();
+      *p_data++ = 12;
+      memcpy(p_data, outputTelemetryBuffer.data + 24, 12);
+      p_data += 12;
+    }
+    if (len >= 48) {
+      *p_data++ = getGhostModuleAddr();
+      *p_data++ = 12;
+      memcpy(p_data, outputTelemetryBuffer.data + 36, 12);
+      p_data += 12;
+    }
+    if (len >= 60) {
+      *p_data++ = getGhostModuleAddr();
+      *p_data++ = 12;
+      memcpy(p_data, outputTelemetryBuffer.data + 48, 12);
+      p_data += 12;
     }
     outputTelemetryBuffer.reset();
   } else

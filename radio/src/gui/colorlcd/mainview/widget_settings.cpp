@@ -33,6 +33,8 @@
 #include "toggleswitch.h"
 #include "view_main.h"
 
+#include <new>
+
 #define SET_DIRTY() storageDirty(EE_MODEL)
 
 static const rect_t widgetSettingsDialogRect = {
@@ -62,12 +64,12 @@ WidgetSettings::WidgetSettings(Widget* w) :
   while (opt && opt->name != nullptr) {
     auto line = form->newLine(grid);
 
-    new StaticText(line, rect_t{},
-                   opt->displayName ? opt->displayName : opt->name);
+    new (std::nothrow) StaticText(
+        line, rect_t{}, opt->displayName ? opt->displayName : opt->name);
 
     switch (opt->type) {
       case WidgetOption::Integer:
-        (new NumberEdit(
+        if (auto edit = new (std::nothrow) NumberEdit(
              line, rect_t{}, opt->min.signedValue,
              opt->max.signedValue,
              [=]() -> int {
@@ -76,12 +78,13 @@ WidgetSettings::WidgetSettings(Widget* w) :
              [=](int32_t newValue) {
                widgetData->setSignedValue(optIdx, newValue);
                SET_DIRTY();
-             }))
-            ->setDefault(opt->deflt.signedValue);
+             })) {
+          edit->setDefault(opt->deflt.signedValue);
+        }
         break;
 
       case WidgetOption::Source:
-        new SourceChoice(
+        new (std::nothrow) SourceChoice(
             line, rect_t{}, 0, MIXSRC_LAST_TELEM,
             [=]() -> int16_t {
               return widgetData->getUnsignedValue(optIdx);
@@ -93,7 +96,7 @@ WidgetSettings::WidgetSettings(Widget* w) :
         break;
 
       case WidgetOption::Bool:
-        new ToggleSwitch(
+        new (std::nothrow) ToggleSwitch(
             line, rect_t{},
             [=]() -> uint8_t {
               return (uint8_t)widgetData->getBoolValue(optIdx);
@@ -105,14 +108,15 @@ WidgetSettings::WidgetSettings(Widget* w) :
         break;
 
       case WidgetOption::String:
-        new ModelStringEdit(line, rect_t{}, widgetData->getString(optIdx),
-                            [=](const char* s) {
-                              widgetData->setString(optIdx, s);
-                            });
+        new (std::nothrow) ModelStringEdit(line, rect_t{},
+                                           widgetData->getString(optIdx),
+                                           [=](const char* s) {
+                                             widgetData->setString(optIdx, s);
+                                           });
         break;
 
       case WidgetOption::TextSize:
-        new Choice(
+        new (std::nothrow) Choice(
             line, rect_t{}, STR_FONT_SIZES, 0, FONTS_COUNT - 1,
             [=]() -> int {  // getValue
               return widgetData->getUnsignedValue(optIdx);
@@ -124,7 +128,7 @@ WidgetSettings::WidgetSettings(Widget* w) :
         break;
 
       case WidgetOption::Align:
-        new Choice(
+        new (std::nothrow) Choice(
             line, rect_t{}, STR_ALIGN_OPTS, 0, ALIGN_COUNT - 1,
             [=]() -> int {  // getValue
               return widgetData->getUnsignedValue(optIdx);
@@ -137,7 +141,7 @@ WidgetSettings::WidgetSettings(Widget* w) :
 
       case WidgetOption::Timer:  // Unsigned
       {
-        auto tmChoice = new Choice(
+        auto tmChoice = new (std::nothrow) Choice(
             line, rect_t{}, 0, TIMERS - 1,
             [=]() -> int {  // getValue
               return widgetData->getUnsignedValue(optIdx);
@@ -147,13 +151,15 @@ WidgetSettings::WidgetSettings(Widget* w) :
               SET_DIRTY();
             });
 
-        tmChoice->setTextHandler([](int value) {
-          return std::string(STR_TIMER) + std::to_string(value + 1);
-        });
+        if (tmChoice) {
+          tmChoice->setTextHandler([](int value) {
+            return std::string(STR_TIMER) + std::to_string(value + 1);
+          });
+        }
       } break;
 
       case WidgetOption::Switch:
-        new SwitchChoice(
+        new (std::nothrow) SwitchChoice(
             line, rect_t{},
             opt->min.signedValue,  // min
             opt->max.signedValue,  // max
@@ -167,7 +173,7 @@ WidgetSettings::WidgetSettings(Widget* w) :
         break;
 
       case WidgetOption::Color:
-        new ColorPicker(
+        new (std::nothrow) ColorPicker(
             line, rect_t{},
             [=]() -> uint32_t {  // getValue
               return widgetData->getUnsignedValue(optIdx);
@@ -179,7 +185,7 @@ WidgetSettings::WidgetSettings(Widget* w) :
         break;
 
       case WidgetOption::Slider:
-        new Slider(
+        new (std::nothrow) Slider(
             line, SLIDER_W, opt->min.signedValue, opt->max.signedValue,
             [=]() {
               return widgetData->getUnsignedValue(optIdx);
@@ -191,7 +197,8 @@ WidgetSettings::WidgetSettings(Widget* w) :
         break;
 
       case WidgetOption::Choice:
-        new Choice(line, rect_t{}, opt->choiceValues, 0, opt->choiceValues.size() - 1,
+        new (std::nothrow) Choice(line, rect_t{}, opt->choiceValues, 0,
+            opt->choiceValues.size() - 1,
             [=]() {
               return widgetData->getUnsignedValue(optIdx) - 1;
             },
@@ -202,14 +209,15 @@ WidgetSettings::WidgetSettings(Widget* w) :
         break;
 
       case WidgetOption::File:
-        new FileChoice(line, rect_t{}, opt->fileSelectPath, "", FF_MAX_LFN,
-                        [=]() {
-                          return widgetData->getString(optIdx);
-                        },
-                        [=](std::string s) {
-                          widgetData->setString(optIdx, s.c_str());
-                          SET_DIRTY();
-                        });
+        new (std::nothrow) FileChoice(line, rect_t{}, opt->fileSelectPath, "",
+                                      FF_MAX_LFN,
+                                      [=]() {
+                                        return widgetData->getString(optIdx);
+                                      },
+                                      [=](std::string s) {
+                                        widgetData->setString(optIdx, s.c_str());
+                                        SET_DIRTY();
+                                      });
         break;
     }
 

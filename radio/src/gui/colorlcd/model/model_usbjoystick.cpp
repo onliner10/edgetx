@@ -195,7 +195,7 @@ static void btnsel_event_cb(lv_event_t* e)
     if (dsc->class_p == &lv_btnmatrix_class &&
         dsc->type == LV_BTNMATRIX_DRAW_PART_BTN) {
       auto btsel = (USBChannelButtonSel*)lv_event_get_user_data(e);
-      btsel->setColor(dsc);
+      if (btsel) btsel->setColor(dsc);
     }
   }
 }

@@ -28,6 +28,7 @@
 #include "messaging.h"
 
 #include <memory>
+#include <new>
 
 class LayoutFactory;
 
@@ -220,7 +221,7 @@ class BaseLayoutFactory: public LayoutFactory
 
   Layout* createNew(Window* parent, int screenNum) const override
   {
-    return new T(parent, this, screenNum, zoneCount, zoneMap);
+    return new (std::nothrow) T(parent, this, screenNum, zoneCount, zoneMap);
   }
 };
 

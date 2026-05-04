@@ -28,6 +28,8 @@
 #include "model_curves.h"
 #include "source_numberedit.h"
 
+#include <new>
+
 #define SET_DIRTY() storageDirty(EE_MODEL)
 
 CurveChoice::CurveChoice(Window* parent, std::function<int()> getRefValue,
@@ -58,7 +60,7 @@ CurveParam::CurveParam(Window* parent, const rect_t& rect, CurveRef* ref,
   lv_obj_set_style_flex_cross_place(lvobj, LV_FLEX_ALIGN_CENTER, 0);
   lv_obj_set_size(lvobj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
 
-  new Choice(this, rect_t{}, STR_VCURVETYPE, 0, modelCurvesEnabled() ? CURVE_REF_CUSTOM : CURVE_REF_FUNC,
+  new (std::nothrow) Choice(this, rect_t{}, STR_VCURVETYPE, 0, modelCurvesEnabled() ? CURVE_REF_CUSTOM : CURVE_REF_FUNC,
              GET_DEFAULT(ref->type), [=](int32_t newValue) {
                ref->type = newValue;
                ref->value = 0;
@@ -68,12 +70,12 @@ CurveParam::CurveParam(Window* parent, const rect_t& rect, CurveRef* ref,
 
   // CURVE_REF_DIFF
   // CURVE_REF_EXPO
-  auto gv = new SourceNumberEdit(this, -100, 100, GET_DEFAULT(ref->value), setRefValue, sourceMin);
-  gv->setSuffix("%");
+  auto gv = new (std::nothrow) SourceNumberEdit(this, -100, 100, GET_DEFAULT(ref->value), setRefValue, sourceMin);
+  if (gv) gv->setSuffix("%");
   value_edit = gv;
 
   // CURVE_REF_FUNC
-  func_choice = new Choice(this, rect_t{}, STR_VCURVEFUNC, 0, CURVE_BASE - 1,
+  func_choice = new (std::nothrow) Choice(this, rect_t{}, STR_VCURVEFUNC, 0, CURVE_BASE - 1,
                            [=]() {
                              SourceNumVal v;
                              v.rawValue = ref->value;
@@ -87,7 +89,7 @@ CurveParam::CurveParam(Window* parent, const rect_t& rect, CurveRef* ref,
                            });
 
   // CURVE_REF_CUSTOM
-  cust_choice = new CurveChoice(this,
+  cust_choice = new (std::nothrow) CurveChoice(this,
                                 [=]() {
                                   SourceNumVal v;
                                   v.rawValue = ref->value;
@@ -107,23 +109,26 @@ void CurveParam::update()
 {
   bool has_focus = act_field && act_field->hasFocus();
 
-  value_edit->hide();
-  func_choice->hide();
-  cust_choice->hide();
+  if (value_edit) value_edit->hide();
+  if (func_choice) func_choice->hide();
+  if (cust_choice) cust_choice->hide();
 
   switch (ref->type) {
     case CURVE_REF_DIFF:
     case CURVE_REF_EXPO:
+      if (!value_edit) return;
       value_edit->update();
       act_field = value_edit;
       break;
 
     case CURVE_REF_FUNC:
+      if (!func_choice) return;
       func_choice->update();
       act_field = func_choice;
       break;
 
     case CURVE_REF_CUSTOM:
+      if (!cust_choice) return;
       cust_choice->update();
       act_field = cust_choice;
       break;

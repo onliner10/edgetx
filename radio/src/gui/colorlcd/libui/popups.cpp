@@ -30,10 +30,13 @@
 #include "os/sleep.h"
 #include "pwr.h"
 
+#include <new>
+
 static void _run_popup_dialog(const char* title, const char* msg,
                               const char* info = nullptr)
 {
-  auto md = new MessageDialog(title, msg, info);
+  auto md = new (std::nothrow) MessageDialog(title, msg, info);
+  if (!md) return;
 
   MainWindow::instance()->blockUntilClose(true, [=]() {
     return md->deleted();
@@ -149,5 +152,5 @@ class BubbleDialog : public Window
 
 void POPUP_BUBBLE(const char* message, uint32_t timeout, coord_t width)
 {
-  new BubbleDialog(message, timeout, width);
+  new (std::nothrow) BubbleDialog(message, timeout, width);
 }

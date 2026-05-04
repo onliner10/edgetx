@@ -25,6 +25,8 @@
 #include "dialog.h"
 #include "etx_lv_theme.h"
 
+#include <new>
+
 #if LANDSCAPE
 static const lv_coord_t col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(1),
                                      LV_GRID_TEMPLATE_LAST};
@@ -84,36 +86,44 @@ class ColorEditorPopup : public BaseDialog
     auto line = form->newLine(grid);
 
     rect_t r{0, 0, CE_SZ, CE_SZ};
-    auto cedit = new ColorEditor(line, r, color, [=](uint32_t c) { updateColor(c); }, format, THM_COLOR_EDITOR);
-    lv_obj_set_style_grid_cell_x_align(cedit->getLvObj(), LV_GRID_ALIGN_CENTER, 0);
+    auto cedit = new (std::nothrow) ColorEditor(
+        line, r, color, [=](uint32_t c) { updateColor(c); }, format,
+        THM_COLOR_EDITOR);
+    if (cedit)
+      lv_obj_set_style_grid_cell_x_align(cedit->getLvObj(),
+                                         LV_GRID_ALIGN_CENTER, 0);
 
-    auto vbox = new Window(line, rect_t{});
+    auto vbox = new (std::nothrow) Window(line, rect_t{});
+    if (!vbox) return;
     lv_obj_set_style_grid_cell_x_align(vbox->getLvObj(), LV_GRID_ALIGN_CENTER, 0);
     vbox->setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_MEDIUM, r.w, r.h);
 
-    auto hbox = new Window(vbox, rect_t{});
+    auto hbox = new (std::nothrow) Window(vbox, rect_t{});
+    if (!hbox) return;
     hbox->setFlexLayout(LV_FLEX_FLOW_ROW, PAD_MEDIUM);
     auto hbox_obj = hbox->getLvObj();
     lv_obj_set_flex_align(hbox_obj, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START,
                           LV_FLEX_ALIGN_SPACE_AROUND);
 
-    colorPad = new ColorSwatch(hbox, {0, 0, COLOR_PAD_WIDTH, EdgeTxStyles::UI_ELEMENT_HEIGHT},
+    colorPad = new (std::nothrow) ColorSwatch(hbox, {0, 0, COLOR_PAD_WIDTH, EdgeTxStyles::UI_ELEMENT_HEIGHT},
                                COLOR_THEME_PRIMARY1);
 
-    hexStr = new StaticText(hbox, {0, 0, EdgeTxStyles::EDIT_FLD_WIDTH, 0}, "", COLOR_THEME_PRIMARY1_INDEX, FONT(L));
+    hexStr = new (std::nothrow) StaticText(hbox, {0, 0, EdgeTxStyles::EDIT_FLD_WIDTH, 0}, "", COLOR_THEME_PRIMARY1_INDEX, FONT(L));
 
     updateColor(color);
 
-    hbox = new Window(vbox, rect_t{});
+    hbox = new (std::nothrow) Window(vbox, rect_t{});
+    if (!hbox) return;
     hbox->padAll(PAD_TINY);
     hbox->setFlexLayout(LV_FLEX_FLOW_ROW_WRAP, PAD_MEDIUM);
     lv_obj_set_flex_align(hbox->getLvObj(), LV_FLEX_ALIGN_CENTER,
                           LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_AROUND);
 
-    auto thmBtn = new TextButton(hbox, {0, 0, BTN_W, 0}, STR_THEME);
-    auto fxdBtn = new TextButton(hbox, {0, 0, BTN_W, 0}, STR_FIXED);
-    auto hsvBtn = new TextButton(hbox, {0, 0, BTN_W, 0}, "HSV");
-    auto rgbBtn = new TextButton(hbox, {0, 0, BTN_W, 0}, "RGB");
+    auto thmBtn = new (std::nothrow) TextButton(hbox, {0, 0, BTN_W, 0}, STR_THEME);
+    auto fxdBtn = new (std::nothrow) TextButton(hbox, {0, 0, BTN_W, 0}, STR_FIXED);
+    auto hsvBtn = new (std::nothrow) TextButton(hbox, {0, 0, BTN_W, 0}, "HSV");
+    auto rgbBtn = new (std::nothrow) TextButton(hbox, {0, 0, BTN_W, 0}, "RGB");
+    if (!thmBtn || !fxdBtn || !hsvBtn || !rgbBtn || !cedit) return;
 
     rgbBtn->setPressHandler([=]() {
       cedit->setColorEditorType(RGB_COLOR_EDITOR);
@@ -151,18 +161,19 @@ class ColorEditorPopup : public BaseDialog
     thmBtn->check(true);
     lv_group_focus_obj(thmBtn->getLvObj());
 
-    hbox = new Window(vbox, {0, height() - EdgeTxStyles::UI_ELEMENT_HEIGHT - PAD_SMALL, 0, 0});
+    hbox = new (std::nothrow) Window(vbox, {0, height() - EdgeTxStyles::UI_ELEMENT_HEIGHT - PAD_SMALL, 0, 0});
+    if (!hbox) return;
     hbox->setFlexLayout(LV_FLEX_FLOW_ROW, PAD_MEDIUM);
     lv_obj_set_flex_align(hbox->getLvObj(), LV_FLEX_ALIGN_CENTER,
                           LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_SPACE_BETWEEN);
     lv_obj_set_flex_grow(hbox->getLvObj(), 1);
 
-    new TextButton(hbox, rect_t{0, 0, BTN_W, 0}, STR_CANCEL, [=]() -> int8_t {
+    new (std::nothrow) TextButton(hbox, rect_t{0, 0, BTN_W, 0}, STR_CANCEL, [=]() -> int8_t {
       onCancel();
       return 0;
     });
 
-    new TextButton(hbox, rect_t{0, 0, BTN_W, 0}, STR_SAVE, [=]() -> int8_t {
+    new (std::nothrow) TextButton(hbox, rect_t{0, 0, BTN_W, 0}, STR_SAVE, [=]() -> int8_t {
       if (setValue) setValue(m_color);
       this->deleteLater();
       return 0;
@@ -194,7 +205,8 @@ ColorPicker::ColorPicker(Window* parent, const rect_t& rect,
 void ColorPicker::onClicked()
 {
   updateColor(getValue());
-  new ColorEditorPopup(color, [=](uint32_t c) { setValue(c); updateColor(c); }, format);
+  new (std::nothrow) ColorEditorPopup(
+      color, [=](uint32_t c) { setValue(c); updateColor(c); }, format);
 }
 
 void ColorPicker::updateColor(uint32_t c)

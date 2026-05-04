@@ -22,6 +22,8 @@
 #include "input_source.h"
 
 #include "edgetx.h"
+
+#include <new>
 #include "getset_helpers.h"
 #include "numberedit.h"
 #include "sourcechoice.h"
@@ -89,7 +91,7 @@ InputSource::InputSource(Window *parent, ExpoData *input) :
   lv_obj_set_flex_flow(lvobj, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_size(lvobj, lv_pct(100), LV_SIZE_CONTENT);
 
-  new SourceChoice(
+  new (std::nothrow) SourceChoice(
       this, rect_t{}, INPUTSRC_FIRST, INPUTSRC_LAST, GET_DEFAULT(input->srcRaw),
       [=](int32_t newValue) {
         input->srcRaw = newValue;
@@ -97,7 +99,8 @@ InputSource::InputSource(Window *parent, ExpoData *input) :
         SET_DIRTY();
       }, true);
 
-  sensor_form = new Window(this, rect_t{});
+  sensor_form = new (std::nothrow) Window(this, rect_t{});
+  if (!sensor_form) return;
   sensor_form->padAll(PAD_TINY);
   sensor_form->setFlexLayout();
 
@@ -108,18 +111,20 @@ InputSource::InputSource(Window *parent, ExpoData *input) :
   line->padAll(PAD_ZERO);
   line->setWidth(SENSOR_W);
 
-  new StaticText(line, rect_t{}, STR_VALUE);
-  auto sensor = new SensorValue(line, rect_t{}, input);
+  new (std::nothrow) StaticText(line, rect_t{}, STR_VALUE);
+  auto sensor = new (std::nothrow) SensorValue(line, rect_t{}, input);
 
   // Scale
   line = sensor_form->newLine(grid);
   line->padAll(PAD_OUTLINE);
   line->setWidth(SENSOR_W);
 
-  new StaticText(line, rect_t{}, STR_SCALE);
-  new NumberEdit(line, {0, 0, EdgeTxStyles::EDIT_FLD_WIDTH_NARROW, 0}, 0,
-                 maxTelemValue(input->srcRaw - MIXSRC_FIRST_TELEM + 1),
-                 GET_SET_DEFAULT(input->scale), sensor->getSensorPrec());
+  new (std::nothrow) StaticText(line, rect_t{}, STR_SCALE);
+  if (sensor) {
+    new (std::nothrow) NumberEdit(line, {0, 0, EdgeTxStyles::EDIT_FLD_WIDTH_NARROW, 0}, 0,
+                   maxTelemValue(input->srcRaw - MIXSRC_FIRST_TELEM + 1),
+                   GET_SET_DEFAULT(input->scale), sensor->getSensorPrec());
+  }
 
   update();
 }

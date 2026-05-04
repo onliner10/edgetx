@@ -596,8 +596,8 @@ enum SrcTypes {
   SRC_TIMER = 1 << 17,
   SRC_TELEM = 1 << 18,
   SRC_LIGHT = 1 << 19,
-  SRC_NONE = 1 << 30,
-  SRC_INVERT = 1 << 31,
+  SRC_NONE = 1U << 30,
+  SRC_INVERT = 1U << 31,
 };
 
 enum BacklightMode {

@@ -68,6 +68,7 @@ MaskBitmap* _decompressed_mask(const uint8_t* lz4_compressed)
 
   uint32_t pixels = width * height;
   MaskBitmap* raw = (MaskBitmap*)malloc(align32(pixels + 4));
+  if (!raw) return nullptr;
 
   raw->width = width;
   raw->height = height;

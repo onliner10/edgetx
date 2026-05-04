@@ -70,16 +70,16 @@ class SpectrumFooterWindow : public Window
       char label[16];
 
       // Frequency
-      sprintf(label, "T: %dMHz",
-              int(reusableBuffer.spectrumAnalyser.freq / 1000000));
+      snprintf(label, sizeof(label), "T: %dMHz",
+               int(reusableBuffer.spectrumAnalyser.freq / 1000000));
       (new StaticText(
            this, rect_t{PAD_TINY, 0, FLD_W, EdgeTxStyles::UI_ELEMENT_HEIGHT},
            label))
           ->padTop(PAD_MEDIUM);
 
       // Span
-      sprintf(label, "S: %dMHz",
-              int(reusableBuffer.spectrumAnalyser.span / 1000000));
+      snprintf(label, sizeof(label), "S: %dMHz",
+               int(reusableBuffer.spectrumAnalyser.span / 1000000));
       (new StaticText(
            this,
            rect_t{PAD_TINY + FLD_W, 0, FLD_W, EdgeTxStyles::UI_ELEMENT_HEIGHT},
@@ -241,7 +241,7 @@ class SpectrumWindow : public Window
     }
 #endif
 
-    for (x = 0, i = 0; x < width(); x += step, i += 2) {
+    for (x = 0, i = 0; x + step <= width(); x += step, i += 2) {
       lv_coord_t yv =
           SCALE_TOP - 1 -
           limit<int>(0,

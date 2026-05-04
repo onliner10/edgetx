@@ -33,6 +33,10 @@
 #include "yaml/yaml_datastructs.h"
 #include "yaml/yaml_bits.h"
 
+#include <cerrno>
+#include <climits>
+#include <cstdlib>
+
 const char * readYamlFile(const char* fullpath, const YamlParserCalls* calls, void* parser_ctx, ChecksumResult* checksum_result)
 {
     FIL  file;
@@ -49,12 +53,14 @@ const char * readYamlFile(const char* fullpath, const YamlParserCalls* calls, vo
 
     uint16_t calculated_checksum = 0xFFFF;
     uint16_t file_checksum = 0;
+    bool has_file_checksum = false;
 
     bool first_block = true;
     char buffer[32];
     while (f_read(&file, buffer, sizeof(buffer)-1, &bytes_read) == FR_OK) {
       if (bytes_read == 0)  // EOF
         break;
+      buffer[bytes_read] = '\0';
       total_bytes += bytes_read;
 
       uint16_t skip = 0;
@@ -68,19 +74,27 @@ const char * readYamlFile(const char* fullpath, const YamlParserCalls* calls, vo
           char* startPos = buffer + strlen(skipValue);
           char* endPos = startPos;
           // Advance through the value
-          while((*endPos != '\r') && (*endPos != '\n')) {
-            if (endPos > buffer + bytes_read) {
-              return SDCARD_ERROR(	FR_INT_ERR );
-            }
+          while(endPos < buffer + bytes_read && (*endPos != '\r') && (*endPos != '\n')) {
             endPos++;
           }
+          if (endPos >= buffer + bytes_read) {
+            return SDCARD_ERROR(FR_INT_ERR);
+          }
           // Skip trailing newline
-          while((*endPos == '\r') || (*endPos == '\n')) {
+          while(endPos < buffer + bytes_read && ((*endPos == '\r') || (*endPos == '\n'))) {
             *endPos = 0;
             endPos++;
           }
 
-          file_checksum = atoi(startPos);
+          errno = 0;
+          char* parseEnd = nullptr;
+          unsigned long parsed = strtoul(startPos, &parseEnd, 10);
+          if (parseEnd == startPos || *parseEnd != '\0' || errno == ERANGE ||
+              parsed > UINT16_MAX) {
+            return SDCARD_ERROR(FR_INVALID_PARAMETER);
+          }
+          file_checksum = parsed;
+          has_file_checksum = true;
           skip = endPos - buffer;
         }
       }
@@ -100,7 +114,7 @@ const char * readYamlFile(const char* fullpath, const YamlParserCalls* calls, vo
       // Special case to handle "old" files with no checksum field
       // 25 was arbitrarily chosen as the minimum realistic file size
       // - The issue is to allow old files to pass, while still detecting garbled files
-      if ( (file_checksum == 0) && (total_bytes > 25) ) {
+      if ( (!has_file_checksum) && (total_bytes > 25) ) {
         *checksum_result = ChecksumResult::Success;
       } else {
         // Normal case - compare read and calculated checksum

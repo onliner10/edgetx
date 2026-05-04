@@ -22,6 +22,7 @@
 #include "screen_setup.h"
 
 #include <algorithm>
+#include <new>
 
 #include "color_picker.h"
 #include "edgetx.h"
@@ -61,7 +62,8 @@ class LayoutChoice : public Button
 
   void onPress() override
   {
-    auto menu = new Menu();
+    auto menu = new (std::nothrow) Menu();
+    if (!menu) return;
     for (auto layout : LayoutFactory::getRegisteredLayouts()) {
       menu->addLine(layout->getBitmap(), layout->getName(),
                     [=]() { if (setValue) setValue(layout); update(); });
@@ -123,9 +125,10 @@ void ScreenSetupPage::build(Window* window)
 
   // Layout choice...
   auto line = window->newLine(grid);
-  auto label = new StaticText(line, rect_t{}, STR_LAYOUT);
+  auto label = new (std::nothrow) StaticText(line, rect_t{}, STR_LAYOUT);
 
-  lv_obj_set_style_grid_cell_y_align(label->getLvObj(), LV_GRID_ALIGN_CENTER, 0);
+  if (label)
+    lv_obj_set_style_grid_cell_y_align(label->getLvObj(), LV_GRID_ALIGN_CENTER, 0);
 
   // Dynamic options window...
   LayoutChoice::LayoutFactoryGetter getFactory =
@@ -170,24 +173,27 @@ void ScreenSetupPage::build(Window* window)
         buildLayoutOptions();
       };
 
-  Window* btn = new LayoutChoice(line, getFactory, setLayout);
+  Window* btn = new (std::nothrow) LayoutChoice(line, getFactory, setLayout);
 
 #if PORTRAIT
   line = window->newLine(grid);
   grid.nextCell();
 #endif
-  btn = new TextButton(line, rect_t{}, STR_SETUP_WIDGETS,
+  btn = new (std::nothrow) TextButton(line, rect_t{}, STR_SETUP_WIDGETS,
                        [=]() -> uint8_t {
     auto idx = customScreenIndex;
     window->getParent()->deleteLater();
-    new SetupWidgetsPage(idx);
+    new (std::nothrow) SetupWidgetsPage(idx);
     return 0;
   });
-  lv_obj_set_style_grid_cell_y_align(btn->getLvObj(), LV_GRID_ALIGN_CENTER, 0);
-  lv_group_focus_obj(btn->getLvObj());
+  if (btn) {
+    lv_obj_set_style_grid_cell_y_align(btn->getLvObj(), LV_GRID_ALIGN_CENTER, 0);
+    lv_group_focus_obj(btn->getLvObj());
+  }
 
   line = window->newLine(grid);
-  layoutOptions = new Window(line, rect_t{});
+  layoutOptions = new (std::nothrow) Window(line, rect_t{});
+  if (!layoutOptions) return;
   buildLayoutOptions();
 
   // Prevent removing the last page
@@ -195,7 +201,7 @@ void ScreenSetupPage::build(Window* window)
     grid.setColSpan(2);
     line = window->newLine(grid);
     Window* btn =
-        new TextButton(line, rect_t{}, STR_REMOVE_SCREEN, [=]() -> uint8_t {
+        new (std::nothrow) TextButton(line, rect_t{}, STR_REMOVE_SCREEN, [=]() -> uint8_t {
           // Remove this screen from the model
           g_model.removeScreenLayout(customScreenIndex);
 
@@ -217,9 +223,11 @@ void ScreenSetupPage::build(Window* window)
           storageDirty(EE_MODEL);
           return 0;
         });
-    auto obj = btn->getLvObj();
-    lv_obj_set_width(obj, lv_pct(100));
-    lv_obj_center(obj);
+    if (btn) {
+      auto obj = btn->getLvObj();
+      lv_obj_set_width(obj, lv_pct(100));
+      lv_obj_center(obj);
+    }
   }
 }
 
@@ -250,12 +258,12 @@ void ScreenSetupPage::buildLayoutOptions()
 
     // Option label
     auto line = layoutOptions->newLine(grid);
-    new StaticText(line, rect_t{}, STR_VAL(option->name));
+    new (std::nothrow) StaticText(line, rect_t{}, STR_VAL(option->name));
 
     // Option value
     switch (option->type) {
       case LayoutOption::Bool:
-        new ToggleSwitch(line, rect_t{},
+        new (std::nothrow) ToggleSwitch(line, rect_t{},
                          GET_DEFAULT(value->boolValue),
                          [=](int newValue) {
                            value->boolValue = newValue;
@@ -265,7 +273,7 @@ void ScreenSetupPage::buildLayoutOptions()
         break;
 
       case LayoutOption::Color:
-        new ColorPicker(line, rect_t{},
+        new (std::nothrow) ColorPicker(line, rect_t{},
                         GET_DEFAULT(value->unsignedValue),
                         [=](int newValue) {
                           value->unsignedValue = newValue;
@@ -322,9 +330,9 @@ void ScreenAddPage::build(Window* window)
 {
   std::string s = replaceAll(STR_QM_ADD_SCREEN, "\n", " ");
 
-  new TextButton(window,
-                 rect_t{LCD_W / 2 - ADD_TXT_W / 2, window->height() / 2 - EdgeTxStyles::UI_ELEMENT_HEIGHT, ADD_TXT_W, EdgeTxStyles::UI_ELEMENT_HEIGHT},
-                 s, [this]() -> uint8_t {
+  new (std::nothrow) TextButton(window,
+                                rect_t{LCD_W / 2 - ADD_TXT_W / 2, window->height() / 2 - EdgeTxStyles::UI_ELEMENT_HEIGHT, ADD_TXT_W, EdgeTxStyles::UI_ELEMENT_HEIGHT},
+                                s, [this]() -> uint8_t {
                     ScreenSetupPage::addScreen();
                     return 0;
                  });

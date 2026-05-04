@@ -33,6 +33,8 @@
 #include "view_channels.h"
 #include "view_main.h"
 
+#include <new>
+
 #if defined(DEBUG)
 static uint32_t dsms, dems, end_ms, start_ms;
 static bool timepg = false;
@@ -113,10 +115,10 @@ PageGroupHeaderBase::PageGroupHeaderBase(Window* parent, coord_t height, EdgeTxI
 {
     etx_solid_bg(lvobj, COLOR_THEME_SECONDARY1_INDEX);
 
-    hdrIcon = new HeaderIcon(this, icon);
+    hdrIcon = new (std::nothrow) HeaderIcon(this, icon);
 
 #if VERSION_MAJOR > 2
-    new HeaderBackIcon(this);
+    new (std::nothrow) HeaderBackIcon(this);
 
     parentLabel = etx_label_create(lvobj);
     etx_txt_color(parentLabel, COLOR_THEME_PRIMARY2_INDEX);
@@ -146,13 +148,14 @@ PageGroupHeaderBase::PageGroupHeaderBase(Window* parent, coord_t height, EdgeTxI
     setTitle("");
 
 #if VERSION_MAJOR == 2
-    carousel = new Window(this,
-                          {MENU_HEADER_BUTTONS_LEFT, 0,
-                           LCD_W - MENU_HEADER_BUTTONS_LEFT, EdgeTxStyles::MENU_HEADER_HEIGHT + ICON_EXTRA_H});
+    carousel = new (std::nothrow) Window(this,
+                                         {MENU_HEADER_BUTTONS_LEFT, 0,
+                                          LCD_W - MENU_HEADER_BUTTONS_LEFT, EdgeTxStyles::MENU_HEADER_HEIGHT + ICON_EXTRA_H});
+    if (!carousel) return;
     carousel->padAll(PAD_ZERO);
     carousel->setWindowFlag(NO_FOCUS);
 
-    selectedIcon = new SelectedTabIcon(carousel);
+    selectedIcon = new (std::nothrow) SelectedTabIcon(carousel);
 #endif
 }
 
@@ -208,12 +211,17 @@ void PageGroupHeaderBase::setIcon(EdgeTxIcon newIcon)
 
 void PageGroupHeaderBase::addTab(PageGroupItem* page)
 {
+  if (!page) return;
   pages.emplace_back(page);
 
 #if VERSION_MAJOR == 2
   uint8_t idx = buttons.size();
-  auto btn = new PageGroupIconButton(
+  auto btn = new (std::nothrow) PageGroupIconButton(
       carousel, {getX(idx), 0, MENU_HEADER_BUTTON_WIDTH + PAD_THREE, PageGroup::PAGE_GROUP_TOP_BAR_H + PAD_THREE + PAD_TINY}, page, idx);
+  if (!btn) {
+    pages.pop_back();
+    return;
+  }
   btn->setPressHandler([=]() {
     menu->setCurrentTab(idx);
     return true;
@@ -225,7 +233,7 @@ void PageGroupHeaderBase::addTab(PageGroupItem* page)
 
 bool PageGroupHeaderBase::hasSubMenu(QMPage qmPage)
 {
-  for (uint8_t i = 0; i < pages.size(); i += 1) {
+  for (size_t i = 0; i < pages.size(); i += 1) {
     if (pages[i]->pageId() == qmPage)
       return true;
   }
@@ -236,7 +244,7 @@ void PageGroupHeaderBase::deleteLater()
 {
   if (deleted()) return;
 
-  for (uint8_t i = 0; i < pages.size(); i += 1)
+  for (size_t i = 0; i < pages.size(); i += 1)
     delete pages[i];
   pages.clear();
 
@@ -291,7 +299,8 @@ PageGroupBase::PageGroupBase(coord_t bodyY, EdgeTxIcon icon) :
 
   pushLayer(true);
 
-  body = new Window(this, {0, bodyY, LCD_W, LCD_H - bodyY});
+  body = new (std::nothrow) Window(this, {0, bodyY, LCD_W, LCD_H - bodyY});
+  if (!body) return;
   body->setWindowFlag(NO_FOCUS);
   lv_obj_set_style_max_height(body->getLvObj(), LCD_H - bodyY, LV_PART_MAIN);
   etx_scrollbar(body->getLvObj());
@@ -329,11 +338,13 @@ void PageGroupBase::onCancel()
 
 uint8_t PageGroupBase::tabCount() const
 {
+  if (!header) return 0;
   return header->tabCount();
 }
 
 void PageGroupBase::addTab(PageGroupItem* page)
 {
+  if (!header) return;
   header->addTab(page);
   if (!currentTab) {
     setCurrentTab(0);
@@ -343,10 +354,12 @@ void PageGroupBase::addTab(PageGroupItem* page)
 void PageGroupBase::setCurrentTab(unsigned index)
 {
   if (deleted()) return;
+  if (!header || !body) return;
 
   header->setCurrentIndex(index);
 
   PageGroupItem* tab = header->pageTab(index);
+  if (!tab) return;
 
   if (tab != currentTab && !deleted()) {
     header->setTitle(tab->getTitle().c_str());
@@ -415,25 +428,28 @@ void PageGroupBase::onLongPressMDL() { doKeyShortcut(EVT_KEY_LONG(KEY_MODEL)); }
 void PageGroupBase::onPressTELE() { doKeyShortcut(EVT_KEY_BREAK(KEY_TELE)); }
 void PageGroupBase::onLongPressTELE() { doKeyShortcut(EVT_KEY_LONG(KEY_TELE)); }
 
-void PageGroupBase::onPressPGUP() { header->prevTab(); }
-void PageGroupBase::onPressPGDN() { header->nextTab(); }
-void PageGroupBase::onLongPressPGUP() { header->prevTab(); }
-void PageGroupBase::onLongPressPGDN() { header->nextTab(); }
+void PageGroupBase::onPressPGUP() { if (header) header->prevTab(); }
+void PageGroupBase::onPressPGDN() { if (header) header->nextTab(); }
+void PageGroupBase::onLongPressPGUP() { if (header) header->prevTab(); }
+void PageGroupBase::onLongPressPGDN() { if (header) header->nextTab(); }
 void PageGroupBase::onLongPressRTN() { onCancel(); }
 #endif
 
 bool PageGroupBase::hasSubMenu(QMPage qmPage)
 {
+  if (!header) return false;
   return header->hasSubMenu(qmPage);
 }
 
 coord_t PageGroupBase::getScrollY()
 {
+  if (!body) return 0;
   return lv_obj_get_scroll_y(body->getLvObj());
 }
 
 void PageGroupBase::setScrollY(coord_t y)
 {
+  if (!body) return;
   lv_obj_scroll_to_y(body->getLvObj(), y, LV_ANIM_OFF);
 }
 
@@ -442,7 +458,8 @@ void PageGroupBase::setScrollY(coord_t y)
 PageGroup::PageGroup(EdgeTxIcon icon, const char* title, const PageDef* pages) :
     PageGroupBase(PAGE_GROUP_BODY_Y, icon)
 {
-  header = new PageGroupHeader(this, icon, title);
+  header = new (std::nothrow) PageGroupHeader(this, icon, title);
+  if (!header) return;
 
   for (int i = 0; pages[i].icon < EDGETX_ICONS_COUNT; i += 1) {
     if (pages[i].create)
@@ -460,7 +477,8 @@ PageGroup::PageGroup(EdgeTxIcon icon, const char* title, const PageDef* pages) :
 
   setCloseHandler([]{
     storageCheck(true);
-    ViewMain::instance()->updateTopbarVisibility();
+    auto viewMain = ViewMain::instance();
+    if (viewMain) viewMain->updateTopbarVisibility();
   });
 }
 
@@ -488,12 +506,12 @@ class TabsGroupHeader : public PageGroupHeaderBase
 #endif
 
 #if VERSION_MAJOR > 2
-    prevBtn = new IconButton(this, ICON_BTN_PREV, LCD_W - PageGroup::PAGE_GROUP_BACK_BTN_W * 3, PAD_MEDIUM, [=]() {
+    prevBtn = new (std::nothrow) IconButton(this, ICON_BTN_PREV, LCD_W - PageGroup::PAGE_GROUP_BACK_BTN_W * 3, PAD_MEDIUM, [=]() {
       prevTab();
       return 0;
     });
 
-    nextBtn = new IconButton(this, ICON_BTN_NEXT, LCD_W - PageGroup::PAGE_GROUP_BACK_BTN_W * 2, PAD_MEDIUM, [=]() {
+    nextBtn = new (std::nothrow) IconButton(this, ICON_BTN_NEXT, LCD_W - PageGroup::PAGE_GROUP_BACK_BTN_W * 2, PAD_MEDIUM, [=]() {
       nextTab();
       return 0;
     });
@@ -529,7 +547,8 @@ class TabsGroupHeader : public PageGroupHeaderBase
 TabsGroup::TabsGroup(EdgeTxIcon icon, const char* parentLabel) :
     PageGroupBase(TABS_GROUP_BODY_Y, icon)
 {
-  header = new TabsGroupHeader(this, icon, parentLabel);
+  header = new (std::nothrow) TabsGroupHeader(this, icon, parentLabel);
+  if (!header) return;
 
 #if defined(HARDWARE_TOUCH)
 #if VERSION_MAJOR == 2

@@ -488,6 +488,8 @@ bool YamlTreeWalker::generate(yaml_writer_func wf, void* opaque)
     
     while (true) {
         const struct YamlNode* attr = getAttr();
+        if (!attr)
+            return false;
 
         if (attr->type == YDT_PADDING) {
             toNextAttr();
@@ -561,6 +563,8 @@ bool YamlTreeWalker::generate(yaml_writer_func wf, void* opaque)
                 setAttrIdx(idx);
 
                 attr = getAttr();
+                if (!attr)
+                    return false;
                 for(int i=1; i < getLevel(); i++)
                     if (!wf(opaque, "   ", 3))
                         return false;

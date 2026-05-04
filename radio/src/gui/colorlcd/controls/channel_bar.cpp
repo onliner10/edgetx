@@ -25,6 +25,8 @@
 #include "etx_lv_theme.h"
 #include "static.h"
 
+#include <new>
+
 #define VIEW_CHANNELS_LIMIT_PCT \
   (g_model.extendedLimits ? LIMIT_EXT_PERCENT : LIMIT_STD_PERCENT)
 
@@ -229,11 +231,11 @@ ComboChannelBar::ComboChannelBar(Window* parent, const rect_t& rect,
 
   coord_t barW = width() - invMask->width - PAD_TINY;
 
-  outputChannelBar = new OutputChannelBar(
+  outputChannelBar = new (std::nothrow) OutputChannelBar(
       this, {PAD_TINY + invMask->width, ChannelBar::BAR_HEIGHT + PAD_TINY, barW, ChannelBar::BAR_HEIGHT},
       channel, isInHeader);
 
-  new MixerChannelBar(
+  new (std::nothrow) MixerChannelBar(
       this,
       {PAD_TINY + invMask->width, (2 * ChannelBar::BAR_HEIGHT) + PAD_TINY + 1, barW, ChannelBar::BAR_HEIGHT},
       channel);
@@ -242,20 +244,20 @@ ComboChannelBar::ComboChannelBar(Window* parent, const rect_t& rect,
   char chanString[10];
   char* s = strAppend(chanString, STR_CH);
   strAppendSigned(s, channel + 1);
-  new StaticText(this, {PAD_TINY + invMask->width, 0, LV_SIZE_CONTENT, ChannelBar::VAL_H}, chanString,
+  new (std::nothrow) StaticText(this, {PAD_TINY + invMask->width, 0, LV_SIZE_CONTENT, ChannelBar::VAL_H}, chanString,
                  txtColIdx, FONT(XS) | LEFT);
 
   // Channel name
   if (g_model.limitData[channel].name[0]) {
     char nm[LEN_CHANNEL_NAME + 1];
     strAppend(nm, g_model.limitData[channel].name, LEN_CHANNEL_NAME);
-    new StaticText(this, {PAD_TINY + ChannelBar::VAL_W, 0, LV_SIZE_CONTENT, ChannelBar::VAL_H}, nm,
+    new (std::nothrow) StaticText(this, {PAD_TINY + ChannelBar::VAL_W, 0, LV_SIZE_CONTENT, ChannelBar::VAL_H}, nm,
                    txtColIdx, FONT(XS) | LEFT);
   }
 
   // Channel value in µS
   const char* suffix = (g_eeGeneral.ppmunit == PPM_US) ? "%" : STR_US;
-  new DynamicNumber<int16_t>(
+  new (std::nothrow) DynamicNumber<int16_t>(
       this, {width() - ChannelBar::VAL_W, 0, ChannelBar::VAL_W, ChannelBar::VAL_H},
       [=] {
         if (g_eeGeneral.ppmunit == PPM_US)
@@ -266,15 +268,15 @@ ComboChannelBar::ComboChannelBar(Window* parent, const rect_t& rect,
 
   // Override icon
 #if defined(OVERRIDE_CHANNEL_FUNCTION)
-  overrideIcon = new StaticIcon(
+  overrideIcon = new (std::nothrow) StaticIcon(
       this, 0, PAD_SMALL, ICON_CHAN_MONITOR_LOCKED, txtColIdx);
-  overrideIcon->show(safetyCh[channel] != OVERRIDE_CHANNEL_UNDEFINED);
+  if (overrideIcon) overrideIcon->show(safetyCh[channel] != OVERRIDE_CHANNEL_UNDEFINED);
 #endif
 
   // Channel reverted icon
   LimitData* ld = limitAddress(channel);
   if (ld && ld->revert) {
-    new StaticIcon(this, 0, invMask->height + PAD_MEDIUM, ICON_CHAN_MONITOR_INVERTED,
+    new (std::nothrow) StaticIcon(this, 0, invMask->height + PAD_MEDIUM, ICON_CHAN_MONITOR_INVERTED,
                    txtColIdx);
   }
 }
@@ -284,6 +286,6 @@ void ComboChannelBar::checkEvents()
 {
   Window::checkEvents();
 
-  overrideIcon->show(safetyCh[channel] != OVERRIDE_CHANNEL_UNDEFINED);
+  if (overrideIcon) overrideIcon->show(safetyCh[channel] != OVERRIDE_CHANNEL_UNDEFINED);
 }
 #endif

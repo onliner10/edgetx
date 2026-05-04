@@ -24,9 +24,9 @@
 #include <stdint.h>
 #include "boards/FirmwareVersionTag.h"
 
-#define UF2_VERSION_TAG 0x9FC7BC
-#define UF2_DEVICE_TAG  0x650D9D
-#define UF2_REBOOT_TAG  0xE60835
+#define UF2_VERSION_TAG 0x9FC7BCU
+#define UF2_DEVICE_TAG  0x650D9DU
+#define UF2_REBOOT_TAG  0xE60835U
 
 // ignore family ID if not defined
 #if !defined(UF2_FAMILY_ID)

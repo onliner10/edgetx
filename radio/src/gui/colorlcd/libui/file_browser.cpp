@@ -23,6 +23,7 @@
 #include "lib_file.h"
 #include "fonts.h"
 
+#include <cstring>
 #include <list>
 #include <string>
 
@@ -32,9 +33,21 @@
 static const char* getFullPath(const char* filename)
 {
   static char full_path[FF_MAX_LFN + 1];
-  f_getcwd((TCHAR*)full_path, FF_MAX_LFN);
-  strcat(full_path, "/");
-  strcat(full_path, filename);
+  if (f_getcwd((TCHAR*)full_path, FF_MAX_LFN) != FR_OK) {
+    full_path[0] = '\0';
+  }
+  full_path[FF_MAX_LFN] = '\0';
+
+  size_t path_len = strlen(full_path);
+  if (path_len < FF_MAX_LFN) {
+    full_path[path_len++] = '/';
+    full_path[path_len] = '\0';
+  }
+
+  if (filename && path_len < FF_MAX_LFN) {
+    strncat(full_path, filename, FF_MAX_LFN - path_len);
+    full_path[FF_MAX_LFN] = '\0';
+  }
   return full_path;
 }
 

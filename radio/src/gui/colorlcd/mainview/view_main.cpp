@@ -31,6 +31,8 @@
 #include "view_channels.h"
 #include "widget.h"
 
+#include <new>
+
 static void tile_view_deleted_cb(lv_event_t* e)
 {
   lv_obj_t* target = lv_event_get_target(e);
@@ -81,7 +83,7 @@ ViewMain* ViewMain::_instance = nullptr;
 ViewMain* ViewMain::instance()
 {
   if (!_instance)
-    _instance = new ViewMain();
+    _instance = new (std::nothrow) ViewMain();
   return _instance;
 }
 
@@ -104,7 +106,7 @@ ViewMain::ViewMain() :
                       nullptr);
 
   // create last to be on top
-  topbar = new TopBar(this);
+  topbar = new (std::nothrow) TopBar(this);
 }
 
 ViewMain::~ViewMain() { _instance = nullptr; }
@@ -112,11 +114,14 @@ ViewMain::~ViewMain() { _instance = nullptr; }
 void ViewMain::addMainView(WidgetsContainer* view, uint32_t viewId)
 {
   TRACE("addMainView(0x%p, %d)", view, viewId);
+  if (!tile_view || !view) return;
 
   auto tile =
       lv_tileview_add_tile(tile_view, viewId, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
+  if (!tile) return;
 
   auto view_obj = view->getLvObj();
+  if (!view_obj) return;
   lv_obj_set_parent(view_obj, tile);
 
   auto user_data = (void*)(intptr_t)viewId;
@@ -126,21 +131,30 @@ void ViewMain::addMainView(WidgetsContainer* view, uint32_t viewId)
   view->show();
 }
 
-void ViewMain::setTopbarVisible(float visible) { topbar->setVisible(visible); }
-void ViewMain::setEdgeTxButtonVisible(float visible) { topbar->setEdgeTxButtonVisible(visible); }
+void ViewMain::setTopbarVisible(float visible)
+{
+  if (topbar) topbar->setVisible(visible);
+}
+void ViewMain::setEdgeTxButtonVisible(float visible)
+{
+  if (topbar) topbar->setEdgeTxButtonVisible(visible);
+}
 
 unsigned ViewMain::getMainViewsCount() const
 {
+  if (!tile_view) return 0;
   return lv_obj_get_child_cnt(tile_view);
 }
 
 unsigned ViewMain::getCurrentMainView() const
 {
+  if (!tile_view || !width()) return 0;
   return lv_obj_get_scroll_x(tile_view) / width();
 }
 
 void ViewMain::setCurrentMainView(unsigned viewId)
 {
+  if (!tile_view) return;
   lv_obj_set_tile_id(tile_view, viewId, 0, LV_ANIM_OFF);
 }
 
@@ -148,8 +162,10 @@ void setRequestedMainView(uint8_t view) { g_model.view = view; }
 
 void ViewMain::nextMainView()
 {
+  auto count = getMainViewsCount();
+  if (!count) return;
   auto view = getCurrentMainView();
-  if (++view >= getMainViewsCount()) view = 0;
+  if (++view >= count) view = 0;
 
   setCurrentMainView(view);
   saveViewId(view);
@@ -157,11 +173,13 @@ void ViewMain::nextMainView()
 
 void ViewMain::previousMainView()
 {
+  auto count = getMainViewsCount();
+  if (!count) return;
   auto view = getCurrentMainView();
   if (view > 0)
     view--;
   else
-    view = getMainViewsCount() - 1;
+    view = count - 1;
 
   setCurrentMainView(view);
   saveViewId(view);
@@ -281,6 +299,7 @@ bool ViewMain::enableWidgetSelect(bool enable)
   if (widget_select == enable) return false;
   widget_select = enable;
 
+  if (!tile_view) return true;
   lv_obj_t* tile = lv_tileview_get_tile_act(tile_view);
   if (!tile) return true;
 
@@ -288,6 +307,7 @@ bool ViewMain::enableWidgetSelect(bool enable)
   if (!cont_obj) return true;
 
   auto cont = (WidgetsContainer*)lv_obj_get_user_data(cont_obj);
+  if (!cont) return true;
 
   for (uint32_t i = 0; i < cont->getZonesCount(); i++) {
     Widget* widget = cont->getWidget(i);
@@ -375,18 +395,18 @@ bool ViewMain::hasTopbar(unsigned view)
 
 void ViewMain::showTopBarEdgeTxButton()
 {
-  topbar->setEdgeTxButtonVisible(hasTopbar() || isAppMode());
+  if (topbar) topbar->setEdgeTxButtonVisible(hasTopbar() || isAppMode());
 }
 
 void ViewMain::hideTopBarEdgeTxButton()
 {
-  topbar->setEdgeTxButtonVisible(0.0);
+  if (topbar) topbar->setEdgeTxButtonVisible(0.0);
 }
 
 void ViewMain::_refreshWidgets()
 {
   if (!_deleted) {
-    topbar->refreshWidgets(isVisible && hasTopbar());
+    if (topbar) topbar->refreshWidgets(isVisible && hasTopbar());
     for (int i = 0; i < MAX_CUSTOM_SCREENS; i += 1) {
       if (customScreens[i])
         customScreens[i]->refreshWidgets(isVisible);

@@ -23,6 +23,8 @@
 #include "etx_lv_theme.h"
 #include "translations/translations.h"
 
+#include <new>
+
 static const lv_obj_class_t menu_button_class = {
     .base_class = &button_class,
     .constructor_cb = nullptr,
@@ -45,7 +47,7 @@ static void toolbar_btn_defocus(lv_event_t* event)
 {
   auto obj = lv_event_get_target(event);
   auto btn = (MenuToolbarButton*)lv_obj_get_user_data(obj);
-  btn->check(false);
+  if (btn) btn->check(false);
 }
 
 MenuToolbarButton::MenuToolbarButton(Window* parent, const rect_t& rect,
@@ -180,7 +182,8 @@ void MenuToolbar::addButton(const char* picto, int16_t filtermin,
   }
 
   rect_t r = getButtonRect(wideButton);
-  auto button = new MenuToolbarButton(this, r, picto);
+  auto button = new (std::nothrow) MenuToolbarButton(this, r, picto);
+  if (!button) return;
 
   button->setPressHandler(std::bind(&MenuToolbar::filterMenu, this, button,
                                     filtermin, filtermax, filterFunc, title));

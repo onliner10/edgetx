@@ -28,6 +28,8 @@
 #include "numberedit.h"
 #include "textedit.h"
 
+#include <new>
+
 #define SET_DIRTY() storageDirty(EE_MODEL)
 
 static const lv_coord_t default_col_dsc[] = {LV_GRID_CONTENT,
@@ -167,7 +169,7 @@ class CurveDataEdit : public Window
   {
     // Point number
     for (int i = 0; i < count; i++) {
-      new StaticText(parent,
+      new (std::nothrow) StaticText(parent,
                      {PTNUM_X + (i * (NUM_BTN_WIDTH + PAD_TINY)), y,
                       NUM_BTN_WIDTH, PTNUM_H},
                      std::to_string(i + start + 1),
@@ -176,7 +178,7 @@ class CurveDataEdit : public Window
 
     y += NUM_HDR_HEIGHT;
 
-    new StaticText(
+    new (std::nothrow) StaticText(
         parent, {1, y + PAD_MEDIUM, PTNUM_X, EdgeTxStyles::UI_ELEMENT_HEIGHT},
         "X", COLOR_THEME_PRIMARY1_INDEX, CENTERED);
 
@@ -187,7 +189,7 @@ class CurveDataEdit : public Window
       uint8_t i = 0;
       uint8_t c = count;
       if (start == 0) {
-        new StaticText(
+        new (std::nothrow) StaticText(
             parent,
             {PTNUM_X + (i * (NUM_BTN_WIDTH + PAD_TINY)), y + PAD_MEDIUM,
              NUM_BTN_WIDTH, EdgeTxStyles::UI_ELEMENT_HEIGHT},
@@ -200,7 +202,7 @@ class CurveDataEdit : public Window
       // Adjustable points for custom curves
       for (; i < c; i++) {
         uint8_t px = i + start - 1;
-        numEditX[px] = new NumberEdit(
+        numEditX[px] = new (std::nothrow) NumberEdit(
             parent,
             {PTNUM_X + (i * (NUM_BTN_WIDTH + PAD_TINY)), y, NUM_BTN_WIDTH,
              EdgeTxStyles::UI_ELEMENT_HEIGHT},
@@ -211,10 +213,10 @@ class CurveDataEdit : public Window
             [=](int32_t newValue) {
               points[curvePointsCount + px] = newValue;
               if (px > 0) {
-                numEditX[px - 1]->setMax(newValue);
+                if (numEditX[px - 1]) numEditX[px - 1]->setMax(newValue);
               }
               if (px < curvePointsCount - 3) {
-                numEditX[px + 1]->setMin(newValue);
+                if (numEditX[px + 1]) numEditX[px + 1]->setMin(newValue);
               }
               SET_DIRTY();
               Messaging::send(Messaging::CURVE_EDIT);
@@ -222,15 +224,15 @@ class CurveDataEdit : public Window
             CENTERED);
       }
       if ((start + count) == curvePointsCount) {
-        new StaticText(
+        new (std::nothrow) StaticText(
             parent,
             {PTNUM_X + (i * (NUM_BTN_WIDTH + PAD_TINY)), y + PAD_MEDIUM,
              NUM_BTN_WIDTH, EdgeTxStyles::UI_ELEMENT_HEIGHT},
             "100", COLOR_THEME_SECONDARY1_INDEX, CENTERED);
       }
     } else {
-      for (uint8_t i = 0; i < count; i++) {
-        new StaticText(
+      for (int i = 0; i < count; i++) {
+        new (std::nothrow) StaticText(
             parent,
             rect_t{PTNUM_X + (i * (NUM_BTN_WIDTH + PAD_TINY)), y + PAD_MEDIUM,
                    NUM_BTN_WIDTH, EdgeTxStyles::UI_ELEMENT_HEIGHT},
@@ -241,13 +243,13 @@ class CurveDataEdit : public Window
 
     y += EdgeTxStyles::UI_ELEMENT_HEIGHT + PAD_TINY;
 
-    new StaticText(
+    new (std::nothrow) StaticText(
         parent, {1, y + PAD_MEDIUM, PTNUM_X, EdgeTxStyles::UI_ELEMENT_HEIGHT},
         "Y", COLOR_THEME_PRIMARY1_INDEX, CENTERED);
 
     // y value
-    for (uint8_t i = 0; i < count; i++) {
-      new NumberEdit(parent,
+    for (int i = 0; i < count; i++) {
+      new (std::nothrow) NumberEdit(parent,
           {PTNUM_X + (i * (NUM_BTN_WIDTH + PAD_TINY)), y, NUM_BTN_WIDTH,
            EdgeTxStyles::UI_ELEMENT_HEIGHT},
           -100, 100, GET_VALUE(points[i + start]),
@@ -300,7 +302,8 @@ void CurveEditWindow::buildBody(Window* window)
   coord_t boxHeight = window->height();
 #endif
 
-  auto box = new Window(line, rect_t{});
+  auto box = new (std::nothrow) Window(line, rect_t{});
+  if (!box) return;
   box->setWidth(boxWidth);
   box->setHeight(boxHeight);
   box->padAll(PAD_ZERO);
@@ -308,7 +311,8 @@ void CurveEditWindow::buildBody(Window* window)
   static const lv_coord_t controls_col_dsc[] = {
       LV_GRID_FR(5), LV_GRID_FR(8), LV_GRID_FR(5), LV_GRID_TEMPLATE_LAST};
 
-  auto form = new Window(box, rect_t{});
+  auto form = new (std::nothrow) Window(box, rect_t{});
+  if (!form) return;
   form->padAll(PAD_ZERO);
   form->setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_ZERO);
 
@@ -320,18 +324,18 @@ void CurveEditWindow::buildBody(Window* window)
                         LV_GRID_ALIGN_SPACE_BETWEEN);
 
   // Name
-  new StaticText(iLine, rect_t{}, STR_NAME);
-  new ModelTextEdit(iLine, rect_t{}, curve.name, sizeof(curve.name));
+  new (std::nothrow) StaticText(iLine, rect_t{}, STR_NAME);
+  new (std::nothrow) ModelTextEdit(iLine, rect_t{}, curve.name, sizeof(curve.name));
 
   // Smooth
   auto smooth =
-      new TextButton(iLine, rect_t{0, 0, EdgeTxStyles::EDIT_FLD_WIDTH_NARROW, 0}, STR_SMOOTH, [=]() {
+      new (std::nothrow) TextButton(iLine, rect_t{0, 0, EdgeTxStyles::EDIT_FLD_WIDTH_NARROW, 0}, STR_SMOOTH, [=]() {
         g_model.curves[index].smooth = !g_model.curves[index].smooth;
         Messaging::send(Messaging::CURVE_EDIT);
         SET_DIRTY();
         return g_model.curves[index].smooth;
       });
-  smooth->check(g_model.curves[index].smooth);
+  if (smooth) smooth->check(g_model.curves[index].smooth);
 
   iLine = form->newLine(iGrid);
   iLine->padAll(PAD_TINY);
@@ -339,8 +343,8 @@ void CurveEditWindow::buildBody(Window* window)
                         LV_GRID_ALIGN_SPACE_BETWEEN);
 
   // Type
-  new StaticText(iLine, rect_t{}, STR_TYPE);
-  new Choice(
+  new (std::nothrow) StaticText(iLine, rect_t{}, STR_TYPE);
+  new (std::nothrow) Choice(
       iLine, {0, 0, EdgeTxStyles::EDIT_FLD_WIDTH, 0}, STR_CURVE_TYPES, 0, 1,
       GET_DEFAULT(g_model.curves[index].type), [=](int32_t newValue) {
         CurveHeader& curve = g_model.curves[index];
@@ -366,7 +370,7 @@ void CurveEditWindow::buildBody(Window* window)
       });
 
   // Points count
-  auto edit = new Choice(
+  auto edit = new (std::nothrow) Choice(
       iLine, {0, 0, EdgeTxStyles::EDIT_FLD_WIDTH_NARROW, 0}, 2, 17,
       GET_DEFAULT(g_model.curves[index].points + 5), [=](int32_t newValue) {
         newValue -= 5;
@@ -392,16 +396,18 @@ void CurveEditWindow::buildBody(Window* window)
           }
         }
       });
-  edit->setTextHandler([=](int value) {
-    return std::to_string(value) + STR_PTS;
-  });
+  if (edit) {
+    edit->setTextHandler([=](int value) {
+      return std::to_string(value) + STR_PTS;
+    });
+  }
 
   iLine = form->newLine(iGrid);
   iLine->padAll(PAD_ZERO);
   lv_obj_set_grid_align(iLine->getLvObj(), LV_GRID_ALIGN_SPACE_BETWEEN,
                         LV_GRID_ALIGN_SPACE_BETWEEN);
 
-  curveDataEdit = new CurveDataEdit(
+  curveDataEdit = new (std::nothrow) CurveDataEdit(
       iLine,
       rect_t{
           0, 0, box->width(),

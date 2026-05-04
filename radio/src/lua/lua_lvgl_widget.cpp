@@ -21,6 +21,8 @@
 
 #include "lua_widget.h"
 
+#include <cstdint>
+
 #include "color_picker.h"
 #include "dialog.h"
 #include "edgetx.h"
@@ -358,7 +360,7 @@ LvglWidgetObjectBase::LvglWidgetObjectBase(const char* meta) :
 int LvglWidgetObjectBase::getRef(lua_State *L)
 {
   LvglWidgetObjectBase **p =
-      (LvglWidgetObjectBase **)lua_newuserdata(L, sizeof(LvglWidgetObjectBase *));
+      (LvglWidgetObjectBase **)lua_newuserdata(L, sizeof(std::uintptr_t));
   *p = this;
   luaL_getmetatable(L, metatable);
   lua_setmetatable(L, -2);

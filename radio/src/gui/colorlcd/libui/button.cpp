@@ -21,6 +21,8 @@
 #include "static.h"
 #include "etx_lv_theme.h"
 
+#include <new>
+
 //-----------------------------------------------------------------------------
 
 static void button_constructor(const lv_obj_class_t* class_p, lv_obj_t* obj)
@@ -129,11 +131,16 @@ IconButton::IconButton(Window* parent, EdgeTxIcon icon, coord_t x, coord_t y,
     ButtonBase(parent, {x, y, EdgeTxStyles::UI_ELEMENT_HEIGHT, EdgeTxStyles::UI_ELEMENT_HEIGHT}, pressHandler, button_create)
 {
   padAll(PAD_ZERO);
-  iconImage = new StaticIcon(this, 0, 0, icon, COLOR_THEME_SECONDARY1_INDEX);
-  iconImage->center(EdgeTxStyles::UI_ELEMENT_HEIGHT - 4, EdgeTxStyles::UI_ELEMENT_HEIGHT - 4);
+  iconImage = new (std::nothrow) StaticIcon(this, 0, 0, icon, COLOR_THEME_SECONDARY1_INDEX);
+  if (iconImage) {
+    iconImage->center(EdgeTxStyles::UI_ELEMENT_HEIGHT - 4, EdgeTxStyles::UI_ELEMENT_HEIGHT - 4);
+  }
 }
 
-void IconButton::setIcon(EdgeTxIcon icon) { iconImage->setIcon(icon); }
+void IconButton::setIcon(EdgeTxIcon icon)
+{
+  if (iconImage) iconImage->setIcon(icon);
+}
 
 //-----------------------------------------------------------------------------
 

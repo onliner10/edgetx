@@ -29,6 +29,8 @@
 #include "theme_manager.h"
 #include "view_main.h"
 
+#include <new>
+
 PageHeader::PageHeader(Window* parent, EdgeTxIcon icon) :
     Window(parent, {0, 0, LCD_W, EdgeTxStyles::MENU_HEADER_HEIGHT})
 {
@@ -36,12 +38,12 @@ PageHeader::PageHeader(Window* parent, EdgeTxIcon icon) :
 
   etx_solid_bg(lvobj, COLOR_THEME_SECONDARY1_INDEX);
 
-  new HeaderIcon(this, icon);
+  new (std::nothrow) HeaderIcon(this, icon);
 
-  title = new StaticText(this,
-                         {PAGE_TITLE_LEFT, PAGE_TITLE_TOP,
-                          LCD_W - PAGE_TITLE_LEFT, EdgeTxStyles::STD_FONT_HEIGHT},
-                         "", COLOR_THEME_PRIMARY2_INDEX);
+  title = new (std::nothrow) StaticText(this,
+                                        {PAGE_TITLE_LEFT, PAGE_TITLE_TOP,
+                                         LCD_W - PAGE_TITLE_LEFT, EdgeTxStyles::STD_FONT_HEIGHT},
+                                        "", COLOR_THEME_PRIMARY2_INDEX);
 }
 
 PageHeader::PageHeader(Window* parent, const char* iconFile) :
@@ -51,23 +53,23 @@ PageHeader::PageHeader(Window* parent, const char* iconFile) :
 
   etx_solid_bg(lvobj, COLOR_THEME_SECONDARY1_INDEX);
 
-  new HeaderIcon(this, iconFile);
+  new (std::nothrow) HeaderIcon(this, iconFile);
 
-  title = new StaticText(this,
-                         {PAGE_TITLE_LEFT, PAGE_TITLE_TOP,
-                          LCD_W - PAGE_TITLE_LEFT, EdgeTxStyles::STD_FONT_HEIGHT},
-                         "", COLOR_THEME_PRIMARY2_INDEX);
+  title = new (std::nothrow) StaticText(this,
+                                        {PAGE_TITLE_LEFT, PAGE_TITLE_TOP,
+                                         LCD_W - PAGE_TITLE_LEFT, EdgeTxStyles::STD_FONT_HEIGHT},
+                                        "", COLOR_THEME_PRIMARY2_INDEX);
 }
 
 StaticText* PageHeader::setTitle2(std::string txt)
 {
   if (title2 == nullptr) {
-    title2 = new StaticText(this,
-                            {PAGE_TITLE_LEFT, PAGE_TITLE_TOP + EdgeTxStyles::STD_FONT_HEIGHT,
-                             LCD_W - PAGE_TITLE_LEFT, EdgeTxStyles::STD_FONT_HEIGHT},
-                            "", COLOR_THEME_PRIMARY2_INDEX);
+    title2 = new (std::nothrow) StaticText(this,
+                                           {PAGE_TITLE_LEFT, PAGE_TITLE_TOP + EdgeTxStyles::STD_FONT_HEIGHT,
+                                            LCD_W - PAGE_TITLE_LEFT, EdgeTxStyles::STD_FONT_HEIGHT},
+                                           "", COLOR_THEME_PRIMARY2_INDEX);
   }
-  title2->setText(std::move(txt));
+  if (title2) title2->setText(std::move(txt));
   return title2;
 }
 
@@ -77,10 +79,10 @@ Page::Page(EdgeTxIcon icon, PaddingSize padding, bool pauseRefresh) :
   if (pauseRefresh)
     lv_obj_enable_style_refresh(false);
 
-  header = new PageHeader(this, icon);
+  header = new (std::nothrow) PageHeader(this, icon);
 
 #if VERSION_MAJOR > 2
-  new HeaderBackIcon(header);
+  if (header) new (std::nothrow) HeaderBackIcon(header);
 #endif
 
 #if defined(HARDWARE_TOUCH)
@@ -92,8 +94,13 @@ Page::Page(EdgeTxIcon icon, PaddingSize padding, bool pauseRefresh) :
 #endif
 #endif
 
-  body = new Window(this,
-                    {0, EdgeTxStyles::MENU_HEADER_HEIGHT, LCD_W, LCD_H - EdgeTxStyles::MENU_HEADER_HEIGHT});
+  body = new (std::nothrow) Window(this,
+                                   {0, EdgeTxStyles::MENU_HEADER_HEIGHT, LCD_W, LCD_H - EdgeTxStyles::MENU_HEADER_HEIGHT});
+  if (!body) {
+    if (pauseRefresh)
+      lv_obj_enable_style_refresh(true);
+    return;
+  }
   body->setWindowFlag(NO_FOCUS);
 
   etx_solid_bg(lvobj);
@@ -198,6 +205,7 @@ void Page::onLongPressRTN() { onCancel(); }
 SubPage::SubPage(EdgeTxIcon icon, const char* title, const char* subtitle, bool pauseRefresh) :
   Page(icon, PAD_SMALL, pauseRefresh)
 {
+  if (!body || !header) return;
   body->padBottom(PAD_LARGE * 2);
 
   header->setTitle(title);
@@ -207,6 +215,7 @@ SubPage::SubPage(EdgeTxIcon icon, const char* title, const char* subtitle, bool 
 SubPage::SubPage(EdgeTxIcon icon, const char* title, const char* subtitle, const SetupLineDef* setupLines) :
   Page(icon, PAD_SMALL, true)
 {
+  if (!body || !header) return;
   body->padBottom(PAD_LARGE * 2);
 
   header->setTitle(title);
@@ -219,12 +228,14 @@ SubPage::SubPage(EdgeTxIcon icon, const char* title, const char* subtitle, const
 
 Window* SubPage::setupLine(const char* title, std::function<void(SetupLine*, coord_t, coord_t)> createEdit, coord_t lblYOffset)
 {
-  auto w = new SetupLine(body, y, EDT_X, PAD_SMALL, title, createEdit, lblYOffset);
+  if (!body) return nullptr;
+  auto w = new (std::nothrow) SetupLine(body, y, EDT_X, PAD_SMALL, title, createEdit, lblYOffset);
+  if (!w) return nullptr;
   y += w->height();
   return w;
 }
 
 void SubPage::useFlexLayout()
 {
-  body->setFlexLayout();
+  if (body) body->setFlexLayout();
 }

@@ -26,6 +26,8 @@
 #include "layout.h"
 #include "theme_manager.h"
 
+#include <new>
+
 class RadioInfoWidget : public Widget
 {
  public:
@@ -34,51 +36,53 @@ class RadioInfoWidget : public Widget
       Widget(factory, parent, rect, screenNum, zoneNum)
   {
     // Logs
-    logsIcon = new StaticIcon(this, W_LOG_X, PAD_THREE, ICON_DOT,
-                              COLOR_THEME_PRIMARY2_INDEX);
-    logsIcon->hide();
+    logsIcon = new (std::nothrow) StaticIcon(this, W_LOG_X, PAD_THREE, ICON_DOT,
+                                             COLOR_THEME_PRIMARY2_INDEX);
+    if (logsIcon) logsIcon->hide();
 
     usbIcon =
-        new StaticIcon(this, W_USB_X, W_USB_Y, ICON_TOPMENU_USB,
-                       COLOR_THEME_PRIMARY2_INDEX);
-    usbIcon->hide();
+        new (std::nothrow) StaticIcon(this, W_USB_X, W_USB_Y, ICON_TOPMENU_USB,
+                                      COLOR_THEME_PRIMARY2_INDEX);
+    if (usbIcon) usbIcon->hide();
 
 #if defined(AUDIO)
-    audioScale = new StaticIcon(this, W_AUDIO_SCALE_X, PAD_TINY,
-                                ICON_TOPMENU_VOLUME_SCALE,
-                                COLOR_THEME_PRIMARY3_INDEX);
+    audioScale = new (std::nothrow) StaticIcon(this, W_AUDIO_SCALE_X, PAD_TINY,
+                                               ICON_TOPMENU_VOLUME_SCALE,
+                                               COLOR_THEME_PRIMARY3_INDEX);
 
     for (int i = 0; i < 5; i += 1) {
-      audioVol[i] = new StaticIcon(
+      audioVol[i] = new (std::nothrow) StaticIcon(
           this, W_AUDIO_X, PAD_TINY,
          (EdgeTxIcon)(ICON_TOPMENU_VOLUME_0 + i),
           COLOR_THEME_PRIMARY2_INDEX);
-      audioVol[i]->hide();
+      if (audioVol[i]) audioVol[i]->hide();
     }
-    audioVol[0]->show();
+    if (audioVol[0]) audioVol[0]->show();
 #endif
 
-    batteryIcon = new StaticIcon(this, W_AUDIO_X, W_BATT_Y,
-                                 ICON_TOPMENU_TXBATT,
-                                 COLOR_THEME_PRIMARY2_INDEX);
+    batteryIcon = new (std::nothrow) StaticIcon(this, W_AUDIO_X, W_BATT_Y,
+                                                ICON_TOPMENU_TXBATT,
+                                                COLOR_THEME_PRIMARY2_INDEX);
 #if defined(USB_CHARGER)
-    batteryChargeIcon = new StaticIcon(
+    batteryChargeIcon = new (std::nothrow) StaticIcon(
         this, W_BATT_CHG_X, W_BATT_CHG_Y,
         ICON_TOPMENU_TXBATT_CHARGE, COLOR_THEME_PRIMARY2_INDEX);
-    batteryChargeIcon->hide();
+    if (batteryChargeIcon) batteryChargeIcon->hide();
 #endif
 
 #if defined(INTERNAL_MODULE_PXX1) && defined(EXTERNAL_ANTENNA)
-    extAntenna = new StaticIcon(this, W_RSSI_X - PAD_SMALL, 1,
-                                ICON_TOPMENU_ANTENNA,
-                                COLOR_THEME_PRIMARY2_INDEX);
-    extAntenna->hide();
+    extAntenna = new (std::nothrow) StaticIcon(this, W_RSSI_X - PAD_SMALL, 1,
+                                               ICON_TOPMENU_ANTENNA,
+                                               COLOR_THEME_PRIMARY2_INDEX);
+    if (extAntenna) extAntenna->hide();
 #endif
 
     batteryFill = lv_obj_create(lvobj);
-    lv_obj_set_pos(batteryFill, W_AUDIO_X + 1, W_BATT_Y + 1);
-    lv_obj_set_size(batteryFill, W_BATT_FILL_W, W_BATT_FILL_H);
-    lv_obj_set_style_bg_opa(batteryFill, LV_OPA_COVER, LV_PART_MAIN);
+    if (batteryFill) {
+      lv_obj_set_pos(batteryFill, W_AUDIO_X + 1, W_BATT_Y + 1);
+      lv_obj_set_size(batteryFill, W_BATT_FILL_W, W_BATT_FILL_H);
+      lv_obj_set_style_bg_opa(batteryFill, LV_OPA_COVER, LV_PART_MAIN);
+    }
     update();
 
     // RSSI bars
@@ -92,11 +96,13 @@ class RadioInfoWidget : public Widget
     for (unsigned int i = 0; i < DIM(rssiBarsHeight); i++) {
       uint8_t height = rssiBarsHeight[i];
       rssiBars[i] = lv_obj_create(lvobj);
-      lv_obj_set_pos(rssiBars[i], W_RSSI_X + i * W_RSSI_BAR_SZ,
-                     W_RSSI_BAR_H - height);
-      lv_obj_set_size(rssiBars[i], W_RSSI_BAR_W, height);
-      etx_solid_bg(rssiBars[i], COLOR_THEME_PRIMARY3_INDEX);
-      etx_bg_color(rssiBars[i], COLOR_THEME_PRIMARY2_INDEX, LV_STATE_USER_1);
+      if (rssiBars[i]) {
+        lv_obj_set_pos(rssiBars[i], W_RSSI_X + i * W_RSSI_BAR_SZ,
+                       W_RSSI_BAR_H - height);
+        lv_obj_set_size(rssiBars[i], W_RSSI_BAR_W, height);
+        etx_solid_bg(rssiBars[i], COLOR_THEME_PRIMARY3_INDEX);
+        etx_bg_color(rssiBars[i], COLOR_THEME_PRIMARY2_INDEX, LV_STATE_USER_1);
+      }
     }
 
     foreground();
@@ -107,6 +113,7 @@ class RadioInfoWidget : public Widget
     if (_deleted) return;
 
     auto widgetData = getPersistentData();
+    if (!batteryFill) return;
 
     // get colors from options
     etx_bg_color_from_flags(batteryFill, widgetData->options[2].value.unsignedValue, LV_PART_MAIN);
@@ -118,14 +125,16 @@ class RadioInfoWidget : public Widget
   {
     if (_deleted) return;
 
-    usbIcon->show(usbPlugged());
+    if (usbIcon) usbIcon->show(usbPlugged());
     if (getSelectedUsbMode() == USB_UNSELECTED_MODE)
-      usbIcon->setColor(COLOR_THEME_PRIMARY3_INDEX);
+      { if (usbIcon) usbIcon->setColor(COLOR_THEME_PRIMARY3_INDEX); }
     else
-      usbIcon->setColor(COLOR_THEME_PRIMARY2_INDEX);
+      { if (usbIcon) usbIcon->setColor(COLOR_THEME_PRIMARY2_INDEX); }
 
-    logsIcon->show(!usbPlugged() && isFunctionActive(FUNCTION_LOGS) &&
-                   BLINK_ON_PHASE);
+    if (logsIcon) {
+      logsIcon->show(!usbPlugged() && isFunctionActive(FUNCTION_LOGS) &&
+                     BLINK_ON_PHASE);
+    }
 
 #if defined(AUDIO)
     /* Audio volume */
@@ -139,19 +148,21 @@ class RadioInfoWidget : public Widget
     else if (requiredSpeakerVolume < 19)
       vol = 3;
     if (vol != lastVol) {
-      audioVol[vol]->show();
-      audioVol[lastVol]->hide();
+      if (audioVol[vol]) audioVol[vol]->show();
+      if (audioVol[lastVol]) audioVol[lastVol]->hide();
       lastVol = vol;
     }
 #endif
 
 #if defined(USB_CHARGER)
-    batteryChargeIcon->show(usbChargerLed());
+    if (batteryChargeIcon) batteryChargeIcon->show(usbChargerLed());
 #endif
 
 #if defined(INTERNAL_MODULE_PXX1) && defined(EXTERNAL_ANTENNA)
-    extAntenna->show(isModuleXJT(INTERNAL_MODULE) &&
-                     isExternalAntennaEnabled());
+    if (extAntenna) {
+      extAntenna->show(isModuleXJT(INTERNAL_MODULE) &&
+                       isExternalAntennaEnabled());
+    }
 #endif
 
     // Battery level
@@ -176,6 +187,8 @@ class RadioInfoWidget : public Widget
     if (rssi != lastRSSI) {
       lastRSSI = rssi;
       for (unsigned int i = 0; i < DIM(rssiBarsValue); i++) {
+        if (!rssiBars[i])
+          continue;
         if (rssi >= rssiBarsValue[i])
           lv_obj_add_state(rssiBars[i], LV_STATE_USER_1);
         else
@@ -207,20 +220,20 @@ class RadioInfoWidget : public Widget
   uint8_t lastVol = 0;
   uint8_t lastBatt = 0;
   uint8_t lastRSSI = 0;
-  StaticIcon* logsIcon;
-  StaticIcon* usbIcon;
+  StaticIcon* logsIcon = nullptr;
+  StaticIcon* usbIcon = nullptr;
 #if defined(AUDIO)
-  StaticIcon* audioScale;
-  StaticIcon* audioVol[5];
+  StaticIcon* audioScale = nullptr;
+  StaticIcon* audioVol[5] = {};
 #endif
-  StaticIcon* batteryIcon;
+  StaticIcon* batteryIcon = nullptr;
   lv_obj_t* batteryFill = nullptr;
   lv_obj_t* rssiBars[5] = {nullptr};
 #if defined(USB_CHARGER)
-  StaticIcon* batteryChargeIcon;
+  StaticIcon* batteryChargeIcon = nullptr;
 #endif
 #if defined(INTERNAL_MODULE_PXX1) && defined(EXTERNAL_ANTENNA)
-  StaticIcon* extAntenna;
+  StaticIcon* extAntenna = nullptr;
 #endif
 };
 
@@ -241,7 +254,7 @@ class DateTimeWidget : public Widget
       Widget(factory, parent, rect, screenNum, zoneNum)
   {
     coord_t x = rect.w - HeaderDateTime::HDR_DATE_WIDTH - DT_XO;
-    dateTime = new HeaderDateTime(this, x, PAD_THREE);
+    dateTime = new (std::nothrow) HeaderDateTime(this, x, PAD_THREE);
     update();
   }
 
@@ -261,6 +274,7 @@ class DateTimeWidget : public Widget
     // get color from options
     uint32_t color;
     memcpy(&color, &widgetData->options[0].value.unsignedValue, sizeof(color));
+    if (!dateTime) return;
     dateTime->setColor(color);
     coord_t x = width() - HeaderDateTime::HDR_DATE_WIDTH - DT_XO;
     dateTime->setPos(x, PAD_THREE);
@@ -293,10 +307,10 @@ class InternalGPSWidget : public Widget
       Widget(factory, parent, rect, screenNum, zoneNum)
   {
     icon =
-        new StaticIcon(this, width() / 2 - PAD_LARGE - PAD_TINY, ICON_H,
-                       ICON_TOPMENU_GPS, COLOR_THEME_PRIMARY3_INDEX);
+        new (std::nothrow) StaticIcon(this, width() / 2 - PAD_LARGE - PAD_TINY, ICON_H,
+                                      ICON_TOPMENU_GPS, COLOR_THEME_PRIMARY3_INDEX);
 
-    numSats = new DynamicNumber<uint16_t>(
+    numSats = new (std::nothrow) DynamicNumber<uint16_t>(
         this, {0, 1, width(), SATS_H}, [=] { return gpsData.numSat; },
         COLOR_THEME_PRIMARY2_INDEX, CENTERED | FONT(XS));
   }
@@ -307,18 +321,20 @@ class InternalGPSWidget : public Widget
 
     bool hasGPS = serialGetModePort(UART_MODE_GPS) >= 0;
 
-    numSats->show(hasGPS && (gpsData.numSat > 0));
-    icon->show(hasGPS);
+    if (numSats) numSats->show(hasGPS && (gpsData.numSat > 0));
+    if (icon) icon->show(hasGPS);
 
-    if (gpsData.fix)
-      icon->setColor(COLOR_THEME_PRIMARY2_INDEX);
-    else
-      icon->setColor(COLOR_THEME_PRIMARY3_INDEX);
+    if (icon) {
+      if (gpsData.fix)
+        icon->setColor(COLOR_THEME_PRIMARY2_INDEX);
+      else
+        icon->setColor(COLOR_THEME_PRIMARY3_INDEX);
+    }
   }
 
  protected:
-  StaticIcon* icon;
-  DynamicNumber<uint16_t>* numSats;
+  StaticIcon* icon = nullptr;
+  DynamicNumber<uint16_t>* numSats = nullptr;
 
   static LAYOUT_VAL_SCALED(ICON_H, 19)
   static LAYOUT_VAL_SCALED(SATS_H, 12)

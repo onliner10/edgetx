@@ -25,6 +25,8 @@
 #include "etx_lv_theme.h"
 #include "hal/rotary_encoder.h"
 
+#include <new>
+
 static const char* const RGBChars[MAX_BARS] = {"R", "G", "B"};
 static const char* const HSVChars[MAX_BARS] = {"H", "S", "V"};
 
@@ -222,7 +224,8 @@ class BarColorType : public ColorType
     for (int i = 0; i < MAX_BARS; i++) {
       r.x = i * spacePerBar + ColorEditor::BAR_MARGIN / 2;
 
-      bars[i] = new ColorBar(parent, r);
+      bars[i] = new (std::nothrow) ColorBar(parent, r);
+      if (!bars[i]) continue;
 
       // bar labels
       auto x = bars[i]->left() + PAD_TINY;
@@ -236,26 +239,35 @@ class BarColorType : public ColorType
   ~BarColorType() override
   {
     for (int i = 0; i < MAX_BARS; i++) {
-      bars[i]->deleteLater();
+      if (bars[i]) bars[i]->deleteLater();
     }
   };
 
   void setText() override
   {
+    auto labelChars = getLabelChars();
     for (int i = 0; i < MAX_BARS; i++) {
       auto bar = bars[i];
-      lv_label_set_text_static(barLabels[i], getLabelChars()[i]);
-      lv_label_set_text_fmt(barValLabels[i], "%" PRIu32, bar->value);
+      if (!bar) continue;
+      if (barLabels[i]) lv_label_set_text_static(barLabels[i], labelChars[i]);
+      if (barValLabels[i]) lv_label_set_text_fmt(barValLabels[i], "%" PRIu32, bar->value);
       bar->invalidate();
     }
   }
 
  protected:
-  ColorBar* bars[MAX_BARS];
-  lv_obj_t* barLabels[MAX_BARS];
-  lv_obj_t* barValLabels[MAX_BARS];
+  ColorBar* bars[MAX_BARS] = {};
+  lv_obj_t* barLabels[MAX_BARS] = {};
+  lv_obj_t* barValLabels[MAX_BARS] = {};
 
-  virtual const char* const* getLabelChars() { return nullptr; };
+  bool ready() const
+  {
+    for (int i = 0; i < MAX_BARS; i += 1)
+      if (!bars[i]) return false;
+    return true;
+  }
+
+  virtual const char* const* getLabelChars() = 0;
 
   lv_obj_t* create_bar_label(lv_obj_t* parent, lv_coord_t x, lv_coord_t y)
   {
@@ -289,6 +301,8 @@ class HSVColorType : public BarColorType
     values[1] *= MAX_SATURATION;  // convert the proper base
     values[2] *= MAX_BRIGHTNESS;
 
+    if (!ready()) return;
+
     for (auto i = 0; i < MAX_BARS; i++) {
       bars[i]->maxValue = (i == 0) ? MAX_HUE : (i == 1) ? MAX_SATURATION : MAX_BRIGHTNESS;
       bars[i]->value = values[i];
@@ -315,6 +329,7 @@ class HSVColorType : public BarColorType
 
   uint32_t getRGB() override
   {
+    if (!ready()) return 0;
     return HSVtoRGB32(bars[0]->value, bars[1]->value, bars[2]->value) | RGB888_FLAG;
   }
 
@@ -336,6 +351,8 @@ class RGBColorType : public BarColorType
     values[1] = g;
     values[2] = b;
 
+    if (!ready()) return;
+
     for (auto i = 0; i < MAX_BARS; i++) {
       bars[i]->maxValue = 255;
       bars[i]->value = values[i];
@@ -348,6 +365,7 @@ class RGBColorType : public BarColorType
 
   uint32_t getRGB() override
   {
+    if (!ready()) return 0;
     return RGB32(bars[0]->value, bars[1]->value, bars[2]->value) | RGB888_FLAG;
   }
 
@@ -363,7 +381,8 @@ class ThemeColorType : public ColorType
   {
     m_color = color;
 
-    auto vbox = new Window(parent, rect_t{});
+    auto vbox = new (std::nothrow) Window(parent, rect_t{});
+    if (!vbox) return;
     vbox->setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_ZERO);
 
     makeButtonsRow(vbox, COLOR_THEME_PRIMARY1_INDEX, COLOR_THEME_PRIMARY2_INDEX,
@@ -385,7 +404,9 @@ class ThemeColorType : public ColorType
 
   void makeButton(Window* parent, uint16_t color)
   {
-    auto btn = new TextButton(parent, {0, 0, BTN_W, 0}, "");
+    if (!parent) return;
+    auto btn = new (std::nothrow) TextButton(parent, {0, 0, BTN_W, 0}, "");
+    if (!btn) return;
     etx_bg_color(btn->getLvObj(), (LcdColorIndex)color);
     btn->setPressHandler([=]() {
       m_color = color;
@@ -396,7 +417,9 @@ class ThemeColorType : public ColorType
 
   void makeButtonsRow(Window* parent, uint16_t c1, uint16_t c2, uint16_t c3)
   {
-    auto hbox = new Window(parent, rect_t{});
+    if (!parent) return;
+    auto hbox = new (std::nothrow) Window(parent, rect_t{});
+    if (!hbox) return;
     hbox->padAll(PAD_OUTLINE);
     hbox->setFlexLayout(LV_FLEX_FLOW_ROW, PAD_OUTLINE);
     lv_obj_set_flex_align(hbox->getLvObj(), LV_FLEX_ALIGN_CENTER,
@@ -418,7 +441,8 @@ class FixedColorType : public ColorType
   {
     m_color = color;
 
-    auto vbox = new Window(parent, rect_t{});
+    auto vbox = new (std::nothrow) Window(parent, rect_t{});
+    if (!vbox) return;
     vbox->padAll(PAD_OUTLINE);
     vbox->setFlexLayout(LV_FLEX_FLOW_ROW_WRAP, PAD_OUTLINE);
     lv_obj_set_flex_align(vbox->getLvObj(), LV_FLEX_ALIGN_CENTER,
@@ -435,7 +459,9 @@ class FixedColorType : public ColorType
 
   void makeButton(Window* parent, uint16_t color)
   {
-    auto btn = new TextButton(parent, {0, 0, BTN_W, 0}, "");
+    if (!parent) return;
+    auto btn = new (std::nothrow) TextButton(parent, {0, 0, BTN_W, 0}, "");
+    if (!btn) return;
     etx_bg_color(btn->getLvObj(), (LcdColorIndex)color);
     btn->setPressHandler([=]() {
       m_color = color;
@@ -482,17 +508,17 @@ void ColorEditor::setColorEditorType(COLOR_EDITOR_TYPE colorType)
     delete _colorType;
   }
   if (colorType == RGB_COLOR_EDITOR) {
-    _colorType = new RGBColorType(this, _color);
-    setText();
+    _colorType = new (std::nothrow) RGBColorType(this, _color);
+    if (_colorType) setText();
   } else if (colorType == HSV_COLOR_EDITOR) {
-    _colorType = new HSVColorType(this, _color);
-    setText();
+    _colorType = new (std::nothrow) HSVColorType(this, _color);
+    if (_colorType) setText();
   } else if (colorType == THM_COLOR_EDITOR) {
-    _colorType = new ThemeColorType(this, _color);
-    setText();
+    _colorType = new (std::nothrow) ThemeColorType(this, _color);
+    if (_colorType) setText();
   } else {
-    _colorType = new FixedColorType(this, _color);
-    setText();
+    _colorType = new (std::nothrow) FixedColorType(this, _color);
+    if (_colorType) setText();
   }
   // Update color bars
   invalidate();
@@ -500,6 +526,7 @@ void ColorEditor::setColorEditorType(COLOR_EDITOR_TYPE colorType)
 
 void ColorEditor::setText()
 {
+  if (!_colorType) return;
   _colorType->setText();
   if (_setValue != nullptr) {
     uint32_t c = _color;
@@ -519,6 +546,7 @@ void ColorEditor::setText()
 
 void ColorEditor::setRGB()
 {
+  if (!_colorType) return;
   _color = _colorType->getRGB();
   // update bars & labels
   setText();

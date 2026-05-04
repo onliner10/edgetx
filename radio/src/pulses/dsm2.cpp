@@ -76,6 +76,8 @@ void dsmDeInit(void* ctx)
 static void* dsm2Init(uint8_t module)
 {
   auto mod_st = dsmInit(module, DSM2_BITRATE, DSM2_PERIOD, false);
+  if (!mod_st) return nullptr;
+
   mod_st->user_data = (void*)(uintptr_t)g_model.moduleData[module].subType;
   return (void*)mod_st;
 }
@@ -140,8 +142,12 @@ static void dsm2SendPulses(void* ctx, uint8_t* buffer, int16_t* channels,
                            uint8_t nChannels)
 {
   auto mod_st = (etx_module_state_t*)ctx;
+  if (!mod_st) return;
+
   auto module = modulePortGetModule(mod_st);
   auto drv    = modulePortGetSerialDrv(mod_st->tx);
+  if (!drv) return;
+
   auto drvCtx = modulePortGetCtx(mod_st->tx);
 
   auto type = (uint8_t)(uintptr_t)mod_st->user_data;

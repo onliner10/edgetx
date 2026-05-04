@@ -78,11 +78,12 @@ bool ListBox::isRowSelected(uint16_t row)
 
 std::set<uint32_t> ListBox::getSelection()
 {
-  if (!multiSelect) return std::set<uint32_t>();
   std::set<uint32_t> selectedIndexes;
-  for (int i = 0; i < getRowCount(); i++) {
-    if (lv_table_has_cell_ctrl(lvobj, i, 0, LV_TABLE_CELL_CTRL_CUSTOM_1))
-      selectedIndexes.insert(i);
+  if (multiSelect) {
+    for (int i = 0; i < getRowCount(); i++) {
+      if (lv_table_has_cell_ctrl(lvobj, i, 0, LV_TABLE_CELL_CTRL_CUSTOM_1))
+        selectedIndexes.insert(i);
+    }
   }
   return selectedIndexes;
 }

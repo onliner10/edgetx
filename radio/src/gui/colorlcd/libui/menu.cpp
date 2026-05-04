@@ -25,6 +25,8 @@
 #include "static.h"
 #include "table.h"
 
+#include <new>
+
 //-----------------------------------------------------------------------------
 
 class MenuBody : public TableField
@@ -142,7 +144,8 @@ class MenuBody : public TableField
       lv_canvas_set_buffer(canvas, (void*)&icon_mask->data[0], w, h, LV_IMG_CF_ALPHA_8BIT);
     }
 
-    auto l = new MenuLine(text, onPress, isChecked, canvas);
+    auto l = new (std::nothrow) MenuLine(text, onPress, isChecked, canvas);
+    if (!l) return;
     lines.push_back(l);
 
     if (update) {

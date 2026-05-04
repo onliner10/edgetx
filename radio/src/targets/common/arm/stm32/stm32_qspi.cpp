@@ -128,7 +128,7 @@ static int qspi_read_status_register(uint8_t reg_num, uint8_t* value)
       return -1;
   }
 
-  return qspi_read(&cmd, value, sizeof(value));
+  return qspi_read(&cmd, value, sizeof(*value));
 }
 
 static int qspi_write_status_register(uint8_t reg_num, uint8_t value)
