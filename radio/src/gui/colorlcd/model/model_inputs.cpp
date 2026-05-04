@@ -52,6 +52,9 @@ uint8_t getExposCount()
 //
 void copyExpo(uint8_t source, uint8_t dest, uint8_t input)
 {
+  if (source >= MAX_EXPOS || dest >= MAX_EXPOS)
+    return;
+
   mixerTaskStop();
   ExpoData sourceExpo;
   memcpy(&sourceExpo, expoAddress(source), sizeof(ExpoData));

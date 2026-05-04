@@ -81,6 +81,9 @@ void insertExpo(uint8_t idx)
 
 void copyExpo(uint8_t idx)
 {
+  if (idx >= MAX_EXPOS)
+    return;
+
   mixerTaskStop();
   ExpoData * expo = expoAddress(idx);
   memmove(expo+1, expo, (MAX_EXPOS-(idx+1))*sizeof(ExpoData));
