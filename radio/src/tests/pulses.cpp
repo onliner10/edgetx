@@ -53,6 +53,7 @@
 #endif
 
 extern uint8_t getRequiredProtocol(uint8_t module);
+int32_t getChannelValue(uint8_t channel);
 
 namespace {
 
@@ -106,6 +107,11 @@ TEST_F(PulsesTest, invalidChannelStartDoesNotExposeOutputBuffer)
 
   EXPECT_TRUE(sendPulsesCalled);
   memset(mod, 0, sizeof(*mod));
+}
+
+TEST_F(PulsesTest, getChannelValueRejectsInvalidChannel)
+{
+  EXPECT_EQ(getChannelValue(MAX_OUTPUT_CHANNELS), 0);
 }
 
 #if defined(MULTIMODULE) && defined(HARDWARE_EXTERNAL_MODULE)

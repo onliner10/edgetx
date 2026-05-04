@@ -613,5 +613,7 @@ void setCustomFailsafe(uint8_t moduleIndex)
 
 int32_t getChannelValue(uint8_t channel)
 {
+  if (channel >= MAX_OUTPUT_CHANNELS) return 0;
+
   return channelOutputs[channel] + 2 * PPM_CH_CENTER(channel) - 2 * PPM_CENTER;
 }
