@@ -755,6 +755,15 @@ TEST_F(MixerTest, InvalidExpoIndexDoesNotInsertInput)
   EXPECT_EQ(expoCount, getExposCount());
 }
 
+TEST_F(MixerTest, InvalidExpoIndexDoesNotDeleteInput)
+{
+  uint8_t expoCount = getExposCount();
+
+  deleteExpo(MAX_EXPOS);
+
+  EXPECT_EQ(expoCount, getExposCount());
+}
+
 TEST_F(MixerTest, RecursiveAddChannel)
 {
   g_model.mixData[0].destCh = 0;

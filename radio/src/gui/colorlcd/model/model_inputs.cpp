@@ -66,6 +66,9 @@ void copyExpo(uint8_t source, uint8_t dest, uint8_t input)
 
 void deleteExpo(uint8_t idx)
 {
+  if (idx >= MAX_EXPOS)
+    return;
+
   mixerTaskStop();
   ExpoData* expo = expoAddress(idx);
   int input = expo->chn;
