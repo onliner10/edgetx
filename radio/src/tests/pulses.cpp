@@ -36,6 +36,10 @@
 #include "pulses/dsm2.h"
 #endif
 
+#if defined(DSMP)
+#include "pulses/dsmp.h"
+#endif
+
 #if defined(PXX1)
 #include "pulses/pxx1.h"
 #endif
@@ -136,6 +140,28 @@ TEST_F(PulsesTest, dsm2SendPulsesHonorsChannelCount)
   EXPECT_EQ(firstPulse, 512);
 
   DSM2Driver.deinit(ctx);
+}
+#endif
+
+#if defined(DSMP) && defined(HARDWARE_EXTERNAL_MODULE)
+TEST_F(PulsesTest, dsmpSendPulsesHonorsChannelCount)
+{
+  modulePortInit();
+  g_model.moduleData[EXTERNAL_MODULE].type = MODULE_TYPE_LEMON_DSMP;
+  g_model.moduleData[EXTERNAL_MODULE].channelsCount = 0;
+  g_model.moduleData[EXTERNAL_MODULE].dsmp.flags = 0;
+  channelOutputs[0] = 1024;
+
+  auto ctx = DSMPDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  uint8_t buffer[MODULE_BUFFER_SIZE] = {};
+  DSMPDriver.sendPulses(ctx, buffer, nullptr, 0);
+
+  uint16_t firstPulse = ((buffer[2] << 8) | buffer[3]) & 0x03FF;
+  EXPECT_EQ(firstPulse, 512);
+
+  DSMPDriver.deinit(ctx);
 }
 #endif
 
