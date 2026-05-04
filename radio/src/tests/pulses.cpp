@@ -32,6 +32,10 @@
 #include "pulses/sbus.h"
 #endif
 
+#if defined(DSM2)
+#include "pulses/dsm2.h"
+#endif
+
 extern uint8_t getRequiredProtocol(uint8_t module);
 
 namespace {
@@ -105,6 +109,25 @@ TEST_F(PulsesTest, multiSendPulsesHonorsChannelCount)
   EXPECT_EQ(firstPulse, 1024);
 
   MultiDriver.deinit(ctx);
+}
+#endif
+
+#if defined(DSM2) && defined(HARDWARE_EXTERNAL_MODULE)
+TEST_F(PulsesTest, dsm2SendPulsesHonorsChannelCount)
+{
+  modulePortInit();
+  channelOutputs[0] = 1024;
+
+  auto ctx = DSM2Driver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  uint8_t buffer[MODULE_BUFFER_SIZE] = {};
+  DSM2Driver.sendPulses(ctx, buffer, nullptr, 0);
+
+  uint16_t firstPulse = ((buffer[2] & 0x03) << 8) | buffer[3];
+  EXPECT_EQ(firstPulse, 512);
+
+  DSM2Driver.deinit(ctx);
 }
 #endif
 

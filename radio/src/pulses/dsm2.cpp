@@ -84,7 +84,20 @@ static void* dsm2Init(uint8_t module)
 
 static inline void sendByte(uint8_t*& p_buf, uint8_t b) { *p_buf++ = b; }
 
-static void setupPulsesDSM2(uint8_t module, uint8_t type, uint8_t*& p_buf)
+static int getChannelValue(uint8_t module, const int16_t* channels,
+                           uint8_t nChannels, uint8_t index)
+{
+  uint16_t channel =
+      static_cast<uint16_t>(g_model.moduleData[module].channelsStart) + index;
+  if (!channels || index >= nChannels || channel >= MAX_OUTPUT_CHANNELS) {
+    return 0;
+  }
+
+  return channels[index] + 2 * PPM_CH_CENTER(channel) - 2 * PPM_CENTER;
+}
+
+static void setupPulsesDSM2(uint8_t module, uint8_t type, uint8_t*& p_buf,
+                            const int16_t* channels, uint8_t nChannels)
 {
   uint8_t dsmDat[DSM2_FRAME_SIZE];
 
@@ -123,9 +136,7 @@ static void setupPulsesDSM2(uint8_t module, uint8_t type, uint8_t*& p_buf)
   dsmDat[1] = g_model.header.modelId[module]; // DSM2 Header second byte for model match
 
   for (int i = 0; i < DSM2_CHANS; i++) {
-    int channel = g_model.moduleData[module].channelsStart + i;
-    int value =
-        channelOutputs[channel] + 2 * PPM_CH_CENTER(channel) - 2 * PPM_CENTER;
+    int value = getChannelValue(module, channels, nChannels, i);
 
     uint16_t pulse = limit(0, ((value * 13) >> 5) + 512, 1023);
     dsmDat[2 + 2 * i] = (i << 2) | ((pulse >> 8) & 0x03);
@@ -153,7 +164,7 @@ static void dsm2SendPulses(void* ctx, uint8_t* buffer, int16_t* channels,
   auto type = (uint8_t)(uintptr_t)mod_st->user_data;
 
   auto p_data = buffer;
-  setupPulsesDSM2(module, type, p_data);
+  setupPulsesDSM2(module, type, p_data, channels, nChannels);
   drv->sendBuffer(drvCtx, buffer, p_data - buffer);
 }
 
