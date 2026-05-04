@@ -24,6 +24,7 @@
 extern int32_t getSourceNumFieldValue(int16_t val, int16_t min, int16_t max);
 
 constexpr int DEFAULT_POINTS = 5;
+constexpr int MIN_CURVE_POINTS = 2;
 constexpr int STD_CURVE_POINTS(int p) { return p + DEFAULT_POINTS; }
 constexpr int CUSTOM_CURVE_POINTS(int p) { return 2 * p + (2 * DEFAULT_POINTS - 2); }
 
@@ -280,9 +281,12 @@ int intpol(int x, uint8_t idx) // -100, -75, -50, -25, 0 ,25 ,50, 75, 100
 {
   CurveHeader& crv = g_model.curves[idx];
   int8_t* points = curveAddress(idx);
-  uint8_t count = STD_CURVE_POINTS(crv.points);
+  int count = STD_CURVE_POINTS(crv.points);
   bool custom = (crv.type == CURVE_TYPE_CUSTOM);
   int16_t erg;
+
+  if (count < MIN_CURVE_POINTS)
+    return 0;
 
   x += RESXu;
 

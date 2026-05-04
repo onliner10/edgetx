@@ -638,6 +638,25 @@ TEST_F(MixerTest, BlockingChannel)
   EXPECT_EQ(chans[0], 0);
 }
 
+TEST_F(MixerTest, InvalidCurvePointCountIsIgnored)
+{
+  g_model.curves[0].type = CURVE_TYPE_STANDARD;
+  // CurveHeader::points stores point count minus 5; -4 is a one-point curve.
+  g_model.curves[0].points = -4;
+  g_model.points[0] = 0;
+
+  g_model.mixData[0].destCh = 0;
+  g_model.mixData[0].srcRaw = MIXSRC_AIL;
+  g_model.mixData[0].weight = makeSourceNumVal(100);
+  g_model.mixData[0].curve.type = CURVE_REF_CUSTOM;
+  g_model.mixData[0].curve.value = makeSourceNumVal(1);
+
+  anaSetFiltered(AIL_STICK, 0);
+  evalFlightModeMixes(e_perout_mode_normal, 0);
+
+  EXPECT_EQ(0, chans[0]);
+}
+
 TEST_F(MixerTest, RecursiveAddChannel)
 {
   g_model.mixData[0].destCh = 0;
