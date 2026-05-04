@@ -614,20 +614,20 @@ void etx_std_ctrl_colors(lv_obj_t* obj, lv_style_selector_t selector)
   etx_obj_add_style(obj, styles->outline_color_focus,
                     selector | LV_STATE_FOCUSED);
 
-  etx_solid_bg(obj, COLOR_THEME_PRIMARY1_INDEX, selector | LV_STATE_EDITED);
-  etx_txt_color(obj, COLOR_THEME_PRIMARY2_INDEX, selector | LV_STATE_EDITED);
-  etx_obj_add_style(obj, styles->border_color[COLOR_THEME_PRIMARY2_INDEX],
+  etx_solid_bg(obj, COLOR_THEME_PRIMARY2_INDEX, selector | LV_STATE_EDITED);
+  etx_txt_color(obj, COLOR_THEME_PRIMARY1_INDEX, selector | LV_STATE_EDITED);
+  etx_obj_add_style(obj, styles->border_color[COLOR_THEME_PRIMARY1_INDEX],
                     selector | LV_STATE_EDITED);
   etx_obj_add_style(obj, styles->state_edit_frame,
                     selector | LV_STATE_EDITED);
   etx_obj_add_style(obj, styles->outline_color_focus,
                     selector | LV_STATE_EDITED);
 
-  etx_solid_bg(obj, COLOR_THEME_PRIMARY1_INDEX,
+  etx_solid_bg(obj, COLOR_THEME_PRIMARY2_INDEX,
                selector | LV_STATE_FOCUSED | LV_STATE_EDITED);
-  etx_txt_color(obj, COLOR_THEME_PRIMARY2_INDEX,
+  etx_txt_color(obj, COLOR_THEME_PRIMARY1_INDEX,
                 selector | LV_STATE_FOCUSED | LV_STATE_EDITED);
-  etx_obj_add_style(obj, styles->border_color[COLOR_THEME_PRIMARY2_INDEX],
+  etx_obj_add_style(obj, styles->border_color[COLOR_THEME_PRIMARY1_INDEX],
                     selector | LV_STATE_FOCUSED | LV_STATE_EDITED);
   etx_obj_add_style(obj, styles->state_edit_frame,
                     selector | LV_STATE_FOCUSED | LV_STATE_EDITED);
@@ -672,7 +672,8 @@ void etx_keyboard_key_colors(lv_obj_t* obj, lv_style_selector_t selector)
   etx_obj_add_style(obj, styles->outline_color_focus,
                     selector | LV_STATE_CHECKED | LV_STATE_FOCUSED);
 
-  etx_bg_color(obj, COLOR_THEME_PRIMARY1_INDEX, selector | LV_STATE_EDITED);
+  etx_bg_color(obj, COLOR_THEME_PRIMARY2_INDEX, selector | LV_STATE_EDITED);
+  etx_txt_color(obj, COLOR_THEME_PRIMARY1_INDEX, selector | LV_STATE_EDITED);
 }
 
 void etx_std_settings(lv_obj_t* obj, lv_style_selector_t selector)
@@ -756,11 +757,13 @@ static void textarea_constructor(const lv_obj_class_t* class_p, lv_obj_t* obj)
   etx_std_ctrl_colors(obj, LV_PART_MAIN);
   etx_obj_add_style(obj, styles->pad_textarea, LV_PART_MAIN);
 
-  etx_bg_color(obj, COLOR_THEME_PRIMARY1_INDEX, LV_PART_MAIN | LV_STATE_EDITED);
-  etx_txt_color(obj, COLOR_THEME_PRIMARY2_INDEX,
+  etx_bg_color(obj, COLOR_THEME_PRIMARY2_INDEX, LV_PART_MAIN | LV_STATE_EDITED);
+  etx_txt_color(obj, COLOR_THEME_PRIMARY1_INDEX,
                 LV_PART_MAIN | LV_STATE_EDITED);
 
-  etx_obj_add_style(obj, styles->bg_opacity_50,
+  etx_bg_color(obj, COLOR_THEME_PRIMARY1_INDEX,
+               LV_PART_CURSOR | LV_STATE_EDITED);
+  etx_obj_add_style(obj, styles->bg_opacity_cover,
                     LV_PART_CURSOR | LV_STATE_EDITED);
 
   lv_obj_set_scrollbar_mode(obj, LV_SCROLLBAR_MODE_OFF);
