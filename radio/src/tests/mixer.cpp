@@ -691,6 +691,11 @@ TEST_F(MixerTest, InvalidCurveIndexDoesNotCrashPointLookup)
   EXPECT_EQ(0, point.y);
 }
 
+TEST_F(MixerTest, InvalidCurveIndexIsNotUsed)
+{
+  EXPECT_FALSE(isCurveUsed(MAX_CURVES));
+}
+
 TEST_F(MixerTest, RecursiveAddChannel)
 {
   g_model.mixData[0].destCh = 0;

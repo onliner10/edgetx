@@ -164,6 +164,9 @@ void curveMirror(uint8_t index)
 
 bool isCurveUsed(uint8_t index)
 {
+  if (index >= MAX_CURVES)
+    return false;
+
   return !is_memclear(&g_model.curves[index], sizeof(CurveHeader)) ||
          !is_memclear(curveAddress(index), DEFAULT_POINTS);
 }
