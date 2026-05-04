@@ -713,6 +713,17 @@ TEST_F(MixerTest, InvalidMixIndexDoesNotInsertMix)
   EXPECT_EQ(mixCount, getMixCount());
 }
 
+TEST_F(MixerTest, InvalidMixIndexDoesNotDeleteMix)
+{
+  updateMixCount();
+  uint8_t mixCount = getMixCount();
+
+  deleteMix(MAX_MIXERS);
+
+  updateMixCount();
+  EXPECT_EQ(mixCount, getMixCount());
+}
+
 TEST_F(MixerTest, RecursiveAddChannel)
 {
   g_model.mixData[0].destCh = 0;

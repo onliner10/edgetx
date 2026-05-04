@@ -68,6 +68,9 @@ void insertMix(uint8_t idx, uint8_t channel)
 
 void deleteMix(uint8_t idx)
 {
+  if (idx >= MAX_MIXERS)
+    return;
+
   mixerTaskStop();
   MixData * mix = mixAddress(idx);
   memmove(mix, mix + 1, (MAX_MIXERS - (idx + 1)) * sizeof(MixData));
