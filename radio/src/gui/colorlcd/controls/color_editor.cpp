@@ -66,8 +66,6 @@ class ColorBar : public FormField
                       LV_PART_MAIN | LV_STATE_EDITED);
     etx_obj_add_style(lvobj, styles->state_edit_frame,
                       LV_PART_MAIN | LV_STATE_EDITED);
-    etx_obj_add_style(lvobj, styles->outline_color_focus,
-                      LV_PART_MAIN | LV_STATE_EDITED);
   }
 
   int valueToScreen(int val)

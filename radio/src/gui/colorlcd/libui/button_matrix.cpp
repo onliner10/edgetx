@@ -34,15 +34,11 @@ static void btnmatrix_constructor(const lv_obj_class_t* class_p, lv_obj_t* obj)
                     LV_PART_MAIN | LV_STATE_FOCUSED);
   etx_obj_add_style(obj, styles->state_focus_frame,
                     LV_PART_MAIN | LV_STATE_FOCUSED);
-  etx_obj_add_style(obj, styles->outline_color_focus,
-                    LV_PART_MAIN | LV_STATE_FOCUSED);
 
   etx_std_style(obj, LV_PART_ITEMS, PAD_LARGE);
   etx_remove_border_color(obj, LV_PART_ITEMS | LV_STATE_FOCUSED);
 
   etx_obj_add_style(obj, styles->border_color[COLOR_THEME_PRIMARY1_INDEX],
-                    LV_PART_ITEMS | LV_STATE_EDITED);
-  etx_obj_add_style(obj, styles->outline_color_focus,
                     LV_PART_ITEMS | LV_STATE_EDITED);
 }
 
