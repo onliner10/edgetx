@@ -65,6 +65,12 @@ WidgetSettings::WidgetSettings(Widget* w) :
   auto* widgetData = widget->getPersistentData();
 
   while (opt && opt->name != nullptr) {
+    if (opt->name[0] == '\0') {
+      optIdx++;
+      opt++;
+      continue;
+    }
+
     auto line = form->newLine(grid);
 
     new (std::nothrow) StaticText(

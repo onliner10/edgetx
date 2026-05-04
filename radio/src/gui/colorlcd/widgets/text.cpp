@@ -37,8 +37,6 @@ class TextWidget : public Widget
   void delayedInit() override
   {
     lv_style_init(&style);
-    lv_style_set_width(&style, lv_pct(100));
-    lv_style_set_height(&style, lv_pct(100));
 
     shadow = etx_label_create(lvobj);
     lv_obj_add_style(shadow, &style, LV_PART_MAIN);
@@ -78,21 +76,12 @@ class TextWidget : public Widget
       etx_txt_color_from_flags(label, color);
     }
 
-    // get font size from options[2]
-    auto font = (FontIndex)widgetData->options[2].value.unsignedValue;
-    if (isCompactTopBarWidget() && font == FONT_STD_INDEX) {
-      font = FONT_BOLD_INDEX;
-    }
-    lv_style_set_text_font(&style, getFont(font << 8));
-    // get alignment from options[4]
-    LcdFlags alignment = widgetData->options[4].value.unsignedValue;
-    lv_style_set_text_align(&style,
-                            (alignment == ALIGN_RIGHT)    ? LV_TEXT_ALIGN_RIGHT
-                            : (alignment == ALIGN_CENTER) ? LV_TEXT_ALIGN_CENTER
-                                                          : LV_TEXT_ALIGN_LEFT);
+    FontIndex font = responsiveTextFont(height());
+    centerLabel(shadow, {0, 0, width(), height()}, font, 1, 1);
+    centerLabel(label, {0, 0, width(), height()}, font);
 
     // Show or hide shadow
-    if (widgetData->options[3].value.boolValue)
+    if (isMainViewWidget() && widgetData->options[3].value.boolValue)
       lv_obj_clear_flag(shadow, LV_OBJ_FLAG_HIDDEN);
     else
       lv_obj_add_flag(shadow, LV_OBJ_FLAG_HIDDEN);
@@ -103,9 +92,9 @@ const WidgetOption TextWidget::options[] = {
     {STR_TEXT, WidgetOption::String,
      WIDGET_OPTION_VALUE_STRING(TEXT_WIDGET_DEFAULT_LABEL)},
     {STR_COLOR, WidgetOption::Color, COLOR2FLAGS(COLOR_THEME_SECONDARY1_INDEX)},
-    {STR_SIZE, WidgetOption::TextSize, 0},
+    {"", WidgetOption::TextSize, 0},
     {STR_SHADOW, WidgetOption::Bool, false},
-    {STR_ALIGNMENT, WidgetOption::Align, ALIGN_LEFT},
+    {"", WidgetOption::Align, ALIGN_CENTER},
     {nullptr, WidgetOption::Bool}};
 
 BaseWidgetFactory<TextWidget> textWidget("Text", TextWidget::options,

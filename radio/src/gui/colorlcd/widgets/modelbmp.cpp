@@ -58,13 +58,14 @@ class ModelBitmapWidget : public Widget
   {
     if (!loaded || _deleted) return;
 
-    if (getHash() != deps_hash) {
-      update();
-    }
-
     char s[LEN_MODEL_NAME + 1];
     strAppend(s, g_model.header.name, LEN_MODEL_NAME);
-    label->setText(s);
+    bool textChanged = label->getText() != s;
+    if (textChanged) label->setText(s);
+
+    if (textChanged || getHash() != deps_hash) {
+      update();
+    }
   }
 
   void update() override
@@ -73,26 +74,22 @@ class ModelBitmapWidget : public Widget
 
     auto widgetData = getPersistentData();
 
+    bool hasBitmap = g_model.header.bitmap[0] != '\0';
     isLarge = rect.h >= LARGE_H && rect.w >= LARGE_W;
-
-    // get font size from options[1]
-    etx_font(label->getLvObj(),
-             (FontIndex)widgetData->options[1].value.unsignedValue);
 
     // set font colour from options[0], if use theme color option off
     if (widgetData->options[4].value.boolValue) {
       etx_txt_color(label->getLvObj(),
-                    isCompactTopBarWidget() ? COLOR_THEME_PRIMARY2_INDEX : COLOR_THEME_SECONDARY1_INDEX,
+                    isTopBarWidget() ? COLOR_THEME_PRIMARY2_INDEX : COLOR_THEME_SECONDARY1_INDEX,
                     LV_PART_MAIN);
     } else {
       etx_txt_color_from_flags(label->getLvObj(), widgetData->options[0].value.unsignedValue);
     }
 
-    // Set label position
-    if (isLarge)
-      lv_obj_set_pos(label->getLvObj(), LARGE_LBL_X, LARGE_LBL_Y);
-    else
-      lv_obj_set_pos(label->getLvObj(), 0, 0);
+    coord_t labelHeight = isLarge && hasBitmap ? LARGE_IMG_H : height();
+    rect_t labelRect = {0, 0, width(), labelHeight};
+    FontIndex font = responsiveTextFont(labelRect.h);
+    centerLabel(label->getLvObj(), labelRect, font);
 
     // get fill color from options[3]
     etx_bg_color_from_flags(lvobj, widgetData->options[3].value.unsignedValue);
@@ -104,11 +101,11 @@ class ModelBitmapWidget : public Widget
       lv_obj_clear_state(lvobj, ETX_STATE_BG_FILL);
 
     coord_t w = width();
-    coord_t h = height() - (isLarge ? LARGE_IMG_H : 0);
+    coord_t h = height() - (isLarge && hasBitmap ? LARGE_IMG_H : 0);
     bool sizeChg = (w != image->width()) || (h != image->height());
 
     if (sizeChg)
-      image->setRect({0, isLarge ? LARGE_IMG_H : 0, w, h});
+      image->setRect({0, isLarge && hasBitmap ? LARGE_IMG_H : 0, w, h});
 
     if (!image->hasImage() || deps_hash != getHash() || sizeChg) {
       if (g_model.header.bitmap[0]) {
@@ -148,7 +145,7 @@ class ModelBitmapWidget : public Widget
 
 const WidgetOption ModelBitmapWidget::options[] = {
     {STR_COLOR, WidgetOption::Color, COLOR2FLAGS(COLOR_THEME_SECONDARY1_INDEX)},
-    {STR_SIZE, WidgetOption::TextSize, FONT_STD_INDEX},
+    {"", WidgetOption::TextSize, FONT_STD_INDEX},
     {STR_FILL_BACKGROUND, WidgetOption::Bool, false},
     {STR_BG_COLOR, WidgetOption::Color, COLOR2FLAGS(COLOR_THEME_SECONDARY3_INDEX)},
     {STR_USE_THEME_COLOR, WidgetOption::Bool, true},

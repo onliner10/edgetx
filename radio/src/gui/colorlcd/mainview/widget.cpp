@@ -170,6 +170,46 @@ Widget::Widget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
   });
 }
 
+static coord_t responsive_text_padding(coord_t height)
+{
+  return height <= EdgeTxStyles::MENU_HEADER_HEIGHT ? PAD_TINY : PAD_SMALL;
+}
+
+FontIndex Widget::responsiveTextFont(coord_t height)
+{
+  static const FontIndex candidates[] = {
+      FONT_XXL_INDEX, FONT_LXL_INDEX, FONT_XL_INDEX, FONT_L_INDEX,
+      FONT_BOLD_INDEX, FONT_STD_INDEX, FONT_XS_INDEX, FONT_XXS_INDEX};
+
+  coord_t pad = responsive_text_padding(height);
+  coord_t contentHeight = height > 2 * pad ? height - 2 * pad : height;
+
+  for (auto font : candidates) {
+    LcdFlags flags = LcdFlags(font) << 8u;
+    if (getFontHeight(flags) <= contentHeight) {
+      return font;
+    }
+  }
+
+  return FONT_XXS_INDEX;
+}
+
+void Widget::centerLabel(lv_obj_t* label, const rect_t& rect, FontIndex font,
+                         coord_t xOffset, coord_t yOffset)
+{
+  coord_t pad = responsive_text_padding(rect.h);
+  LcdFlags flags = LcdFlags(font) << 8u;
+  coord_t fontHeight = getFontHeight(flags);
+  coord_t x = rect.x + pad + xOffset;
+  coord_t y = rect.y + (rect.h - fontHeight) / 2 + yOffset;
+  coord_t w = rect.w > 2 * pad ? rect.w - 2 * pad : rect.w;
+
+  etx_font(label, font);
+  lv_obj_set_pos(label, x, y);
+  lv_obj_set_size(label, w, fontHeight);
+  lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+}
+
 void Widget::openMenu()
 {
   auto viewMain = ViewMain::instance();

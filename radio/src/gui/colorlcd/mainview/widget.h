@@ -139,6 +139,10 @@ class Widget : public ButtonBase
   lv_style_t borderStyle;
   lv_point_t borderPts[5];
 
+  static FontIndex responsiveTextFont(coord_t height);
+  static void centerLabel(lv_obj_t* label, const rect_t& rect, FontIndex font,
+                          coord_t xOffset = 0, coord_t yOffset = 0);
+
   void onCancel() override;
   bool onLongPress() override;
 
