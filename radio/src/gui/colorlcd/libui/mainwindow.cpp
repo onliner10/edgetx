@@ -57,7 +57,34 @@ void MainWindow::emptyTrash()
   trash.clear();
 }
 
-uint32_t MainWindow::run(bool trash)
+uint32_t MainWindow::runMainLoopTick()
+{
+  return run(NormalUiTick{});
+}
+
+uint32_t MainWindow::run(NormalUiTick mode)
+{
+  return runUiTick(mode);
+}
+
+uint32_t MainWindow::run(ModalUiTick mode)
+{
+  return runUiTick(mode);
+}
+
+void MainWindow::refreshModelWidgets(NormalUiTick)
+{
+  if (widgetRefreshEnable)
+    ViewMain::refreshWidgets(ViewMain::WidgetRefreshToken{});
+}
+
+void MainWindow::collectDeletedWindows(NormalUiTick)
+{
+  emptyTrash();
+}
+
+template <class TickMode>
+uint32_t MainWindow::runUiTick(TickMode mode)
 {
   uint32_t nextRun = LvglWrapper::instance()->run();
 
@@ -65,8 +92,7 @@ uint32_t MainWindow::run(bool trash)
   auto start = time_get_ms();
 #endif
 
-  if (widgetRefreshEnable)
-    ViewMain::refreshWidgets();
+  refreshModelWidgets(mode);
 
   auto opaque = Window::firstOpaque();
   if (opaque) {
@@ -82,8 +108,7 @@ uint32_t MainWindow::run(bool trash)
     }
   }
 
-  if (trash)
-    emptyTrash();
+  collectDeletedWindows(mode);
 
 #if defined(DEBUG_WINDOWS)
   auto delta = time_get_ms() - start;
@@ -145,7 +170,7 @@ void MainWindow::blockUntilClose(bool checkPwr, std::function<bool(void)> closeC
     // On startup error wait for power button to be released
     while (pwrPressed()) {
       WDG_RESET();
-      run(false);
+      run(ModalUiTick{});
       sleep_ms(10);
     }
   }
@@ -173,7 +198,7 @@ void MainWindow::blockUntilClose(bool checkPwr, std::function<bool(void)> closeC
 
     WDG_RESET();
 
-    run(false);
+    run(ModalUiTick{});
     sleep_ms(10);
   }
 }

@@ -25,6 +25,7 @@
 #include "window.h"
 
 class TopBar;
+class MainWindow;
 
 class ViewMain : public NavWindow
 {
@@ -69,7 +70,13 @@ class ViewMain : public NavWindow
 
   void refreshWidgetSelectTimer();
 
-  static void refreshWidgets();
+  class WidgetRefreshToken
+  {
+    friend class MainWindow;
+    WidgetRefreshToken() = default;
+  };
+
+  static void refreshWidgets(WidgetRefreshToken);
 
  protected:
   static ViewMain* _instance;

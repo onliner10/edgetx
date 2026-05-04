@@ -553,7 +553,7 @@ void perMain()
 #endif
 
 #if defined(COLORLCD)
-  MainWindow::instance()->run();
+  MainWindow::instance()->runMainLoopTick();
 #endif
 
 #if defined(RTC_BACKUP_RAM)

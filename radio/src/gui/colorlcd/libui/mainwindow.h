@@ -45,7 +45,7 @@ class MainWindow: public Window
   }
 #endif
 
-  uint32_t run(bool trash = true);
+  uint32_t runMainLoopTick();
 
   bool setBackgroundImage(std::string& fileName);
 
@@ -63,4 +63,28 @@ class MainWindow: public Window
   static MainWindow * _instance;
 
   void emptyTrash();
+
+ private:
+  class NormalUiTick
+  {
+    friend class MainWindow;
+    NormalUiTick() = default;
+  };
+
+  class ModalUiTick
+  {
+    friend class MainWindow;
+    ModalUiTick() = default;
+  };
+
+  uint32_t run(NormalUiTick);
+  uint32_t run(ModalUiTick);
+
+  template <class TickMode>
+  uint32_t runUiTick(TickMode mode);
+
+  void refreshModelWidgets(NormalUiTick);
+  void refreshModelWidgets(ModalUiTick) {}
+  void collectDeletedWindows(NormalUiTick);
+  void collectDeletedWindows(ModalUiTick) {}
 };

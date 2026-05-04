@@ -414,7 +414,7 @@ void ViewMain::_refreshWidgets()
   }
 }
 
-void ViewMain::refreshWidgets()
+void ViewMain::refreshWidgets(WidgetRefreshToken)
 {
   if (_instance) _instance->_refreshWidgets();
 }

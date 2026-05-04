@@ -86,7 +86,7 @@ void drawSplash()
   }
 
   // Refresh to show splash screen
-  MainWindow::instance()->run();
+  MainWindow::instance()->runMainLoopTick();
 }
 
 static tmr10ms_t splashStartTime = 0;
@@ -215,7 +215,7 @@ void drawShutdownAnimation(uint32_t duration, uint32_t totalDuration,
     if (shutdownAnim[i]) shutdownAnim[i]->hide();
   }
 
-  MainWindow::instance()->run();
+  MainWindow::instance()->runMainLoopTick();
 }
 
 Window* drawFatalErrorScreen(const char* message)
