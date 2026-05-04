@@ -83,6 +83,7 @@ class Widget : public ButtonBase
   const WidgetOption* getOptionDefinitions() const;
   bool hasOptions() const { return getOptionDefinitions() && getOptionDefinitions()->name; }
   bool isTopBarWidget() const { return parent && parent->isTopBar(); }
+  bool isMainViewWidget() const { return !isTopBarWidget(); }
   bool isCompactTopBarWidget() const
   {
     return isTopBarWidget() && height() <= EdgeTxStyles::MENU_HEADER_HEIGHT;

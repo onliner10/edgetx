@@ -197,6 +197,7 @@ const char * loadRadioSettings()
     adcCalibDefaults();
     generalDefaultSwitches();
 #if defined(COLORLCD)
+    g_eeGeneral.getTopbarData()->clear();
     g_eeGeneral.defaultKeyShortcuts();
 #endif
 

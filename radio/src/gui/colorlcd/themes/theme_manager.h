@@ -167,6 +167,8 @@ class HeaderDateTime : public Window
   HeaderDateTime(Window* parent, int x, int y);
 
   void setColor(LcdFlags color);
+  void setFont(FontIndex font);
+  void setDisplayWidth(coord_t width);
 
   static LAYOUT_VAL_SCALED(HDR_DATE_WIDTH, 45)
   static LAYOUT_VAL_SCALED(HDR_DATE_HEIGHT, 12)

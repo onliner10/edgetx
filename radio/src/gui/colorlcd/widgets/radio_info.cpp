@@ -70,6 +70,31 @@ class RadioInfoWidget : public Widget
     if (batteryChargeIcon) batteryChargeIcon->hide();
 #endif
 
+    if (isCompactTopBarWidget()) {
+      if (batteryIcon) batteryIcon->hide();
+      batteryShell = lv_obj_create(lvobj);
+      if (batteryShell) {
+        lv_obj_set_pos(batteryShell, W_BATT_HUD_X, W_BATT_HUD_Y);
+        lv_obj_set_size(batteryShell, W_BATT_HUD_W, W_BATT_HUD_H);
+        lv_obj_clear_flag(batteryShell, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_style_bg_opa(batteryShell, LV_OPA_TRANSP, LV_PART_MAIN);
+        lv_obj_set_style_border_width(batteryShell, 2, LV_PART_MAIN);
+        lv_obj_set_style_border_opa(batteryShell, LV_OPA_COVER, LV_PART_MAIN);
+        lv_obj_set_style_border_color(batteryShell,
+                                      makeLvColor(COLOR_THEME_PRIMARY2),
+                                      LV_PART_MAIN);
+        lv_obj_set_style_radius(batteryShell, 2, LV_PART_MAIN);
+      }
+      batteryCap = lv_obj_create(lvobj);
+      if (batteryCap) {
+        lv_obj_set_pos(batteryCap, W_BATT_HUD_X + W_BATT_HUD_W,
+                       W_BATT_HUD_Y + 3);
+        lv_obj_set_size(batteryCap, 3, W_BATT_HUD_H - 6);
+        lv_obj_clear_flag(batteryCap, LV_OBJ_FLAG_CLICKABLE);
+        etx_solid_bg(batteryCap, COLOR_THEME_PRIMARY2_INDEX);
+      }
+    }
+
 #if defined(INTERNAL_MODULE_PXX1) && defined(EXTERNAL_ANTENNA)
     extAntenna = new (std::nothrow) StaticIcon(this, W_RSSI_X - PAD_SMALL, 1,
                                                ICON_TOPMENU_ANTENNA,
@@ -79,27 +104,27 @@ class RadioInfoWidget : public Widget
 
     batteryFill = lv_obj_create(lvobj);
     if (batteryFill) {
-      lv_obj_set_pos(batteryFill, W_AUDIO_X + 1, W_BATT_Y + 1);
-      lv_obj_set_size(batteryFill, W_BATT_FILL_W, W_BATT_FILL_H);
+      lv_obj_set_pos(batteryFill, batteryFillX(), batteryFillY());
+      lv_obj_set_size(batteryFill, batteryFillWidth(), batteryFillHeight());
       lv_obj_set_style_bg_opa(batteryFill, LV_OPA_COVER, LV_PART_MAIN);
     }
     update();
 
     // RSSI bars
-    LAYOUT_VAL_SCALED(RSSI_BH, 31)
+    coord_t rssiBh = rssiBarHeight();
     const uint8_t rssiBarsHeight[] = {
-      (RSSI_BH * 5 + 15) / 31,
-      (RSSI_BH * 10 + 15) / 31,
-      (RSSI_BH * 15 + 15) / 31,
-      (RSSI_BH * 21 + 15) / 31,
-      RSSI_BH};
+      (uint8_t)((rssiBh * 5 + 15) / 31),
+      (uint8_t)((rssiBh * 10 + 15) / 31),
+      (uint8_t)((rssiBh * 15 + 15) / 31),
+      (uint8_t)((rssiBh * 21 + 15) / 31),
+      (uint8_t)rssiBh};
     for (unsigned int i = 0; i < DIM(rssiBarsHeight); i++) {
       uint8_t height = rssiBarsHeight[i];
       rssiBars[i] = lv_obj_create(lvobj);
       if (rssiBars[i]) {
-        lv_obj_set_pos(rssiBars[i], W_RSSI_X + i * W_RSSI_BAR_SZ,
-                       W_RSSI_BAR_H - height);
-        lv_obj_set_size(rssiBars[i], W_RSSI_BAR_W, height);
+        lv_obj_set_pos(rssiBars[i], rssiX() + i * rssiBarStep(),
+                       rssiBarBottom() - height);
+        lv_obj_set_size(rssiBars[i], rssiBarWidth(), height);
         etx_solid_bg(rssiBars[i], COLOR_THEME_SECONDARY2_INDEX);
         etx_bg_color(rssiBars[i], COLOR_THEME_PRIMARY2_INDEX, LV_STATE_USER_1);
       }
@@ -166,13 +191,13 @@ class RadioInfoWidget : public Widget
 #endif
 
     // Battery level
-    uint8_t bars = GET_TXBATT_BARS(W_BATT_FILL_W);
+    uint8_t bars = GET_TXBATT_BARS(batteryFillWidth());
     if (bars != lastBatt) {
       lastBatt = bars;
-      lv_obj_set_size(batteryFill, bars, W_BATT_FILL_H);
-      if (bars >= W_BATT_FILL_GRN) {
+      lv_obj_set_size(batteryFill, bars, batteryFillHeight());
+      if (bars >= batteryGreenThreshold()) {
         lv_obj_clear_state(batteryFill, LV_STATE_USER_1 | LV_STATE_USER_2);
-      } else if (bars >= W_BATT_FILL_ORA) {
+      } else if (bars >= batteryOrangeThreshold()) {
         lv_obj_add_state(batteryFill, LV_STATE_USER_1);
         lv_obj_clear_state(batteryFill, LV_STATE_USER_2);
       } else {
@@ -213,8 +238,75 @@ class RadioInfoWidget : public Widget
   static LAYOUT_VAL_SCALED(W_BATT_FILL_H, 10)
   static LAYOUT_VAL_SCALED(W_BATT_FILL_GRN, 12)
   static LAYOUT_VAL_SCALED(W_BATT_FILL_ORA, 5)
+  static LAYOUT_VAL_SCALED(W_BATT_HUD_X, 1)
+  static LAYOUT_VAL_SCALED(W_BATT_HUD_Y, 24)
+  static LAYOUT_VAL_SCALED(W_BATT_HUD_W, 28)
+  static LAYOUT_VAL_SCALED(W_BATT_HUD_H, 13)
+  static LAYOUT_VAL_SCALED(W_BATT_HUD_FILL_W, 24)
+  static LAYOUT_VAL_SCALED(W_BATT_HUD_FILL_H, 9)
+  static LAYOUT_VAL_SCALED(W_BATT_HUD_FILL_GRN, 14)
+  static LAYOUT_VAL_SCALED(W_BATT_HUD_FILL_ORA, 6)
   static LAYOUT_VAL_SCALED(W_BATT_CHG_X, 25)
   static LAYOUT_VAL_SCALED(W_BATT_CHG_Y, 23)
+  static LAYOUT_VAL_SCALED(W_RSSI_HUD_X, 32)
+  static LAYOUT_VAL_SCALED(W_RSSI_HUD_BAR_W, 6)
+  static LAYOUT_VAL_SCALED(W_RSSI_HUD_BAR_SZ, 8)
+  static LAYOUT_VAL_SCALED(W_RSSI_HUD_BAR_H, 36)
+
+  coord_t batteryFillX() const
+  {
+    return isCompactTopBarWidget() ? W_BATT_HUD_X + 2 : W_AUDIO_X + 1;
+  }
+
+  coord_t batteryFillY() const
+  {
+    return isCompactTopBarWidget() ? W_BATT_HUD_Y + 2 : W_BATT_Y + 1;
+  }
+
+  uint8_t batteryFillWidth() const
+  {
+    return isCompactTopBarWidget() ? W_BATT_HUD_FILL_W : W_BATT_FILL_W;
+  }
+
+  coord_t batteryFillHeight() const
+  {
+    return isCompactTopBarWidget() ? W_BATT_HUD_FILL_H : W_BATT_FILL_H;
+  }
+
+  uint8_t batteryGreenThreshold() const
+  {
+    return isCompactTopBarWidget() ? W_BATT_HUD_FILL_GRN : W_BATT_FILL_GRN;
+  }
+
+  uint8_t batteryOrangeThreshold() const
+  {
+    return isCompactTopBarWidget() ? W_BATT_HUD_FILL_ORA : W_BATT_FILL_ORA;
+  }
+
+  coord_t rssiX() const
+  {
+    return isCompactTopBarWidget() ? W_RSSI_HUD_X : W_RSSI_X;
+  }
+
+  coord_t rssiBarWidth() const
+  {
+    return isCompactTopBarWidget() ? W_RSSI_HUD_BAR_W : W_RSSI_BAR_W;
+  }
+
+  coord_t rssiBarStep() const
+  {
+    return isCompactTopBarWidget() ? W_RSSI_HUD_BAR_SZ : W_RSSI_BAR_SZ;
+  }
+
+  coord_t rssiBarHeight() const
+  {
+    return isCompactTopBarWidget() ? W_RSSI_HUD_BAR_H : (coord_t)31;
+  }
+
+  coord_t rssiBarBottom() const
+  {
+    return isCompactTopBarWidget() ? W_RSSI_HUD_BAR_H : W_RSSI_BAR_H;
+  }
 
  protected:
   uint8_t lastVol = 0;
@@ -227,6 +319,8 @@ class RadioInfoWidget : public Widget
   StaticIcon* audioVol[5] = {};
 #endif
   StaticIcon* batteryIcon = nullptr;
+  lv_obj_t* batteryShell = nullptr;
+  lv_obj_t* batteryCap = nullptr;
   lv_obj_t* batteryFill = nullptr;
   lv_obj_t* rssiBars[5] = {nullptr};
 #if defined(USB_CHARGER)

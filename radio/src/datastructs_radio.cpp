@@ -93,6 +93,13 @@ void RadioData::cfsSetOffColorLuaOverride(uint8_t n, bool v) {
 #endif
 
 #if defined(COLORLCD)
+static TopBarPersistentData _radioTopbarData;
+
+TopBarPersistentData* RadioData::getTopbarData()
+{
+  return &_radioTopbarData;
+}
+
 int RadioData::getKeyShortcutNum(event_t event)
 {
   switch(event) {

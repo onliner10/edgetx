@@ -115,7 +115,7 @@ void SetupTopBarWidgetsPage::deleteLater()
   // restore screen setting tab on top
   QuickMenu::openPage(QM_UI_SETUP);
 
-  storageDirty(EE_MODEL);
+  storageDirty(EE_GENERAL);
 }
 
 //-----------------------------------------------------------------------------
@@ -133,7 +133,7 @@ unsigned int TopBar::getZonesCount() const
 {
   unsigned int zc = 0;
   for (int i = 0; i < zoneCount; i += 1)
-    if (g_model.topbarWidgetWidth[i] > 0)
+    if (g_eeGeneral.topbarWidgetWidth[i] > 0)
       zc += 1;
   return zc;
 }
@@ -143,9 +143,9 @@ rect_t TopBar::getZone(unsigned int index) const
   coord_t x = MENU_HEADER_BUTTONS_LEFT + 1;
 
   for (unsigned int i = 0; i < index; i += 1)
-    x += (g_model.topbarWidgetWidth[i] * (TOPBAR_ZONE_WIDTH + PAD_TINY));
+    x += (g_eeGeneral.topbarWidgetWidth[i] * (TOPBAR_ZONE_WIDTH + PAD_TINY));
 
-  coord_t size = ((g_model.topbarWidgetWidth[index] - 1) * (TOPBAR_ZONE_WIDTH + PAD_TINY) + TOPBAR_ZONE_WIDTH);
+  coord_t size = ((g_eeGeneral.topbarWidgetWidth[index] - 1) * (TOPBAR_ZONE_WIDTH + PAD_TINY) + TOPBAR_ZONE_WIDTH);
 
   if ((x + size) > LCD_W) size = LCD_W - x;
 
@@ -194,20 +194,20 @@ void TopBar::removeWidget(unsigned int index)
   bool mark = false;
 
   // If user manually removes 'system' widgets, mark name so widget does not get reloaded on restart
-  if ((index == (unsigned int)(zoneCount - 1)) && g_model.getTopbarData()->isWidget(index, "Date Time"))
+  if ((index == (unsigned int)(zoneCount - 1)) && g_eeGeneral.getTopbarData()->isWidget(index, "Date Time"))
     mark = true;
-  if ((index == (unsigned int)(zoneCount - 2)) && g_model.getTopbarData()->isWidget(index, "Radio Info"))
+  if ((index == (unsigned int)(zoneCount - 2)) && g_eeGeneral.getTopbarData()->isWidget(index, "Radio Info"))
     mark = true;
 #if defined(INTERNAL_GPS)
-  if ((index == (unsigned int)(zoneCount - 3)) && g_model.getTopbarData()->isWidget(index, "Internal GPS"))
+  if ((index == (unsigned int)(zoneCount - 3)) && g_eeGeneral.getTopbarData()->isWidget(index, "Internal GPS"))
     mark = true;
 #endif
 
   // If user manually removes 'system' widgets, mark name so widget does not get reloaded on restart
   if (mark)
-    g_model.getTopbarData()->setWidgetName(index, "---");
+    g_eeGeneral.getTopbarData()->setWidgetName(index, "---");
 
-  g_model.getTopbarData()->clearZone(index);
+  g_eeGeneral.getTopbarData()->clearZone(index);
 
   WidgetsContainer::removeWidget(index);
 }
@@ -226,8 +226,8 @@ void TopBar::load()
 
   for (unsigned int i = 0; i < count; i++) {
     // and load new one if required
-    if (g_model.getTopbarData()->hasWidget(i)) {
-      widgets[i] = WidgetFactory::newWidget(g_model.getTopbarData()->getWidgetName(i), this, getZone(i), -1, i);
+    if (g_eeGeneral.getTopbarData()->hasWidget(i)) {
+      widgets[i] = WidgetFactory::newWidget(g_eeGeneral.getTopbarData()->getWidgetName(i), this, getZone(i), -1, i);
     }
   }
 }
@@ -242,7 +242,7 @@ Widget* TopBar::createWidget(unsigned int index,
 
   Widget* widget = nullptr;
   if (factory) {
-    g_model.getTopbarData()->setWidgetName(index, factory->getName());
+    g_eeGeneral.getTopbarData()->setWidgetName(index, factory->getName());
     widget = factory->create(this, getZone(index), -1, index);
   }
   widgets[index] = widget;
@@ -252,7 +252,7 @@ Widget* TopBar::createWidget(unsigned int index,
 
 void TopBar::create()
 {
-  g_model.getTopbarData()->clear();
+  g_eeGeneral.getTopbarData()->clear();
 }
 
 //-----------------------------------------------------------------------------

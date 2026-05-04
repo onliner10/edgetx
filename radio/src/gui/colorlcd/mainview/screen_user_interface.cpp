@@ -78,22 +78,22 @@ void ScreenUserInterfacePage::build(Window* window)
   box->padAll(PAD_TINY);
   box->padLeft(PAD_MEDIUM);
   for (int i = 0; i < MAX_TOPBAR_ZONES; i += 1) {
-    coord_t w = (g_model.topbarWidgetWidth[i] * (WWBTN_W + PAD_TINY)) - PAD_TINY;
+    coord_t w = (g_eeGeneral.topbarWidgetWidth[i] * (WWBTN_W + PAD_TINY)) - PAD_TINY;
     if (w < WWBTN_W) w = WWBTN_W;
     widths[i] = new (std::nothrow) Choice(box, {0, 0, w, 0}, 0, MAX_TOPBAR_ZONES,
               [=]() {
-                return g_model.topbarWidgetWidth[i];
+                return g_eeGeneral.topbarWidgetWidth[i];
               },
               [=](int value) {
-                g_model.topbarWidgetWidth[i] = value;
-                coord_t w = (g_model.topbarWidgetWidth[i] * (WWBTN_W + PAD_TINY)) - PAD_TINY;
+                g_eeGeneral.topbarWidgetWidth[i] = value;
+                coord_t w = (g_eeGeneral.topbarWidgetWidth[i] * (WWBTN_W + PAD_TINY)) - PAD_TINY;
                 if (widths[i]) widths[i]->setWidth(w);
                 int remaining = MAX_TOPBAR_ZONES;
                 for (int n = 0; n < MAX_TOPBAR_ZONES; n += 1) {
                   if (n > i) {
                     if (remaining > 0) {
-                      if (g_model.topbarWidgetWidth[n] == 0) {
-                        g_model.topbarWidgetWidth[n] = 1;
+                      if (g_eeGeneral.topbarWidgetWidth[n] == 0) {
+                        g_eeGeneral.topbarWidgetWidth[n] = 1;
                         if (widths[n]) {
                           widths[n]->setWidth(WWBTN_W);
                           widths[n]->show();
@@ -101,8 +101,8 @@ void ScreenUserInterfacePage::build(Window* window)
                         }
                       }
                     } else {
-                      if (g_model.topbarWidgetWidth[n] != 0) {
-                        g_model.topbarWidgetWidth[n] = 0;
+                      if (g_eeGeneral.topbarWidgetWidth[n] != 0) {
+                        g_eeGeneral.topbarWidgetWidth[n] = 0;
                         if (widths[n]) {
                           widths[n]->setWidth(WWBTN_W);
                           widths[n]->hide();
@@ -112,18 +112,18 @@ void ScreenUserInterfacePage::build(Window* window)
                     }
                   }
                   ViewMain::instance()->getTopbar()->load();
-                  remaining -= g_model.topbarWidgetWidth[n];
+                  remaining -= g_eeGeneral.topbarWidgetWidth[n];
                 }
-                storageDirty(EE_MODEL);
+                storageDirty(EE_GENERAL);
               }, STR_WIDGET_SIZE);
     if (!widths[i]) continue;
     widths[i]->setAvailableHandler([=](int value) {
       int remaining = MAX_TOPBAR_ZONES;
       for (int n = 0; n < i; n += 1)
-        remaining -= g_model.topbarWidgetWidth[n];
+        remaining -= g_eeGeneral.topbarWidgetWidth[n];
       return value > 0 && value <= remaining;
     });
-    if (g_model.topbarWidgetWidth[i] == 0)
+    if (g_eeGeneral.topbarWidgetWidth[i] == 0)
       widths[i]->hide();
   }
 }

@@ -345,6 +345,40 @@ static const struct YamlNode struct_QMFavorite[] = {
   YAML_PADDING( 8 ),
   YAML_END
 };
+static const struct YamlNode struct_RadioTopbarUnsigned8[] = {
+  YAML_IDX,
+  YAML_UNSIGNED( nullptr, 8 ),
+  YAML_END
+};
+static const struct YamlNode union_RadioTopbarWidgetOptionValue_elmts[] = {
+  YAML_CUSTOM("unsignedValue",r_wov_unsigned,w_wov_unsigned),
+  YAML_CUSTOM("signedValue",r_wov_signed,w_wov_signed),
+  YAML_CUSTOM("boolValue",r_wov_unsigned,w_wov_unsigned),
+  YAML_CUSTOM("stringValue",r_wov_string,w_wov_string),
+  YAML_CUSTOM("source",r_wov_source,w_wov_source),
+  YAML_CUSTOM("color",r_wov_color,w_wov_color),
+  YAML_END
+};
+static const struct YamlNode struct_RadioTopbarWidgetOptionValueTyped[] = {
+  YAML_IDX,
+  YAML_CUSTOM("type",r_wov_type,w_wov_type),
+  YAML_UNION("value", 0, union_RadioTopbarWidgetOptionValue_elmts, select_wov),
+  YAML_END
+};
+static const struct YamlNode struct_RadioTopbarWidgetPersistentData[] = {
+  YAML_ARRAY("options", 0, 50, struct_RadioTopbarWidgetOptionValueTyped, widget_option_is_active),
+  YAML_END
+};
+static const struct YamlNode struct_RadioTopbarZonePersistentData[] = {
+  YAML_IDX,
+  YAML_CUSTOM("widgetName",r_widget_name,w_widget_name),
+  YAML_STRUCT("widgetData", 0, struct_RadioTopbarWidgetPersistentData, isAlwaysActive),
+  YAML_END
+};
+static const struct YamlNode struct_RadioTopBarPersistentData[] = {
+  YAML_ARRAY("zones", 0, 6, struct_RadioTopbarZonePersistentData, widget_is_active),
+  YAML_END
+};
 static const struct YamlNode struct_RadioData[] = {
   YAML_UNSIGNED( "manuallyEdited", 1 ),
   YAML_SIGNED( "timezoneMinutes", 3 ),
@@ -459,6 +493,8 @@ static const struct YamlNode struct_RadioData[] = {
   YAML_UNSIGNED( "pwrOffIfInactive", 8 ),
   YAML_ARRAY("keyShortcuts", 8, 6, struct_KeyShortcut, NULL),
   YAML_ARRAY("qmFavorites", 8, 12, struct_QMFavorite, NULL),
+  YAML_STRUCT("topbarData", 0, struct_RadioTopBarPersistentData, isAlwaysActive),
+  YAML_ARRAY("topbarWidgetWidth", 8, 6, struct_RadioTopbarUnsigned8, NULL),
   YAML_END
 };
 static const struct YamlNode struct_unsigned_8[] = {
@@ -951,8 +987,7 @@ static const struct YamlNode struct_ModelData[] = {
   YAML_ARRAY("potsWarnPosition", 8, 16, struct_signed_8, NULL),
   YAML_ARRAY("telemetrySensors", 112, 60, struct_TelemetrySensor, NULL),
   YAML_ARRAY("screenData", 0, 10, struct_CustomScreenData, screen_is_active),
-  YAML_STRUCT("topbarData", 0, struct_TopBarPersistentData, isAlwaysActive),
-  YAML_ARRAY("topbarWidgetWidth", 8, 6, struct_unsigned_8, NULL),
+  YAML_PADDING( 48 ),
   YAML_UNSIGNED( "view", 8 ),
   YAML_STRING("modelRegistrationID", 8),
   YAML_UNSIGNED( "usbJoystickExtMode", 1 ),
@@ -998,4 +1033,3 @@ const YamlNode* get_partialmodel_nodes()
 {
    return &__PartialModel_root_node;
 }
-

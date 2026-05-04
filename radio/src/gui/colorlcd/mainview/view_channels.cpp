@@ -96,7 +96,8 @@ class ChannelsViewPage : public PageGroupItem
 #if PORTRAIT
     coord_t w = window->width() - (PAD_SMALL * 2);
 #else
-    coord_t w = window->width() / 2 - (PAD_SMALL * 2);
+    coord_t w = cols == 1 ? window->width() - (PAD_SMALL * 2)
+                          : window->width() / 2 - (PAD_SMALL * 2);
 #endif
 
     // Channels bars
@@ -108,7 +109,8 @@ class ChannelsViewPage : public PageGroupItem
         coord_t xPos = PAD_SMALL;
         coord_t yPos = j * ((window->height() - PAD_LARGE * 3) / rows);
 #else
-        coord_t xPos = (j & 1) ? w + (PAD_SMALL * 2) : PAD_SMALL;
+        coord_t xPos = cols == 1 ? PAD_SMALL
+                                 : ((j & 1) ? w + (PAD_SMALL * 2) : PAD_SMALL);
         coord_t yPos = (j / cols) * ((window->height() - ChannelsViewFooter::FOOTER_H) / rows);
 #endif
         new ComboChannelBar(window, {xPos, yPos, w, CHANS_H}, uint8_t(chan));
@@ -131,8 +133,13 @@ ChannelsViewMenu::ChannelsViewMenu() :
     int cols = 1;
     int rows = 8;
 #else
+#if LCD_W < 800
+    int cols = 1;
+    int rows = 4;
+#else
     int cols = 2;
-    int rows = (LCD_H - EdgeTxStyles::MENU_HEADER_HEIGHT - ChannelsViewFooter::FOOTER_H) / ChannelsViewPage::CHANS_H;
+    int rows = 4;
+#endif
 #endif
 
   int pages = 0;

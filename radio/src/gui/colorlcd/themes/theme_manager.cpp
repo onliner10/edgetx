@@ -572,6 +572,19 @@ void HeaderDateTime::setColor(LcdFlags color)
   etx_txt_color_from_flags(time, color);
 }
 
+void HeaderDateTime::setFont(FontIndex font)
+{
+  etx_font(date, font);
+  etx_font(time, font);
+}
+
+void HeaderDateTime::setDisplayWidth(coord_t width)
+{
+  setWidth(width);
+  lv_obj_set_width(date, width);
+  lv_obj_set_width(time, width);
+}
+
 HeaderIcon::HeaderIcon(Window* parent, EdgeTxIcon icon, std::function<void()> action) :
   StaticIcon(parent, 0, 0, ICON_TOPLEFT_BG, COLOR_THEME_FOCUS_INDEX),
   action(std::move(action))

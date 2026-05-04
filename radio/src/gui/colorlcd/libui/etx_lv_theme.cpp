@@ -355,7 +355,7 @@ void EdgeTxStyles::applyColors()
   lv_style_set_outline_color(&outline_color_normal,
                              makeLvColor(COLOR_THEME_SECONDARY2));
   lv_style_set_outline_color(&outline_color_focus,
-                             makeLvColor(COLOR_THEME_ACTIVE));
+                             makeLvColor(COLOR_THEME_PRIMARY1));
   lv_style_set_outline_color(&outline_color_edit,
                              makeLvColor(COLOR_THEME_EDIT));
 }
@@ -583,7 +583,9 @@ void etx_std_ctrl_colors(lv_obj_t* obj, lv_style_selector_t selector)
   etx_solid_bg(obj, COLOR_THEME_PRIMARY2_INDEX, selector);
   etx_txt_color(obj, COLOR_THEME_SECONDARY1_INDEX, selector);
 
-  etx_obj_add_style(obj, styles->border_color[COLOR_THEME_FOCUS_INDEX],
+  etx_solid_bg(obj, COLOR_THEME_ACTIVE_INDEX, selector | LV_STATE_FOCUSED);
+  etx_txt_color(obj, COLOR_THEME_PRIMARY1_INDEX, selector | LV_STATE_FOCUSED);
+  etx_obj_add_style(obj, styles->border_color[COLOR_THEME_PRIMARY1_INDEX],
                     selector | LV_STATE_FOCUSED);
 
   etx_bg_color(obj, COLOR_THEME_ACTIVE_INDEX, selector | LV_STATE_CHECKED);
