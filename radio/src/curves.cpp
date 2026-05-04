@@ -402,6 +402,9 @@ int applyCustomCurve(int x, uint8_t idx)
 point_t getPoint(uint8_t curveIndex, uint8_t index)
 {
   point_t result = {0, 0};
+  if (curveIndex >= MAX_CURVES)
+    return result;
+
   CurveHeader & crv = g_model.curves[curveIndex];
   int8_t * points = curveAddress(curveIndex);
   bool custom = (crv.type == CURVE_TYPE_CUSTOM);

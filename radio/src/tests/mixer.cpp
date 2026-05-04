@@ -683,6 +683,14 @@ TEST_F(MixerTest, InvalidCurvePointCountDoesNotCrashPointLookup)
   EXPECT_EQ(0, point.y);
 }
 
+TEST_F(MixerTest, InvalidCurveIndexDoesNotCrashPointLookup)
+{
+  point_t point = getPoint(MAX_CURVES, 0);
+
+  EXPECT_EQ(0, point.x);
+  EXPECT_EQ(0, point.y);
+}
+
 TEST_F(MixerTest, RecursiveAddChannel)
 {
   g_model.mixData[0].destCh = 0;
