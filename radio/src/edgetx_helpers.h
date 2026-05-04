@@ -49,6 +49,26 @@ inline T limit(T vmin, T x, T vmax)
   return min(max(vmin, x), vmax);
 }
 
+template<class N, class D, class R>
+inline R divOr(N n, D d, R fallback)
+{
+  return d == 0 ? fallback : static_cast<R>(n / d);
+}
+
+template<class N, class D, class R>
+inline bool divInto(N n, D d, R & result)
+{
+  if (d == 0) return false;
+  result = static_cast<R>(n / d);
+  return true;
+}
+
+template<class N, class D, class R>
+inline R modOr(N n, D d, R fallback)
+{
+  return d == 0 ? fallback : static_cast<R>(n % d);
+}
+
 inline int divRoundClosest(int n, int d)
 {
   if (d == 0)

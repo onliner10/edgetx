@@ -1305,13 +1305,13 @@ void copySticksToOffset(uint8_t ch)
   }
 
   int32_t divisor = 1024 * 256 - val;
-  if (divisor == 0) {
+  int32_t offset = 0;
+  if (!divInto(zero*256000 - val*lim, divisor, offset)) {
     mixerTaskStart();
     return;
   }
 
-  zero = (zero*256000 - val*lim) / divisor;
-  ld->offset = (ld->revert ? -zero : zero);
+  ld->offset = (ld->revert ? -offset : offset);
 
   mixerTaskStart();
   storageDirty(EE_MODEL);

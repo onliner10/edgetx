@@ -130,7 +130,7 @@ void evalTimers(int16_t throttle, uint8_t tick10ms)
           } else if (timerMode == TMRMODE_THR_REL) {
             // throttle was normalized to 0 to 128 value
             // (throttle/64*2 (because - range is added as well)
-            if ((timerState->sum / timerState->cnt) >= 128) {  
+            if (divOr(timerState->sum, timerState->cnt, 0) >= 128) {
               newTimerVal++;  // add second used of throttle
               timerState->sum -= 128 * timerState->cnt;
             }
