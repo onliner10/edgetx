@@ -64,7 +64,8 @@ class ColorBar : public FormField
     etx_std_style(lvobj, LV_PART_MAIN, PAD_ZERO);
     etx_obj_add_style(lvobj, styles->border_color[COLOR_THEME_PRIMARY2_INDEX],
                       LV_PART_MAIN | LV_STATE_EDITED);
-    etx_obj_add_style(lvobj, styles->sunlight_edit, LV_PART_MAIN | LV_STATE_EDITED);
+    etx_obj_add_style(lvobj, styles->state_edit_frame,
+                      LV_PART_MAIN | LV_STATE_EDITED);
     etx_obj_add_style(lvobj, styles->outline_color_focus,
                       LV_PART_MAIN | LV_STATE_EDITED);
   }

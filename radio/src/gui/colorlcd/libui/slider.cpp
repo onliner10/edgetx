@@ -134,7 +134,7 @@ static void slider_constructor(const lv_obj_class_t* class_p, lv_obj_t* obj)
   etx_obj_add_style(obj, styles->border_color[COLOR_THEME_SECONDARY1_INDEX], LV_PART_MAIN);
   etx_obj_add_style(obj, styles->border_color[COLOR_THEME_PRIMARY1_INDEX],
                     LV_PART_KNOB | LV_STATE_FOCUSED);
-  etx_obj_add_style(obj, styles->sunlight_focus,
+  etx_obj_add_style(obj, styles->state_focus_frame,
                     LV_PART_KNOB | LV_STATE_FOCUSED);
   etx_obj_add_style(obj, styles->outline_color_focus,
                     LV_PART_KNOB | LV_STATE_FOCUSED);
@@ -142,7 +142,7 @@ static void slider_constructor(const lv_obj_class_t* class_p, lv_obj_t* obj)
                LV_PART_KNOB | LV_STATE_FOCUSED | LV_STATE_EDITED);
   etx_obj_add_style(obj, styles->border_color[COLOR_THEME_PRIMARY2_INDEX],
                     LV_PART_KNOB | LV_STATE_FOCUSED | LV_STATE_EDITED);
-  etx_obj_add_style(obj, styles->sunlight_edit,
+  etx_obj_add_style(obj, styles->state_edit_frame,
                     LV_PART_KNOB | LV_STATE_FOCUSED | LV_STATE_EDITED);
   etx_obj_add_style(obj, styles->outline_color_focus,
                     LV_PART_KNOB | LV_STATE_FOCUSED | LV_STATE_EDITED);
@@ -250,7 +250,7 @@ static void vslider_constructor(const lv_obj_class_t* class_p, lv_obj_t* obj)
   etx_obj_add_style(obj, styles->border_color[COLOR_THEME_SECONDARY1_INDEX], LV_PART_MAIN);
   etx_obj_add_style(obj, styles->border_color[COLOR_THEME_PRIMARY1_INDEX],
                     LV_PART_KNOB | LV_STATE_FOCUSED);
-  etx_obj_add_style(obj, styles->sunlight_focus,
+  etx_obj_add_style(obj, styles->state_focus_frame,
                     LV_PART_KNOB | LV_STATE_FOCUSED);
   etx_obj_add_style(obj, styles->outline_color_focus,
                     LV_PART_KNOB | LV_STATE_FOCUSED);
@@ -258,7 +258,7 @@ static void vslider_constructor(const lv_obj_class_t* class_p, lv_obj_t* obj)
                LV_PART_KNOB | LV_STATE_FOCUSED | LV_STATE_EDITED);
   etx_obj_add_style(obj, styles->border_color[COLOR_THEME_PRIMARY2_INDEX],
                     LV_PART_KNOB | LV_STATE_FOCUSED | LV_STATE_EDITED);
-  etx_obj_add_style(obj, styles->sunlight_edit,
+  etx_obj_add_style(obj, styles->state_edit_frame,
                     LV_PART_KNOB | LV_STATE_FOCUSED | LV_STATE_EDITED);
   etx_obj_add_style(obj, styles->outline_color_focus,
                     LV_PART_KNOB | LV_STATE_FOCUSED | LV_STATE_EDITED);

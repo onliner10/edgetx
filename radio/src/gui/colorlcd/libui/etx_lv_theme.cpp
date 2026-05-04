@@ -184,7 +184,7 @@ static const lv_style_const_prop_t outline_props[] = {
 };
 LV_STYLE_CONST_MULTI_INIT(EdgeTxStyles::outline, outline_props);
 
-static const lv_style_const_prop_t sunlight_focus_props[] = {
+static const lv_style_const_prop_t state_focus_frame_props[] = {
     LV_STYLE_CONST_BORDER_WIDTH(PAD_BORDER + 1),
     LV_STYLE_CONST_BORDER_OPA(LV_OPA_COVER),
     LV_STYLE_CONST_OUTLINE_WIDTH(PAD_OUTLINE + 2),
@@ -192,10 +192,10 @@ static const lv_style_const_prop_t sunlight_focus_props[] = {
     LV_STYLE_CONST_OUTLINE_PAD(PAD_TINY),
     LV_STYLE_PROP_INV,
 };
-LV_STYLE_CONST_MULTI_INIT(EdgeTxStyles::sunlight_focus,
-                          sunlight_focus_props);
+LV_STYLE_CONST_MULTI_INIT(EdgeTxStyles::state_focus_frame,
+                          state_focus_frame_props);
 
-static const lv_style_const_prop_t sunlight_edit_props[] = {
+static const lv_style_const_prop_t state_edit_frame_props[] = {
     LV_STYLE_CONST_BORDER_WIDTH(PAD_BORDER + 1),
     LV_STYLE_CONST_BORDER_OPA(LV_OPA_COVER),
     LV_STYLE_CONST_OUTLINE_WIDTH(PAD_OUTLINE + 3),
@@ -203,7 +203,8 @@ static const lv_style_const_prop_t sunlight_edit_props[] = {
     LV_STYLE_CONST_OUTLINE_PAD(PAD_TINY),
     LV_STYLE_PROP_INV,
 };
-LV_STYLE_CONST_MULTI_INIT(EdgeTxStyles::sunlight_edit, sunlight_edit_props);
+LV_STYLE_CONST_MULTI_INIT(EdgeTxStyles::state_edit_frame,
+                          state_edit_frame_props);
 
 // States (pressed, disabled, etc)
 static lv_color_t dark_color_filter_cb(const lv_color_filter_dsc_t* f,
@@ -608,7 +609,8 @@ void etx_std_ctrl_colors(lv_obj_t* obj, lv_style_selector_t selector)
   etx_txt_color(obj, COLOR_THEME_PRIMARY1_INDEX, selector | LV_STATE_FOCUSED);
   etx_obj_add_style(obj, styles->border_color[COLOR_THEME_PRIMARY1_INDEX],
                     selector | LV_STATE_FOCUSED);
-  etx_obj_add_style(obj, styles->sunlight_focus, selector | LV_STATE_FOCUSED);
+  etx_obj_add_style(obj, styles->state_focus_frame,
+                    selector | LV_STATE_FOCUSED);
   etx_obj_add_style(obj, styles->outline_color_focus,
                     selector | LV_STATE_FOCUSED);
 
@@ -616,7 +618,8 @@ void etx_std_ctrl_colors(lv_obj_t* obj, lv_style_selector_t selector)
   etx_txt_color(obj, COLOR_THEME_PRIMARY2_INDEX, selector | LV_STATE_EDITED);
   etx_obj_add_style(obj, styles->border_color[COLOR_THEME_PRIMARY2_INDEX],
                     selector | LV_STATE_EDITED);
-  etx_obj_add_style(obj, styles->sunlight_edit, selector | LV_STATE_EDITED);
+  etx_obj_add_style(obj, styles->state_edit_frame,
+                    selector | LV_STATE_EDITED);
   etx_obj_add_style(obj, styles->outline_color_focus,
                     selector | LV_STATE_EDITED);
 
@@ -626,13 +629,50 @@ void etx_std_ctrl_colors(lv_obj_t* obj, lv_style_selector_t selector)
                 selector | LV_STATE_FOCUSED | LV_STATE_EDITED);
   etx_obj_add_style(obj, styles->border_color[COLOR_THEME_PRIMARY2_INDEX],
                     selector | LV_STATE_FOCUSED | LV_STATE_EDITED);
-  etx_obj_add_style(obj, styles->sunlight_edit,
+  etx_obj_add_style(obj, styles->state_edit_frame,
                     selector | LV_STATE_FOCUSED | LV_STATE_EDITED);
   etx_obj_add_style(obj, styles->outline_color_focus,
                     selector | LV_STATE_FOCUSED | LV_STATE_EDITED);
 
   etx_bg_color(obj, COLOR_THEME_ACTIVE_INDEX, selector | LV_STATE_CHECKED);
   etx_txt_color(obj, COLOR_THEME_PRIMARY1_INDEX, selector | LV_STATE_CHECKED);
+}
+
+void etx_keyboard_key_colors(lv_obj_t* obj, lv_style_selector_t selector)
+{
+  etx_std_style(obj, selector, PAD_SMALL);
+  etx_txt_color(obj, COLOR_THEME_PRIMARY1_INDEX, selector);
+
+  etx_solid_bg(obj, COLOR_THEME_SECONDARY3_INDEX,
+               selector | LV_STATE_CHECKED);
+  etx_txt_color(obj, COLOR_THEME_PRIMARY1_INDEX,
+                selector | LV_STATE_CHECKED);
+  etx_obj_add_style(obj, styles->border_color[COLOR_THEME_SECONDARY2_INDEX],
+                    selector | LV_STATE_CHECKED);
+
+  etx_solid_bg(obj, COLOR_THEME_PRIMARY1_INDEX,
+               selector | LV_STATE_FOCUSED);
+  etx_txt_color(obj, COLOR_THEME_PRIMARY2_INDEX,
+                selector | LV_STATE_FOCUSED);
+  etx_obj_add_style(obj, styles->border_color[COLOR_THEME_PRIMARY2_INDEX],
+                    selector | LV_STATE_FOCUSED);
+  etx_obj_add_style(obj, styles->state_edit_frame,
+                    selector | LV_STATE_FOCUSED);
+  etx_obj_add_style(obj, styles->outline_color_focus,
+                    selector | LV_STATE_FOCUSED);
+
+  etx_solid_bg(obj, COLOR_THEME_PRIMARY1_INDEX,
+               selector | LV_STATE_CHECKED | LV_STATE_FOCUSED);
+  etx_txt_color(obj, COLOR_THEME_PRIMARY2_INDEX,
+                selector | LV_STATE_CHECKED | LV_STATE_FOCUSED);
+  etx_obj_add_style(obj, styles->border_color[COLOR_THEME_PRIMARY2_INDEX],
+                    selector | LV_STATE_CHECKED | LV_STATE_FOCUSED);
+  etx_obj_add_style(obj, styles->state_edit_frame,
+                    selector | LV_STATE_CHECKED | LV_STATE_FOCUSED);
+  etx_obj_add_style(obj, styles->outline_color_focus,
+                    selector | LV_STATE_CHECKED | LV_STATE_FOCUSED);
+
+  etx_bg_color(obj, COLOR_THEME_PRIMARY1_INDEX, selector | LV_STATE_EDITED);
 }
 
 void etx_std_settings(lv_obj_t* obj, lv_style_selector_t selector)

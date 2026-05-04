@@ -147,6 +147,9 @@ void etx_btn_style(lv_obj_t* obj, lv_style_selector_t selector = LV_PART_MAIN);
 void etx_std_ctrl_colors(lv_obj_t* obj,
                          lv_style_selector_t selector = LV_PART_MAIN);
 
+void etx_keyboard_key_colors(lv_obj_t* obj,
+                             lv_style_selector_t selector = LV_PART_ITEMS);
+
 void etx_scrollbar(lv_obj_t* obj);
 
 void etx_padding(lv_obj_t* obj, PaddingSize padding,
@@ -213,6 +216,12 @@ extern const lv_obj_class_t window_base_class;
 extern const lv_obj_class_t field_edit_class;
 extern const lv_obj_class_t button_class;
 
+// TX16S UI role rules:
+// - PRIMARY1/PRIMARY2 are the high-contrast ink/surface pair.
+// - SECONDARY* colors provide quiet structure and panels.
+// - FOCUS/EDIT/ACTIVE are accents for navigation chrome and data/status, not
+//   the default field focus/edit treatment.
+
 // Color and font styles
 class EdgeTxStyles
 {
@@ -271,8 +280,8 @@ class EdgeTxStyles
   static const lv_style_t border_transparent;
   static const lv_style_t border_thin;
   static const lv_style_t outline;
-  static const lv_style_t sunlight_focus;
-  static const lv_style_t sunlight_edit;
+  static const lv_style_t state_focus_frame;
+  static const lv_style_t state_edit_frame;
 
   EdgeTxStyles();
 
