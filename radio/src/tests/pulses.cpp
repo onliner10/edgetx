@@ -44,6 +44,10 @@
 #include "pulses/pxx1.h"
 #endif
 
+#if defined(PXX2)
+#include "pulses/pxx2.h"
+#endif
+
 #if defined(PPM)
 #include "pulses/ppm.h"
 #endif
@@ -189,6 +193,23 @@ TEST_F(PulsesTest, pxx1SendPulsesHonorsChannelCount)
   EXPECT_EQ(memcmp(neutralFrame, highFrame, sizeof(neutralFrame)), 0);
 
   Pxx1Driver.deinit(ctx);
+}
+#endif
+
+#if defined(PXX2) && defined(HARDWARE_INTERNAL_MODULE)
+TEST_F(PulsesTest, pxx2SendPulsesHonorsChannelCount)
+{
+  modulePortInit();
+  g_model.moduleData[INTERNAL_MODULE].type = MODULE_TYPE_ISRM_PXX2;
+  g_model.moduleData[INTERNAL_MODULE].channelsCount = 0;
+
+  auto ctx = Pxx2Driver.init(INTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  uint8_t buffer[MODULE_BUFFER_SIZE] = {};
+  Pxx2Driver.sendPulses(ctx, buffer, nullptr, 0);
+
+  Pxx2Driver.deinit(ctx);
 }
 #endif
 
