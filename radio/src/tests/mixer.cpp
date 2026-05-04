@@ -22,6 +22,11 @@
 #include "gtests.h"
 #include "hal/adc_driver.h"
 #include "mixes.h"
+#if defined(COLORLCD)
+#include "gui/colorlcd/menus.h"
+#else
+#include "gui/common/stdlcd/menus_common.h"
+#endif
 
 class TrimsTest : public EdgeTxTest {};
 class MixerTest : public EdgeTxTest {};
@@ -734,6 +739,20 @@ TEST_F(MixerTest, InvalidMixIndexDoesNotCopyMix)
 
   updateMixCount();
   EXPECT_EQ(mixCount, getMixCount());
+}
+
+TEST_F(MixerTest, InvalidExpoIndexDoesNotInsertInput)
+{
+  uint8_t expoCount = getExposCount();
+
+#if defined(COLORLCD)
+  insertExpo(MAX_EXPOS, 0);
+#else
+  s_currCh = 1;
+  insertExpo(MAX_EXPOS);
+#endif
+
+  EXPECT_EQ(expoCount, getExposCount());
 }
 
 TEST_F(MixerTest, RecursiveAddChannel)

@@ -83,6 +83,9 @@ int8_t s_currCh;
 
 void insertExpo(uint8_t idx, uint8_t input)
 {
+  if (idx >= MAX_EXPOS)
+    return;
+
   mixerTaskStop();
   ExpoData* expo = expoAddress(idx);
   memmove(expo + 1, expo, (MAX_EXPOS - (idx + 1)) * sizeof(ExpoData));
