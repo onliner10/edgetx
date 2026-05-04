@@ -196,14 +196,15 @@ static void ghostSendPulses(void* ctx, uint8_t* buffer, int16_t* channels, uint8
   if (outputTelemetryBuffer.destination == TELEMETRY_ENDPOINT_SPORT) {
     constexpr uint8_t payloadSize = 12;
     constexpr uint8_t frameSize = payloadSize + 2;
-    const uint8_t chunks =
-        min<uint8_t>(outputTelemetryBuffer.size / payloadSize,
-                     MODULE_BUFFER_SIZE / frameSize);
-    for (uint8_t i = 0; i < chunks; i += 1) {
+    uint8_t payloadOffset = 0;
+    while (payloadOffset <= TELEMETRY_OUTPUT_BUFFER_SIZE - payloadSize &&
+           payloadOffset + payloadSize <= outputTelemetryBuffer.size &&
+           p_data - buffer <= MODULE_BUFFER_SIZE - frameSize) {
       *p_data++ = getGhostModuleAddr();
       *p_data++ = payloadSize;
-      memcpy(p_data, outputTelemetryBuffer.data + i * payloadSize, payloadSize);
+      memcpy(p_data, outputTelemetryBuffer.data + payloadOffset, payloadSize);
       p_data += payloadSize;
+      payloadOffset += payloadSize;
     }
     outputTelemetryBuffer.reset();
   } else
