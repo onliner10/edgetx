@@ -32,6 +32,16 @@
 // Minimum space after the last PPM pulse in us
 #define PPM_SAFE_MARGIN 3000 // 3ms
 
+static uint8_t getLastPpmChannel(uint8_t firstCh, int8_t channelsCount)
+{
+  int16_t lastCh = static_cast<int16_t>(firstCh) + 8 + channelsCount;
+  if (lastCh < firstCh) {
+    return firstCh;
+  }
+
+  return static_cast<uint8_t>(min<int16_t>(MAX_OUTPUT_CHANNELS, lastCh));
+}
+
 template <class T>
 uint16_t setupPulsesPPM(T*& data, uint8_t channelsStart, int8_t channelsCount)
 {
@@ -45,12 +55,37 @@ uint16_t setupPulsesPPM(T*& data, uint8_t channelsStart, int8_t channelsCount)
   // The pulse ISR is 2mhz that's why everything is multiplied by 2
 
   uint8_t firstCh = channelsStart;
-  uint8_t lastCh = min<uint8_t>(MAX_OUTPUT_CHANNELS, firstCh + 8 + channelsCount);
+  uint8_t lastCh = getLastPpmChannel(firstCh, channelsCount);
 
   for (uint32_t i = firstCh; i < lastCh; i++) {
     int16_t v =
         limit((int16_t)-PPM_range, channelOutputs[i], (int16_t)PPM_range) +
         2 * PPM_CH_CENTER(i);
+    *data++ = v;
+    total += v;
+  }
+
+  return total;
+}
+
+template <class T>
+uint16_t setupPulsesPPM(T*& data, uint8_t channelsStart, int8_t channelsCount,
+                        const int16_t* channels, uint8_t nChannels)
+{
+  uint16_t total = 0;
+  int16_t PPM_range = g_model.extendedLimits ?
+    // range of 0.7 .. 1.7msec
+    (512*LIMIT_EXT_PERCENT/100) * 2 : 512 * 2;
+
+  uint8_t firstCh = channelsStart;
+  uint8_t lastCh = getLastPpmChannel(firstCh, channelsCount);
+
+  for (uint32_t i = firstCh; i < lastCh; i++) {
+    uint8_t index = i - firstCh;
+    int16_t channelValue =
+        (channels && index < nChannels) ? channels[index] : 0;
+    int16_t v = limit((int16_t)-PPM_range, channelValue, (int16_t)PPM_range) +
+                2 * PPM_CH_CENTER(i);
     *data++ = v;
     total += v;
   }
@@ -84,12 +119,16 @@ void setupPulsesPPMTrainer()
   trainerPulsesData.ppm.ptr = p_data;
 }
 
-static uint32_t setupPulsesPPMModule(uint8_t module, pulse_duration_t*& data)
+static uint32_t setupPulsesPPMModule(uint8_t module, pulse_duration_t*& data,
+                                     const int16_t* channels,
+                                     uint8_t nChannels)
 {
   auto start = data;
   setupPulsesPPM(data,
                  g_model.moduleData[module].channelsStart,
-                 g_model.moduleData[module].channelsCount);
+                 g_model.moduleData[module].channelsCount,
+                 channels,
+                 nChannels);
 
   // Set the final period to 1ms after which the
   // PPM will be switched OFF
@@ -190,16 +229,12 @@ static void ppmDeInit(void* ctx)
 
 static void ppmSendPulses(void* ctx, uint8_t* buffer, int16_t* channels, uint8_t nChannels)
 {
-  // TODO:
-  (void)channels;
-  (void)nChannels;
-
   auto mod_st = (etx_module_state_t*)ctx;
   auto module = modulePortGetModule(mod_st);
 
   pulse_duration_t* pulses =
       static_cast<pulse_duration_t*>(static_cast<void*>(buffer));
-  auto length = setupPulsesPPMModule(module, pulses);
+  auto length = setupPulsesPPMModule(module, pulses, channels, nChannels);
 
   auto drv = modulePortGetTimerDrv(mod_st->tx);
   auto drv_ctx = modulePortGetCtx(mod_st->tx);

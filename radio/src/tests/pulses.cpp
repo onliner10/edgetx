@@ -40,6 +40,10 @@
 #include "pulses/pxx1.h"
 #endif
 
+#if defined(PPM)
+#include "pulses/ppm.h"
+#endif
+
 extern uint8_t getRequiredProtocol(uint8_t module);
 
 namespace {
@@ -159,6 +163,30 @@ TEST_F(PulsesTest, pxx1SendPulsesHonorsChannelCount)
   EXPECT_EQ(memcmp(neutralFrame, highFrame, sizeof(neutralFrame)), 0);
 
   Pxx1Driver.deinit(ctx);
+}
+#endif
+
+#if defined(PPM) && defined(HARDWARE_EXTERNAL_MODULE)
+TEST_F(PulsesTest, ppmSendPulsesHonorsChannelCount)
+{
+  modulePortInit();
+  g_model.moduleData[EXTERNAL_MODULE].type = MODULE_TYPE_PPM;
+  g_model.moduleData[EXTERNAL_MODULE].channelsCount = 0;
+
+  auto ctx = PpmDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  uint8_t neutralFrame[MODULE_BUFFER_SIZE] = {};
+  channelOutputs[0] = 0;
+  PpmDriver.sendPulses(ctx, neutralFrame, nullptr, 0);
+
+  uint8_t highFrame[MODULE_BUFFER_SIZE] = {};
+  channelOutputs[0] = 1024;
+  PpmDriver.sendPulses(ctx, highFrame, nullptr, 0);
+
+  EXPECT_EQ(memcmp(neutralFrame, highFrame, sizeof(neutralFrame)), 0);
+
+  PpmDriver.deinit(ctx);
 }
 #endif
 
