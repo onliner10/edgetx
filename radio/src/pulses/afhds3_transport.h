@@ -100,9 +100,14 @@ PACK(struct AfhdsFrame {
   uint8_t command;
   uint8_t value;
 
+  uint8_t* GetValue()
+  {
+    return reinterpret_cast<uint8_t*>(this) + offsetof(AfhdsFrame, value);
+  }
+
   AfhdsFrameData* GetData()
   {
-    return reinterpret_cast<AfhdsFrameData*>(&value);
+    return reinterpret_cast<AfhdsFrameData*>(GetValue());
   }
 });
 

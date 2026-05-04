@@ -222,6 +222,11 @@ static int read_regs(uint8_t reg, uint8_t* data, uint8_t len)
   return i2c_read(s_i2c_bus, s_i2c_addr, reg, 1, data, len);
 }
 
+static int16_t read_i16_le(const uint8_t* data)
+{
+  return (int16_t)(uint16_t(data[0]) | (uint16_t(data[1]) << 8));
+}
+
 static int lsm6dsRead(etx_imu_data_t* data)
 {
   // LSM6DS registers are contiguous: gyro X/Y/Z then accel X/Y/Z (little-endian)
@@ -229,13 +234,12 @@ static int lsm6dsRead(etx_imu_data_t* data)
   if (read_regs(LSM6DS_GYRO_OUT_X_L_ADDR, buf, sizeof(buf)) < 0)
     return -1;
 
-  int16_t* raw = (int16_t*)buf;
-  data->gyro_x  = raw[0];
-  data->gyro_y  = raw[1];
-  data->gyro_z  = raw[2];
-  data->accel_x = raw[3];
-  data->accel_y = raw[4];
-  data->accel_z = raw[5];
+  data->gyro_x  = read_i16_le(&buf[0]);
+  data->gyro_y  = read_i16_le(&buf[2]);
+  data->gyro_z  = read_i16_le(&buf[4]);
+  data->accel_x = read_i16_le(&buf[6]);
+  data->accel_y = read_i16_le(&buf[8]);
+  data->accel_z = read_i16_le(&buf[10]);
   return 0;
 }
 
@@ -264,4 +268,3 @@ const etx_imu_driver_t imu_lsm6ds_driver = {
   lsm6dsRead,
   "LSM6DS",
 };
-

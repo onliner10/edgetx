@@ -402,6 +402,17 @@ inline void mixSample(audio_data_t * result, int16_t sample, unsigned int fade)
 #define RIFF_CHUNK_SIZE 12
 uint8_t wavBuffer[AUDIO_BUFFER_SIZE * 2] __DMA;
 
+static uint16_t read_u16_le(const uint8_t* data)
+{
+  return uint16_t(data[0]) | (uint16_t(data[1]) << 8);
+}
+
+static uint32_t read_u32_le(const uint8_t* data)
+{
+  return uint32_t(data[0]) | (uint32_t(data[1]) << 8) |
+         (uint32_t(data[2]) << 16) | (uint32_t(data[3]) << 24);
+}
+
 int WavContext::mixBuffer(AudioBuffer *buffer, int volume, unsigned int fade)
 {
   FRESULT result = FR_OK;
@@ -416,13 +427,13 @@ int WavContext::mixBuffer(AudioBuffer *buffer, int volume, unsigned int fade)
     if (result == FR_OK) {
       result = f_read(&state.file, wavBuffer, RIFF_CHUNK_SIZE+8, &read);
       if (result == FR_OK && read == RIFF_CHUNK_SIZE+8 && !memcmp(wavBuffer, "RIFF", 4) && !memcmp(wavBuffer+8, "WAVEfmt ", 8)) {
-        uint32_t size = *((uint32_t *)(wavBuffer+16));
+        uint32_t size = read_u32_le(wavBuffer + 16);
         result = (size < 256 ? f_read(&state.file, wavBuffer, size+8, &read) : FR_DENIED);
         if (result == FR_OK && read == size+8) {
-          state.codec = ((uint16_t *)wavBuffer)[0];
-          state.freq = ((uint16_t *)wavBuffer)[2];
-          uint32_t *wavSamplesPtr = (uint32_t *)(wavBuffer + size);
-          uint32_t size = wavSamplesPtr[1];
+          state.codec = read_u16_le(wavBuffer);
+          state.freq = read_u16_le(wavBuffer + 4);
+          uint8_t *wavSamplesPtr = wavBuffer + size;
+          uint32_t size = read_u32_le(wavSamplesPtr + 4);
           if (state.freq != 0 && state.freq * (AUDIO_SAMPLE_RATE / state.freq) == AUDIO_SAMPLE_RATE) {
             state.resampleRatio = (AUDIO_SAMPLE_RATE / state.freq);
             state.readSize = (state.codec == CODEC_ID_PCM_S16LE ? 2*AUDIO_BUFFER_SIZE : AUDIO_BUFFER_SIZE) / state.resampleRatio;
@@ -435,8 +446,8 @@ int WavContext::mixBuffer(AudioBuffer *buffer, int volume, unsigned int fade)
             if (result == FR_OK) {
               result = f_read(&state.file, wavBuffer, 8, &read);
               if (read != 8) result = FR_DENIED;
-              wavSamplesPtr = (uint32_t *)wavBuffer;
-              size = wavSamplesPtr[1];
+              wavSamplesPtr = wavBuffer;
+              size = read_u32_le(wavSamplesPtr + 4);
             }
           }
           state.size = size;
@@ -470,7 +481,7 @@ int WavContext::mixBuffer(AudioBuffer *buffer, int volume, unsigned int fade)
         read /= 2;
         for (uint32_t i=0; i<read; i++) {
           for (uint8_t j=0; j<state.resampleRatio; j++) {
-            mixSample(samples++, ((int16_t *)wavBuffer)[i], fade+2-volume);
+            mixSample(samples++, (int16_t)read_u16_le(wavBuffer + (i * 2)), fade+2-volume);
           }
         }
       }

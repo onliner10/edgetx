@@ -31,12 +31,17 @@
 
 uint8_t menuCalibrationState;
 
-static const uint8_t stick_pointer[] __FLASH = {
+alignas(LZ4Bitmap) static const uint8_t stick_pointer[] __FLASH = {
 #include "bmp_radio_stick_pointer.lbm"
 };
-static const uint8_t stick_background[] __FLASH = {
+alignas(LZ4Bitmap) static const uint8_t stick_background[] __FLASH = {
 #include "bmp_radio_stick_background.lbm"
 };
+
+static const LZ4Bitmap* lz4Bitmap(const uint8_t* data)
+{
+  return static_cast<const LZ4Bitmap*>(static_cast<const void*>(data));
+}
 
 class StickCalibrationWindow : public Window
 {
@@ -45,8 +50,8 @@ class StickCalibrationWindow : public Window
                          uint8_t stickY) :
       Window(parent, rect), stickX(stickX), stickY(stickY)
   {
-    new StaticLZ4Image(this, 0, 0, (LZ4Bitmap *)stick_background);
-    calibStick = new StaticLZ4Image(this, 0, 0, (LZ4Bitmap *)stick_pointer);
+    new StaticLZ4Image(this, 0, 0, lz4Bitmap(stick_background));
+    calibStick = new StaticLZ4Image(this, 0, 0, lz4Bitmap(stick_pointer));
     checkEvents();
   }
 
@@ -89,7 +94,7 @@ void RadioCalibrationPage::buildBody(Window *window)
 
   // The two sticks
 
-  LZ4Bitmap *bg = (LZ4Bitmap *)stick_background;
+  auto bg = lz4Bitmap(stick_background);
 
   new StickCalibrationWindow(
       window,

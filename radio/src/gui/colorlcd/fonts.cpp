@@ -50,6 +50,28 @@ static bool fontAllocFailed = false;
 
 #define BUFSIZE(x) (((x) + 15) & 0xFFFFFFF0)
 
+static uint8_t* alignFontPtr(uint8_t* ptr, size_t alignment)
+{
+  uintptr_t value = reinterpret_cast<uintptr_t>(ptr);
+  value = (value + alignment - 1) & ~(alignment - 1);
+  return reinterpret_cast<uint8_t*>(value);
+}
+
+template <typename T>
+static T* takeFontObject(uint8_t*& ptr)
+{
+  ptr = alignFontPtr(ptr, alignof(T));
+  T* object = static_cast<T*>(static_cast<void*>(ptr));
+  ptr += sizeof(T);
+  return object;
+}
+
+template <typename T>
+static T* fontDataPtr(uint8_t* ptr)
+{
+  return static_cast<T*>(static_cast<void*>(ptr));
+}
+
 #if !defined(ALL_LANGS)
 
 extern "C" {
@@ -134,7 +156,7 @@ uint8_t* allocBuf(etxLvglFont* fonts, uint8_t* b)
 {
   for (int i = FONT_STD_INDEX; i < FONTS_COUNT; i += 1) {
     if (fonts[i].lz4Font) {
-      fonts[i].lvglFont = (lv_font_t*)b;
+      fonts[i].lvglFont = fontDataPtr<lv_font_t>(b);
       b += BUFSIZE(fonts[i].lz4Font->lvglFontBufSize);
     }
   }
@@ -302,16 +324,16 @@ void initFontBuffers()
     for (int i = FONT_STD_INDEX; i < FONTS_COUNT; i += 1) {
       if (en_fontTable[i].lz4Font) {
         // EN data
-        en_fontTable[i].lvglFont = (lv_font_t*)b;
+        en_fontTable[i].lvglFont = fontDataPtr<lv_font_t>(b);
         b += BUFSIZE(en_fontTable[i].lz4Font->lvglFontBufSize);
         // All languages except EN use the same buffer for the uncompressed data (only one active)
-        cn_fontTable[i].lvglFont = (lv_font_t*)b;
-        tw_fontTable[i].lvglFont = (lv_font_t*)b;
-        jp_fontTable[i].lvglFont = (lv_font_t*)b;
-        ko_fontTable[i].lvglFont = (lv_font_t*)b;
-        he_fontTable[i].lvglFont = (lv_font_t*)b;
-        ru_fontTable[i].lvglFont = (lv_font_t*)b;
-        ua_fontTable[i].lvglFont = (lv_font_t*)b;
+        cn_fontTable[i].lvglFont = fontDataPtr<lv_font_t>(b);
+        tw_fontTable[i].lvglFont = fontDataPtr<lv_font_t>(b);
+        jp_fontTable[i].lvglFont = fontDataPtr<lv_font_t>(b);
+        ko_fontTable[i].lvglFont = fontDataPtr<lv_font_t>(b);
+        he_fontTable[i].lvglFont = fontDataPtr<lv_font_t>(b);
+        ru_fontTable[i].lvglFont = fontDataPtr<lv_font_t>(b);
+        ua_fontTable[i].lvglFont = fontDataPtr<lv_font_t>(b);
         b += getMaxFontSize(i);
       }
     }
@@ -350,27 +372,26 @@ void decompressFont(int idx, etxLvglFont* fonts)
   uint8_t* next = data;
 
   // 'Create' lv_font_t structure
-  lv_font_t* lvglFont = (lv_font_t*)next;
-  next += sizeof(lv_font_t);
+  lv_font_t* lvglFont = takeFontObject<lv_font_t>(next);
 
   // 'Create' lv_font_fmt_txt_dsc_t structure
-  lv_font_fmt_txt_dsc_t* lvglFontDsc = (lv_font_fmt_txt_dsc_t*)next;
-  next += sizeof(lv_font_fmt_txt_dsc_t);
+  lv_font_fmt_txt_dsc_t* lvglFontDsc =
+      takeFontObject<lv_font_fmt_txt_dsc_t>(next);
 
   // 'Create' lv_font_fmt_txt_glyph_cache_t structure
   lv_font_fmt_txt_glyph_cache_t* lvglCache =
-      (lv_font_fmt_txt_glyph_cache_t*)next;
-  next += sizeof(lv_font_fmt_txt_glyph_cache_t);
+      takeFontObject<lv_font_fmt_txt_glyph_cache_t>(next);
 
   // 'Create' lv_font_fmt_txt_kern_classes_t structure (optional)
   lv_font_fmt_txt_kern_classes_t* lvglKernClasses = nullptr;
   if (etxFont->kern_classes) {
-    lvglKernClasses = (lv_font_fmt_txt_kern_classes_t*)next;
-    next += sizeof(lv_font_fmt_txt_kern_classes_t);
+    lvglKernClasses = takeFontObject<lv_font_fmt_txt_kern_classes_t>(next);
   }
 
   // 'Create' lv_font_fmt_txt_cmap_t structure array
-  lv_font_fmt_txt_cmap_t* lvglCmaps = (lv_font_fmt_txt_cmap_t*)next;
+  next = alignFontPtr(next, alignof(lv_font_fmt_txt_cmap_t));
+  lv_font_fmt_txt_cmap_t* lvglCmaps =
+      fontDataPtr<lv_font_fmt_txt_cmap_t>(next);
   next += sizeof(lv_font_fmt_txt_cmap_t) * etxFont->cmap_num;
 
   // Decompress the compressed data into the remaining space
@@ -393,7 +414,8 @@ void decompressFont(int idx, etxLvglFont* fonts)
   // Rebuild the lv_font_fmt_txt_dsc_t structure
   // Relocate pointers
   lvglFontDsc->glyph_bitmap = &next[etxFont->glyph_bitmap];
-  lvglFontDsc->glyph_dsc = (lv_font_fmt_txt_glyph_dsc_t*)&next[0];
+  lvglFontDsc->glyph_dsc =
+      fontDataPtr<lv_font_fmt_txt_glyph_dsc_t>(&next[0]);
   lvglFontDsc->cmaps = lvglCmaps;
   lvglFontDsc->kern_dsc = lvglKernClasses;
   lvglFontDsc->kern_classes = etxFont->kern_classes;
@@ -421,7 +443,7 @@ void decompressFont(int idx, etxLvglFont* fonts)
     // Relocate pointers
     if (etxFont->cmaps[i].unicode_list)
       lvglCmaps[i].unicode_list =
-          (uint16_t*)&next[etxFont->cmaps[i].unicode_list];
+          fontDataPtr<uint16_t>(&next[etxFont->cmaps[i].unicode_list]);
     if (etxFont->cmaps[i].glyph_id_ofs_list)
       lvglCmaps[i].glyph_id_ofs_list =
           &next[etxFont->cmaps[i].glyph_id_ofs_list];

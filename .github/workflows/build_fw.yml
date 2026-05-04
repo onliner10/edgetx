@@ -8,6 +8,9 @@ on:
     tags:
       - v*
     paths: &trigger-paths
+      - '.clang-tidy'
+      - '.cppcheck-suppressions'
+      - '.semgrep/**'
       - '.github/workflows/build_fw.yml'
       - 'cmake/**'
       - 'radio/**'
@@ -50,14 +53,265 @@ jobs:
       - name: Test ${{ matrix.target }}
         env:
           FLAVOR: ${{ matrix.target }}
+          EDGE16_UV_ACTIVE: 1
+          EXTRA_OPTIONS: "-DWARNINGS_AS_ERRORS=YES -DEDGE16_SAFETY_CHECKS=ON"
           CMAKE_BUILD_PARALLEL_LEVEL: 4
         run: |
           echo "Running commit tests"
-          ./tools/commit-tests.sh
+          uv run --with-requirements requirements.txt bash ./tools/commit-tests.sh
+
+  native-sanitizers:
+    name: Native sanitizer tests (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'pull_request' ||
+      !contains(github.event.pull_request.labels.*.name, 'ci: skip-fw')
+    strategy:
+      matrix:
+        target:
+          - tx16s
+          - tx16smk3
+    container:
+      image: ghcr.io/edgetx/edgetx-dev:latest
+      volumes:
+        - ${{ github.workspace }}:/src
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Run ASan and UBSan tests
+        env:
+          FLAVOR: ${{ matrix.target }}
+          EDGE16_UV_ACTIVE: 1
+          EXTRA_OPTIONS: "-DEDGE16_SANITIZERS=address,undefined -DEDGE16_SAFETY_CHECKS=ON"
+          CMAKE_BUILD_PARALLEL_LEVEL: 4
+        run: |
+          uv run --with-requirements requirements.txt bash ./tools/commit-tests.sh
+
+  native-tsan:
+    name: Native TSan tests (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'pull_request' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    strategy:
+      matrix:
+        target:
+          - tx16s
+          - tx16smk3
+    container:
+      image: ghcr.io/edgetx/edgetx-dev:latest
+      volumes:
+        - ${{ github.workspace }}:/src
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Run TSan tests
+        env:
+          FLAVOR: ${{ matrix.target }}
+          EDGE16_UV_ACTIVE: 1
+          EXTRA_OPTIONS: "-DEDGE16_SANITIZERS=thread -DEDGE16_SAFETY_CHECKS=ON"
+          CMAKE_BUILD_PARALLEL_LEVEL: 4
+        run: |
+          uv run --with-requirements requirements.txt bash ./tools/commit-tests.sh
+
+  firmware-safety:
+    name: Firmware safety analyzers (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'pull_request' ||
+      !contains(github.event.pull_request.labels.*.name, 'ci: skip-fw')
+    strategy:
+      matrix:
+        target:
+          - tx16s
+          - tx16smk3
+    container:
+      image: ghcr.io/edgetx/edgetx-dev:latest
+      volumes:
+        - ${{ github.workspace }}:/src
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install analyzer packages
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends clang-tidy cppcheck
+
+      - name: Build firmware with strict safety flags
+        env:
+          FLAVOR: ${{ matrix.target }}
+          FIRMWARE_TARGET: firmware
+          EDGE16_UV_ACTIVE: 1
+          EXTRA_OPTIONS: "-DWARNINGS_AS_ERRORS=YES -DEDGE16_SAFETY_CHECKS=ON"
+          CMAKE_BUILD_PARALLEL_LEVEL: 4
+        run: |
+          uv run --with-requirements requirements.txt bash ./tools/build-gh.sh
+
+      - name: Run clang-tidy
+        run: |
+          gcc_sysroot="$(arm-none-eabi-g++ -print-sysroot)"
+          gcc_version="$(arm-none-eabi-g++ -dumpversion)"
+          gcc_machine="$(arm-none-eabi-g++ -dumpmachine)"
+          gcc_include="$(arm-none-eabi-g++ -print-file-name=include)"
+          gcc_include_fixed="$(arm-none-eabi-g++ -print-file-name=include-fixed)"
+          cxx_include="${gcc_sysroot}/include/c++/${gcc_version}"
+          cxx_target_include="${cxx_include}/${gcc_machine}"
+          run-clang-tidy \
+            -p build/arm-none-eabi \
+            -j "${CMAKE_BUILD_PARALLEL_LEVEL:-4}" \
+            -extra-arg=-Wthread-safety \
+            -extra-arg=-Wno-unknown-warning-option \
+            -extra-arg=-Wno-ignored-attributes \
+            -extra-arg=-isystem"${cxx_include}" \
+            -extra-arg=-isystem"${cxx_target_include}" \
+            -extra-arg=-isystem"${gcc_include}" \
+            -extra-arg=-isystem"${gcc_include_fixed}" \
+            -extra-arg=-isystem"${gcc_sysroot}/include" \
+            '^.*/radio/src/(?!thirdparty|translations|tests).*\.(c|cc|cpp|cxx)$'
+
+      - name: Run cppcheck
+        run: |
+          mkdir -p build/safety
+          cppcheck \
+            --project=build/arm-none-eabi/compile_commands.json \
+            --inline-suppr \
+            --suppressions-list=.cppcheck-suppressions \
+            --error-exitcode=1 \
+            --xml \
+            --xml-version=2 \
+            --platform=unix32 \
+            -D__GNUC__=14 \
+            -D__GNUC_MINOR__=2 \
+            -iradio/src/thirdparty \
+            -iradio/src/translations \
+            -iradio/src/tests \
+            2> build/safety/cppcheck.xml
+
+      - name: Run Semgrep firmware policies
+        run: |
+          uvx semgrep scan \
+            --error \
+            --config p/c \
+            --config .semgrep/edge16-firmware.yml \
+            --include 'radio/src/**' \
+            --exclude 'radio/src/thirdparty/**' \
+            --exclude 'radio/src/translations/**' \
+            --exclude 'radio/src/tests/**'
+
+      - name: Upload safety artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: safety-${{ matrix.target }}
+          path: build/safety
+          retention-days: 15
+          if-no-files-found: ignore
+
+  gcc-analyzer:
+    name: GCC analyzer (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'pull_request' ||
+      !contains(github.event.pull_request.labels.*.name, 'ci: skip-fw')
+    strategy:
+      matrix:
+        target:
+          - tx16s
+          - tx16smk3
+    container:
+      image: ghcr.io/edgetx/edgetx-dev:latest
+      volumes:
+        - ${{ github.workspace }}:/src
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Run GCC analyzer on firmware C/C++ sources
+        env:
+          FLAVOR: ${{ matrix.target }}
+          FIRMWARE_TARGET: firmware
+          EDGE16_UV_ACTIVE: 1
+          EXTRA_OPTIONS: "-DWARNINGS_AS_ERRORS=YES -DEDGE16_SAFETY_CHECKS=ON -DEDGE16_GCC_ANALYZER=ON"
+          CMAKE_BUILD_PARALLEL_LEVEL: 4
+        run: |
+          uv run --with-requirements requirements.txt bash ./tools/build-gh.sh
+
+  codeql:
+    name: CodeQL firmware analysis
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'pull_request' ||
+      !contains(github.event.pull_request.labels.*.name, 'ci: skip-fw')
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    container:
+      image: ghcr.io/edgetx/edgetx-dev:latest
+      volumes:
+        - ${{ github.workspace }}:/src
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: c-cpp
+          build-mode: manual
+          queries: security-and-quality
+
+      - name: Build supported firmware for CodeQL
+        env:
+          FLAVOR: tx16s;tx16smk3
+          FIRMWARE_TARGET: firmware
+          EDGE16_UV_ACTIVE: 1
+          EXTRA_OPTIONS: "-DWARNINGS_AS_ERRORS=YES -DEDGE16_SAFETY_CHECKS=ON"
+          CMAKE_BUILD_PARALLEL_LEVEL: 4
+        run: |
+          uv run --with-requirements requirements.txt bash ./tools/build-gh.sh
+
+      - name: Analyze with CodeQL
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:c-cpp/edge16-firmware"
 
   build:
     name: Run builds
-    needs: test
+    needs:
+      - test
+      - native-sanitizers
+      - firmware-safety
+      - gcc-analyzer
+      - codeql
     runs-on: ubuntu-latest
     if: |
       github.event_name != 'pull_request' ||
@@ -83,10 +337,12 @@ jobs:
       - name: Build ${{ matrix.target }}
         env:
           FLAVOR: ${{ matrix.target }}
+          EDGE16_UV_ACTIVE: 1
+          EXTRA_OPTIONS: "-DWARNINGS_AS_ERRORS=YES -DEDGE16_SAFETY_CHECKS=ON"
           CMAKE_BUILD_PARALLEL_LEVEL: 4
         run: |
           echo "Running firmware build"
-          ./tools/build-gh.sh
+          uv run --with-requirements requirements.txt bash ./tools/build-gh.sh
 
       - name: Upload ${{ matrix.target }}
         uses: actions/upload-artifact@v7
@@ -106,7 +362,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Compose release filename
-        run: echo "artifact_name=edgetx-firmware-${GITHUB_REF##*/}" >> $GITHUB_ENV
+        run: echo "artifact_name=edgetx-firmware-${GITHUB_REF##*/}" >> "$GITHUB_ENV"
 
       - name: Merge firmware artifact packages
         uses: actions/upload-artifact/merge@v7

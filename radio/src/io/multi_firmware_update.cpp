@@ -121,6 +121,7 @@ bool MultiFirmwareUpdateDriver::getByte(uint8_t & byte) const
 {
   auto drv = modulePortGetSerialDrv(mod_st->rx);
   auto ctx = modulePortGetCtx(mod_st->rx);
+  if (!drv) return false;
   return drv->getByte(ctx, &byte) > 0;
 }
 
@@ -128,6 +129,7 @@ void MultiFirmwareUpdateDriver::sendByte(uint8_t byte) const
 {
   auto drv = modulePortGetSerialDrv(mod_st->tx);
   auto ctx = modulePortGetCtx(mod_st->tx);
+  if (!drv) return;
   drv->sendByte(ctx, byte);
 }
 
@@ -135,6 +137,7 @@ void MultiFirmwareUpdateDriver::sendBuffer(uint8_t* buffer, uint16_t size) const
 {
   auto drv = modulePortGetSerialDrv(mod_st->tx);
   auto ctx = modulePortGetCtx(mod_st->tx);
+  if (!drv) return;
 
   drv->waitForTxCompleted(ctx);
   drv->sendBuffer(ctx, buffer, size);
@@ -145,6 +148,7 @@ void MultiFirmwareUpdateDriver::clear() const
 {
   auto drv = modulePortGetSerialDrv(mod_st->rx);
   auto ctx = modulePortGetCtx(mod_st->rx);
+  if (!drv) return;
   drv->clearRxBuffer(ctx);
 }
 

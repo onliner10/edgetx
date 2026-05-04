@@ -24,6 +24,8 @@
 #include <cctype>
 #include <cstdio>
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
 
 #include "edgetx.h"
 #include "widget.h"
@@ -35,6 +37,25 @@
 #define BITMAP_METATABLE "BITMAP*"
 
 BitmapBuffer* luaLcdBuffer  = nullptr;
+
+static const MaskBitmap* luaCheckMaskBitmap(lua_State* L, int index,
+                                            uint8_t** alignedCopy)
+{
+  size_t len = 0;
+  const char* data = luaL_checklstring(L, index, &len);
+  *alignedCopy = nullptr;
+  if (!data || len < sizeof(MaskBitmap)) return nullptr;
+
+  if ((reinterpret_cast<uintptr_t>(data) % alignof(MaskBitmap)) == 0) {
+    return reinterpret_cast<const MaskBitmap*>(static_cast<const void*>(data));
+  }
+
+  *alignedCopy = static_cast<uint8_t*>(malloc(len));
+  if (!*alignedCopy) return nullptr;
+
+  memcpy(*alignedCopy, data, len);
+  return reinterpret_cast<const MaskBitmap*>(static_cast<const void*>(*alignedCopy));
+}
 
 /*luadoc
 @function lcd.refresh()
@@ -727,16 +748,18 @@ static int luaLcdDrawBitmapPattern(lua_State *L)
   if (!luaLcdAllowed || !luaLcdBuffer)
     return 0;
 
-  const char* m = luaL_checkstring(L, 1);
+  uint8_t* alignedCopy = nullptr;
+  const MaskBitmap* m = luaCheckMaskBitmap(L, 1, &alignedCopy);
 
   if (m) {
     auto x = luaL_checkinteger(L, 2);
     auto y = luaL_checkinteger(L, 3);
     auto flags = (LcdFlags)luaL_optinteger(L, 4, 0);
     flags = colorToRGB(flags);
-    luaLcdBuffer->drawBitmapPattern(x, y, reinterpret_cast<const MaskBitmap*>(m), flags);
+    luaLcdBuffer->drawBitmapPattern(x, y, m, flags);
   }
 
+  free(alignedCopy);
   return 0;
 }
 
@@ -764,7 +787,8 @@ static int luaLcdDrawBitmapPatternPie(lua_State *L)
   if (!luaLcdAllowed || !luaLcdBuffer)
     return 0;
 
-  const char* m = luaL_checkstring(L, 1);
+  uint8_t* alignedCopy = nullptr;
+  const MaskBitmap* m = luaCheckMaskBitmap(L, 1, &alignedCopy);
 
   if (m) {
     coord_t x = luaL_checkinteger(L, 2);
@@ -773,9 +797,10 @@ static int luaLcdDrawBitmapPatternPie(lua_State *L)
     int endAngle = luaL_checkinteger(L, 5);
     LcdFlags flags = luaL_optinteger(L, 6, 0);
     flags = colorToRGB(flags);
-    luaLcdBuffer->drawBitmapPatternPie(x, y, reinterpret_cast<const MaskBitmap*>(m), flags, startAngle, endAngle);
+    luaLcdBuffer->drawBitmapPatternPie(x, y, m, flags, startAngle, endAngle);
   }
 
+  free(alignedCopy);
   return 0;
 }
 

@@ -105,13 +105,10 @@ bool MultiRfProtocols::RfProto::parse(const uint8_t* data, uint8_t len)
 
 void MultiRfProtocols::RfProto::fillSubProtoList(const char* str, int n, int len)
 {
-  char tmp[len + 1];
   subProtos.reserve(n);
 
   for (int i = 0; i < n; i++, str += len) {
-    strncpy(tmp, str, len);
-    tmp[len] = '\0';
-    subProtos.emplace_back((const char*)tmp);
+    subProtos.emplace_back(str, len);
     //TRACE("%s: '%s'", label.c_str(), subProtos.back().c_str());
   }
 }

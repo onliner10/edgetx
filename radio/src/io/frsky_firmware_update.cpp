@@ -42,6 +42,20 @@
 #define PRIM_END_DOWNLOAD   0x83
 #define PRIM_DATA_CRC_ERR   0x84
 
+static uint32_t read_u32_le(const uint8_t* data)
+{
+  return uint32_t(data[0]) | (uint32_t(data[1]) << 8) |
+         (uint32_t(data[2]) << 16) | (uint32_t(data[3]) << 24);
+}
+
+static void write_u32_le(uint8_t* data, uint32_t value)
+{
+  data[0] = value & 0xFF;
+  data[1] = (value >> 8) & 0xFF;
+  data[2] = (value >> 16) & 0xFF;
+  data[3] = value >> 24;
+}
+
 const char * readFrSkyFirmwareInformation(const char * filename, FrSkyFirmwareInformation & data)
 {
   FIL file;
@@ -89,7 +103,7 @@ void FrskyDeviceFirmwareUpdate::processFrame(const uint8_t * frame)
 
       case PRIM_REQ_DATA_ADDR:
         if (state == SPORT_DATA_TRANSFER) {
-          address = *((uint32_t *)(&frame[3]));
+          address = read_u32_le(&frame[3]);
           state = SPORT_DATA_REQ;
         }
         break;
@@ -427,7 +441,7 @@ void FrskyDeviceFirmwareUpdate::sendDataTransfer(uint32_t* buffer)
 {
   startFrame(PRIM_DATA_WORD);
   uint32_t offset = (address & 1023) >> 2; // 32 bit word offset into buffer
-  *((uint32_t *)(frame + 2)) = buffer[offset];
+  write_u32_le(frame + 2, buffer[offset]);
   frame[6] = address & 0x000000FF;
   state = SPORT_DATA_TRANSFER;
   sendFrame();

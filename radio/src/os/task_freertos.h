@@ -26,6 +26,7 @@
 #include <FreeRTOS/include/semphr.h>
 
 #include "definitions.h"
+#include "thread_annotations.h"
 
 #define TASK_DEFINE_STACK(name, size) StackType_t __ALIGNED(8) name[size] __CCMRAM
 
@@ -35,7 +36,7 @@ struct task_handle_t {
   uint32_t     _stack_size;
 };
 
-struct mutex_handle_t {
+struct ETX_CAPABILITY("mutex") mutex_handle_t {
   SemaphoreHandle_t _rtos_handle;
   StaticSemaphore_t _mutex_struct;
 };

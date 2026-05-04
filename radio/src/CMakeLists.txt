@@ -59,6 +59,18 @@ else()
   option(USBJ_EX "Enable USB Joystick Extension" ON)
 endif()
 option(AUDIO "Enable audio" ON)
+option(EDGE16_SAFETY_CHECKS "Enable strict Edge16 firmware safety compiler checks." OFF)
+option(EDGE16_GCC_ANALYZER "Enable GCC static analyzer for firmware C and C++ translation units." OFF)
+set(EDGE16_SANITIZERS "" CACHE STRING
+  "Native test sanitizers to enable, comma-separated: address,undefined,thread.")
+set(EDGE16_STACK_USAGE_LIMIT 8192 CACHE STRING
+  "Maximum static stack usage in bytes before GCC emits -Wstack-usage.")
+set(EDGE16_FRAME_SIZE_LIMIT 4096 CACHE STRING
+  "Maximum stack frame size in bytes before GCC emits -Wframe-larger-than.")
+
+if(EDGE16_SAFETY_CHECKS)
+  add_definitions(-DEDGE16_SAFETY_CHECKS)
+endif()
 
 if(NATIVE_BUILD)
   option(ALL_LANGUAGES "Enable runtime language selection" ON)
@@ -152,7 +164,8 @@ endif()
 AddHardwareDefTarget(${HW_DESC_JSON})
 add_custom_target(hardware_defs DEPENDS ${HW_DESC_JSON}.h)
 
-include_directories(targets/${TARGET_DIR} ${THIRDPARTY_DIR})
+include_directories(targets/${TARGET_DIR})
+include_directories(SYSTEM ${THIRDPARTY_DIR})
 
 if(NATIVE_BUILD)
   include_directories(targets/simu)
@@ -542,6 +555,16 @@ add_definitions(-DCORRECT_NEGATIVE_SHIFTS)
 
 if(NOT MSVC)
   set(WARNING_FLAGS "${WARNING_FLAGS} -Wall -Wno-address-of-packed-member -Wno-strict-aliasing -Wformat -Wreturn-type -Wunused -Wuninitialized -Wunknown-pragmas -Wno-switch -Wtype-limits")
+  if(EDGE16_SAFETY_CHECKS)
+    set(WARNING_FLAGS "${WARNING_FLAGS} -Wformat=2 -Wnull-dereference -Wimplicit-fallthrough -Wvla")
+    if(CMAKE_C_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+      set(WARNING_FLAGS "${WARNING_FLAGS} -Warray-bounds=2 -Wstringop-overflow=4 -Wimplicit-fallthrough=5 -Walloca -Wtrampolines -Wduplicated-cond -Wlogical-op -Wcast-align")
+    endif()
+    if(NOT NATIVE_BUILD)
+      set(WARNING_FLAGS "${WARNING_FLAGS} -fstack-usage -Wstack-usage=${EDGE16_STACK_USAGE_LIMIT} -Wframe-larger-than=${EDGE16_FRAME_SIZE_LIMIT}")
+    endif()
+    set(WARNING_FLAGS "${WARNING_FLAGS} -Wno-unused-parameter -Wno-missing-field-initializers -Wno-sign-compare -Wno-ignored-qualifiers -Wno-empty-body -Wno-format-nonliteral")
+  endif()
   if(WARNINGS_AS_ERRORS)
     set(WARNING_FLAGS "${WARNING_FLAGS} -Werror")
   endif(WARNINGS_AS_ERRORS)
@@ -646,6 +669,23 @@ add_executable(firmware ${SRC})
 link_libraries(firmware -lstdc++)
 add_dependencies(firmware ${RADIO_DEPENDENCIES})
 set_target_properties(firmware PROPERTIES EXCLUDE_FROM_ALL TRUE)
+
+if(EDGE16_GCC_ANALYZER)
+  target_compile_options(firmware PRIVATE
+    $<$<COMPILE_LANGUAGE:C>:-fanalyzer>
+    $<$<COMPILE_LANGUAGE:CXX>:-fanalyzer>)
+  foreach(src ${SRC})
+    if(src MATCHES "(^|/)thirdparty/")
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS -fno-analyzer)
+    elseif(src MATCHES "(^|/)lua/(widgets|lua_widget_factory)\\.cpp$")
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS
+        -Wno-analyzer-malloc-leak)
+    elseif(src MATCHES "(^|/)lua/lua_lvgl_widget\\.cpp$")
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS
+        -Wno-analyzer-use-of-uninitialized-value)
+    endif()
+  endforeach()
+endif()
 
 if(ARCH STREQUAL ARM)
   target_link_libraries(firmware PRIVATE cmsis)

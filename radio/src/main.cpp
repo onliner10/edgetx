@@ -28,6 +28,8 @@
 #include "edgetx.h"
 #include "lua/lua_states.h"
 
+#include <new>
+
 #if defined(COLORLCD)
 #include "view_main.h"
 #include "startup_shutdown.h"
@@ -74,7 +76,8 @@ void openUsbMenu()
 {
   if (_usbMenu || _usbDisabled) return;
 
-  _usbMenu = new Menu();
+  _usbMenu = new (std::nothrow) Menu();
+  if (!_usbMenu) return;
 
   _usbMenu->setCloseHandler([]() { _usbMenu = nullptr; });
 

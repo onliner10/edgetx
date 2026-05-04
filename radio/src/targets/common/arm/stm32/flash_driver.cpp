@@ -195,6 +195,12 @@ static int stm32_flash_read(uint32_t address, void* data, uint32_t len)
   return 0;
 }
 
+static uint32_t read_u32_le(const uint8_t* data)
+{
+  return uint32_t(data[0]) | (uint32_t(data[1]) << 8) |
+         (uint32_t(data[2]) << 16) | (uint32_t(data[3]) << 24);
+}
+
 const etx_flash_driver_t stm32_flash_driver = {
   .get_size_kb = stm32_flash_get_size_kb,
   .get_sector = stm32_flash_get_sector,
@@ -227,47 +233,49 @@ void flashWrite(uint32_t* address, const uint32_t* buffer)
 // TODO: move this somewhere else, as it depends on firmware layout
 uint32_t isFirmwareStart(const uint8_t * buffer)
 {
-  const uint32_t * block = (const uint32_t *)buffer;
+  const uint32_t block0 = read_u32_le(buffer);
+  const uint32_t block1 = read_u32_le(buffer + 4);
+  const uint32_t block2 = read_u32_le(buffer + 8);
 
 #if defined(STM32F4)
   // Stack pointer in CCM or RAM
-  if ((block[0] & 0xFFFC0000) != 0x10000000 && (block[0] & 0xFFFC0000) != 0x20000000) {
+  if ((block0 & 0xFFFC0000) != 0x10000000 && (block0 & 0xFFFC0000) != 0x20000000) {
     return 0;
   }
   // First ISR pointer in FLASH
-  if ((block[1] & 0xFFC00000) != 0x08000000) {//for nv14 firmware may start up to 0x81F ....
+  if ((block1 & 0xFFC00000) != 0x08000000) {//for nv14 firmware may start up to 0x81F ....
     return 0;
   }
   // Second ISR pointer in FLASH
-  if ((block[2] & 0xFFC00000) != 0x08000000) {
+  if ((block2 & 0xFFC00000) != 0x08000000) {
     return 0;
   }
 #elif defined(STM32H7)
 //  // Stack pointer in D1 RAM
-//  if ((block[0] & 0xFFFC0000) != 0x24080000) {
+//  if ((block0 & 0xFFFC0000) != 0x24080000) {
   // Stack pointer in DTCM RAM
-  if ((block[0] & 0xFFFF0000) != 0x20020000) {
+  if ((block0 & 0xFFFF0000) != 0x20020000) {
     return 0;
   }
   // First ISR pointer in FLASH
-  if ((block[1] & 0xF0000000) != 0x90000000) {
+  if ((block1 & 0xF0000000) != 0x90000000) {
     return 0;
   }
   // Second ISR pointer in FLASH
-  if ((block[2] & 0xF0000000) != 0xC0000000) {
+  if ((block2 & 0xF0000000) != 0xC0000000) {
     return 0;
   }
 #else
   // Stack pointer in RAM
-  if ((block[0] & 0xFFFC0000) != 0x20000000) {
+  if ((block0 & 0xFFFC0000) != 0x20000000) {
     return 0;
   }
   // First ISR pointer in FLASH
-  if ((block[1] & 0xFFF00000) != 0x08000000) {
+  if ((block1 & 0xFFF00000) != 0x08000000) {
     return 0;
   }
   // Second ISR pointer in FLASH
-  if ((block[2] & 0xFFF00000) != 0x08000000) {
+  if ((block2 & 0xFFF00000) != 0x08000000) {
     return 0;
   }
 #endif
@@ -276,10 +284,8 @@ uint32_t isFirmwareStart(const uint8_t * buffer)
 
 uint32_t isBootloaderStart(const uint8_t * buffer)
 {
-  const uint32_t * block = (const uint32_t *)buffer;
-
   for (int i = 0; i < 256; i++) {
-    if (block[i] == 0x544F4F42/*BOOT*/) {
+    if (read_u32_le(buffer + (i * 4)) == 0x544F4F42/*BOOT*/) {
       return 1;
     }
   }

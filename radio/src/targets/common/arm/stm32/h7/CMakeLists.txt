@@ -109,6 +109,9 @@ if(NOT NATIVE_BUILD)
 
   add_library(stm32cube_ll OBJECT EXCLUDE_FROM_ALL ${STM32CUBE_SRC})
   target_compile_definitions(stm32cube_ll PRIVATE USE_FULL_LL_DRIVER)
+  if(EDGE16_SAFETY_CHECKS)
+    target_compile_options(stm32cube_ll PRIVATE -Wno-cast-align)
+  endif()
 
   set(FIRMWARE_SRC ${FIRMWARE_SRC} $<TARGET_OBJECTS:stm32cube_ll>)
   set(BOOTLOADER_SRC ${BOOTLOADER_SRC} $<TARGET_OBJECTS:stm32cube_ll>)

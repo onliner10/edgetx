@@ -22,6 +22,7 @@
 #include "modelslist.h"
 
 #include <algorithm>
+#include <new>
 
 using std::list;
 
@@ -1151,7 +1152,8 @@ bool ModelsList::loadYaml()
     if (filehash.celladded == false) {
       TRACE_LABELS("  Created a modelcell for %s, not in labels.yml",
                    filehash.name.c_str());
-      model = new ModelCell(filehash.name.c_str());
+      model = new (std::nothrow) ModelCell(filehash.name.c_str());
+      if (!model) continue;
       strncpy(model->modelFinfoHash, filehash.hash, FILE_HASH_LENGTH);
       model->modelFinfoHash[FILE_HASH_LENGTH] = '\0';
       modelslist.push_back(model);
@@ -1215,8 +1217,10 @@ bool ModelsList::load()
       TRACE("  - No Models Found, making a new one");
       // No models found, make a new one
       auto model = modelslist.addModel(createModel(), true);
-      modelslist.setCurrentModel(model);
-      updateCurrentModelCell();
+      if (model) {
+        modelslist.setCurrentModel(model);
+        updateCurrentModelCell();
+      }
     }
   }
 
@@ -1350,7 +1354,8 @@ void ModelsList::updateCurrentModelCell()
 
 ModelCell *ModelsList::addModel(const char *fileName, bool save, ModelCell *copyCell)
 {
-  ModelCell *result = new ModelCell(fileName);
+  ModelCell *result = new (std::nothrow) ModelCell(fileName);
+  if (!result) return nullptr;
   if (copyCell != nullptr) { // Duplicate all data
     memcpy(result, copyCell, sizeof(ModelCell));
   }

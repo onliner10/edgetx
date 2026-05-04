@@ -84,9 +84,8 @@ static void _copy_rotate_180(uint16_t* dst, uint16_t* src, const rect_t& copy_ar
 
     auto line_end = px_dst + (copy_area.w & ~1);
     while (px_dst != line_end) {
-      uint32_t* px2_src = (uint32_t*)src;
-
-      *((uint32_t*)px_dst) = ((*px2_src & 0xFFFF0000) >> 16) | ((*px2_src & 0xFFFF) << 16);
+      px_dst[0] = src[1];
+      px_dst[1] = src[0];
 
       src -= 2;
       px_dst += 2;
@@ -446,4 +445,3 @@ extern "C" void LTDC_IRQHandler(void)
   __HAL_LTDC_CLEAR_FLAG(&hltdc, LTDC_FLAG_LI);
   _frame_addr_reloaded = 1;
 }
-

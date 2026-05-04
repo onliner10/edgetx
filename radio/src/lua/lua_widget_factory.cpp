@@ -26,6 +26,9 @@
 #include "lua_states.h"
 #include "strhelpers.h"
 
+#include <cstdlib>
+#include <new>
+
 #define MAX_INSTRUCTIONS       (20000/100)
 
 LuaWidgetFactory::LuaWidgetFactory(const char* name, WidgetOption* widgetOptions, int optionDefinitionsReference,
@@ -56,16 +59,16 @@ LuaWidgetFactory::~LuaWidgetFactory() {
   luaL_unref(lsWidgets, LUA_REGISTRYINDEX, backgroundFunction);
   luaL_unref(lsWidgets, LUA_REGISTRYINDEX, translateFunction);
 
-  if (name) delete name;
-  if (displayName) delete displayName;
+  free(const_cast<char *>(name));
+  free(const_cast<char *>(displayName));
 
-  auto option = getDefaultOptions();
+  auto options = const_cast<WidgetOption *>(getDefaultOptions());
+  auto option = options;
   while (option && option->name != nullptr) {
-    if (option->displayName) {
-      delete option->displayName;
-    }
+    free(const_cast<char *>(option->displayName));
     option++;
   }
+  delete[] options;
 }
 
 Widget* LuaWidgetFactory::createNew(Window* parent, const rect_t& rect,
@@ -134,7 +137,10 @@ void LuaWidgetFactory::translateOptions(WidgetOption * options)
     bool err = lua_pcall(lsWidgets, 2, 1, 0);
     if (!err) {
       auto dn = lua_tostring(lsWidgets, -1);
-      if (dn) option->displayName = strdup(dn);
+      if (dn) {
+        free(const_cast<char *>(option->displayName));
+        option->displayName = strdup(dn);
+      }
     }
     lua_pop(lsWidgets, 1);
 
@@ -148,7 +154,10 @@ void LuaWidgetFactory::translateOptions(WidgetOption * options)
   bool err = lua_pcall(lsWidgets, 2, 1, 0);
   if (!err) {
     auto dn = lua_tostring(lsWidgets, -1);
-    if (dn) displayName = strdup(dn);
+    if (dn) {
+      free(const_cast<char *>(displayName));
+      displayName = strdup(dn);
+    }
   }
   lua_pop(lsWidgets, 1);
 }
@@ -293,7 +302,7 @@ WidgetOption* LuaWidgetFactory::parseOptionDefinitions(int reference)
     // TRACE("limited to %d options", count);
   }
 
-  WidgetOption *options = new WidgetOption[count + 1];
+  WidgetOption *options = new (std::nothrow) WidgetOption[count + 1];
   if (!options) {
     return NULL;
   }

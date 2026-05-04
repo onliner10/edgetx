@@ -46,13 +46,22 @@ void LZ4BitmapBuffer::load(const LZ4Bitmap* lz4Data)
 
 #if !defined(BOOT)
 
+static uint16_t read_u16_le(const uint8_t* data)
+{
+  return uint16_t(data[0]) | (uint16_t(data[1]) << 8);
+}
+
+static uint32_t read_u32_le(const uint8_t* data)
+{
+  return uint32_t(data[0]) | (uint32_t(data[1]) << 8) |
+         (uint32_t(data[2]) << 16) | (uint32_t(data[3]) << 24);
+}
+
 MaskBitmap* _decompressed_mask(const uint8_t* lz4_compressed)
 {
-  const uint16_t* hdr = (const uint16_t*)lz4_compressed;
-  uint16_t width = hdr[0];
-  uint16_t height = hdr[1];
-
-  size_t len = *(uint32_t*)&hdr[2];
+  uint16_t width = read_u16_le(lz4_compressed);
+  uint16_t height = read_u16_le(lz4_compressed + 2);
+  size_t len = read_u32_le(lz4_compressed + 4);
 
   // skip 8 bytes header
   lz4_compressed += 8;

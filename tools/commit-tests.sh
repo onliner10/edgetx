@@ -37,7 +37,7 @@ if (( $WERROR )); then COMMON_OPTIONS+=" -DWARNINGS_AS_ERRORS=YES "; fi
 
 COMMON_OPTIONS+=${EXTRA_OPTIONS}" "
 
-: ${FIRMARE_TARGET:="firmware-size"}
+: "${FIRMWARE_TARGET:=${FIRMARE_TARGET:-firmware-size}}"
 
 # Determine parallel jobs
 determine_max_jobs

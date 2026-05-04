@@ -675,7 +675,7 @@ void ProtoState::parseData(uint8_t* rxBuffer, uint8_t rxBufferCount)
 //        modelcfgGet = false;
 //         TRACE("AFHDS3 [MODULE_GET_CONFIG]");
         size_t len = min<size_t>(sizeof(cfg.buffer), rxBufferCount);
-        std::memcpy((void*) cfg.buffer, &responseFrame->value, len);
+        std::memcpy((void*) cfg.buffer, responseFrame->GetValue(), len);
         moduleData->afhds3.emi = cfg.v0.EMIStandard;
         moduleData->afhds3.telemetry = cfg.v0.IsTwoWay;
         moduleData->afhds3.phyMode = cfg.v0.PhyMode;
@@ -685,13 +685,13 @@ void ProtoState::parseData(uint8_t* rxBuffer, uint8_t rxBufferCount)
         cfg.others.lastUpdated = get_tmr10ms();
       } break;
       case COMMAND::MODULE_VERSION:
-        std::memcpy((void*) &version, &responseFrame->value, sizeof(version));
+        std::memcpy((void*) &version, responseFrame->GetValue(), sizeof(version));
 //         TRACE("AFHDS3 [MODULE_VERSION] Product %d, HW %d, BOOT %d, FW %d",
 //               version.productNumber, version.hardwareVersion,
 //               version.bootloaderVersion, version.firmwareVersion);
         break;
       case COMMAND::MODULE_RFPOWER:
-        {  uint8_t* value = &responseFrame->value;
+        {  uint8_t* value = responseFrame->GetValue();
           RFCurrentPower = (value[1]<<8) + value[0];
         }
         break;
@@ -744,7 +744,7 @@ void ProtoState::parseData(uint8_t* rxBuffer, uint8_t rxBufferCount)
         break;
       case COMMAND::TELEMETRY_DATA:
         {
-        uint8_t* telemetry = &responseFrame->value;
+        uint8_t* telemetry = responseFrame->GetValue();
 
         if (telemetry[0] == 0x22) {
           telemetry++;
@@ -763,7 +763,7 @@ void ProtoState::parseData(uint8_t* rxBuffer, uint8_t rxBufferCount)
       }
         break;
       case COMMAND::COMMAND_RESULT: {
-        uint8_t *data = &responseFrame->value;
+        uint8_t *data = responseFrame->GetValue();
         uint16_t cmd_code = *data++;
         cmd_code |= (*data++)<<8;
         uint8_t result  = *data++;

@@ -1,0 +1,82 @@
+rules:
+  - id: edge16.realtime.no-c-heap
+    languages: [c, cpp]
+    severity: ERROR
+    message: "Dynamic C heap allocation is forbidden in firmware realtime paths."
+    paths:
+      include:
+        - /radio/src/tasks/**
+        - /radio/src/pulses/**
+        - /radio/src/telemetry/**
+        - /radio/src/hal/**
+        - /radio/src/targets/common/arm/stm32/**
+        - /radio/src/targets/horus/**
+        - /radio/src/targets/tx16smk3/**
+        - /radio/src/mixer.cpp
+        - /radio/src/mixer_scheduler.cpp
+        - /radio/src/tasks.cpp
+        - /radio/src/audio.cpp
+        - /radio/src/sbus.cpp
+      exclude:
+        - /radio/src/thirdparty/**
+        - /radio/src/tests/**
+    pattern-either:
+      - pattern: malloc(...)
+      - pattern: calloc(...)
+      - pattern: realloc(...)
+      - pattern: free(...)
+      - pattern: pvPortMalloc(...)
+      - pattern: vPortFree(...)
+
+  - id: edge16.realtime.no-cpp-heap
+    languages: [cpp]
+    severity: ERROR
+    message: "Dynamic C++ heap allocation is forbidden in firmware realtime paths."
+    paths:
+      include:
+        - /radio/src/tasks/**
+        - /radio/src/pulses/**
+        - /radio/src/telemetry/**
+        - /radio/src/hal/**
+        - /radio/src/targets/common/arm/stm32/**
+        - /radio/src/targets/horus/**
+        - /radio/src/targets/tx16smk3/**
+        - /radio/src/mixer.cpp
+        - /radio/src/mixer_scheduler.cpp
+        - /radio/src/tasks.cpp
+        - /radio/src/audio.cpp
+        - /radio/src/sbus.cpp
+      exclude:
+        - /radio/src/thirdparty/**
+        - /radio/src/tests/**
+    pattern-either:
+      - pattern-regex: '^(?!\s*//)(?:(?!//).)*\bnew\s+[A-Za-z_:][A-Za-z0-9_:]*(?:\s*<[^;\n{}()]+>)?(?:\s*\(|\s*\[|\s*;)'
+      - pattern-regex: '^(?!\s*//)(?:(?!//).)*\bdelete\s*(?:\[\]\s*)?[A-Za-z_*&]'
+
+  - id: edge16.realtime.no-dynamic-stl
+    languages: [cpp]
+    severity: ERROR
+    message: "Dynamically allocating STL containers are forbidden in firmware realtime paths."
+    paths:
+      include:
+        - /radio/src/tasks/**
+        - /radio/src/pulses/**
+        - /radio/src/telemetry/**
+        - /radio/src/hal/**
+        - /radio/src/targets/common/arm/stm32/**
+        - /radio/src/targets/horus/**
+        - /radio/src/targets/tx16smk3/**
+        - /radio/src/mixer.cpp
+        - /radio/src/mixer_scheduler.cpp
+        - /radio/src/tasks.cpp
+        - /radio/src/audio.cpp
+        - /radio/src/sbus.cpp
+      exclude:
+        - /radio/src/thirdparty/**
+        - /radio/src/tests/**
+    pattern-either:
+      - pattern: std::vector<$T> $X;
+      - pattern: std::string $X;
+      - pattern: std::map<$K, $V> $X;
+      - pattern: std::unordered_map<$K, $V> $X;
+      - pattern: std::function<$T> $X;

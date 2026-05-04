@@ -37,13 +37,19 @@
 
 #define UF2_BLOCK_SIZE 512
 
+static uint32_t read_u32_le(const uint8_t* data)
+{
+  return uint32_t(data[0]) | (uint32_t(data[1]) << 8) |
+         (uint32_t(data[2]) << 16) | (uint32_t(data[3]) << 24);
+}
+
 bool isUF2Block(const void* block, uint32_t len)
 {
-  const UF2_Block* uf2 = (UF2_Block*)block;
+  const uint8_t* data = (const uint8_t*)block;
   return len >= UF2_BLOCK_SIZE
-      && uf2->magicStart0 == UF2_MAGIC_START0
-      && uf2->magicStart1 == UF2_MAGIC_START1
-      && uf2->magicEnd == UF2_MAGIC_END;
+      && read_u32_le(data) == UF2_MAGIC_START0
+      && read_u32_le(data + 4) == UF2_MAGIC_START1
+      && read_u32_le(data + UF2_BLOCK_SIZE - sizeof(uint32_t)) == UF2_MAGIC_END;
 }
 
 static size_t getUF2Extension(const UF2_Block* block, uint32_t extension,
@@ -51,18 +57,20 @@ static size_t getUF2Extension(const UF2_Block* block, uint32_t extension,
 {
   if ((block->flags & UF2_FLAG_EXTENSION_TAGS) == 0) return 0;
 
-  uint32_t* ptr = (uint32_t*)(block->data + block->payloadSize);
-  if (*ptr == 0) return 0;
+  const uint8_t* block_start = (const uint8_t*)block;
+  const uint8_t* block_end = block_start + sizeof(UF2_Block);
+  const uint8_t* ptr = block->data + block->payloadSize;
 
-  while ((size_t)((uint8_t*)ptr - (uint8_t*)block) < sizeof(UF2_Block)) {
-    uint32_t tag = ((*ptr) & 0xFFFFFF00) >> 8;
-    uint32_t len = (*ptr) & 0x000000FF;
-    if (*ptr == 0) break;
+  while (ptr + sizeof(uint32_t) <= block_end) {
+    uint32_t value = read_u32_le(ptr);
+    uint32_t tag = (value & 0xFFFFFF00) >> 8;
+    uint32_t len = value & 0x000000FF;
+    if (value == 0) break;
     if (tag != extension) {
-      ptr += (len + 3) / 4;
+      ptr += ((len + 3) / 4) * sizeof(uint32_t);
       continue;
     }
-    *data = (char*)++ptr;
+    *data = (const char*)(ptr + sizeof(uint32_t));
     return len > 4 ? len - 4 : 0;
   }
 
@@ -74,12 +82,15 @@ bool extractUF2FirmwareVersion(const void* block, VersionTag* tag)
 
   memset(tag, 0, sizeof(VersionTag));
 
+  UF2_Block uf2;
+  memcpy(&uf2, block, sizeof(uf2));
+
   const char* extension;
-  size_t len = getUF2Extension((UF2_Block*)block, UF2_DEVICE_TAG, &extension);
+  size_t len = getUF2Extension(&uf2, UF2_DEVICE_TAG, &extension);
   if (len == 0) return false;
   memcpy(tag->flavour, extension, std::min(len, sizeof(tag->flavour) - 1));
 
-  len = getUF2Extension((UF2_Block*)block, UF2_VERSION_TAG, &extension);
+  len = getUF2Extension(&uf2, UF2_VERSION_TAG, &extension);
   if (len == 0) return false;
   memcpy(tag->full_version, extension, std::min(len, sizeof(tag->full_version) - 1));
 
@@ -136,19 +147,19 @@ bool isUF2FirmwareFile(const char * filename)
 }
 
 static uint8_t* skipUF2Extensions(uint8_t* data) {
-
-  uint32_t* ptr = (uint32_t*)data;
+  uint8_t* ptr = data;
   while(true) {
-    uint32_t tag = ((*ptr) & 0xFFFFFF00) >> 8;
-    uint32_t len = (*ptr) & 0x000000FF;
-    if (*ptr == 0) break;
+    uint32_t value = read_u32_le(ptr);
+    uint32_t tag = (value & 0xFFFFFF00) >> 8;
+    uint32_t len = value & 0x000000FF;
+    if (value == 0) break;
     if (tag) {
-      ptr += (len + 3) / 4;
+      ptr += ((len + 3) / 4) * sizeof(uint32_t);
       continue;
     }
   }
 
-  return (uint8_t*)ptr;
+  return ptr;
 }
 
 #if defined(STM32) && !defined(SIMU)

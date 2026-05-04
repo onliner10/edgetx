@@ -36,6 +36,11 @@ constexpr int32_t MULTI_DESIRED_VERSION = (1 << 24) | (3 << 16) | (3 << 8)  | 0;
 
 extern uint8_t g_moduleIdx;
 
+static uint16_t read_u16_le(const uint8_t* data)
+{
+  return uint16_t(data[0]) | (uint16_t(data[1]) << 8);
+}
+
 enum MultiPacketTypes : uint8_t
 {
   MultiStatus = 1,
@@ -466,7 +471,7 @@ static void processMultiTelemetryPaket(const uint8_t * packet, uint8_t module)
       if (len >= 4) {
         if (sportProcessTelemetryPacket(module, data, len) && len >= 8) {
           uint8_t primId = data[1];
-          uint16_t dataId = *((uint16_t *)(data+2));
+          uint16_t dataId = read_u16_le(data + 2);
           if (primId == DATA_FRAME && dataId == RSSI_ID) {
             // fetch MPM special TX_RSSI & TX_LQI sensors
             uint8_t physicalId = data[0] & 0x1F;

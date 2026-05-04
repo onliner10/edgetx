@@ -93,6 +93,7 @@ point_t BitmapBuffer::drawTextLines(coord_t left, coord_t top, coord_t width,
         case '{':
         case '[':
           nxt++;
+          [[fallthrough]];
         case ' ':
         case '\n':
         case '\0':

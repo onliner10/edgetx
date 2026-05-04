@@ -396,8 +396,10 @@ class ModelsPageBody : public Window
             // same labels
             auto new_model =
                 modelslist.addModel(duplicatedFilename, true, model);
-            for (const auto &lbl : modelslabels.getLabelsByModel(model)) {
-              modelslabels.addLabelToModel(lbl, new_model);
+            if (new_model) {
+              for (const auto &lbl : modelslabels.getLabelsByModel(model)) {
+                modelslabels.addLabelToModel(lbl, new_model);
+              }
             }
             update();
           } else {
@@ -609,6 +611,7 @@ void ModelLabelsWindow::newModel()
     // Create a new blank ModelCell and activate it first, createmodel() will
     // modify the model in memory.
     auto newCell = modelslist.addModel("", false);
+    if (!newCell) return;
     modelslist.setCurrentModel(newCell);
 
     // Make the new model

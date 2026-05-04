@@ -23,6 +23,7 @@
 
 #include <ctype.h>
 #include <stdio.h>
+#include <new>
 #include "edgetx.h"
 #include "stamp.h"
 #include "lua_api.h"
@@ -85,7 +86,8 @@ static int luaRxFifoGetByte(void*, uint8_t* data)
 void luaAllocRxFifo()
 {
   if (!luaRxFifo) {
-    auto fifo = new Fifo<uint8_t, LUA_FIFO_SIZE>();
+    auto fifo = new (std::nothrow) Fifo<uint8_t, LUA_FIFO_SIZE>();
+    if (!fifo) return;
     luaRxFifo = fifo;
     luaSetGetSerialByte(nullptr, luaRxFifoGetByte);
   }
@@ -330,7 +332,7 @@ void luaGetValueAndPush(lua_State* L, int src)
             luaPushCells(L, telemetrySensor, telemetryItems[qr.quot]);
             break;
           }
-          // deliberate no break here to properly return `Cels-` and `Cels+`
+          [[fallthrough]];
         default:
           if (telemetrySensor.prec > 0)
             lua_pushnumber(L, float(value)/telemetrySensor.getPrecDivisor());
@@ -827,7 +829,7 @@ static int luaGetSourceValue(lua_State * L)
             luaPushCells(L, telemetrySensor, telemetryItems[qr.quot]);
             break;
           }
-          // deliberate no break here to properly return `Cels-` and `Cels+`
+          [[fallthrough]];
         default:
           if (telemetrySensor.prec > 0)
             lua_pushnumber(L, float(value)/telemetrySensor.getPrecDivisor());
@@ -899,12 +901,12 @@ static TelemetryQueue* getTelemetryQueue()
     return luaScriptManager->telemetryQueue();
   } else {
     if (!luaInputTelemetryFifo)
-      luaInputTelemetryFifo = new TelemetryQueue();
+      luaInputTelemetryFifo = new (std::nothrow) TelemetryQueue();
     return luaInputTelemetryFifo;
   }
 #else
   if (!luaInputTelemetryFifo)
-    luaInputTelemetryFifo = new TelemetryQueue();
+    luaInputTelemetryFifo = new (std::nothrow) TelemetryQueue();
   return luaInputTelemetryFifo;
 #endif
 }
@@ -932,7 +934,7 @@ static int luaSportTelemetryPop(lua_State * L)
 
   if (queue) {
     if (queue->size() >= sizeof(SportTelemetryPacket)) {
-      SportTelemetryPacket packet;
+      SportTelemetryPacket packet = {};
       for (uint8_t i=0; i<sizeof(packet); i++) {
         queue->pop(packet.raw[i]);
       }

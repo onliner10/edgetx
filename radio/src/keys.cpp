@@ -149,7 +149,7 @@ event_t Key::input(bool val)
         m_state >>= 1;
         m_cnt = 0;
       }
-      // no break
+      [[fallthrough]];
     case 1:
       if ((m_cnt & (m_state - 1)) == 0) {
         // this produces repeat events that at first repeat slowly and then increase in speed

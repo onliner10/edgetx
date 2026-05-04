@@ -38,6 +38,9 @@ if(NOT NATIVE_BUILD)
     )
 
   target_compile_options(stm32cube_ll PRIVATE -DUSE_FULL_LL_DRIVER)
+  if(EDGE16_SAFETY_CHECKS)
+    target_compile_options(stm32cube_ll PRIVATE -Wno-cast-align)
+  endif()
   target_include_directories(stm32cube_ll PRIVATE
     ${THIRDPARTY_DIR}/CMSIS/Device/ST/STM32F2xx/Include
     ${THIRDPARTY_DIR}/CMSIS/Include)
@@ -91,4 +94,3 @@ if(NOT NATIVE_BUILD)
   #
   set(FIRMWARE_SRC ${FIRMWARE_SRC} $<TARGET_OBJECTS:freertos>)
 endif()
-

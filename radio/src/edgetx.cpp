@@ -842,13 +842,13 @@ bool isThrottleWarningAlertNeeded()
 #if defined(COLORLCD)
 void checkThrottleStick()
 {
-  char throttleNotIdle[strlen(STR_THROTTLE_NOT_IDLE) + 9];
+  char throttleNotIdle[128];
   if (isThrottleWarningAlertNeeded()) {
     if (g_model.enableCustomThrottleWarning) {
-    sprintf(throttleNotIdle, "%s (%d%%)", STR_THROTTLE_NOT_IDLE, g_model.customThrottleWarningPosition);
+      snprintf(throttleNotIdle, sizeof(throttleNotIdle), "%s (%d%%)", STR_THROTTLE_NOT_IDLE, g_model.customThrottleWarningPosition);
     }
     else {
-      strcpy(throttleNotIdle, STR_THROTTLE_NOT_IDLE);
+      snprintf(throttleNotIdle, sizeof(throttleNotIdle), "%s", STR_THROTTLE_NOT_IDLE);
     }
     LED_ERROR_BEGIN();
     auto dialog = new ThrottleWarnDialog(throttleNotIdle);
@@ -861,15 +861,15 @@ void checkThrottleStick()
 #else
 void checkThrottleStick()
 {
-  char throttleNotIdle[strlen(STR_THROTTLE_NOT_IDLE) + 9];
+  char throttleNotIdle[128];
   if (!isThrottleWarningAlertNeeded()) {
     return;
   }
   if (g_model.enableCustomThrottleWarning) {
-    sprintf(throttleNotIdle, "%s (%d%%)", STR_THROTTLE_NOT_IDLE, g_model.customThrottleWarningPosition);
+    snprintf(throttleNotIdle, sizeof(throttleNotIdle), "%s (%d%%)", STR_THROTTLE_NOT_IDLE, g_model.customThrottleWarningPosition);
   }
   else {
-    strcpy(throttleNotIdle, STR_THROTTLE_NOT_IDLE);
+    snprintf(throttleNotIdle, sizeof(throttleNotIdle), "%s", STR_THROTTLE_NOT_IDLE);
   }
   // first - display warning; also deletes inputs if any have been before
   LED_ERROR_BEGIN();

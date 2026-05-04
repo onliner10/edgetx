@@ -122,7 +122,7 @@ void processGhostTelemetryValue(uint8_t index, int32_t value)
 
 void processGhostTelemetryValueString(const GhostSensor * sensor, const char * str)
 {
-  if (TELEMETRY_STREAMING()) {
+  if (sensor && TELEMETRY_STREAMING()) {
     setTelemetryText(PROTOCOL_TELEMETRY_GHOST, sensor->id, 0, 0, str);
   }
 }

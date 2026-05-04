@@ -112,6 +112,7 @@ static void autodetectProtocol(uint8_t c)
     case 0: // Init
       time = get_tmr10ms();
       state = 1;
+      [[fallthrough]];
     case 1: // Wait for a valid packet
       if (gpsNewFrameNMEA(c)) {
         if (!firstPacketNMEA) {

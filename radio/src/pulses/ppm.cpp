@@ -197,11 +197,13 @@ static void ppmSendPulses(void* ctx, uint8_t* buffer, int16_t* channels, uint8_t
   auto mod_st = (etx_module_state_t*)ctx;
   auto module = modulePortGetModule(mod_st);
 
-  pulse_duration_t* pulses = (pulse_duration_t*)buffer;
+  pulse_duration_t* pulses =
+      static_cast<pulse_duration_t*>(static_cast<void*>(buffer));
   auto length = setupPulsesPPMModule(module, pulses);
 
   auto drv = modulePortGetTimerDrv(mod_st->tx);
   auto drv_ctx = modulePortGetCtx(mod_st->tx);
+  if (!drv) return;
 
   auto delay = GET_MODULE_PPM_DELAY(module) * 2;
   etx_timer_config_t cfg = {

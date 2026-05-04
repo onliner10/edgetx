@@ -53,7 +53,7 @@ fi
 
 COMMON_OPTIONS+=${EXTRA_OPTIONS}" "
 
-: "${FIRMARE_TARGET:="firmware-size"}"
+: "${FIRMWARE_TARGET:=${FIRMARE_TARGET:-firmware-size}}"
 
 # Determine parallel jobs
 determine_max_jobs
@@ -83,7 +83,7 @@ do
     cmake ${BUILD_OPTIONS} "${SRCDIR}"
     
     cmake_build_parallel  . --target arm-none-eabi-configure
-    cmake_build_parallel arm-none-eabi --target ${FIRMARE_TARGET}
+    cmake_build_parallel arm-none-eabi --target "${FIRMWARE_TARGET}"
 
     rm -f CMakeCache.txt arm-none-eabi/CMakeCache.txt
 

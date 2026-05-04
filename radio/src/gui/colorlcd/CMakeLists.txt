@@ -193,6 +193,22 @@ include(${RADIO_SRC_DIR}/gui/colorlcd/CMakeListsLVGL.txt)
 list(TRANSFORM LVGL_SOURCES_MINIMAL PREPEND ${RADIO_SRC_DIR}/)
 list(TRANSFORM LVGL_FONT_SOURCES_MINIMAL PREPEND ${RADIO_SRC_DIR}/)
 
+if(EDGE16_SAFETY_CHECKS)
+  set(EDGE16_LVGL_SOURCE_OPTIONS -Wno-null-dereference -Wno-cast-align)
+  set(EDGE16_STACK_SOURCE_OPTIONS)
+  if(CMAKE_C_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    list(APPEND EDGE16_STACK_SOURCE_OPTIONS -Wno-stack-usage -Wno-frame-larger-than)
+  endif()
+  set(EDGE16_LZ4_SOURCE_OPTIONS ${EDGE16_STACK_SOURCE_OPTIONS})
+  if(EDGE16_GCC_ANALYZER)
+    list(APPEND EDGE16_LVGL_SOURCE_OPTIONS -fno-analyzer)
+    list(APPEND EDGE16_LZ4_SOURCE_OPTIONS -fno-analyzer)
+  endif()
+
+  set_source_files_properties(${LVGL_SOURCES_MINIMAL}
+    PROPERTIES COMPILE_OPTIONS "${EDGE16_LVGL_SOURCE_OPTIONS}")
+endif()
+
 set(BOOTLOADER_SRC ${BOOTLOADER_SRC}
   ${LVGL_SOURCES_MINIMAL}
   ${LVGL_FONT_SOURCES_MINIMAL}
@@ -209,5 +225,16 @@ set(SRC ${SRC}
   ${LVGL_FONT_SOURCES}
   ${RADIO_SRC_DIR}/thirdparty/lz4/lz4.c
 )
+
+if(EDGE16_SAFETY_CHECKS)
+  set_source_files_properties(${LVGL_SOURCES}
+    PROPERTIES COMPILE_OPTIONS "${EDGE16_LVGL_SOURCE_OPTIONS}")
+  if(EDGE16_STACK_SOURCE_OPTIONS)
+    set_source_files_properties(${RADIO_SRC_DIR}/gui/colorlcd/libui/bitmapbuffer_fileio.cpp
+      PROPERTIES COMPILE_OPTIONS "${EDGE16_STACK_SOURCE_OPTIONS}")
+  endif()
+  set_source_files_properties(${RADIO_SRC_DIR}/thirdparty/lz4/lz4.c
+    PROPERTIES COMPILE_OPTIONS "${EDGE16_LZ4_SOURCE_OPTIONS}")
+endif()
 
 add_definitions(-DCOLORLCD)

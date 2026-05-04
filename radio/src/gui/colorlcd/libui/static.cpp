@@ -27,6 +27,13 @@
 
 //-----------------------------------------------------------------------------
 
+static uint16_t read_u16_le(const uint8_t* data)
+{
+  return uint16_t(data[0]) | (uint16_t(data[1]) << 8);
+}
+
+//-----------------------------------------------------------------------------
+
 StaticText::StaticText(Window* parent, const rect_t& rect, std::string txt,
                        LcdColorIndex color, LcdFlags textFlags) :
     Window(parent, rect, lv_label_create), text(std::move(txt))
@@ -331,20 +338,20 @@ StaticLZ4Image::StaticLZ4Image(Window* parent, coord_t x, coord_t y,
   uint32_t pixels = w * h;
   uint32_t size = (pixels + 1) & 0xFFFFFFFE;
   imgData = (uint8_t*)lv_mem_alloc(size * 3);
-  uint16_t* decompData = (uint16_t*)(imgData + size);
+  uint8_t* decompData = imgData + size;
 
   LZ4_decompress_safe((const char*)lz4Bitmap->data, (char*)decompData,
                       lz4Bitmap->compressedSize, pixels * sizeof(uint16_t));
 
   uint8_t* dest = imgData;
   for (uint32_t i = 0; i < pixels; i += 1) {
-    uint16_t c = *decompData;
+    uint16_t c = read_u16_le(decompData);
     ARGB_SPLIT(c, a, r, g, b);
     c = RGB_JOIN(r * 2, g * 4, b * 2);
     *dest++ = c & 0xFF;
     *dest++ = c >> 8;
     *dest++ = (a * 255) / 15;
-    decompData += 1;
+    decompData += sizeof(uint16_t);
   }
 
   lv_canvas_set_buffer(lvobj, imgData, w, h, LV_IMG_CF_TRUE_COLOR_ALPHA);

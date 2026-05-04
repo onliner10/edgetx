@@ -1,0 +1,32 @@
+# Cppcheck suppressions for Edge16 firmware safety gates.
+#
+# Suppression format is cppcheck-native. Every new suppression must be paired
+# with a nearby comment containing reason: and owner:.
+#
+# Example:
+# # reason: false positive in generated register access, owner: firmware
+# unmatchedSuppression:radio/src/example.cpp
+
+# reason: CMSIS GCC intrinsic helpers intentionally compare linker/register helper addresses; third-party vendor header, owner: firmware-safety
+comparePointers:radio/src/thirdparty/CMSIS/Include/cmsis_gcc.h
+
+# reason: Cppcheck cannot expand the project PACK macro when preprocessor directives appear in the packed declaration body, owner: firmware-safety
+syntaxError:radio/src/datastructs_private.h
+
+# reason: Cppcheck cannot expand the project PACK macro when preprocessor directives appear in the packed declaration body, owner: firmware-safety
+syntaxError:radio/src/pulses/pulses.h
+
+# reason: STB image decoder is third-party code; firmware gate tracks first-party defects separately from vendored decoder internals, owner: firmware-safety
+uninitvar:radio/src/thirdparty/stb/stb_image.h
+
+# reason: Existing color LCD bitmap allocation path predates Edge16 safety tooling; tracked as baseline so new cppcheck errors remain blocking, owner: firmware-safety
+nullPointerArithmeticOutOfMemory:radio/src/gui/colorlcd/libui/bitmapbuffer.cpp
+
+# reason: Existing color LCD button matrix allocation path predates Edge16 safety tooling; tracked as baseline so new cppcheck errors remain blocking, owner: firmware-safety
+nullPointerOutOfMemory:radio/src/gui/colorlcd/libui/button_matrix.cpp
+
+# reason: Existing color LCD bitmap mask allocation path predates Edge16 safety tooling; tracked as baseline so new cppcheck errors remain blocking, owner: firmware-safety
+nullPointerOutOfMemory:radio/src/gui/colorlcd/bitmaps.cpp
+
+# reason: Existing color LCD bitmap buffer allocation path predates Edge16 safety tooling; tracked as baseline so new cppcheck errors remain blocking, owner: firmware-safety
+nullPointerArithmeticOutOfMemory:radio/src/gui/colorlcd/bitmaps.cpp

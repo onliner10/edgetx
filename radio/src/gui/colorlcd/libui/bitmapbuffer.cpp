@@ -561,11 +561,11 @@ void BitmapBuffer::resizeToLVGL(coord_t w, coord_t h)
     scaledh = height() * scale;
   }
 
-  uint8_t *ndata =
-      (uint8_t *)malloc(align32(scaledw * scaledh * 3));
+  pixel_t *ndata =
+      (pixel_t *)malloc(align32(scaledw * scaledh * 3));
 
   if (ndata) {
-    uint8_t *dst = ndata;
+    uint8_t *dst = (uint8_t *)ndata;
     for (int i = 0; i < scaledh; i += 1) {
       pixel_t *src = &data[(coord_t)(i / scale) * width()];
       for (int j = 0; j < scaledw; j += 1) {
@@ -577,8 +577,8 @@ void BitmapBuffer::resizeToLVGL(coord_t w, coord_t h)
       }
     }
 
-    delete data;
-    data = (pixel_t*)ndata;
+    free(data);
+    data = ndata;
     _width = scaledw;
     _height = scaledh;
     data_end = data + ((scaledw * scaledh * 3 + 1) / 2);

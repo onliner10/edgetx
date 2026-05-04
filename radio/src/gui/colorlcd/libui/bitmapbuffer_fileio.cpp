@@ -219,11 +219,12 @@ static uint8_t *convert_bitmap(uint8_t *img, int w, int h, int n)
       }
     }
   } else {
-    pixel_t *dest = (pixel_t *)bmp;
+    uint8_t *dest = bmp;
     for (int row = 0; row < h; ++row) {
       for (int col = 0; col < w; ++col) {
-        *dest = RGB(p[0], p[1], p[2]);
-        MOVE_TO_NEXT_RIGHT_PIXEL(dest);
+        uint16_t c = RGB(p[0], p[1], p[2]);
+        *dest++ = c & 0xFF;
+        *dest++ = c >> 8;
         p += 4;
       }
     }

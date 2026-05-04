@@ -389,18 +389,16 @@ void uf2_fat_read_block(uint32_t block_no, uint8_t *data)
             uint32_t addr = 0;
             if (sectionIdx >= UF2_MAX_FW_SIZE / 256 + REBOOT_BLOCK) return;
 
-            UF2_Block *bl = (UF2_Block *)data;
-            bl->magicStart0 = UF2_MAGIC_START0;
-            bl->magicStart1 = UF2_MAGIC_START1;
-            bl->magicEnd = UF2_MAGIC_END;
-            bl->blockNo = sectionIdx;
-            bl->numBlocks = current_flash_size() / 256 + REBOOT_BLOCK;
-            bl->flags = 0;
-            bl->reserved = 0;
+            UF2_Block bl = {};
+            bl.magicStart0 = UF2_MAGIC_START0;
+            bl.magicStart1 = UF2_MAGIC_START1;
+            bl.magicEnd = UF2_MAGIC_END;
+            bl.blockNo = sectionIdx;
+            bl.numBlocks = current_flash_size() / 256 + REBOOT_BLOCK;
 
             if (REBOOT_BLOCK && (sectionIdx == BOOTLOADER_SIZE / 256)) {
-                writeUF2RebootBlock(bl);
-                writeUF2FirmwareVersion(bl);
+                writeUF2RebootBlock(&bl);
+                writeUF2FirmwareVersion(&bl);
             } else {
                 if (sectionIdx < BOOTLOADER_SIZE / 256) {
                     addr = BOOTLOADER_ADDRESS + sectionIdx * 256;
@@ -409,11 +407,12 @@ void uf2_fat_read_block(uint32_t block_no, uint8_t *data)
                     addr = APP_START_ADDRESS + sectionIdx * 256;
                 }
 
-                bl->targetAddr = addr;
-                bl->payloadSize = 256;
-                memcpy(bl->data, (void *)addr, bl->payloadSize);
-                writeUF2FirmwareVersion(bl);
+                bl.targetAddr = addr;
+                bl.payloadSize = 256;
+                memcpy(bl.data, (void *)addr, bl.payloadSize);
+                writeUF2FirmwareVersion(&bl);
             }
+            memcpy(data, &bl, sizeof(bl));
         }
     }
 }
@@ -431,36 +430,37 @@ void uf2_fat_read_block(uint32_t block_no, uint8_t *data)
 int uf2_fat_write_block(uint32_t block_no, uint8_t *data)
 {
     uf2_fat_write_state_t *wr_st = &_uf2_write_state;
-    UF2_Block *bl = (UF2_Block *)data;
+    UF2_Block bl;
+    memcpy(&bl, data, sizeof(bl));
     // TRACE("Write magic: %x", bl->magicStart0);
 
-    if (!isUF2Block((const uint8_t*)bl, 512)) {
+    if (!isUF2Block(data, 512)) {
         return -1;
     }
 
     // only accept block with same family id
-    if (UF2_FAMILY_ID && !((bl->flags & UF2_FLAG_FAMILY_ID) &&
-                           (bl->reserved == UF2_FAMILY_ID))) {
+    if (UF2_FAMILY_ID && !((bl.flags & UF2_FLAG_FAMILY_ID) &&
+                           (bl.reserved == UF2_FAMILY_ID))) {
         return -1;
     }
 
-    if ((bl->flags & UF2_FLAG_NOFLASH) || bl->payloadSize > 256 ||
-        (bl->targetAddr & 0xff) || bl->targetAddr < BOOTLOADER_ADDRESS ||
-        bl->targetAddr + bl->payloadSize >
+    if ((bl.flags & UF2_FLAG_NOFLASH) || bl.payloadSize > 256 ||
+        (bl.targetAddr & 0xff) || bl.targetAddr < BOOTLOADER_ADDRESS ||
+        bl.targetAddr + bl.payloadSize >
             (FIRMWARE_ADDRESS + UF2_MAX_FW_SIZE)) {
         // block doesn't seem valid; we still want to count these blocks
         // to reset properly
     } else {
-        uint32_t wr_block = bl->blockNo;
+        uint32_t wr_block = bl.blockNo;
         if (REBOOT_BLOCK && (wr_block >= BOOTLOADER_SIZE / 256)) wr_block--;
 
         uint32_t erase_sector = wr_block / (UF2_ERASE_BLOCK_SIZE / 256);
         uint32_t mask = 1 << (erase_sector & 0x1F);
         uint32_t pos = erase_sector >> 5;
 
-        uint32_t addr = bl->targetAddr;
+        uint32_t addr = bl.targetAddr;
         if (wr_st && !(_erased_mask[pos] & mask)) {
-            TRACE_DEBUG("[UF2] erase 0x%08x\n", bl->targetAddr);
+            TRACE_DEBUG("[UF2] erase 0x%08x\n", bl.targetAddr);
 
             auto drv = flashFindDriver(addr);
             if (drv) {
@@ -482,32 +482,31 @@ int uf2_fat_write_block(uint32_t block_no, uint8_t *data)
             }
         }
 
-        TRACE_DEBUG("[UF2] write 0x%08x\n", bl->targetAddr);
+        TRACE_DEBUG("[UF2] write 0x%08x\n", bl.targetAddr);
 
         auto drv = flashFindDriver(addr);
         if (drv) {
-          uint32_t len = bl->payloadSize;
-          uint8_t* data = (uint8_t*)bl->data;
-          if (drv->program(addr, data, len) < 0) return -1;
+          uint32_t len = bl.payloadSize;
+          if (drv->program(addr, bl.data, len) < 0) return -1;
         }
     }
 
-    if (wr_st && bl->numBlocks) {
-        if (wr_st->num_blocks != bl->numBlocks) {
-            if (bl->numBlocks >= UF2_MAX_BLOCKS || wr_st->num_blocks) {
+    if (wr_st && bl.numBlocks) {
+        if (wr_st->num_blocks != bl.numBlocks) {
+            if (bl.numBlocks >= UF2_MAX_BLOCKS || wr_st->num_blocks) {
                 wr_st->num_blocks = UF2_INVALID_NUM_BLOCKS;
             } else {
-                wr_st->num_blocks = bl->numBlocks;
+                wr_st->num_blocks = bl.numBlocks;
             }
         }
-        if (bl->blockNo < UF2_MAX_BLOCKS) {
-            uint32_t mask = 1 << (bl->blockNo & 0x1F);
-            uint32_t pos = bl->blockNo >> 5;
+        if (bl.blockNo < UF2_MAX_BLOCKS) {
+            uint32_t mask = 1 << (bl.blockNo & 0x1F);
+            uint32_t pos = bl.blockNo >> 5;
             if (!(_written_mask[pos] & mask)) {
                 _written_mask[pos] |= mask;
                 wr_st->num_written++;
-                TRACE_DEBUG("[UF2] wr #%d (%d / %d)\n", bl->blockNo,
-                            wr_st->num_written, bl->numBlocks);
+                TRACE_DEBUG("[UF2] wr #%d (%d / %d)\n", bl.blockNo,
+                            wr_st->num_written, bl.numBlocks);
             }
             if (wr_st->num_written >= wr_st->num_blocks) {
                 TRACE_DEBUG("[UF2] done: reboot\n");

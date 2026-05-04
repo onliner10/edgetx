@@ -93,7 +93,7 @@ YamlParser::parse(const char* buffer, unsigned int size)
                 ++indent;
                 break;
             }
-            // trap
+            [[fallthrough]];
         case ps_Dash:
             if (*c == ' ') { // skip space(s), should be only one??
                 ++indent;
@@ -161,7 +161,7 @@ YamlParser::parse(const char* buffer, unsigned int size)
             }
             if ((*c != ':') && (*c != '\r') && (*c != '\n'))
                 scratch_buf += *c;
-            // trap
+            [[fallthrough]];
         case ps_AttrSP:
             if (*c == '\r' || *c == '\n') {
                 if (state == ps_Attr) {
@@ -301,4 +301,3 @@ YamlParser::parse(const char* buffer, unsigned int size)
     
     return CONTINUE_PARSING;
 }
-

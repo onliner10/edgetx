@@ -311,7 +311,7 @@ void processFlySkyAFHDS3Sensor(const uint8_t * packet, uint8_t len )
 
 void processFlySkySensor(const uint8_t * packet, uint8_t type)
 {
-  uint8_t buffer[8];
+  uint8_t buffer[8] = {};
   uint16_t id = packet[0];
   const uint8_t instance = packet[1];
   int32_t value;
@@ -351,6 +351,7 @@ void processFlySkySensor(const uint8_t * packet, uint8_t type)
   }
   else if (id == AFHDS2A_ID_GPS_FULL) {
     //(AC FRAME)[ID][inst][size][fix][sats][LAT]x4[LON]x4[ALT]x4
+    if (type != 0xAC || packet[2] < 14) return;
     setTelemetryValue(PROTOCOL_TELEMETRY_FLYSKY_IBUS, AFHDS2A_ID_GPS_STATUS, 0, instance, packet[4], UNIT_RAW, 0);
 
     for (uint8_t sensorID = AFHDS2A_ID_GPS_LAT; sensorID <= AFHDS2A_ID_GPS_ALT; sensorID++) {
@@ -378,6 +379,7 @@ void processFlySkySensor(const uint8_t * packet, uint8_t type)
     return;
   } else if (id == AFHDS2A_ID_VOLT_FULL) {
     //(AC FRAME)[ID][inst][size][ACC_X]x2[ACC_Y]x2[ACC_Z]x2[ROLL]x2[PITCH]x2[YAW]x2
+    if (type != 0xAC || packet[2] < 10) return;
     for (uint8_t sensorID = AFHDS2A_ID_EXTV; sensorID <= AFHDS2A_ID_RPM; sensorID++) {
       int index = 3 + (sensorID - AFHDS2A_ID_EXTV) * 2;
       buffer[0] = sensorID;
@@ -389,6 +391,7 @@ void processFlySkySensor(const uint8_t * packet, uint8_t type)
     return;
   } else if (id == AFHDS2A_ID_ACC_FULL) {
     //(AC FRAME)[ID][inst][size]
+    if (type != 0xAC || packet[2] < 14) return;
     for (uint8_t sensorID = AFHDS2A_ID_ACC_X; sensorID <= AFHDS2A_ID_YAW; sensorID++) {
       int index = 3 + (sensorID - AFHDS2A_ID_ACC_X) * 2;
       buffer[0] = sensorID;
@@ -433,6 +436,7 @@ void processFlySkyPacketAC(const uint8_t * packet)
   {
     if (*buffer == SENSOR_TYPE_END) break;
     uint8_t size = buffer[2];
+    if (size > 26 - (buffer - packet) - 3) break;
     processFlySkySensor(buffer, 0xAC);
     buffer += size + 3;
   }

@@ -28,6 +28,17 @@
 
 static_assert(PXX2_FRAME_MAXLENGTH <= INTMODULE_FIFO_SIZE, "");
 
+static uint16_t read_u16_le(const uint8_t* data)
+{
+  return uint16_t(data[0]) | (uint16_t(data[1]) << 8);
+}
+
+static uint32_t read_u32_le(const uint8_t* data)
+{
+  return uint32_t(data[0]) | (uint32_t(data[1]) << 8) |
+         (uint32_t(data[2]) << 16) | (uint32_t(data[3]) << 24);
+}
+
 static const char * const PXX2ModulesNames[] = {
   "---",
   "XJT",
@@ -397,8 +408,8 @@ static void processSpectrumAnalyserFrame(uint8_t module, const uint8_t * frame)
     return;
   }
 
-  uint32_t frequency = *((uint32_t *)&frame[4]);
-  int8_t power = *((int8_t *)&frame[8]);
+  uint32_t frequency = read_u32_le(&frame[4]);
+  int8_t power = frame[8];
 
   // center = 2440000000;  // 2440MHz
   // span = 40000000;  // 40MHz
@@ -432,7 +443,7 @@ static void processPowerMeterFrame(uint8_t module, const uint8_t * frame)
     return;
   }
 
-  reusableBuffer.powerMeter.power = *((int16_t *)&frame[8]);
+  reusableBuffer.powerMeter.power = (int16_t)read_u16_le(&frame[8]);
   if (!reusableBuffer.powerMeter.peak || reusableBuffer.powerMeter.power > reusableBuffer.powerMeter.peak) {
     reusableBuffer.powerMeter.peak = reusableBuffer.powerMeter.power;
   }
@@ -452,7 +463,7 @@ static void processOtaUpdateFrame(uint8_t module, const uint8_t * frame)
     }
   }
   else if (destination->step == OTA_UPDATE_TRANSFER) {
-    uint32_t address = *((uint32_t *)&frame[4]);
+    uint32_t address = read_u32_le(&frame[4]);
     if (frame[3] == 0x01 && destination->address == address) {
       destination->step = OTA_UPDATE_TRANSFER_ACK;
     }

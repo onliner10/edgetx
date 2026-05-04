@@ -152,7 +152,7 @@ extern TrainerPulsesData trainerPulsesData;
 #endif
 
 struct module_pulse_buffer {
-  uint8_t _buffer[MODULE_BUFFER_SIZE];
+  alignas(pulse_duration_t) uint8_t _buffer[MODULE_BUFFER_SIZE];
 };
 
 struct module_pulse_driver {

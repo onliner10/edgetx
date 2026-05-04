@@ -44,7 +44,7 @@ const std::string nam_str = strip_leading_hyphen("" VERSION_SUFFIX);
 const std::string git_str = "(" GIT_STR ")";
 #endif
 
-const uint8_t __bmp_splash_logo[] __FLASH = {
+alignas(LZ4Bitmap) const uint8_t __bmp_splash_logo[] __FLASH = {
 #include "bmp_logo_edgetx_splash.lbm"
 };
 
@@ -64,7 +64,8 @@ void drawSplash()
   bg->show(bg->hasImage());
 
   if (!bg->hasImage()) {
-    LZ4Bitmap* logo = (LZ4Bitmap*)__bmp_splash_logo;
+    auto logo =
+        static_cast<const LZ4Bitmap*>(static_cast<const void*>(__bmp_splash_logo));
     coord_t x = (LANDSCAPE ? LCD_W / 3 : LCD_W / 2) - logo->width / 2;
     coord_t y = (LANDSCAPE ? LCD_H / 2 : LCD_H * 2 / 5) - logo->height / 2;
     new StaticLZ4Image(splashScreen, x, y, logo);

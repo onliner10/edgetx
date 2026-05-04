@@ -55,6 +55,13 @@ if(NOT NO_LTO)
   target_compile_options(board_bl PRIVATE -flto)
 endif()
 
+if(EDGE16_SAFETY_CHECKS AND (CMAKE_C_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU"))
+  set_property(SOURCE ${LVGL_SOURCES_MINIMAL} APPEND PROPERTY COMPILE_OPTIONS
+    -Wno-cast-align)
+  set_source_files_properties(${RADIO_SRC_DIR}/thirdparty/lz4/lz4.c
+    PROPERTIES COMPILE_OPTIONS "-Wno-stack-usage;-Wno-frame-larger-than")
+endif()
+
 add_executable(bootloader EXCLUDE_FROM_ALL ${BOOTLOADER_SRC})
 add_dependencies(bootloader ${BITMAPS_TARGET})
 

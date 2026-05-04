@@ -1,5 +1,5 @@
 ---
-name: Build TX16S firmware release
+name: Build Edge16 firmware release
 
 on:
   workflow_dispatch:
@@ -18,8 +18,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  native-safety:
+    name: Native safety tests (${{ matrix.target }}, ${{ matrix.sanitizer }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - tx16s
+          - tx16smk3
+        sanitizer:
+          - address,undefined
+          - thread
+    container:
+      image: ghcr.io/edgetx/edgetx-dev:latest
+      volumes:
+        - ${{ github.workspace }}:/src
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Run native sanitizer tests
+        env:
+          FLAVOR: ${{ matrix.target }}
+          EDGE16_UV_ACTIVE: 1
+          EXTRA_OPTIONS: "-DEDGE16_SANITIZERS=${{ matrix.sanitizer }} -DEDGE16_SAFETY_CHECKS=ON"
+          CMAKE_BUILD_PARALLEL_LEVEL: 4
+        run: uv run --with-requirements requirements.txt bash ./tools/commit-tests.sh
+
   build:
-    name: Build TX16S firmware
+    name: Build Edge16 firmware
+    needs: native-safety
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/edgetx/edgetx-dev:latest
@@ -34,22 +67,26 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
 
-      - name: Build TX16S firmware
+      - name: Build Edge16 firmware
         env:
-          FLAVOR: tx16s
-          FIRMARE_TARGET: firmware
+          FLAVOR: tx16s;tx16smk3
+          FIRMWARE_TARGET: firmware
           EDGETX_VERSION_SUFFIX: ${{ inputs.version_suffix }}
+          EDGE16_UV_ACTIVE: 1
+          EXTRA_OPTIONS: "-DWARNINGS_AS_ERRORS=YES -DEDGE16_SAFETY_CHECKS=ON"
           CMAKE_BUILD_PARALLEL_LEVEL: 4
-        run: ./tools/build-gh.sh
+        run: uv run --with-requirements requirements.txt bash ./tools/build-gh.sh
 
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v7
         with:
-          name: tx16s-firmware
+          name: edge16-firmware
           path: |
             fw.json
             LICENSE
             tx16s-*.bin
+            tx16smk3-*.uf2
+            tx16smk3-*.bin
           retention-days: 15
           if-no-files-found: error
 
@@ -68,14 +105,14 @@ jobs:
       - name: Download firmware artifact
         uses: actions/download-artifact@v8
         with:
-          name: tx16s-firmware
-          path: tx16s-firmware
+          name: edge16-firmware
+          path: edge16-firmware
 
       - name: Compose release asset
         run: |
           set -euo pipefail
-          cd tx16s-firmware
-          zip -9 -r "../edgetx-tx16s-${GITHUB_SHA::8}.zip" .
+          cd edge16-firmware
+          zip -9 -r "../edge16-firmware-${GITHUB_SHA::8}.zip" .
 
       - name: Replace release tag
         run: |
@@ -93,10 +130,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.release_tag }}
-          name: TX16S custom firmware
+          name: Edge16 custom firmware
           prerelease: true
           body: |
-            Custom TX16S firmware built from `${{ github.sha }}`.
+            Custom Edge16 firmware for RadioMaster TX16S MK2 and TX16S MK3 built from `${{ github.sha }}`.
 
-            Download the zip, extract the `.bin`, copy it to the radio SD card `FIRMWARE/` folder, then flash it from the EdgeTX bootloader.
-          files: edgetx-tx16s-*.zip
+            Download the zip, extract the firmware for your exact radio, copy it to the radio SD card `FIRMWARE/` folder, then flash it from the bootloader.
+          files: edge16-firmware-*.zip

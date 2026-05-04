@@ -21,6 +21,8 @@
 
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <new>
 
 #include "edgetx.h"
 #include "lua_api.h"
@@ -46,6 +48,20 @@ extern int custom_lua_atpanic(lua_State *L);
 #define LUA_FULLPATH_MAXLEN                  \
   (LEN_FILE_PATH_MAX + LEN_SCRIPT_FILENAME + \
    LEN_FILE_EXTENSION_MAX)
+
+static void luaUnrefWidgetCallbacks(int optionDefinitionsReference,
+                                    int createFunction, int updateFunction,
+                                    int refreshFunction,
+                                    int backgroundFunction,
+                                    int translateFunction)
+{
+  luaL_unref(lsWidgets, LUA_REGISTRYINDEX, optionDefinitionsReference);
+  luaL_unref(lsWidgets, LUA_REGISTRYINDEX, createFunction);
+  luaL_unref(lsWidgets, LUA_REGISTRYINDEX, updateFunction);
+  luaL_unref(lsWidgets, LUA_REGISTRYINDEX, refreshFunction);
+  luaL_unref(lsWidgets, LUA_REGISTRYINDEX, backgroundFunction);
+  luaL_unref(lsWidgets, LUA_REGISTRYINDEX, translateFunction);
+}
 
 static void luaHook(lua_State *L, lua_Debug *ar)
 {
@@ -146,11 +162,34 @@ void luaLoadWidgetCallback(const char* filename)
   if (name && createFunction != LUA_REFNIL) {
     WidgetOption * options = LuaWidgetFactory::parseOptionDefinitions(optionDefinitionsReference);
     if (options) {
-      new LuaWidgetFactory(strdup(name), options, optionDefinitionsReference,
-              createFunction, updateFunction, refreshFunction, backgroundFunction,
-              translateFunction, lvglLayout, filename);
-      TRACE("Loaded Lua widget %s", name);
+      char * nameCopy = strdup(name);
+      auto factory = nameCopy
+          ? new (std::nothrow) LuaWidgetFactory(
+                nameCopy, options, optionDefinitionsReference, createFunction,
+                updateFunction, refreshFunction, backgroundFunction,
+                translateFunction, lvglLayout, filename)
+          : nullptr;
+      if (factory) {
+        TRACE("Loaded Lua widget %s", name);
+      }
+      else {
+        free(nameCopy);
+        delete[] options;
+        luaUnrefWidgetCallbacks(optionDefinitionsReference, createFunction,
+                                updateFunction, refreshFunction,
+                                backgroundFunction, translateFunction);
+      }
     }
+    else {
+      luaUnrefWidgetCallbacks(optionDefinitionsReference, createFunction,
+                              updateFunction, refreshFunction,
+                              backgroundFunction, translateFunction);
+    }
+  }
+  else {
+    luaUnrefWidgetCallbacks(optionDefinitionsReference, createFunction,
+                            updateFunction, refreshFunction,
+                            backgroundFunction, translateFunction);
   }
 }
 
@@ -262,7 +301,7 @@ void luaUnregisterWidgets()
 {
   std::list<const WidgetFactory *> regWidgets(WidgetFactory::getRegisteredWidgets());
   for (auto w : regWidgets) {
-    if (w->isLuaWidgetFactory()) {
+    if (w && w->isLuaWidgetFactory()) {
       delete w;
     }
   }

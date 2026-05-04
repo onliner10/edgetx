@@ -269,7 +269,8 @@ class ColorEditPage : public Page
 
     r.h = colForm->height() - COLOR_BOX_HEIGHT - PAD_SMALL;
 
-    uint32_t color = _theme->getColorEntryByIndex(_indexOfColor)->colorValue;
+    auto colorEntry = _theme->getColorEntryByIndex(_indexOfColor);
+    uint32_t color = colorEntry ? colorEntry->colorValue : 0;
 
     _colorEditor = new ColorEditor(
         colForm, r, COLOR2FLAGS(color) | RGB_FLAG,

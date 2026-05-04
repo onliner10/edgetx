@@ -26,6 +26,28 @@
 #include <FreeRTOS/include/FreeRTOS.h>
 #include <FreeRTOS/include/task.h>
 
+volatile const char *edge16_freertos_fault_file;
+volatile int edge16_freertos_fault_line;
+volatile const char *edge16_freertos_stack_overflow_task;
+
+void edge16_freertos_assert_failed(const char *file, int line)
+{
+  edge16_freertos_fault_file = file;
+  edge16_freertos_fault_line = line;
+  taskDISABLE_INTERRUPTS();
+  for (;;) {
+  }
+}
+
+#if configCHECK_FOR_STACK_OVERFLOW > 0
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
+{
+  (void)xTask;
+  edge16_freertos_stack_overflow_task = pcTaskName;
+  edge16_freertos_assert_failed(__FILE__, __LINE__);
+}
+#endif
+
 /* configSUPPORT_STATIC_ALLOCATION is set to 1, so the application must provide an
    implementation of vApplicationGetIdleTaskMemory() to provide the memory that is
    used by the Idle task. */
