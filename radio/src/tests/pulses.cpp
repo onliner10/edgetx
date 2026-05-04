@@ -36,6 +36,10 @@
 #include "pulses/dsm2.h"
 #endif
 
+#if defined(PXX1)
+#include "pulses/pxx1.h"
+#endif
+
 extern uint8_t getRequiredProtocol(uint8_t module);
 
 namespace {
@@ -128,6 +132,33 @@ TEST_F(PulsesTest, dsm2SendPulsesHonorsChannelCount)
   EXPECT_EQ(firstPulse, 512);
 
   DSM2Driver.deinit(ctx);
+}
+#endif
+
+#if defined(PXX1) && defined(HARDWARE_EXTERNAL_MODULE)
+TEST_F(PulsesTest, pxx1SendPulsesHonorsChannelCount)
+{
+  modulePortInit();
+  g_model.moduleData[EXTERNAL_MODULE].type = MODULE_TYPE_R9M_PXX1;
+  g_model.moduleData[EXTERNAL_MODULE].channelsCount = 0;
+  g_model.moduleData[EXTERNAL_MODULE].failsafeMode = FAILSAFE_NOT_SET;
+
+  auto ctx = Pxx1Driver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  uint8_t neutralFrame[MODULE_BUFFER_SIZE] = {};
+  moduleState[EXTERNAL_MODULE].counter = 0;
+  channelOutputs[0] = 0;
+  Pxx1Driver.sendPulses(ctx, neutralFrame, nullptr, 0);
+
+  uint8_t highFrame[MODULE_BUFFER_SIZE] = {};
+  moduleState[EXTERNAL_MODULE].counter = 0;
+  channelOutputs[0] = 1024;
+  Pxx1Driver.sendPulses(ctx, highFrame, nullptr, 0);
+
+  EXPECT_EQ(memcmp(neutralFrame, highFrame, sizeof(neutralFrame)), 0);
+
+  Pxx1Driver.deinit(ctx);
 }
 #endif
 
