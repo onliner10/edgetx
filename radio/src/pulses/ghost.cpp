@@ -194,38 +194,16 @@ static void ghostSendPulses(void* ctx, uint8_t* buffer, int16_t* channels, uint8
 
 #if defined(LUA)
   if (outputTelemetryBuffer.destination == TELEMETRY_ENDPOINT_SPORT) {
-    const uint8_t len = outputTelemetryBuffer.size;
-    if (len >= 12) {
-      // insert address byte
+    constexpr uint8_t payloadSize = 12;
+    constexpr uint8_t frameSize = payloadSize + 2;
+    const uint8_t chunks =
+        min<uint8_t>(outputTelemetryBuffer.size / payloadSize,
+                     MODULE_BUFFER_SIZE / frameSize);
+    for (uint8_t i = 0; i < chunks; i += 1) {
       *p_data++ = getGhostModuleAddr();
-      // and length
-      *p_data++ = 12;
-      memcpy(p_data, outputTelemetryBuffer.data, 12);
-      p_data += 12;
-    }
-    if (len >= 24) {
-      *p_data++ = getGhostModuleAddr();
-      *p_data++ = 12;
-      memcpy(p_data, outputTelemetryBuffer.data + 12, 12);
-      p_data += 12;
-    }
-    if (len >= 36) {
-      *p_data++ = getGhostModuleAddr();
-      *p_data++ = 12;
-      memcpy(p_data, outputTelemetryBuffer.data + 24, 12);
-      p_data += 12;
-    }
-    if (len >= 48) {
-      *p_data++ = getGhostModuleAddr();
-      *p_data++ = 12;
-      memcpy(p_data, outputTelemetryBuffer.data + 36, 12);
-      p_data += 12;
-    }
-    if (len >= 60) {
-      *p_data++ = getGhostModuleAddr();
-      *p_data++ = 12;
-      memcpy(p_data, outputTelemetryBuffer.data + 48, 12);
-      p_data += 12;
+      *p_data++ = payloadSize;
+      memcpy(p_data, outputTelemetryBuffer.data + i * payloadSize, payloadSize);
+      p_data += payloadSize;
     }
     outputTelemetryBuffer.reset();
   } else

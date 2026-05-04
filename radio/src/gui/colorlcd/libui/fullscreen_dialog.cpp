@@ -28,6 +28,7 @@
 #include "mainwindow.h"
 #include "os/sleep.h"
 #include "static.h"
+#include "startup_shutdown.h"
 #include "theme_manager.h"
 #include "view_main.h"
 
@@ -176,6 +177,22 @@ void raiseAlert(const char* title, const char* msg, const char* action,
     MainWindow::instance()->blockUntilClose(true, [=]() {
       return dialog->deleted();
     });
+  } else {
+    while (true) {
+      sleep_ms(10);
+
+      if (getEvent())
+        break;
+
+      checkBacklight();
+      WDG_RESET();
+
+      if (pwrCheck() == e_power_off) {
+        drawSleepBitmap();
+        boardOff();
+        return;
+      }
+    }
   }
   LED_ERROR_END();
 }
