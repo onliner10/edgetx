@@ -436,6 +436,19 @@ TEST_F(TrimsTest, CopySticksToOffset)
 #endif
 }
 
+TEST_F(TrimsTest, CopySticksToOffsetAtFullOutputIsIgnored)
+{
+  memclear(g_model.mixData, sizeof(g_model.mixData));
+  g_model.mixData[0].destCh = ELE_CHAN;
+  g_model.mixData[0].srcRaw = MIXSRC_MAX;
+  g_model.mixData[0].weight = makeSourceNumVal(100);
+
+  evalMixes(1);
+  copySticksToOffset(ELE_CHAN);
+
+  EXPECT_EQ(0, g_model.limitData[ELE_CHAN].offset);
+}
+
 TEST_F(TrimsTest, MoveTrimsToOffsets)
 {
   // No trim idle only
