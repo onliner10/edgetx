@@ -442,5 +442,5 @@ jobs:
         with:
           name: "${{ env.artifact_name }}"
           pattern: firmware-*
-          delete-merged: true
+          delete-merged: false
           retention-days: 15
