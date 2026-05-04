@@ -35,6 +35,8 @@ class RadioInfoWidget : public Widget
                   int screenNum, int zoneNum) :
       Widget(factory, parent, rect, screenNum, zoneNum)
   {
+    bool compact = isCompactTopBarWidget();
+
     // Logs
     logsIcon = new (std::nothrow) StaticIcon(this, W_LOG_X, PAD_THREE, ICON_DOT,
                                              COLOR_THEME_PRIMARY2_INDEX);
@@ -46,36 +48,39 @@ class RadioInfoWidget : public Widget
     if (usbIcon) usbIcon->hide();
 
 #if defined(AUDIO)
-    audioScale = new (std::nothrow) StaticIcon(this, W_AUDIO_SCALE_X, PAD_TINY,
-                                               ICON_TOPMENU_VOLUME_SCALE,
-                                               COLOR_THEME_SECONDARY2_INDEX);
+    if (!compact) {
+      audioScale = new (std::nothrow) StaticIcon(this, W_AUDIO_SCALE_X, PAD_TINY,
+                                                 ICON_TOPMENU_VOLUME_SCALE,
+                                                 COLOR_THEME_SECONDARY2_INDEX);
 
-    for (int i = 0; i < 5; i += 1) {
-      audioVol[i] = new (std::nothrow) StaticIcon(
-          this, W_AUDIO_X, PAD_TINY,
-         (EdgeTxIcon)(ICON_TOPMENU_VOLUME_0 + i),
-          COLOR_THEME_PRIMARY2_INDEX);
-      if (audioVol[i]) audioVol[i]->hide();
+      for (int i = 0; i < 5; i += 1) {
+        audioVol[i] = new (std::nothrow) StaticIcon(
+            this, W_AUDIO_X, PAD_TINY,
+           (EdgeTxIcon)(ICON_TOPMENU_VOLUME_0 + i),
+            COLOR_THEME_PRIMARY2_INDEX);
+        if (audioVol[i]) audioVol[i]->hide();
+      }
+      if (audioVol[0]) audioVol[0]->show();
     }
-    if (audioVol[0]) audioVol[0]->show();
 #endif
 
-    batteryIcon = new (std::nothrow) StaticIcon(this, W_AUDIO_X, W_BATT_Y,
-                                                ICON_TOPMENU_TXBATT,
-                                                COLOR_THEME_PRIMARY2_INDEX);
+    if (!compact) {
+      batteryIcon = new (std::nothrow) StaticIcon(this, W_AUDIO_X, W_BATT_Y,
+                                                  ICON_TOPMENU_TXBATT,
+                                                  COLOR_THEME_PRIMARY2_INDEX);
+    }
 #if defined(USB_CHARGER)
-    batteryChargeIcon = new (std::nothrow) StaticIcon(
-        this, W_BATT_CHG_X, W_BATT_CHG_Y,
-        ICON_TOPMENU_TXBATT_CHARGE, COLOR_THEME_PRIMARY2_INDEX);
-    if (batteryChargeIcon) batteryChargeIcon->hide();
+    if (!compact) {
+      batteryChargeIcon = new (std::nothrow) StaticIcon(
+          this, W_BATT_CHG_X, W_BATT_CHG_Y,
+          ICON_TOPMENU_TXBATT_CHARGE, COLOR_THEME_PRIMARY2_INDEX);
+      if (batteryChargeIcon) batteryChargeIcon->hide();
+    }
 #endif
 
-    if (isCompactTopBarWidget()) {
-      if (batteryIcon) batteryIcon->hide();
+    if (compact) {
       batteryShell = lv_obj_create(lvobj);
       if (batteryShell) {
-        lv_obj_set_pos(batteryShell, W_BATT_HUD_X, W_BATT_HUD_Y);
-        lv_obj_set_size(batteryShell, W_BATT_HUD_W, W_BATT_HUD_H);
         lv_obj_clear_flag(batteryShell, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_set_style_bg_opa(batteryShell, LV_OPA_TRANSP, LV_PART_MAIN);
         lv_obj_set_style_border_width(batteryShell, 2, LV_PART_MAIN);
@@ -87,49 +92,36 @@ class RadioInfoWidget : public Widget
       }
       batteryCap = lv_obj_create(lvobj);
       if (batteryCap) {
-        lv_obj_set_pos(batteryCap, W_BATT_HUD_X + W_BATT_HUD_W,
-                       W_BATT_HUD_Y + 3);
-        lv_obj_set_size(batteryCap, 3, W_BATT_HUD_H - 6);
         lv_obj_clear_flag(batteryCap, LV_OBJ_FLAG_CLICKABLE);
         etx_solid_bg(batteryCap, COLOR_THEME_PRIMARY2_INDEX);
       }
     }
 
 #if defined(INTERNAL_MODULE_PXX1) && defined(EXTERNAL_ANTENNA)
-    extAntenna = new (std::nothrow) StaticIcon(this, W_RSSI_X - PAD_SMALL, 1,
-                                               ICON_TOPMENU_ANTENNA,
-                                               COLOR_THEME_PRIMARY2_INDEX);
-    if (extAntenna) extAntenna->hide();
+    if (!compact) {
+      extAntenna = new (std::nothrow) StaticIcon(this, W_RSSI_X - PAD_SMALL, 1,
+                                                 ICON_TOPMENU_ANTENNA,
+                                                 COLOR_THEME_PRIMARY2_INDEX);
+      if (extAntenna) extAntenna->hide();
+    }
 #endif
 
     batteryFill = lv_obj_create(lvobj);
     if (batteryFill) {
-      lv_obj_set_pos(batteryFill, batteryFillX(), batteryFillY());
-      lv_obj_set_size(batteryFill, batteryFillWidth(), batteryFillHeight());
       lv_obj_set_style_bg_opa(batteryFill, LV_OPA_COVER, LV_PART_MAIN);
     }
     update();
 
     // RSSI bars
-    coord_t rssiBh = rssiBarHeight();
-    const uint8_t rssiBarsHeight[] = {
-      (uint8_t)((rssiBh * 5 + 15) / 31),
-      (uint8_t)((rssiBh * 10 + 15) / 31),
-      (uint8_t)((rssiBh * 15 + 15) / 31),
-      (uint8_t)((rssiBh * 21 + 15) / 31),
-      (uint8_t)rssiBh};
-    for (unsigned int i = 0; i < DIM(rssiBarsHeight); i++) {
-      uint8_t height = rssiBarsHeight[i];
+    for (unsigned int i = 0; i < DIM(rssiBars); i++) {
       rssiBars[i] = lv_obj_create(lvobj);
       if (rssiBars[i]) {
-        lv_obj_set_pos(rssiBars[i], rssiX() + i * rssiBarStep(),
-                       rssiBarBottom() - height);
-        lv_obj_set_size(rssiBars[i], rssiBarWidth(), height);
         etx_solid_bg(rssiBars[i], COLOR_THEME_SECONDARY2_INDEX);
         etx_bg_color(rssiBars[i], COLOR_THEME_PRIMARY2_INDEX, LV_STATE_USER_1);
       }
     }
 
+    layoutStatus();
     foreground();
   }
 
@@ -139,6 +131,8 @@ class RadioInfoWidget : public Widget
 
     auto widgetData = getPersistentData();
     if (!batteryFill) return;
+
+    layoutStatus();
 
     // get colors from options
     etx_bg_color_from_flags(batteryFill, widgetData->options[2].value.unsignedValue, LV_PART_MAIN);
@@ -150,14 +144,16 @@ class RadioInfoWidget : public Widget
   {
     if (_deleted) return;
 
-    if (usbIcon) usbIcon->show(usbPlugged());
+    bool compact = isCompactTopBarWidget();
+
+    if (usbIcon) usbIcon->show(!compact && usbPlugged());
     if (getSelectedUsbMode() == USB_UNSELECTED_MODE)
       { if (usbIcon) usbIcon->setColor(COLOR_THEME_SECONDARY2_INDEX); }
     else
       { if (usbIcon) usbIcon->setColor(COLOR_THEME_PRIMARY2_INDEX); }
 
     if (logsIcon) {
-      logsIcon->show(!usbPlugged() && isFunctionActive(FUNCTION_LOGS) &&
+      logsIcon->show(!compact && !usbPlugged() && isFunctionActive(FUNCTION_LOGS) &&
                      BLINK_ON_PHASE);
     }
 
@@ -180,12 +176,12 @@ class RadioInfoWidget : public Widget
 #endif
 
 #if defined(USB_CHARGER)
-    if (batteryChargeIcon) batteryChargeIcon->show(usbChargerLed());
+    if (batteryChargeIcon) batteryChargeIcon->show(!compact && usbChargerLed());
 #endif
 
 #if defined(INTERNAL_MODULE_PXX1) && defined(EXTERNAL_ANTENNA)
     if (extAntenna) {
-      extAntenna->show(isModuleXJT(INTERNAL_MODULE) &&
+      extAntenna->show(!compact && isModuleXJT(INTERNAL_MODULE) &&
                        isExternalAntennaEnabled());
     }
 #endif
@@ -238,20 +234,17 @@ class RadioInfoWidget : public Widget
   static LAYOUT_VAL_SCALED(W_BATT_FILL_H, 10)
   static LAYOUT_VAL_SCALED(W_BATT_FILL_GRN, 12)
   static LAYOUT_VAL_SCALED(W_BATT_FILL_ORA, 5)
-  static LAYOUT_VAL_SCALED(W_BATT_HUD_X, 1)
-  static LAYOUT_VAL_SCALED(W_BATT_HUD_Y, 24)
-  static LAYOUT_VAL_SCALED(W_BATT_HUD_W, 28)
+  static LAYOUT_VAL_SCALED(W_BATT_HUD_X, 2)
+  static LAYOUT_VAL_SCALED(W_BATT_HUD_W, 29)
   static LAYOUT_VAL_SCALED(W_BATT_HUD_H, 13)
-  static LAYOUT_VAL_SCALED(W_BATT_HUD_FILL_W, 24)
+  static LAYOUT_VAL_SCALED(W_BATT_HUD_FILL_W, 25)
   static LAYOUT_VAL_SCALED(W_BATT_HUD_FILL_H, 9)
   static LAYOUT_VAL_SCALED(W_BATT_HUD_FILL_GRN, 14)
   static LAYOUT_VAL_SCALED(W_BATT_HUD_FILL_ORA, 6)
   static LAYOUT_VAL_SCALED(W_BATT_CHG_X, 25)
   static LAYOUT_VAL_SCALED(W_BATT_CHG_Y, 23)
-  static LAYOUT_VAL_SCALED(W_RSSI_HUD_X, 32)
-  static LAYOUT_VAL_SCALED(W_RSSI_HUD_BAR_W, 6)
-  static LAYOUT_VAL_SCALED(W_RSSI_HUD_BAR_SZ, 8)
-  static LAYOUT_VAL_SCALED(W_RSSI_HUD_BAR_H, 36)
+  static LAYOUT_VAL_SCALED(W_RSSI_HUD_BAR_W, 5)
+  static LAYOUT_VAL_SCALED(W_RSSI_HUD_BAR_SZ, 7)
 
   coord_t batteryFillX() const
   {
@@ -260,7 +253,7 @@ class RadioInfoWidget : public Widget
 
   coord_t batteryFillY() const
   {
-    return isCompactTopBarWidget() ? W_BATT_HUD_Y + 2 : W_BATT_Y + 1;
+    return isCompactTopBarWidget() ? batteryShellY() + 2 : W_BATT_Y + 1;
   }
 
   uint8_t batteryFillWidth() const
@@ -285,7 +278,11 @@ class RadioInfoWidget : public Widget
 
   coord_t rssiX() const
   {
-    return isCompactTopBarWidget() ? W_RSSI_HUD_X : W_RSSI_X;
+    if (!isCompactTopBarWidget()) return W_RSSI_X;
+
+    coord_t minX = W_BATT_HUD_X + W_BATT_HUD_W + PAD_MEDIUM;
+    coord_t alignX = width() - rssiClusterWidth();
+    return alignX > minX ? alignX : minX;
   }
 
   coord_t rssiBarWidth() const
@@ -300,12 +297,12 @@ class RadioInfoWidget : public Widget
 
   coord_t rssiBarHeight() const
   {
-    return isCompactTopBarWidget() ? W_RSSI_HUD_BAR_H : (coord_t)31;
+    return isCompactTopBarWidget() ? height() - 2 * PAD_TINY : (coord_t)31;
   }
 
   coord_t rssiBarBottom() const
   {
-    return isCompactTopBarWidget() ? W_RSSI_HUD_BAR_H : W_RSSI_BAR_H;
+    return isCompactTopBarWidget() ? height() - PAD_TINY : W_RSSI_BAR_H;
   }
 
  protected:
@@ -329,6 +326,49 @@ class RadioInfoWidget : public Widget
 #if defined(INTERNAL_MODULE_PXX1) && defined(EXTERNAL_ANTENNA)
   StaticIcon* extAntenna = nullptr;
 #endif
+
+  coord_t batteryShellY() const
+  {
+    return height() - W_BATT_HUD_H - PAD_TINY;
+  }
+
+  coord_t rssiClusterWidth() const
+  {
+    return 4 * rssiBarStep() + rssiBarWidth();
+  }
+
+  void layoutStatus()
+  {
+    if (batteryShell) {
+      lv_obj_set_pos(batteryShell, W_BATT_HUD_X, batteryShellY());
+      lv_obj_set_size(batteryShell, W_BATT_HUD_W, W_BATT_HUD_H);
+    }
+    if (batteryCap) {
+      lv_obj_set_pos(batteryCap, W_BATT_HUD_X + W_BATT_HUD_W,
+                     batteryShellY() + 3);
+      lv_obj_set_size(batteryCap, 3, W_BATT_HUD_H - 6);
+    }
+    if (batteryFill) {
+      lv_obj_set_pos(batteryFill, batteryFillX(), batteryFillY());
+      lv_obj_set_size(batteryFill, batteryFillWidth(), batteryFillHeight());
+      lastBatt = 255;
+    }
+
+    coord_t rssiBh = rssiBarHeight();
+    const uint8_t rssiBarsHeight[] = {
+      (uint8_t)((rssiBh * 5 + 15) / 31),
+      (uint8_t)((rssiBh * 10 + 15) / 31),
+      (uint8_t)((rssiBh * 15 + 15) / 31),
+      (uint8_t)((rssiBh * 21 + 15) / 31),
+      (uint8_t)rssiBh};
+    for (unsigned int i = 0; i < DIM(rssiBars); i++) {
+      if (!rssiBars[i]) continue;
+      uint8_t height = rssiBarsHeight[i];
+      lv_obj_set_pos(rssiBars[i], rssiX() + i * rssiBarStep(),
+                     rssiBarBottom() - height);
+      lv_obj_set_size(rssiBars[i], rssiBarWidth(), height);
+    }
+  }
 };
 
 const WidgetOption RadioInfoWidget::options[] = {
@@ -347,7 +387,9 @@ class DateTimeWidget : public Widget
                  int screenNum, int zoneNum) :
       Widget(factory, parent, rect, screenNum, zoneNum)
   {
-    coord_t x = rect.w - HeaderDateTime::HDR_DATE_WIDTH - DT_XO;
+    coord_t x = isCompactTopBarWidget()
+                    ? 0
+                    : rect.w - HeaderDateTime::HDR_DATE_WIDTH - DT_XO;
     dateTime = new (std::nothrow) HeaderDateTime(this, x, PAD_THREE);
     update();
   }
@@ -370,7 +412,10 @@ class DateTimeWidget : public Widget
     memcpy(&color, &widgetData->options[0].value.unsignedValue, sizeof(color));
     if (!dateTime) return;
     dateTime->setColor(color);
-    coord_t x = width() - HeaderDateTime::HDR_DATE_WIDTH - DT_XO;
+    bool compact = isCompactTopBarWidget();
+    coord_t displayWidth = compact ? width() : HeaderDateTime::HDR_DATE_WIDTH;
+    coord_t x = compact ? 0 : width() - displayWidth - DT_XO;
+    dateTime->setDisplayWidth(displayWidth);
     dateTime->setPos(x, PAD_THREE);
   }
 
