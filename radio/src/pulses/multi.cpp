@@ -43,7 +43,8 @@
 #define MULTI_DATA     0x02
 
 static void sendFrameProtocolHeader(uint8_t*& p_buf, uint8_t module, bool failsafe);
-static void sendChannels(uint8_t*& p_buf, uint8_t module);
+static void sendChannels(uint8_t*& p_buf, uint8_t module,
+                         const int16_t* channels, uint8_t nChannels);
 static void sendD16BindOption(uint8_t*& p_buf, uint8_t module);
 #if defined(LUA)
 static void sendSport(uint8_t*& p_buf, uint8_t module);
@@ -64,6 +65,32 @@ etx_serial_init const multiSerialInitParams = {
 static inline void sendMulti(uint8_t*& p_buf, uint8_t b)
 {
   *p_buf++ = b;
+}
+
+static uint16_t getModuleChannelIndex(uint8_t module, uint8_t index)
+{
+  return static_cast<uint16_t>(g_model.moduleData[module].channelsStart) + index;
+}
+
+static int addChannelCenter(uint8_t module, uint8_t index, int value)
+{
+  uint16_t channel = getModuleChannelIndex(module, index);
+  if (channel >= MAX_OUTPUT_CHANNELS) {
+    return value;
+  }
+
+  return value + 2 * PPM_CH_CENTER(channel) - 2 * PPM_CENTER;
+}
+
+static int getChannelValue(uint8_t module, const int16_t* channels,
+                           uint8_t nChannels, uint8_t index)
+{
+  uint16_t channel = getModuleChannelIndex(module, index);
+  if (!channels || index >= nChannels || channel >= MAX_OUTPUT_CHANNELS) {
+    return 0;
+  }
+
+  return channels[index] + 2 * PPM_CH_CENTER(channel) - 2 * PPM_CENTER;
 }
 
 static void updateMultiSync(uint8_t module)
@@ -97,9 +124,7 @@ static void sendFailsafeChannels(uint8_t*& p_buf, uint8_t module)
                failsafeValue == FAILSAFE_CHANNEL_NOPULSE) {
       pulseValue = 0;
     } else {
-      failsafeValue +=
-          2 * PPM_CH_CENTER(g_model.moduleData[module].channelsStart + i) -
-          2 * PPM_CENTER;
+      failsafeValue = addChannelCenter(module, i, failsafeValue);
       pulseValue = limit(1, (failsafeValue * 800 / 1000) + 1024, 2046);
     }
 
@@ -113,7 +138,8 @@ static void sendFailsafeChannels(uint8_t*& p_buf, uint8_t module)
   }
 }
 
-static void setupPulsesMulti(uint8_t*& p_buf, uint8_t module)
+static void setupPulsesMulti(uint8_t*& p_buf, uint8_t module,
+                             const int16_t* channels, uint8_t nChannels)
 {
   static int counter[2] = {0,0}; //TODO
   static uint8_t invert[2] = {
@@ -153,7 +179,7 @@ static void setupPulsesMulti(uint8_t*& p_buf, uint8_t module)
   if (type & MULTI_FAILSAFE)
     sendFailsafeChannels(p_buf, module);
   else
-    sendChannels(p_buf, module);
+    sendChannels(p_buf, module, channels, nChannels);
 
   // Multi V1.3.X.X -> Send byte 26, Protocol (bits 7 & 6), RX_Num (bits 5 & 4), invert, not used, disable telemetry, disable mapping
   if (moduleState[module].mode == MODULE_MODE_SPECTRUM_ANALYSER
@@ -255,15 +281,11 @@ static void multiDeInit(void* ctx)
 
 static void multiSendPulses(void* ctx, uint8_t* buffer, int16_t* channels, uint8_t nChannels)
 {
-  // TODO:
-  (void)channels;
-  (void)nChannels;
-
   auto mod_st = (etx_module_state_t*)ctx;
   auto module = modulePortGetModule(mod_st);
 
   auto data = buffer;
-  setupPulsesMulti(data, module);
+  setupPulsesMulti(data, module, channels, nChannels);
 
   auto drv = modulePortGetSerialDrv(mod_st->tx);
   auto drv_ctx = modulePortGetCtx(mod_st->tx);
@@ -292,7 +314,8 @@ const etx_proto_driver_t MultiDriver = {
   .txCompleted = modulePortSerialTxCompleted,
 };
 
-static void sendChannels(uint8_t*& p_buf, uint8_t module)
+static void sendChannels(uint8_t*& p_buf, uint8_t module,
+                         const int16_t* channels, uint8_t nChannels)
 {
   uint32_t bits = 0;
   uint8_t bitsavailable = 0;
@@ -301,8 +324,7 @@ static void sendChannels(uint8_t*& p_buf, uint8_t module)
   // Range for pulses (channelsOutputs) is [-1024:+1024] for [-100%;100%]
   // Multi uses [204;1843] as [-100%;100%]
   for (int i = 0; i < MULTI_CHANS; i++) {
-    int channel = g_model.moduleData[module].channelsStart + i;
-    int value = channelOutputs[channel] + 2 * PPM_CH_CENTER(channel) - 2 * PPM_CENTER;
+    int value = getChannelValue(module, channels, nChannels, i);
 
     // Scale to 80%
     value = value * 800 / 1000 + 1024;

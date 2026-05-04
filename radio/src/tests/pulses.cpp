@@ -21,7 +21,12 @@
 
 #include "gtests.h"
 
+#include "hal/module_port.h"
 #include "pulses/pulses.h"
+
+#if defined(MULTIMODULE)
+#include "pulses/multi.h"
+#endif
 
 extern uint8_t getRequiredProtocol(uint8_t module);
 
@@ -78,3 +83,23 @@ TEST_F(PulsesTest, invalidChannelStartDoesNotExposeOutputBuffer)
   EXPECT_TRUE(sendPulsesCalled);
   memset(mod, 0, sizeof(*mod));
 }
+
+#if defined(MULTIMODULE) && defined(HARDWARE_EXTERNAL_MODULE)
+TEST_F(PulsesTest, multiSendPulsesHonorsChannelCount)
+{
+  modulePortInit();
+  g_model.moduleData[EXTERNAL_MODULE].failsafeMode = FAILSAFE_NOT_SET;
+  channelOutputs[0] = 1024;
+
+  auto ctx = MultiDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  uint8_t buffer[MODULE_BUFFER_SIZE] = {};
+  MultiDriver.sendPulses(ctx, buffer, nullptr, 0);
+
+  uint16_t firstPulse = buffer[4] | ((buffer[5] & 0x07) << 8);
+  EXPECT_EQ(firstPulse, 1024);
+
+  MultiDriver.deinit(ctx);
+}
+#endif
