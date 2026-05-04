@@ -65,7 +65,14 @@ static uint8_t createGhostMenuControlFrame(uint8_t * frame, int16_t * pulses)
 }
 
 // Range for pulses (channels output) is [-1024:+1024]
-static uint8_t createGhostChannelsFrame(uint8_t * frame, int16_t * pulses, bool raw12bits)
+static int16_t getGhostPulse(const int16_t * pulses, uint8_t nChannels,
+                             uint8_t index)
+{
+  return (pulses && index < nChannels) ? pulses[index] : 0;
+}
+
+static uint8_t createGhostChannelsFrame(uint8_t * frame, int16_t * pulses,
+                                        uint8_t nChannels, bool raw12bits)
 {
   static uint8_t lastGhostFrameId = 0;
   uint8_t ghostUpper4Offset = 0;
@@ -106,17 +113,18 @@ static uint8_t createGhostChannelsFrame(uint8_t * frame, int16_t * pulses, bool 
   uint32_t bits = 0;
   uint8_t bitsavailable = 0;
   for (int i = 0; i < 4; i++) {
+    int16_t pulse = getGhostPulse(pulses, nChannels, i);
     uint32_t value;
     if (raw12bits) {
-    value = limit(
-        0, (1024 + (pulses[i] + 2 * PPM_CH_CENTER(i) - 2 * PPM_CENTER)) << 1,
-        0xFFF);
+      value = limit(
+          0, (1024 + (pulse + 2 * PPM_CH_CENTER(i) - 2 * PPM_CENTER)) << 1,
+          0xFFF);
     } else {
-    value = limit(
-        0,
-        GHST_RC_CTR_VAL_12BIT +
-            (((pulses[i] + 2 * PPM_CH_CENTER(i) - 2 * PPM_CENTER) << 3) / 5),
-        2 * GHST_RC_CTR_VAL_12BIT);
+      value = limit(
+          0,
+          GHST_RC_CTR_VAL_12BIT +
+              (((pulse + 2 * PPM_CH_CENTER(i) - 2 * PPM_CENTER) << 3) / 5),
+          2 * GHST_RC_CTR_VAL_12BIT);
     }
     bits |= value << bitsavailable;
     bitsavailable += GHST_CH_BITS_12;
@@ -130,17 +138,18 @@ static uint8_t createGhostChannelsFrame(uint8_t * frame, int16_t * pulses, bool 
   // second 4 lower speed, 8 bit channels
   for (int i = 4; i < 8; ++i) {
     uint8_t channelIndex = i + ghostUpper4Offset;
+    int16_t pulse = getGhostPulse(pulses, nChannels, channelIndex);
     uint8_t value;
     if (raw12bits) {
       value = limit(0,
-                    128 + ((pulses[channelIndex] +
+                    128 + ((pulse +
                             2 * PPM_CH_CENTER(channelIndex) - 2 * PPM_CENTER) >>
                            3),
                     0xFF);
     } else {
       value = limit(0,
                     GHST_RC_CTR_VAL_8BIT +
-                        (((pulses[channelIndex] +
+                        (((pulse +
                            2 * PPM_CH_CENTER(channelIndex) - 2 * PPM_CENTER) >>
                           1) /
                          5),
@@ -212,7 +221,8 @@ static void ghostSendPulses(void* ctx, uint8_t* buffer, int16_t* channels, uint8
   if (moduleState[module].counter == GHST_MENU_CONTROL) {
     p_data += createGhostMenuControlFrame(p_data, channels);
   } else {
-    p_data += createGhostChannelsFrame(p_data, channels, mod_cfg.raw12bits);
+    p_data += createGhostChannelsFrame(p_data, channels, nChannels,
+                                       mod_cfg.raw12bits);
   }
 
   moduleState[module].counter = GHST_FRAME_CHANNEL;

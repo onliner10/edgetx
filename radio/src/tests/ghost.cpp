@@ -117,4 +117,17 @@ TEST(Ghost, telemetryOutputIsBoundedByTelemetryBuffer)
   GhostDriver.deinit(ctx);
 }
 
+TEST(Ghost, channelsFrameHonorsChannelCount)
+{
+  modulePortInit();
+
+  auto ctx = GhostDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  uint8_t buffer[MODULE_BUFFER_SIZE] = {};
+  GhostDriver.sendPulses(ctx, buffer, nullptr, 0);
+
+  GhostDriver.deinit(ctx);
+}
+
 #endif
