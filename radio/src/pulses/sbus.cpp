@@ -44,15 +44,17 @@ static inline void sendByte(uint8_t*& p_buf, uint8_t b)
   *p_buf++ = b;
 }
 
-static inline int getChannelValue(uint8_t port, int channel)
+static inline int getChannelValue(uint8_t port, const int16_t* channels,
+                                  uint8_t nChannels, int channel)
 {
   int ch = g_model.moduleData[port].channelsStart + channel;
   // We will ignore 17 and 18th if that brings us over the limit
-  if (ch > 31) return 0;
-  return channelOutputs[ch] + 2 * PPM_CH_CENTER(ch) - 2 * PPM_CENTER;
+  if (!channels || channel >= nChannels || ch > 31) return 0;
+  return channels[channel] + 2 * PPM_CH_CENTER(ch) - 2 * PPM_CENTER;
 }
 
-static void setupPulsesSbus(uint8_t module, uint8_t*& p_buf)
+static void setupPulsesSbus(uint8_t module, uint8_t*& p_buf,
+                            const int16_t* channels, uint8_t nChannels)
 {
   // extmodulePulsesData.dsm2.index = 0;
   // extmodulePulsesData.dsm2.ptr = extmodulePulsesData.dsm2.pulses;
@@ -65,7 +67,7 @@ static void setupPulsesSbus(uint8_t module, uint8_t*& p_buf)
 
   // byte 1-22, channels 0..2047, limits not really clear (B
   for (int i=0; i<SBUS_NORMAL_CHANS; i++) {
-    int value = getChannelValue(module, i);
+    int value = getChannelValue(module, channels, nChannels, i);
 
     value =  value*8/10 + SBUS_CHAN_CENTER;
     bits |= limit(0, value, 2047) << bitsavailable;
@@ -79,9 +81,9 @@ static void setupPulsesSbus(uint8_t module, uint8_t*& p_buf)
 
   // flags
   uint8_t flags=0;
-  if (getChannelValue(module, 16) > 0)
+  if (getChannelValue(module, channels, nChannels, 16) > 0)
     flags |= SBUS_FLAG_CHANNEL_17;
-  if (getChannelValue(module, 17) > 0)
+  if (getChannelValue(module, channels, nChannels, 17) > 0)
     flags |= SBUS_FLAG_CHANNEL_18;
 
   sendByte(p_buf, flags);
@@ -162,15 +164,11 @@ static void sbusDeInit(void* ctx)
 
 static void sbusSendPulses(void* ctx, uint8_t* buffer, int16_t* channels, uint8_t nChannels)
 {
-  // TODO:
-  (void)channels;
-  (void)nChannels;
-
   auto mod_st = (etx_module_state_t*)ctx;
   auto module = modulePortGetModule(mod_st);
 
   auto p_data = buffer;
-  setupPulsesSbus(module, p_data);
+  setupPulsesSbus(module, p_data, channels, nChannels);
 
   auto drv = modulePortGetSerialDrv(mod_st->tx);
   auto drv_ctx = modulePortGetCtx(mod_st->tx);

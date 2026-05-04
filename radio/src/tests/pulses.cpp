@@ -28,6 +28,10 @@
 #include "pulses/multi.h"
 #endif
 
+#if defined(SBUS)
+#include "pulses/sbus.h"
+#endif
+
 extern uint8_t getRequiredProtocol(uint8_t module);
 
 namespace {
@@ -101,5 +105,24 @@ TEST_F(PulsesTest, multiSendPulsesHonorsChannelCount)
   EXPECT_EQ(firstPulse, 1024);
 
   MultiDriver.deinit(ctx);
+}
+#endif
+
+#if defined(SBUS) && defined(HARDWARE_EXTERNAL_MODULE)
+TEST_F(PulsesTest, sbusSendPulsesHonorsChannelCount)
+{
+  modulePortInit();
+  channelOutputs[0] = 1024;
+
+  auto ctx = SBusDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  uint8_t buffer[MODULE_BUFFER_SIZE] = {};
+  SBusDriver.sendPulses(ctx, buffer, nullptr, 0);
+
+  uint16_t firstPulse = buffer[1] | ((buffer[2] & 0x07) << 8);
+  EXPECT_EQ(firstPulse, 992);
+
+  SBusDriver.deinit(ctx);
 }
 #endif
