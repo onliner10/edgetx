@@ -28,6 +28,7 @@
 #include "lua/lua_states.h"
 
 #include <filesystem>
+#include <string>
 
 #define MIXSRC_THR     (MIXSRC_FIRST_STICK + inputMappingGetThrottle())
 #define MIXSRC_TRIMTHR (MIXSRC_FIRST_TRIM + inputMappingGetThrottle())
@@ -220,6 +221,20 @@ TEST(Lua, testLegacyNames)
   luaExecStr("value = getValue('ele')");
   luaExecStr("if value ~= -1024 then error('ele not defined in Legacy') end");
 #endif
+}
+
+TEST(Lua, setCurveRejectsPointPastMax)
+{
+  MODEL_RESET();
+  loadCurves();
+
+  const std::string script =
+      "local y = {}\n"
+      "for i = 1, " + std::to_string(MAX_POINTS_PER_CURVE + 1) + " do y[i] = 0 end\n"
+      "local result = model.setCurve(0, {type = 0, y = y})\n"
+      "if result ~= 4 then error('model.setCurve accepted out-of-range point') end\n";
+
+  luaExecStr(script.c_str());
 }
 
 TEST(Lua, ioSeek)
