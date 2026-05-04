@@ -696,6 +696,11 @@ TEST_F(MixerTest, InvalidCurveIndexIsNotUsed)
   EXPECT_FALSE(isCurveUsed(MAX_CURVES));
 }
 
+TEST_F(MixerTest, InvalidCurveIndexDoesNotMoveCurveMemory)
+{
+  EXPECT_FALSE(moveCurve(MAX_CURVES, 1));
+}
+
 TEST_F(MixerTest, RecursiveAddChannel)
 {
   g_model.mixData[0].destCh = 0;

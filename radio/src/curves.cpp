@@ -103,6 +103,9 @@ static void curveMove_unsafe(uint8_t index, int8_t shift)
 
 bool moveCurve(uint8_t index, int8_t shift)
 {
+  if (index >= MAX_CURVES)
+    return false;
+
   if (curveEnd[MAX_CURVES-1] + shift > g_model.points + sizeof(g_model.points)) {
     AUDIO_WARNING2();
     return false;
