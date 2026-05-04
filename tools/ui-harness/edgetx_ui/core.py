@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -82,6 +83,7 @@ def configure_command(target: str) -> list[str]:
         "-DEdgeTX_SUPERBUILD=OFF",
         "-DNATIVE_BUILD=ON",
         "-DDISABLE_COMPANION=ON",
+        "-DSIMU_EXECUTABLE=ON",
         "-DEDGE_TX_BUILD_TESTS=OFF",
         f"-DPython3_EXECUTABLE={python_exec}",
         f"-DPCB={cfg.pcb}",
@@ -119,6 +121,10 @@ def find_simu_executable(target: str) -> Path:
     base = build_dir(target)
     names = ["simu", "simu.exe"]
     for name in names:
+        candidate = base / name
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return candidate
+    for name in names:
         for candidate in base.rglob(name):
             if candidate.is_file() and os.access(candidate, os.X_OK):
                 return candidate
@@ -141,8 +147,11 @@ def git_commit() -> str:
 
 def project_python_executable() -> str:
     venv_python = REPO_ROOT / ".venv" / "bin" / "python"
-    if venv_python.exists():
-        return str(venv_python)
+    try:
+        if venv_python.exists():
+            return str(venv_python)
+    except OSError:
+        pass
     return sys.executable
 
 
@@ -156,11 +165,26 @@ class SdlAutomationSession:
         height: int = 600,
     ) -> None:
         self.target = target_config(target)
-        self.sdcard = Path(sdcard) if sdcard else default_fixture_path("sdcard", self.target.name)
-        self.settings = Path(settings) if settings else default_fixture_path("settings", self.target.name)
+        self.runtime_dir: tempfile.TemporaryDirectory[str] | None = None
+        self.sdcard = Path(sdcard) if sdcard else self.runtime_fixture_path("sdcard")
+        self.settings = Path(settings) if settings else self.runtime_fixture_path("settings")
         self.width = width
         self.height = height
         self.process: subprocess.Popen[str] | None = None
+
+    def runtime_fixture_path(self, kind: str) -> Path:
+        if self.runtime_dir is None:
+            self.runtime_dir = tempfile.TemporaryDirectory(prefix=f"edgetx-ui-{self.target.name}-")
+
+        source = default_fixture_path(kind, self.target.name)
+        destination = Path(self.runtime_dir.name) / f"{kind}-{self.target.name}"
+        if source.exists():
+            shutil.copytree(source, destination, dirs_exist_ok=True)
+            if kind == "settings":
+                normalize_yaml_line_endings(destination)
+        else:
+            destination.mkdir(parents=True, exist_ok=True)
+        return destination
 
     def start(self) -> dict[str, Any]:
         if self.process and self.process.poll() is None:
@@ -204,6 +228,9 @@ class SdlAutomationSession:
                 self.process.wait(timeout=3.0)
             except subprocess.TimeoutExpired:
                 self.process.kill()
+        if self.runtime_dir is not None:
+            self.runtime_dir.cleanup()
+            self.runtime_dir = None
         return {"running": False}
 
     def command(self, command: str, timeout: float = 5.0) -> dict[str, Any]:
@@ -312,6 +339,13 @@ def normalize_key(key: str) -> str:
 
 def default_fixture_path(kind: str, target: str) -> Path:
     return REPO_ROOT / "tools" / "ui-harness" / "fixtures" / f"{kind}-{target}"
+
+
+def normalize_yaml_line_endings(base: Path) -> None:
+    for path in base.rglob("*.yml"):
+        data = path.read_bytes()
+        normalized = data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+        path.write_bytes(normalized.replace(b"\n", b"\r\n"))
 
 
 class HarnessService:

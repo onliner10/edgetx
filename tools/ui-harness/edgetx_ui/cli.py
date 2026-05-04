@@ -39,9 +39,9 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "smoke":
             service.start(args.target)
             try:
-                service.wait(1000)
-                service.press("ENTER")
-                service.wait(2000)
+                service.wait(2500)
+                service.press("EXIT")
+                service.wait(500)
                 home = service.screenshot("home", args.out)
                 service.press("MODEL")
                 service.wait(500)

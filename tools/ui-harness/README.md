@@ -22,6 +22,9 @@ uv run tools/ui-harness/edgetx-mcp
 touch, wait, screenshot, status, and run-flow tools. It uses the same Python
 core as the CLI.
 
+Default sessions copy these fixtures into a temporary runtime directory before
+starting the simulator, so smoke runs do not modify tracked fixture files.
+
 The root `pyproject.toml` mirrors the Python build dependencies used by
 EdgeTX's existing `requirements.txt`. Running through `uv` gives CMake a Python
 with Pillow, clang bindings, lz4, jinja2, and the other scripts dependencies.
