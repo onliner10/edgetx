@@ -139,6 +139,52 @@ These options enable or disable firmware features. Defaults are typically set by
 
 ---
 
+## Safety and Sanitizer Options
+
+Runtime sanitizers are for native host tests and simulator/fuzzer binaries only. Do not flash sanitizer builds to a radio; firmware builds should use compiler/static safety checks instead.
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `EDGE16_SAFETY_CHECKS` | OFF | Enables stricter warning coverage for firmware and native safety builds. |
+| `EDGE16_GCC_ANALYZER` | OFF | Enables GCC's static analyzer for firmware C/C++ translation units. |
+| `EDGE16_SANITIZERS` | empty | Native test sanitizers, comma-separated: `address`, `undefined`, `thread`. Empty native test builds default to AddressSanitizer. |
+| `EDGE16_BUILD_FUZZERS` | OFF | Builds Clang/libFuzzer native fuzz targets. Requires Clang and cannot be combined with ThreadSanitizer. |
+| `EDGE16_STACK_USAGE_LIMIT` | 8192 | Static stack usage warning limit used with `EDGE16_SAFETY_CHECKS` for firmware builds. |
+| `EDGE16_FRAME_SIZE_LIMIT` | 4096 | Stack frame size warning limit used with `EDGE16_SAFETY_CHECKS` for firmware builds. |
+
+AddressSanitizer and UndefinedBehaviorSanitizer should run together for regular native radio tests:
+
+```sh
+cmake --preset san-asan-ubsan
+cmake --build --preset san-asan-ubsan
+```
+
+ThreadSanitizer is intentionally a separate build:
+
+```sh
+cmake --preset san-tsan
+cmake --build --preset san-tsan
+```
+
+The fuzzer smoke targets are available with Clang:
+
+```sh
+CC=clang CXX=clang++ cmake --preset fuzzers
+cmake --build --preset fuzz-smoke
+```
+
+`fuzz-smoke` currently covers YAML parsing and the mixer/output control path. The mixer fuzzer feeds fuzzed model mixes, expos, limits, and analog inputs through repeated `evalFlightModeMixes()` calls under ASan+UBSan.
+
+Recommended sanitizer runtime options are wired into the native test and CI targets. Leak detection is disabled for these automated smoke runs because the current native UI test harness retains process-lifetime LVGL objects at exit; ASan still checks invalid accesses and UBSan still checks undefined behavior.
+
+```sh
+ASAN_OPTIONS=abort_on_error=1:detect_leaks=0:check_initialization_order=1
+UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1
+TSAN_OPTIONS=halt_on_error=1:second_deadlock_stack=1
+```
+
+---
+
 ## Hardware Configuration
 
 These string options configure hardware behaviour and are normally set by the target.

@@ -41,7 +41,11 @@ endif()
 
 if(EDGE_TX_BUILD_TESTS)
   add_custom_target(tests-radio
-    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/gtests-radio
+    COMMAND ${CMAKE_COMMAND} -E env
+      ASAN_OPTIONS=abort_on_error=1:detect_leaks=0:check_initialization_order=1
+      UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1
+      TSAN_OPTIONS=halt_on_error=1:second_deadlock_stack=1
+      ${CMAKE_CURRENT_BINARY_DIR}/gtests-radio
     DEPENDS gtests-radio
   )
 endif()

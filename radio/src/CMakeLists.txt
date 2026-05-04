@@ -63,6 +63,7 @@ option(EDGE16_SAFETY_CHECKS "Enable strict Edge16 firmware safety compiler check
 option(EDGE16_GCC_ANALYZER "Enable GCC static analyzer for firmware C and C++ translation units." OFF)
 set(EDGE16_SANITIZERS "" CACHE STRING
   "Native test sanitizers to enable, comma-separated: address,undefined,thread.")
+option(EDGE16_BUILD_FUZZERS "Build Clang/libFuzzer native fuzz targets." OFF)
 set(EDGE16_STACK_USAGE_LIMIT 8192 CACHE STRING
   "Maximum static stack usage in bytes before GCC emits -Wstack-usage.")
 set(EDGE16_FRAME_SIZE_LIMIT 4096 CACHE STRING

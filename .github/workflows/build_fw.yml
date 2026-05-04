@@ -90,6 +90,8 @@ jobs:
           FLAVOR: ${{ matrix.target }}
           EDGE16_UV_ACTIVE: 1
           EXTRA_OPTIONS: "-DEDGE16_SANITIZERS=address,undefined -DEDGE16_SAFETY_CHECKS=ON"
+          ASAN_OPTIONS: "abort_on_error=1:detect_leaks=0:check_initialization_order=1"
+          UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
           CMAKE_BUILD_PARALLEL_LEVEL: 4
         run: |
           uv run --with-requirements requirements.txt bash ./tools/commit-tests.sh
@@ -123,6 +125,7 @@ jobs:
           FLAVOR: ${{ matrix.target }}
           EDGE16_UV_ACTIVE: 1
           EXTRA_OPTIONS: "-DEDGE16_SANITIZERS=thread -DEDGE16_SAFETY_CHECKS=ON"
+          TSAN_OPTIONS: "halt_on_error=1:second_deadlock_stack=1"
           CMAKE_BUILD_PARALLEL_LEVEL: 4
         run: |
           uv run --with-requirements requirements.txt bash ./tools/commit-tests.sh

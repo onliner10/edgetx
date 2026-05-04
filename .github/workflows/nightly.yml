@@ -10,9 +10,80 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  sanitizer-stress:
+    name: Sanitizer stress (${{ matrix.target }}, ${{ matrix.sanitizer }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - tx16s
+          - tx16smk3
+        sanitizer:
+          - address,undefined
+          - thread
+    container:
+      image: ghcr.io/edgetx/edgetx-dev:latest
+      volumes:
+        - ${{ github.workspace }}:/src
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Run native sanitizer stress
+        env:
+          FLAVOR: ${{ matrix.target }}
+          EDGE16_UV_ACTIVE: 1
+          EXTRA_OPTIONS: "-DEDGE16_SANITIZERS=${{ matrix.sanitizer }} -DEDGE16_SAFETY_CHECKS=ON"
+          ASAN_OPTIONS: "abort_on_error=1:detect_leaks=0:check_initialization_order=1"
+          UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
+          TSAN_OPTIONS: "halt_on_error=1:second_deadlock_stack=1"
+          CMAKE_BUILD_PARALLEL_LEVEL: 4
+        run: uv run --with-requirements requirements.txt bash ./tools/commit-tests.sh
+
+  fuzz-yaml:
+    name: Native fuzz smoke
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/edgetx/edgetx-dev:latest
+      volumes:
+        - ${{ github.workspace }}:/src
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install Clang
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends clang
+          rm -rf /var/lib/apt/lists/*
+
+      - name: Run native fuzzer smoke
+        env:
+          CC: clang
+          CXX: clang++
+          EDGE16_UV_ACTIVE: 1
+          ASAN_OPTIONS: "abort_on_error=1:detect_leaks=0"
+          UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
+        run: |
+          uv run --with-requirements requirements.txt cmake --preset fuzzers
+          uv run --with-requirements requirements.txt cmake --build --preset fuzz-smoke
+
   build:
     name: Build firmware
     runs-on: ubuntu-latest
+    needs:
+      - sanitizer-stress
+      - fuzz-yaml
     strategy:
       matrix:
         target:

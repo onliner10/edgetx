@@ -35,8 +35,8 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS_DEBUG} -O0 ${EDGE16_NATIVE_SANITIZER_FLAGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_DEBUG} -O0 ${WARNING_FLAGS} ${EDGE16_NATIVE_SANITIZER_FLAGS}")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${EDGE16_NATIVE_SANITIZER_FLAGS}")
 
-file(GLOB TEST_SRC_FILES ${RADIO_SRC_DIR}/tests/*.cpp
-  CONFIGURE_DEPENDS "${RADIO_SRC_DIR}/tests/*.cpp")
+file(GLOB TEST_SRC_FILES CONFIGURE_DEPENDS
+  ${RADIO_SRC_DIR}/tests/*.cpp)
 
 if(EDGE16_SAFETY_CHECKS)
   set_source_files_properties(${RADIO_SRC_DIR}/tests/lcd_480x272.cpp
@@ -54,3 +54,66 @@ target_compile_options(gtests-radio PRIVATE ${SIMU_SRC_OPTIONS})
 
 target_link_libraries(gtests-radio gtests-radio-lib)
 message(STATUS "Added optional gtests target")
+
+if(EDGE16_BUILD_FUZZERS)
+  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(FATAL_ERROR "EDGE16_BUILD_FUZZERS requires Clang for -fsanitize=fuzzer.")
+  endif()
+  if(EDGE16_SANITIZERS MATCHES "(^|,)thread(,|$)")
+    message(FATAL_ERROR "EDGE16_BUILD_FUZZERS cannot be combined with ThreadSanitizer.")
+  endif()
+
+  set(EDGE16_FUZZ_SANITIZER_FLAGS -fsanitize=fuzzer,address,undefined)
+  set(EDGE16_FUZZ_COVERAGE_FLAGS -fsanitize=fuzzer-no-link)
+
+  target_compile_options(radiolib_native PUBLIC ${EDGE16_FUZZ_COVERAGE_FLAGS})
+  target_compile_options(simu_drivers PUBLIC ${EDGE16_FUZZ_COVERAGE_FLAGS})
+
+  add_executable(edge16-fuzz-yaml EXCLUDE_FROM_ALL
+    fuzz/yaml_parser_fuzzer.cpp
+    ${RADIO_SRC_DIR}/storage/yaml/yaml_bits.cpp
+    ${RADIO_SRC_DIR}/storage/yaml/yaml_parser.cpp
+    ${RADIO_SRC_DIR}/storage/yaml/yaml_tree_walker.cpp
+  )
+  target_compile_options(edge16-fuzz-yaml PRIVATE
+    ${EDGE16_FUZZ_SANITIZER_FLAGS}
+    -O1
+    -g
+  )
+  target_link_options(edge16-fuzz-yaml PRIVATE
+    ${EDGE16_FUZZ_SANITIZER_FLAGS}
+  )
+
+  add_executable(edge16-fuzz-mixer EXCLUDE_FROM_ALL
+    fuzz/mixer_fuzzer.cpp
+    ${SIMU_SRC}
+  )
+  target_compile_options(edge16-fuzz-mixer PRIVATE
+    ${SIMU_SRC_OPTIONS}
+    ${EDGE16_FUZZ_SANITIZER_FLAGS}
+    -O1
+    -g
+  )
+  target_link_options(edge16-fuzz-mixer PRIVATE
+    ${EDGE16_FUZZ_SANITIZER_FLAGS}
+  )
+
+  add_custom_target(fuzz-yaml-smoke
+    COMMAND ${CMAKE_COMMAND} -E env
+      ASAN_OPTIONS=abort_on_error=1:detect_leaks=0
+      UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1
+      $<TARGET_FILE:edge16-fuzz-yaml> -runs=1000 -max_len=4096
+    DEPENDS edge16-fuzz-yaml
+  )
+
+  add_custom_target(fuzz-mixer-smoke
+    COMMAND ${CMAKE_COMMAND} -E env
+      ASAN_OPTIONS=abort_on_error=1:detect_leaks=0
+      UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1
+      $<TARGET_FILE:edge16-fuzz-mixer> -runs=1000 -max_len=8192
+    DEPENDS edge16-fuzz-mixer
+  )
+
+  add_custom_target(fuzz-smoke DEPENDS fuzz-yaml-smoke fuzz-mixer-smoke)
+  add_custom_target(fuzzers DEPENDS edge16-fuzz-yaml edge16-fuzz-mixer)
+endif()

@@ -39,6 +39,64 @@
       "warnings": {
         "dev": false
       }
+    },
+    {
+      "name": "san-asan-ubsan",
+      "displayName": "Native ASan + UBSan Tests",
+      "binaryDir": "build/san-asan-ubsan",
+      "toolchainFile": "cmake/toolchain/native.cmake",
+      "cacheVariables": {
+        "EdgeTX_SUPERBUILD": false,
+        "NATIVE_BUILD": true,
+        "DISABLE_COMPANION": true,
+        "PCB": "X10",
+        "PCBREV": "TX16S",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "EDGE16_SANITIZERS": "address,undefined",
+        "EDGE16_SAFETY_CHECKS": true
+      },
+      "warnings": {
+        "dev": false
+      }
+    },
+    {
+      "name": "san-tsan",
+      "displayName": "Native TSan Tests",
+      "binaryDir": "build/san-tsan",
+      "toolchainFile": "cmake/toolchain/native.cmake",
+      "cacheVariables": {
+        "EdgeTX_SUPERBUILD": false,
+        "NATIVE_BUILD": true,
+        "DISABLE_COMPANION": true,
+        "PCB": "X10",
+        "PCBREV": "TX16S",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "EDGE16_SANITIZERS": "thread",
+        "EDGE16_SAFETY_CHECKS": true
+      },
+      "warnings": {
+        "dev": false
+      }
+    },
+    {
+      "name": "fuzzers",
+      "displayName": "Native Clang Fuzzers",
+      "binaryDir": "build/fuzzers",
+      "toolchainFile": "cmake/toolchain/native.cmake",
+      "cacheVariables": {
+        "EdgeTX_SUPERBUILD": false,
+        "NATIVE_BUILD": true,
+        "DISABLE_COMPANION": true,
+        "PCB": "X10",
+        "PCBREV": "TX16S",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "EDGE16_BUILD_FUZZERS": true,
+        "EDGE16_SANITIZERS": "address,undefined",
+        "EDGE16_SAFETY_CHECKS": true
+      },
+      "warnings": {
+        "dev": false
+      }
     }
   ],
   "buildPresets": [
@@ -72,6 +130,46 @@
       "configurePreset": "simu",
       "targets": [
         "tests-radio"
+      ]
+    },
+    {
+      "name": "san-asan-ubsan",
+      "displayName": "Native ASan + UBSan Tests",
+      "configurePreset": "san-asan-ubsan",
+      "targets": [
+        "tests-radio"
+      ]
+    },
+    {
+      "name": "san-tsan",
+      "displayName": "Native TSan Tests",
+      "configurePreset": "san-tsan",
+      "targets": [
+        "tests-radio"
+      ]
+    },
+    {
+      "name": "fuzz-yaml-smoke",
+      "displayName": "YAML Fuzzer Smoke",
+      "configurePreset": "fuzzers",
+      "targets": [
+        "fuzz-yaml-smoke"
+      ]
+    },
+    {
+      "name": "fuzz-mixer-smoke",
+      "displayName": "Mixer Fuzzer Smoke",
+      "configurePreset": "fuzzers",
+      "targets": [
+        "fuzz-mixer-smoke"
+      ]
+    },
+    {
+      "name": "fuzz-smoke",
+      "displayName": "All Fuzzer Smoke Targets",
+      "configurePreset": "fuzzers",
+      "targets": [
+        "fuzz-smoke"
       ]
     }
   ]

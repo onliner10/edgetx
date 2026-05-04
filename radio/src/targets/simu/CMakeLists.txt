@@ -80,6 +80,11 @@ set(SIMU_SRC ${SIMU_SRC} PARENT_SCOPE)
 # Set the options as well in parent scope to be used by unit tests
 set(SIMU_SRC_OPTIONS ${SIMU_SRC_OPTIONS} PARENT_SCOPE)
 
+if(DISABLE_COMPANION)
+  message(STATUS "simu executable disabled")
+  return()
+endif()
+
 if(WASI)
   # strip debug info in Release builds
   list(APPEND CMAKE_EXE_LINKER_FLAGS_RELEASE
