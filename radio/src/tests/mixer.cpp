@@ -21,6 +21,7 @@
 
 #include "gtests.h"
 #include "hal/adc_driver.h"
+#include "mixes.h"
 
 class TrimsTest : public EdgeTxTest {};
 class MixerTest : public EdgeTxTest {};
@@ -699,6 +700,17 @@ TEST_F(MixerTest, InvalidCurveIndexIsNotUsed)
 TEST_F(MixerTest, InvalidCurveIndexDoesNotMoveCurveMemory)
 {
   EXPECT_FALSE(moveCurve(MAX_CURVES, 1));
+}
+
+TEST_F(MixerTest, InvalidMixIndexDoesNotInsertMix)
+{
+  updateMixCount();
+  uint8_t mixCount = getMixCount();
+
+  insertMix(MAX_MIXERS, 0);
+
+  updateMixCount();
+  EXPECT_EQ(mixCount, getMixCount());
 }
 
 TEST_F(MixerTest, RecursiveAddChannel)
