@@ -1303,7 +1303,14 @@ void copySticksToOffset(uint8_t ch)
     val = -val;
     lim = LIMIT_MIN(ld);
   }
-  zero = (zero*256000 - val*lim) / (1024*256-val);
+
+  int32_t divisor = 1024 * 256 - val;
+  if (divisor == 0) {
+    mixerTaskStart();
+    return;
+  }
+
+  zero = (zero*256000 - val*lim) / divisor;
   ld->offset = (ld->revert ? -zero : zero);
 
   mixerTaskStart();
