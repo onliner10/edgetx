@@ -49,18 +49,21 @@ class ValueWidget : public Widget
     labelShadow = etx_label_create(lvobj);
     lv_obj_add_style(labelShadow, &labelStyle, LV_PART_MAIN);
     lv_obj_set_style_text_color(labelShadow, lv_color_black(), LV_PART_MAIN);
+    lv_label_set_long_mode(labelShadow, LV_LABEL_LONG_DOT);
     lv_label_set_text(labelShadow, "");
 
     label = etx_label_create(lvobj);
     lv_obj_add_style(label, &labelStyle, LV_PART_MAIN);
     etx_txt_color(label, COLOR_THEME_WARNING_INDEX, ETX_STATE_TIMER_ELAPSED);
     etx_txt_color(label, COLOR_THEME_DISABLED_INDEX, ETX_STATE_TELEM_STALE);
+    lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
     lv_label_set_text(label, "");
 
     valueShadow = etx_label_create(lvobj, FONT_L_INDEX);
     lv_obj_add_style(valueShadow, &valueStyle, LV_PART_MAIN);
     lv_obj_set_style_text_color(valueShadow, lv_color_black(), LV_PART_MAIN);
     etx_font(valueShadow, FONT_XL_INDEX, ETX_STATE_LARGE_FONT);
+    lv_label_set_long_mode(valueShadow, LV_LABEL_LONG_DOT);
     lv_label_set_text(valueShadow, "");
 
     value = etx_label_create(lvobj, FONT_L_INDEX);
@@ -68,6 +71,7 @@ class ValueWidget : public Widget
     etx_txt_color(value, COLOR_THEME_WARNING_INDEX, ETX_STATE_TIMER_ELAPSED);
     etx_txt_color(value, COLOR_THEME_DISABLED_INDEX, ETX_STATE_TELEM_STALE);
     etx_font(value, FONT_XL_INDEX, ETX_STATE_LARGE_FONT);
+    lv_label_set_long_mode(value, LV_LABEL_LONG_DOT);
     lv_label_set_text(value, "");
 
     update();
@@ -181,6 +185,7 @@ class ValueWidget : public Widget
 
   static LAYOUT_VAL_SCALED(VAL_Y1, 14)
   static LAYOUT_VAL_SCALED(VAL_Y2, 18)
+  static LAYOUT_VAL_SCALED(COMPACT_VAL_Y, 14)
   static LAYOUT_VAL_SCALED(H_CHK, 50)
   static LAYOUT_VAL_SCALED(W_CHK, 120)
 
@@ -207,13 +212,28 @@ class ValueWidget : public Widget
     lv_coord_t labelY = 0;
     lv_coord_t valueX = 0;
     lv_coord_t valueY = VAL_Y1;
+    bool compact = isCompactTopBarWidget();
 
-    // Set font to L
+    etx_font(label, FONT_STD_INDEX);
+    etx_font(labelShadow, FONT_STD_INDEX);
+    etx_font(value, FONT_L_INDEX);
+    etx_font(valueShadow, FONT_L_INDEX);
     lv_obj_clear_state(value, ETX_STATE_LARGE_FONT);
     lv_obj_clear_state(valueShadow, ETX_STATE_LARGE_FONT);
 
     // Get positions, alignment and value font size.
-    if (height() < H_CHK) {
+    if (compact) {
+      lblAlign = ALIGN_CENTER;
+      valAlign = ALIGN_CENTER;
+      labelX = 0;
+      labelY = 0;
+      valueX = 0;
+      valueY = COMPACT_VAL_Y;
+      etx_font(label, FONT_XXS_INDEX);
+      etx_font(labelShadow, FONT_XXS_INDEX);
+      etx_font(value, FONT_BOLD_INDEX);
+      etx_font(valueShadow, FONT_BOLD_INDEX);
+    } else if (height() < H_CHK) {
       if (width() >= W_CHK) {
         lblAlign = ALIGN_LEFT;
         valAlign = ALIGN_RIGHT;

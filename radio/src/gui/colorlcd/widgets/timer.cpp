@@ -56,6 +56,7 @@ class TimerWidget : public Widget
     // Timer name
     nameLabel = etx_label_create(lvobj, FONT_XS_INDEX);
     lv_label_set_text(nameLabel, "");
+    lv_label_set_long_mode(nameLabel, LV_LABEL_LONG_DOT);
     lv_obj_add_style(nameLabel, &style, LV_PART_MAIN);
     etx_obj_add_style(nameLabel, styles->text_align_left, LV_PART_MAIN);
     etx_obj_add_style(nameLabel, styles->text_align_right,
@@ -69,6 +70,7 @@ class TimerWidget : public Widget
     // Timer value - on small size widgets
     valLabel = etx_label_create(lvobj);
     lv_label_set_text(valLabel, "");
+    lv_label_set_long_mode(valLabel, LV_LABEL_LONG_DOT);
     lv_obj_add_style(valLabel, &style, LV_PART_MAIN);
     etx_txt_color(valLabel, COLOR_THEME_PRIMARY2_INDEX);
     etx_font(valLabel, FONT_XS_INDEX, LV_PART_MAIN | ETX_VALUE_SMALL_FONT);
@@ -203,6 +205,7 @@ class TimerWidget : public Widget
   static LAYOUT_VAL_SCALED(SMALL_TXT_MAX_W, 100)
   static LAYOUT_VAL_SCALED(SMALL_TXT_MAX_H, 40)
   static LAYOUT_VAL_SCALED(VAL_LBL_Y, 20)
+  static LAYOUT_VAL_SCALED(COMPACT_VAL_LBL_Y, 14)
   static LAYOUT_VAL_SCALED(TMR_LRG_W, 180)
   static LAYOUT_VAL_SCALED(TMR_LRG_H, 70)
   static LAYOUT_VAL_SCALED(TMR_ARC_SZ, 64)
@@ -247,9 +250,14 @@ class TimerWidget : public Widget
     TimerData& timerData = g_model.timers[index];
 
     bool hasName = ZLEN(timerData.name) > 0;
+    bool compact = isCompactTopBarWidget();
 
     if (width() >= TMR_LRG_W && height() >= TMR_LRG_H) {
       isLarge = true;
+      etx_font(nameLabel, FONT_XS_INDEX);
+      etx_font(valLabel, FONT_STD_INDEX);
+      lv_obj_set_style_text_align(nameLabel, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+      lv_obj_set_style_text_align(valLabel, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
       if (hasName)
         lv_obj_clear_state(nameLabel, EXT_NAME_ALIGN_RIGHT);
       else
@@ -266,9 +274,20 @@ class TimerWidget : public Widget
       timerBg->show();
     } else {
       isLarge = false;
-      lv_obj_set_pos(nameLabel, PAD_TINY, 0);
+      etx_font(nameLabel, compact ? FONT_XXS_INDEX : FONT_XS_INDEX);
+      etx_font(valLabel, compact ? FONT_BOLD_INDEX : FONT_STD_INDEX);
+      lv_obj_set_style_text_align(nameLabel,
+                                  compact ? LV_TEXT_ALIGN_CENTER : LV_TEXT_ALIGN_LEFT,
+                                  LV_PART_MAIN);
+      lv_obj_set_style_text_align(valLabel,
+                                  compact ? LV_TEXT_ALIGN_CENTER : LV_TEXT_ALIGN_LEFT,
+                                  LV_PART_MAIN);
+      lv_obj_clear_state(nameLabel, EXT_NAME_ALIGN_RIGHT);
+      lv_obj_set_pos(nameLabel, compact ? 0 : PAD_TINY, 0);
       lv_obj_set_width(nameLabel, lv_pct(100));
       lv_obj_add_state(nameLabel, ETX_NAME_COLOR_WHITE);
+      lv_obj_set_pos(valLabel, compact ? 0 : PAD_THREE,
+                     compact ? COMPACT_VAL_LBL_Y : VAL_LBL_Y);
 
       lv_obj_clear_flag(valLabel, LV_OBJ_FLAG_HIDDEN);
       lv_obj_add_flag(digits0, LV_OBJ_FLAG_HIDDEN);

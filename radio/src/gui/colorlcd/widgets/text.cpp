@@ -44,9 +44,11 @@ class TextWidget : public Widget
     lv_obj_add_style(shadow, &style, LV_PART_MAIN);
     lv_obj_set_style_text_color(shadow, lv_color_black(), LV_PART_MAIN);
     lv_obj_set_pos(shadow, 1, 1);
+    lv_label_set_long_mode(shadow, LV_LABEL_LONG_DOT);
 
     label = etx_label_create(lvobj);
     lv_obj_add_style(label, &style, LV_PART_MAIN);
+    lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
 
     update();
   }
@@ -68,11 +70,20 @@ class TextWidget : public Widget
     lv_label_set_text(shadow, widgetData->options[0].value.stringValue.c_str());
     lv_label_set_text(label, widgetData->options[0].value.stringValue.c_str());
 
-    // get font color from options[1]
-    etx_txt_color_from_flags(label, widgetData->options[1].value.unsignedValue);
+    auto color = widgetData->options[1].value.unsignedValue;
+    if (isCompactTopBarWidget() &&
+        color == COLOR2FLAGS(COLOR_THEME_SECONDARY1_INDEX)) {
+      etx_txt_color(label, COLOR_THEME_PRIMARY2_INDEX);
+    } else {
+      etx_txt_color_from_flags(label, color);
+    }
+
     // get font size from options[2]
-    lv_style_set_text_font(
-        &style, getFont(widgetData->options[2].value.unsignedValue << 8));
+    auto font = (FontIndex)widgetData->options[2].value.unsignedValue;
+    if (isCompactTopBarWidget() && font == FONT_STD_INDEX) {
+      font = FONT_BOLD_INDEX;
+    }
+    lv_style_set_text_font(&style, getFont(font << 8));
     // get alignment from options[4]
     LcdFlags alignment = widgetData->options[4].value.unsignedValue;
     lv_style_set_text_align(&style,

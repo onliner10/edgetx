@@ -37,7 +37,10 @@ class ChannelValue : public Window
                uint8_t channel, LcdFlags txtColor, LcdFlags barColor) :
       Window(parent,
              {col * colWidth, row * ROW_HEIGHT, colWidth - 1 + (colWidth & 1), (ROW_HEIGHT + 1)}),
-      channel(channel), txtColor(txtColor), barColor(barColor)
+      channel(channel),
+      txtColor(txtColor),
+      barColor(barColor),
+      compactTopBar(parent->isCompactTopBarWidget())
   {
     setWindowFlag(NO_FOCUS | NO_CLICK);
 
@@ -49,7 +52,9 @@ class ChannelValue : public Window
   void delayedInit() override
   {
     etx_obj_add_style(lvobj, styles->border_thin, LV_PART_MAIN);
-    etx_obj_add_style(lvobj, styles->border_color[COLOR_BLACK_INDEX], LV_PART_MAIN);
+    etx_obj_add_style(lvobj,
+                      styles->border_color[compactTopBar ? COLOR_THEME_SECONDARY2_INDEX : COLOR_BLACK_INDEX],
+                      LV_PART_MAIN);
 
     padAll(PAD_ZERO);
 
@@ -67,11 +72,13 @@ class ChannelValue : public Window
     etx_obj_add_style(valueLabel, styles->text_align_right, LV_PART_MAIN);
     etx_txt_color_from_flags(valueLabel, txtColor);
     lv_obj_add_style(valueLabel, &style, LV_PART_MAIN);
+    lv_label_set_long_mode(valueLabel, LV_LABEL_LONG_DOT);
     lv_label_set_text(valueLabel, "");
 
     chanLabel = etx_label_create(lvobj, FONT_XS_INDEX);
     etx_obj_add_style(chanLabel, styles->text_align_left, LV_PART_MAIN);
     etx_txt_color_from_flags(chanLabel, txtColor);
+    lv_label_set_long_mode(chanLabel, LV_LABEL_LONG_DOT);
     lv_label_set_text(chanLabel, "");
 
     chanHasName = g_model.limitData[channel].name[0] != 0;
@@ -149,6 +156,7 @@ class ChannelValue : public Window
   uint8_t channel;
   LcdFlags txtColor;
   LcdFlags barColor;
+  bool compactTopBar = false;
   int16_t lastValue = OUTPUT_INVALID_VALUE;
   int16_t lastScaledValue = OUTPUT_INVALID_VALUE;
   std::string lastText;
@@ -193,15 +201,21 @@ class OutputsWidget : public Widget
     else
       lv_obj_clear_state(lvobj, ETX_STATE_BG_FILL);
 
-    if (height() <= SHOW_MIN_H || width() <= SHOW_MIN_W)
+    bool compact = isCompactTopBarWidget();
+    if ((!compact && (height() <= SHOW_MIN_H || width() <= SHOW_MIN_W)) ||
+        (compact && (height() < ChannelValue::ROW_HEIGHT || width() <= COMPACT_SHOW_MIN_W)))
       return;
 
     bool changed = false;
 
     // Colors
     LcdFlags f = widgetData->options[4].value.unsignedValue;
+    if (compact && f == COLOR2FLAGS(COLOR_THEME_PRIMARY1_INDEX))
+      f = COLOR2FLAGS(COLOR_THEME_PRIMARY2_INDEX);
     if (f != txtColor) { txtColor = f; changed = true; }
     f = widgetData->options[5].value.unsignedValue;
+    if (compact && f == COLOR2FLAGS(COLOR_THEME_SECONDARY1_INDEX))
+      f = COLOR2FLAGS(COLOR_THEME_SECONDARY2_INDEX);
     if (f != barColor) { barColor = f; changed = true; }
 
     // Setup channels
@@ -215,7 +229,7 @@ class OutputsWidget : public Widget
     if (height() != lastHeight) { lastHeight = height(); changed = true; }
     uint8_t n = lastHeight / ChannelValue::ROW_HEIGHT;
     if (n != rows) { rows = n; changed = true; }
-    n = (lastWidth > COLS_MIN_W) ? 2 : 1;
+    n = (compact || lastWidth <= COLS_MIN_W) ? 1 : 2;
     if (n != cols) { cols = n; changed = true; }
 
     if (changed) {
@@ -251,6 +265,7 @@ class OutputsWidget : public Widget
 
   static LAYOUT_VAL_SCALED(SHOW_MIN_W, 100)
   static LAYOUT_VAL_SCALED(SHOW_MIN_H, 20)
+  static LAYOUT_VAL_SCALED(COMPACT_SHOW_MIN_W, 36)
   static LAYOUT_VAL_SCALED(COLS_MIN_W, 300)
 };
 

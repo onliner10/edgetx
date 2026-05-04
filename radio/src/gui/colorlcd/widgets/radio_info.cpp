@@ -48,7 +48,7 @@ class RadioInfoWidget : public Widget
 #if defined(AUDIO)
     audioScale = new (std::nothrow) StaticIcon(this, W_AUDIO_SCALE_X, PAD_TINY,
                                                ICON_TOPMENU_VOLUME_SCALE,
-                                               COLOR_THEME_PRIMARY3_INDEX);
+                                               COLOR_THEME_SECONDARY2_INDEX);
 
     for (int i = 0; i < 5; i += 1) {
       audioVol[i] = new (std::nothrow) StaticIcon(
@@ -100,7 +100,7 @@ class RadioInfoWidget : public Widget
         lv_obj_set_pos(rssiBars[i], W_RSSI_X + i * W_RSSI_BAR_SZ,
                        W_RSSI_BAR_H - height);
         lv_obj_set_size(rssiBars[i], W_RSSI_BAR_W, height);
-        etx_solid_bg(rssiBars[i], COLOR_THEME_PRIMARY3_INDEX);
+        etx_solid_bg(rssiBars[i], COLOR_THEME_SECONDARY2_INDEX);
         etx_bg_color(rssiBars[i], COLOR_THEME_PRIMARY2_INDEX, LV_STATE_USER_1);
       }
     }
@@ -127,7 +127,7 @@ class RadioInfoWidget : public Widget
 
     if (usbIcon) usbIcon->show(usbPlugged());
     if (getSelectedUsbMode() == USB_UNSELECTED_MODE)
-      { if (usbIcon) usbIcon->setColor(COLOR_THEME_PRIMARY3_INDEX); }
+      { if (usbIcon) usbIcon->setColor(COLOR_THEME_SECONDARY2_INDEX); }
     else
       { if (usbIcon) usbIcon->setColor(COLOR_THEME_PRIMARY2_INDEX); }
 
@@ -204,10 +204,10 @@ class RadioInfoWidget : public Widget
   static LAYOUT_VAL_SCALED(W_USB_X, 32)
   static LAYOUT_VAL_SCALED(W_USB_Y, 5)
   static constexpr coord_t W_LOG_X = W_USB_X;
-  static LAYOUT_VAL_SCALED(W_RSSI_X, 40)
-  static LAYOUT_VAL_SCALED(W_RSSI_BAR_W, 4)
-  static LAYOUT_VAL_SCALED(W_RSSI_BAR_H, 35)
-  static LAYOUT_VAL_SCALED(W_RSSI_BAR_SZ, 6)
+  static LAYOUT_VAL_SCALED(W_RSSI_X, 37)
+  static LAYOUT_VAL_SCALED(W_RSSI_BAR_W, 5)
+  static LAYOUT_VAL_SCALED(W_RSSI_BAR_H, 36)
+  static LAYOUT_VAL_SCALED(W_RSSI_BAR_SZ, 7)
   static LAYOUT_VAL_SCALED(W_BATT_Y, 25)
   static LAYOUT_VAL_SCALED(W_BATT_FILL_W, 20)
   static LAYOUT_VAL_SCALED(W_BATT_FILL_H, 10)
@@ -308,7 +308,7 @@ class InternalGPSWidget : public Widget
   {
     icon =
         new (std::nothrow) StaticIcon(this, width() / 2 - PAD_LARGE - PAD_TINY, ICON_H,
-                                      ICON_TOPMENU_GPS, COLOR_THEME_PRIMARY3_INDEX);
+                                      ICON_TOPMENU_GPS, COLOR_THEME_SECONDARY2_INDEX);
 
     numSats = new (std::nothrow) DynamicNumber<uint16_t>(
         this, {0, 1, width(), SATS_H}, [=] { return gpsData.numSat; },
@@ -328,7 +328,7 @@ class InternalGPSWidget : public Widget
       if (gpsData.fix)
         icon->setColor(COLOR_THEME_PRIMARY2_INDEX);
       else
-        icon->setColor(COLOR_THEME_PRIMARY3_INDEX);
+        icon->setColor(COLOR_THEME_SECONDARY2_INDEX);
     }
   }
 

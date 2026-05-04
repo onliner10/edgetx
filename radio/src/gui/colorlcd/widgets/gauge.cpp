@@ -39,10 +39,12 @@ class GaugeWidget : public Widget
     // Gauge label
     sourceText = new StaticText(this, {0, 0, LV_SIZE_CONTENT, 16}, "",
                                 COLOR_THEME_PRIMARY2_INDEX, FONT(XS));
+    lv_label_set_long_mode(sourceText->getLvObj(), LV_LABEL_LONG_DOT);
 
     valueText = new DynamicNumber<int16_t>(
         this, {0, 0, lv_pct(100), GUAGE_H}, [=]() { return getGuageValue(); },
         COLOR_THEME_PRIMARY2_INDEX, FONT(XS) | CENTERED, "", "%");
+    lv_label_set_long_mode(valueText->getLvObj(), LV_LABEL_LONG_DOT);
     etx_obj_add_style(valueText->getLvObj(), styles->text_align_right,
                       LV_STATE_USER_1);
 
@@ -88,8 +90,17 @@ class GaugeWidget : public Widget
 
     mixsrc_t index = widgetData->options[0].value.unsignedValue;
     sourceText->setText(getSourceString(index));
+    bool compact = isCompactTopBarWidget();
+    if (compact) {
+      sourceText->setRect({0, 0, width(), GUAGE_H});
+      etx_font(sourceText->getLvObj(), FONT_XXS_INDEX);
+    } else {
+      sourceText->setRect({0, 0, LV_SIZE_CONTENT, GUAGE_H});
+      etx_font(sourceText->getLvObj(), FONT_XS_INDEX);
+    }
+    etx_font(valueText->getLvObj(), FONT_XS_INDEX);
 
-    if (width() < ALIGN_MAX_W)
+    if (compact || width() < ALIGN_MAX_W)
       lv_obj_add_state(valueText->getLvObj(), LV_STATE_USER_1);
     else
       lv_obj_clear_state(valueText->getLvObj(), LV_STATE_USER_1);

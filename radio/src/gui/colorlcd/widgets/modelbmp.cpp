@@ -45,6 +45,7 @@ class ModelBitmapWidget : public Widget
   void delayedInit() override
   {
     label = new StaticText(this, rect_t{}, "");
+    lv_label_set_long_mode(label->getLvObj(), LV_LABEL_LONG_DOT);
     label->hide();
 
     image = new StaticBitmap(this, {0, 0, width(), height()});
@@ -80,7 +81,8 @@ class ModelBitmapWidget : public Widget
 
     // set font colour from options[0], if use theme color option off
     if (widgetData->options[4].value.boolValue) {
-      etx_txt_color(label->getLvObj(), COLOR_THEME_SECONDARY1_INDEX,
+      etx_txt_color(label->getLvObj(),
+                    isCompactTopBarWidget() ? COLOR_THEME_PRIMARY2_INDEX : COLOR_THEME_SECONDARY1_INDEX,
                     LV_PART_MAIN);
     } else {
       etx_txt_color_from_flags(label->getLvObj(), widgetData->options[0].value.unsignedValue);
