@@ -87,6 +87,9 @@ void deleteMix(uint8_t idx)
 
 void copyMix(uint8_t src, uint8_t dst, uint8_t channel)
 {
+  if (src >= MAX_MIXERS || dst >= MAX_MIXERS)
+    return;
+
   mixerTaskStop();
   MixData sourceMix;
   memcpy(&sourceMix, mixAddress(src), sizeof(MixData));
