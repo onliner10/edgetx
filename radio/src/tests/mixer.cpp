@@ -670,6 +670,19 @@ TEST_F(MixerTest, InvalidCurvePointCountIsIgnored)
   EXPECT_EQ(0, chans[0]);
 }
 
+TEST_F(MixerTest, InvalidCurvePointCountDoesNotCrashPointLookup)
+{
+  g_model.curves[0].type = CURVE_TYPE_STANDARD;
+  // CurveHeader::points stores point count minus 5; -4 is a one-point curve.
+  g_model.curves[0].points = -4;
+  g_model.points[0] = 0;
+
+  point_t point = getPoint(0, 0);
+
+  EXPECT_EQ(0, point.x);
+  EXPECT_EQ(0, point.y);
+}
+
 TEST_F(MixerTest, RecursiveAddChannel)
 {
   g_model.mixData[0].destCh = 0;

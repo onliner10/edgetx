@@ -410,7 +410,8 @@ void getSwitchesPosition(bool startup)
       if (IS_MULTIPOS_CALIBRATED(calib)) {
         uint8_t count = calib->count;
 #endif
-        uint8_t pos = anaIn(analog_idx) / (2 * RESX / count);
+        uint16_t step = divOr(2 * RESX, count, 0);
+        uint8_t pos = divOr(anaIn(analog_idx), step, 0);
         uint8_t previousPos = potsPos[i] >> 4;
         uint8_t previousStoredPos = potsPos[i] & 0x0F;
         if (startup) {
@@ -853,7 +854,8 @@ swsrc_t getMovedSwitch()
         uint8_t count = calib->count;
 #endif
         uint8_t prev = potsPos[i] & 0x0F;
-        uint8_t next = anaIn(MAX_STICKS + i) / (2 * RESX / count);
+        uint16_t step = divOr(2 * RESX, count, 0);
+        uint8_t next = divOr(anaIn(MAX_STICKS + i), step, 0);
         if (prev != next) {
           result = SWSRC_FIRST_MULTIPOS_SWITCH + i * XPOTS_MULTIPOS_COUNT + next;
         }

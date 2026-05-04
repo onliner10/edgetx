@@ -116,7 +116,10 @@ bool moveCurve(uint8_t index, int8_t shift)
 
 int8_t getCurveX(int noPoints, int point)
 {
-  return -100 + divRoundClosest((point*2000) / (noPoints-1), 10);
+  if (noPoints < MIN_CURVE_POINTS)
+    return 0;
+
+  return -100 + divRoundClosest(divOr(point * 2000, noPoints - 1, 0), 10);
 }
 
 void resetCustomCurveX(int8_t * points, int noPoints)
@@ -171,7 +174,9 @@ bool isCurveUsed(uint8_t index)
 int32_t compute_tangent(CurveHeader* crv, const int8_t* points, int i)
 {
   int32_t m = 0;
-  uint8_t num_points = STD_CURVE_POINTS(crv->points);
+  int num_points = STD_CURVE_POINTS(crv->points);
+  if (num_points < MIN_CURVE_POINTS)
+    return 0;
 #define MMULT 1024
   if (i == 0) {
     // linear interpolation between 1st 2 points
@@ -179,10 +184,10 @@ int32_t compute_tangent(CurveHeader* crv, const int8_t* points, int i)
     if (crv->type == CURVE_TYPE_CUSTOM) {
       int8_t x0 = CUSTOM_POINT_X(points, num_points, 0);
       int8_t x1 = CUSTOM_POINT_X(points, num_points, 1);
-      if (x1 > x0) m = (MMULT * (points[1] - points[0])) / (x1 - x0);
+      if (x1 > x0) m = divOr(MMULT * (points[1] - points[0]), x1 - x0, 0);
     } else {
-      int32_t delta = (2 * 100) / (num_points - 1);
-      m = (MMULT * (points[1] - points[0])) / delta;
+      int32_t delta = divOr(2 * 100, num_points - 1, 0);
+      m = divOr(MMULT * (points[1] - points[0]), delta, 0);
     }
   } else if (i == num_points - 1) {
     // linear interpolation between last 2 points
@@ -191,11 +196,12 @@ int32_t compute_tangent(CurveHeader* crv, const int8_t* points, int i)
       int8_t x0 = CUSTOM_POINT_X(points, num_points, num_points - 2);
       int8_t x1 = CUSTOM_POINT_X(points, num_points, num_points - 1);
       if (x1 > x0)
-        m = (MMULT * (points[num_points - 1] - points[num_points - 2])) /
-            (x1 - x0);
+        m = divOr(MMULT * (points[num_points - 1] - points[num_points - 2]),
+                  x1 - x0, 0);
     } else {
-      int32_t delta = (2 * 100) / (num_points - 1);
-      m = (MMULT * (points[num_points - 1] - points[num_points - 2])) / delta;
+      int32_t delta = divOr(2 * 100, num_points - 1, 0);
+      m = divOr(MMULT * (points[num_points - 1] - points[num_points - 2]),
+                delta, 0);
     }
   } else {
     // apply monotone rules from
@@ -206,21 +212,21 @@ int32_t compute_tangent(CurveHeader* crv, const int8_t* points, int i)
       int8_t x0 = CUSTOM_POINT_X(points, num_points, i - 1);
       int8_t x1 = CUSTOM_POINT_X(points, num_points, i);
       int8_t x2 = CUSTOM_POINT_X(points, num_points, i + 1);
-      if (x1 > x0) d0 = (MMULT * (points[i] - points[i - 1])) / (x1 - x0);
-      if (x2 > x1) d1 = (MMULT * (points[i + 1] - points[i])) / (x2 - x1);
+      if (x1 > x0) d0 = divOr(MMULT * (points[i] - points[i - 1]), x1 - x0, 0);
+      if (x2 > x1) d1 = divOr(MMULT * (points[i + 1] - points[i]), x2 - x1, 0);
     } else {
-      int32_t delta = (2 * 100) / (num_points - 1);
-      d0 = (MMULT * (points[i] - points[i - 1])) / (delta);
-      d1 = (MMULT * (points[i + 1] - points[i])) / (delta);
+      int32_t delta = divOr(2 * 100, num_points - 1, 0);
+      d0 = divOr(MMULT * (points[i] - points[i - 1]), delta, 0);
+      d1 = divOr(MMULT * (points[i + 1] - points[i]), delta, 0);
     }
     // 2) compute initial average tangent
     m = (d0 + d1) / 2;
     // 3 check for horizontal lines
     if (d0 == 0 || d1 == 0 || (d0 > 0 && d1 < 0) || (d0 < 0 && d1 > 0)) {
       m = 0;
-    } else if (MMULT * m / d0 > 3 * MMULT) {
+    } else if (divOr(MMULT * m, d0, 0) > 3 * MMULT) {
       m = 3 * d0;
-    } else if (MMULT * m / d1 > 3 * MMULT) {
+    } else if (divOr(MMULT * m, d1, 0) > 3 * MMULT) {
       m = 3 * d1;
     }
   }
@@ -236,8 +242,11 @@ int16_t hermite_spline(int16_t x, uint8_t idx)
 {
   CurveHeader &crv = g_model.curves[idx];
   int8_t *points = curveAddress(idx);
-  uint8_t count = STD_CURVE_POINTS(crv.points);
+  int count = STD_CURVE_POINTS(crv.points);
   bool custom = (crv.type == CURVE_TYPE_CUSTOM);
+
+  if (count < MIN_CURVE_POINTS)
+    return 0;
 
   if (x < -RESX)
     x = -RESX;
@@ -251,8 +260,8 @@ int16_t hermite_spline(int16_t x, uint8_t idx)
       p3x = (i<count-2 ? calc100toRESX(points[count+i]) : RESX);
     }
     else {
-      p0x = -RESX + (i*2*RESX)/(count-1);
-      p3x = -RESX + ((i+1)*2*RESX)/(count-1);
+      p0x = -RESX + divOr(i * 2 * RESX, count - 1, 0);
+      p3x = -RESX + divOr((i + 1) * 2 * RESX, count - 1, 0);
     }
 
     if (x >= p0x && x <= p3x) {
@@ -262,7 +271,7 @@ int16_t hermite_spline(int16_t x, uint8_t idx)
       int32_t m3 = compute_tangent(&crv, points, i+1);
       int32_t y;
       int32_t h = p3x - p0x;
-      int32_t t = (h > 0 ? (MMULT * (x - p0x)) / h : 0);
+      int32_t t = (h > 0 ? divOr(MMULT * (x - p0x), h, 0) : 0);
       int32_t t2 = t * t / MMULT;
       int32_t t3 = t2 * t / MMULT;
       int32_t h00 = 2*t3 - 3*t2 + MMULT;
@@ -305,14 +314,16 @@ int intpol(int x, uint8_t idx) // -100, -75, -50, -25, 0 ,25 ,50, 75, 100
         if ((uint16_t)x <= b) break;
       }
     } else {
-      uint16_t d = (RESX * 2) / (count - 1);
-      i = (uint16_t)x / d;
+      uint16_t d = divOr(RESX * 2, count - 1, 0);
+      i = divOr((uint16_t)x, d, 0);
+      if (i >= count - 1)
+        i = count - 2;
       a = i * d;
       b = a + d;
     }
     erg = (int16_t)points[i] * (RESX / 4) +
-          ((int32_t)(x - a) * (points[i + 1] - points[i]) * (RESX / 4)) /
-              ((b - a));
+          divOr((int32_t)(x - a) * (points[i + 1] - points[i]) * (RESX / 4),
+                b - a, 0);
   }
 
   return erg / 25; // 100*D5/RESX;
@@ -394,16 +405,19 @@ point_t getPoint(uint8_t curveIndex, uint8_t index)
   CurveHeader & crv = g_model.curves[curveIndex];
   int8_t * points = curveAddress(curveIndex);
   bool custom = (crv.type == CURVE_TYPE_CUSTOM);
-  uint8_t count = STD_CURVE_POINTS(crv.points);
-  if (index < count) {
-    if (custom && index > 0 && index < count - 1) {
-      result.x = calc100toRESX(points[count + index - 1]);
-    }
-    else {
-      result.x = -RESX + calc100toRESX(200 * index / (count - 1));
-    }
-    result.y = calc100toRESX(points[index]);
+  int count = STD_CURVE_POINTS(crv.points);
+  if (count < MIN_CURVE_POINTS || index >= count) {
+    return result;
   }
+
+  if (custom && index > 0 && index < count - 1) {
+    result.x = calc100toRESX(points[count + index - 1]);
+  }
+  else {
+    result.x = -RESX + calc100toRESX(divOr(200 * index, count - 1, 0));
+  }
+  result.y = calc100toRESX(points[index]);
+
   return result;
 }
 

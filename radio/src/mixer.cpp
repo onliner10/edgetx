@@ -207,7 +207,7 @@ void applyExpos(int16_t * anas, uint8_t mode, int16_t ovwrIdx, int16_t ovwrValue
       else {
         v = getValue(srcRaw);
         if (src >= MIXSRC_FIRST_TELEM && ed->scale > 0) {
-          v = (v * 1024) / convertTelemValue(src-MIXSRC_FIRST_TELEM+1, ed->scale);
+          v = divOr(v * 1024, convertTelemValue(src-MIXSRC_FIRST_TELEM+1, ed->scale), 0);
         }
         v = limit<int32_t>(-1024, v, 1024);
       }
@@ -466,7 +466,7 @@ getvalue_t _getValue(mixsrc_t i, bool* valid)
       if (g_model.cfsGroupAlwaysOn(group_idx))
         stepcount--;
 
-      int stepsize = (2 * RESX) / stepcount;
+      int stepsize = divOr(2 * RESX, stepcount, 0);
       int value = -RESX;
 
       for (uint8_t i =  0; i < switchGetMaxSwitches(); i++) {
@@ -578,10 +578,12 @@ void evalInputs(uint8_t mode)
     if (g_eeGeneral.stickDeadZone && ch != inputMappingGetThrottle()) {
       if (v > deadZoneOffset) {
         // y=ax+b
-        v = (int16_t)((int32_t)(v - deadZoneOffset) * 1024L / (1024L - deadZoneOffset));
+        v = divOr((int32_t)(v - deadZoneOffset) * 1024L,
+                  1024L - deadZoneOffset, (int16_t)0);
       } else if (v < -deadZoneOffset) {
         // y=ax+b
-        v = (int16_t)((int32_t)(v + deadZoneOffset) * 1024L / (1024L - deadZoneOffset));
+        v = divOr((int32_t)(v + deadZoneOffset) * 1024L,
+                  1024L - deadZoneOffset, (int16_t)0);
       } else {
         v = 0;
       }
@@ -770,8 +772,8 @@ void evalFlightModeMixes(uint8_t mode, uint8_t tick10ms)
       if (v>q) {
         uint16_t d = isqrt32(v);
         int16_t tmp = calc100toRESX(g_model.swashR.value);
-        heliEleValue = (int32_t) heliEleValue*tmp/d;
-        heliAilValue = (int32_t) heliAilValue*tmp/d;
+        heliEleValue = divOr((int32_t) heliEleValue*tmp, d, 0);
+        heliAilValue = divOr((int32_t) heliAilValue*tmp, d, 0);
       }
     }
 
@@ -1014,14 +1016,14 @@ void evalFlightModeMixes(uint8_t mode, uint8_t tick10ms)
             if (diff > 0) {
               if (s_mixer_first_run_done && md->speedUp > 0) {
                 // if a speed upwards is defined recalculate the new value according configured speed; the higher the speed the smaller the add value is
-                int32_t newValue = tact+rate/((int16_t)precMult*md->speedUp);
+                int32_t newValue = tact + divOr(rate, (int16_t)precMult*md->speedUp, 0);
                 if (newValue<currentValue) currentValue = newValue; // Endposition; prevent toggling around the destination
               }
             }
             else {  // if is <0 because ==0 is not possible
               if (s_mixer_first_run_done && md->speedDown > 0) {
                 // see explanation in speedUp
-                int32_t newValue = tact-rate/((int16_t)precMult*md->speedDown);
+                int32_t newValue = tact - divOr(rate, (int16_t)precMult*md->speedDown, 0);
                 if (newValue>currentValue) currentValue = newValue; // Endposition; prevent toggling around the destination
               }
             }
@@ -1165,7 +1167,7 @@ void evalMixes(uint8_t tick10ms)
       uint16_t transitionMask = (0x01u << lastFlightMode) + (0x01u << fm);
       if (fadeTime) {
         flightModesFade |= transitionMask;
-        delta = (MAX_ACT / 10) / fadeTime;
+        delta = divOr(MAX_ACT / 10, fadeTime, 0);
       }
       else {
         flightModesFade &= ~transitionMask;
@@ -1256,7 +1258,7 @@ void evalMixes(uint8_t tick10ms)
     // at the end chans[i] = chans[i]/256 =>  -1024..1024
     // interpolate value with min/max so we get smooth motion from center to stop
     // this limits based on v original values and min=-1024, max=1024  RESX=1024
-    int32_t q = (flightModesFade ? (sum_chans512[i] / weight) << 4 : chans[i]);
+    int32_t q = (flightModesFade ? divOr(sum_chans512[i], weight, 0) << 4 : chans[i]);
 
     ex_chans[i] = q / 256;
 
@@ -1339,7 +1341,7 @@ void doMixerPeriodicUpdates()
       // usually max is 1024 min is -1024 --> max-min = 2048 full range
 
       if (gModelMax != 0 && gModelMax != 2048)
-        val = (int32_t) (val << 11) / (gModelMax); // rescaling only needed if Min, Max differs
+        val = divOr((int32_t) (val << 11), gModelMax, 0); // rescaling only needed if Min, Max differs
 
       if (val < 0)
         val=0;  // prevent val be negative, which would corrupt throttle trace and timers; could occur if safetyswitch is smaller than limits
@@ -1387,7 +1389,7 @@ void doMixerPeriodicUpdates()
         if (mixWarning & 4) if ((sessionTimer&0x03)==2) AUDIO_MIX_WARNING(3);
 #endif
 
-        val = s_sum_samples_thr_1s / s_cnt_samples_thr_1s;
+        val = divOr(s_sum_samples_thr_1s, s_cnt_samples_thr_1s, 0);
         s_timeCum16ThrP += (val>>3);  // s_timeCum16ThrP would overrun if we would store throttle value with higher accuracy; therefore stay with 16 steps
         if (val)
           s_timeCumThr += 1;
@@ -1402,7 +1404,7 @@ void doMixerPeriodicUpdates()
 
         if (++s_cnt_10s >= 10) { // 10s
           s_cnt_10s -= 10;
-          val = s_sum_samples_thr_10s / s_cnt_samples_thr_10s;
+          val = divOr(s_sum_samples_thr_10s, s_cnt_samples_thr_10s, 0);
           s_sum_samples_thr_10s = 0;
           s_cnt_samples_thr_10s = 0;
           s_traceBuf[s_traceWr % MAXTRACE] = val;
