@@ -41,11 +41,13 @@ ChannelBar::ChannelBar(Window* parent, const rect_t& rect, uint8_t channel,
   setWindowFlag(NO_CLICK);
 
   etx_solid_bg(lvobj, COLOR_THEME_PRIMARY2_INDEX);
+  etx_obj_add_style(lvobj, styles->border_thin, LV_PART_MAIN);
+  etx_obj_add_style(lvobj, styles->border_color[COLOR_THEME_SECONDARY2_INDEX], LV_PART_MAIN);
 
   bar = lv_obj_create(lvobj);
   etx_solid_bg(bar, barColorIndex);
-  lv_obj_set_pos(bar, width() / 2, 0);
-  lv_obj_set_size(bar, 0, height());
+  lv_obj_set_pos(bar, width() / 2, 1);
+  lv_obj_set_size(bar, 0, height() - 2);
 
   coord_t yo = (height() < 10) ? -1 : -PAD_TINY;
 
@@ -101,8 +103,8 @@ void ChannelBar::checkEvents()
 
       int16_t x = width() / 2 - ((chanVal > 0) ? 0 : size);
 
-      lv_obj_set_pos(bar, x, 0);
-      lv_obj_set_size(bar, size, height());
+      lv_obj_set_pos(bar, x, 1);
+      lv_obj_set_size(bar, size, height() - 2);
     }
 
     extendedLimits = g_model.extendedLimits;
