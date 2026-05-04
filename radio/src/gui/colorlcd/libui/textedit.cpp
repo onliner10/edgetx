@@ -23,6 +23,8 @@
 #include "storage/storage.h"
 #include "etx_lv_theme.h"
 
+#include <new>
+
 #if defined(HARDWARE_KEYS)
 #include "menu.h"
 #endif
@@ -151,10 +153,11 @@ void TextEdit::update()
 void TextEdit::openEdit()
 {
   if (edit == nullptr) {
-    edit = new TextArea(this,
-                        {-(PAD_MEDIUM + 2), -(PAD_BORDER * 2),
-                          lv_obj_get_width(lvobj), lv_obj_get_height(lvobj)},
-                        text, length);
+    edit = new (std::nothrow) TextArea(this,
+                                       {-(PAD_MEDIUM + 2), -(PAD_BORDER * 2),
+                                         lv_obj_get_width(lvobj), lv_obj_get_height(lvobj)},
+                                       text, length);
+    if (!edit) return;
     edit->setChangeHandler([=]() {
       update();
       if (updateHandler) updateHandler();
@@ -176,9 +179,10 @@ void TextEdit::preview(bool edited, char* text, uint8_t length)
 {
   setWindowFlag(NO_FOCUS | NO_CLICK);
 
-  edit = new TextArea(this,
-                      {-(PAD_MEDIUM + 2), -(PAD_BORDER * 2), width(), height()},
-                      text, length);
+  edit = new (std::nothrow) TextArea(this,
+                                     {-(PAD_MEDIUM + 2), -(PAD_BORDER * 2), width(), height()},
+                                     text, length);
+  if (!edit) return;
   edit->setWindowFlag(NO_CLICK);
   lv_group_focus_obj(edit->getLvObj());
   lv_obj_add_state(edit->getLvObj(), LV_STATE_FOCUSED);

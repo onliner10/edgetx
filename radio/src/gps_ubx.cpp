@@ -33,6 +33,7 @@
  */
 
 #include <ctype.h>
+#include <string.h>
 
 #include "gps.h"
 #include "edgetx.h"
@@ -152,28 +153,32 @@ static void gpsProcessMessage(uint16_t msg_type, uint16_t msg_len,
                               uint8_t* payload)
 {
   if (msg_type == 0x0107) {
-    auto pvt = (ubxNavPvt_t*)payload;
-    gpsData.fix = pvt->flags & 0x01;
-    gpsData.numSat = pvt->numSV;
-    gpsData.speed = pvt->gSpeed / 100;            // speed in 0.1m/s
-    gpsData.groundCourse = pvt->headMot / 10000;  // degrees * 10
+    if (msg_len < sizeof(ubxNavPvt_t)) return;
+    ubxNavPvt_t pvt;
+    memcpy(&pvt, payload, sizeof(pvt));
+    gpsData.fix = pvt.flags & 0x01;
+    gpsData.numSat = pvt.numSV;
+    gpsData.speed = pvt.gSpeed / 100;            // speed in 0.1m/s
+    gpsData.groundCourse = pvt.headMot / 10000;  // degrees * 10
     if (gpsData.fix) {
-      gpsData.longitude = pvt->lon / 10;   // degrees * 1.000.000
-      gpsData.latitude = pvt->lat / 10;    // degrees * 1.000.000
-      gpsData.altitude = pvt->hMSL / 100;  // altitude in 0.1m
+      gpsData.longitude = pvt.lon / 10;   // degrees * 1.000.000
+      gpsData.latitude = pvt.lat / 10;    // degrees * 1.000.000
+      gpsData.altitude = pvt.hMSL / 100;  // altitude in 0.1m
     }
 
 #if defined(RTCLOCK)
     // set RTC clock if needed
-    if (g_eeGeneral.adjustRTC && (pvt->valid & 0x03) == 0x03) {
-      rtcAdjust(pvt->year, pvt->month, pvt->day, pvt->hour, pvt->min, pvt->sec);
+    if (g_eeGeneral.adjustRTC && (pvt.valid & 0x03) == 0x03) {
+      rtcAdjust(pvt.year, pvt.month, pvt.day, pvt.hour, pvt.min, pvt.sec);
     }
 #endif
   }
 
   if (msg_type == 0x0104) {
-    auto dop = (ubxNavDop_t*)payload;
-    gpsData.hdop = dop->hdop;
+    if (msg_len < sizeof(ubxNavDop_t)) return;
+    ubxNavDop_t dop;
+    memcpy(&dop, payload, sizeof(dop));
+    gpsData.hdop = dop.hdop;
   }
 }
 

@@ -26,6 +26,8 @@
 #include "edgetx.h"
 #include "sliders.h"
 
+#include <new>
+
 class TrimIcon : public SliderIcon
 {
  public:
@@ -111,14 +113,16 @@ MainViewTrim::MainViewTrim(Window* parent, const rect_t& rect, uint8_t idx,
                     TRIM_LINE_WIDTH);
   }
 
-  trimIcon = new TrimIcon(this, isVertical);
+  trimIcon = new (std::nothrow) TrimIcon(this, isVertical);
 
-  trimValue = new DynamicNumber<int16_t>(
+  trimValue = new (std::nothrow) DynamicNumber<int16_t>(
       this, {0, 0, MainViewSlider::SLIDER_BAR_SIZE, 12},
       [=]() { return divRoundClosest(abs(value) * 100, trimMax); },
       COLOR_THEME_PRIMARY2_INDEX, FONT(XXS) | CENTERED);
-  etx_solid_bg(trimValue->getLvObj(), COLOR_THEME_SECONDARY1_INDEX);
-  trimValue->hide();
+  if (trimValue) {
+    etx_solid_bg(trimValue->getLvObj(), COLOR_THEME_SECONDARY1_INDEX);
+    trimValue->hide();
+  }
 
   setRange();
   setPos();
@@ -141,8 +145,10 @@ void MainViewTrim::setPos()
   coord_t x = sx();
   coord_t y = sy();
 
-  lv_obj_set_pos(trimIcon->getLvObj(), x, y);
-  trimIcon->setState(value);
+  if (trimIcon) {
+    lv_obj_set_pos(trimIcon->getLvObj(), x, y);
+    trimIcon->setState(value);
+  }
 
   if ((g_model.displayTrims == DISPLAY_TRIMS_ALWAYS) ||
       ((g_model.displayTrims == DISPLAY_TRIMS_CHANGE) &&
@@ -158,15 +164,17 @@ void MainViewTrim::setPos()
                          MainViewSlider::SLIDER_BAR_SIZE / 2;
         y = (MainViewSlider::SLIDER_BAR_SIZE - 12) / 2;
       }
-      lv_obj_set_pos(trimValue->getLvObj(), x, y);
-      trimValue->show();
+      if (trimValue) {
+        lv_obj_set_pos(trimValue->getLvObj(), x, y);
+        trimValue->show();
+      }
       showChange = true;
     } else {
-      trimValue->hide();
+      if (trimValue) trimValue->hide();
     }
   } else {
     showChange = false;
-    trimValue->hide();
+    if (trimValue) trimValue->hide();
   }
 }
 

@@ -23,6 +23,8 @@
 #include "edgetx_helpers.h"
 #include "debug.h"
 
+#include <new>
+
 FIL imgFile __DMA;
 
 // #define TRACE_STB_MALLOC
@@ -124,9 +126,10 @@ BitmapBuffer *BitmapBuffer::loadBitmap(const char *filename, BitmapFormats fmt)
     dst_fmt = (n == 4 ? BMP_ARGB4444 : BMP_RGB565);
   }
 
-  BitmapBuffer *bmp = new BitmapBuffer(dst_fmt, w, h);
+  BitmapBuffer *bmp = new (std::nothrow) BitmapBuffer(dst_fmt, w, h);
   if (bmp == nullptr) {
     TRACE_ERROR("loadBitmap: malloc failed\n");
+    stbi_image_free(img);
     return nullptr;
   }
 
@@ -219,11 +222,12 @@ static uint8_t *convert_bitmap(uint8_t *img, int w, int h, int n)
       }
     }
   } else {
-    pixel_t *dest = (pixel_t *)bmp;
+    uint8_t *dest = bmp;
     for (int row = 0; row < h; ++row) {
       for (int col = 0; col < w; ++col) {
-        *dest = RGB(p[0], p[1], p[2]);
-        MOVE_TO_NEXT_RIGHT_PIXEL(dest);
+        uint16_t c = RGB(p[0], p[1], p[2]);
+        *dest++ = c & 0xFF;
+        *dest++ = c >> 8;
         p += 4;
       }
     }

@@ -27,6 +27,8 @@
 #include "view_main.h"
 #include "widget_settings.h"
 
+#include <new>
+
 #if defined(HARDWARE_TOUCH)
 #include "touch.h"
 #endif
@@ -170,21 +172,23 @@ Widget::Widget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
 
 void Widget::openMenu()
 {
-  if (!parent->isTopBar() && ViewMain::instance()->isAppMode())
+  auto viewMain = ViewMain::instance();
+  if (!parent->isTopBar() && viewMain && viewMain->isAppMode())
   {
     setFullscreen(true);
     return;
   }
 
   if (hasOptions() || !parent->isTopBar()) {
-    Menu* menu = new Menu();
+    Menu* menu = new (std::nothrow) Menu();
+    if (!menu) return;
     menu->setTitle(getFactory()->getDisplayName());
     if (!parent->isTopBar()) {
       menu->addLine(STR_WIDGET_FULLSCREEN, [&]() { setFullscreen(true); });
     }
     if (hasOptions()) {
       menu->addLine(STR_WIDGET_SETTINGS,
-                    [=]() { new WidgetSettings(this); });
+                    [=]() { new (std::nothrow) WidgetSettings(this); });
     }
   }
 }
@@ -210,7 +214,8 @@ void Widget::setFullscreen(bool enable)
   fullscreen = enable;
 
   // Show or hide ViewMain widgets and decorations
-  ViewMain::instance()->show(!enable);
+  auto viewMain = ViewMain::instance();
+  if (viewMain) viewMain->show(!enable);
   Messaging::send(Messaging::DECORATION_UPDATE);
 
   // Leave Fullscreen Mode
@@ -225,7 +230,7 @@ void Widget::setFullscreen(bool enable)
   }
   // Enter Fullscreen Mode
   else {
-    ViewMain::instance()->enableWidgetSelect(false);
+    if (viewMain) viewMain->enableWidgetSelect(false);
 
     // ViewMain hidden - re-show this widget
     show();
@@ -297,7 +302,8 @@ void Widget::enableFocus(bool enable)
         } else {
           lv_obj_add_flag(focusBorder, LV_OBJ_FLAG_HIDDEN);
         }
-        ViewMain::instance()->refreshWidgetSelectTimer();
+        auto viewMain = ViewMain::instance();
+        if (viewMain) viewMain->refreshWidgetSelectTimer();
       });
 
       lv_group_add_obj(lv_group_get_default(), lvobj);

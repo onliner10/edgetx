@@ -29,6 +29,8 @@
 #include "stamp.h"
 #include "theme_manager.h"
 
+#include <new>
+
 extern void checkSpeakerVolume();
 
 constexpr const char* strip_leading_hyphen(const char* str) {
@@ -44,7 +46,7 @@ const std::string nam_str = strip_leading_hyphen("" VERSION_SUFFIX);
 const std::string git_str = "(" GIT_STR ")";
 #endif
 
-const uint8_t __bmp_splash_logo[] __FLASH = {
+alignas(LZ4Bitmap) const uint8_t __bmp_splash_logo[] __FLASH = {
 #include "bmp_logo_edgetx_splash.lbm"
 };
 
@@ -54,29 +56,31 @@ void drawSplash()
 {
   if (!sdMounted()) sdInit();
 
-  splashScreen = new Window(MainWindow::instance(), {0, 0, LCD_W, LCD_H});
+  splashScreen = new (std::nothrow) Window(MainWindow::instance(), {0, 0, LCD_W, LCD_H});
+  if (!splashScreen) return;
   lv_obj_set_parent(splashScreen->getLvObj(), lv_layer_top());
 
   etx_solid_bg(splashScreen->getLvObj(), COLOR_BLACK_INDEX);
 
-  auto bg = new StaticImage(splashScreen, {0, 0, LCD_W, LCD_H},
+  auto bg = new (std::nothrow) StaticImage(splashScreen, {0, 0, LCD_W, LCD_H},
                             BITMAPS_PATH "/" SPLASH_FILE);
-  bg->show(bg->hasImage());
+  if (bg) bg->show(bg->hasImage());
 
-  if (!bg->hasImage()) {
-    LZ4Bitmap* logo = (LZ4Bitmap*)__bmp_splash_logo;
+  if (!bg || !bg->hasImage()) {
+    auto logo =
+        static_cast<const LZ4Bitmap*>(static_cast<const void*>(__bmp_splash_logo));
     coord_t x = (LANDSCAPE ? LCD_W / 3 : LCD_W / 2) - logo->width / 2;
     coord_t y = (LANDSCAPE ? LCD_H / 2 : LCD_H * 2 / 5) - logo->height / 2;
-    new StaticLZ4Image(splashScreen, x, y, logo);
+    new (std::nothrow) StaticLZ4Image(splashScreen, x, y, logo);
 
     coord_t w = LAYOUT_SCALE(200);
     x = (LANDSCAPE ? LCD_W * 4 / 5 : LCD_W / 2) - w / 2;
     y = LCD_H - EdgeTxStyles::STD_FONT_HEIGHT * 4;
-    new StaticText(splashScreen, {x, y, w, EdgeTxStyles::STD_FONT_HEIGHT}, ver_str.c_str(), COLOR_GREY_INDEX, CENTERED);
-    new StaticText(splashScreen, {x, y + EdgeTxStyles::STD_FONT_HEIGHT, w, EdgeTxStyles::STD_FONT_HEIGHT},
+    new (std::nothrow) StaticText(splashScreen, {x, y, w, EdgeTxStyles::STD_FONT_HEIGHT}, ver_str.c_str(), COLOR_GREY_INDEX, CENTERED);
+    new (std::nothrow) StaticText(splashScreen, {x, y + EdgeTxStyles::STD_FONT_HEIGHT, w, EdgeTxStyles::STD_FONT_HEIGHT},
                    nam_str.c_str(), COLOR_GREY_INDEX, CENTERED);
 #if !defined(VERSION_TAG)
-    new StaticText(splashScreen, {x, y + EdgeTxStyles::STD_FONT_HEIGHT * 2, w, EdgeTxStyles::STD_FONT_HEIGHT},
+    new (std::nothrow) StaticText(splashScreen, {x, y + EdgeTxStyles::STD_FONT_HEIGHT * 2, w, EdgeTxStyles::STD_FONT_HEIGHT},
                    git_str.c_str(), COLOR_GREY_INDEX, CENTERED);
 #endif
   }
@@ -147,13 +151,14 @@ void drawSleepBitmap()
     shutdownWindow->clear();
   } else {
     shutdownWindow =
-        new Window(MainWindow::instance(), {0, 0, LCD_W, LCD_H});
+        new (std::nothrow) Window(MainWindow::instance(), {0, 0, LCD_W, LCD_H});
+    if (!shutdownWindow) return;
     shutdownWindow->setWindowFlag(OPAQUE);
     etx_solid_bg(shutdownWindow->getLvObj(), COLOR_THEME_PRIMARY1_INDEX);
   }
 
-  (new StaticIcon(shutdownWindow, 0, 0, ICON_SHUTDOWN, COLOR_THEME_PRIMARY2_INDEX))
-      ->center(LCD_W, LCD_H);
+  if (auto icon = new (std::nothrow) StaticIcon(shutdownWindow, 0, 0, ICON_SHUTDOWN, COLOR_THEME_PRIMARY2_INDEX))
+    icon->center(LCD_W, LCD_H);
 
   // Force screen refresh
   lv_refr_now(nullptr);
@@ -176,7 +181,8 @@ void drawShutdownAnimation(uint32_t duration, uint32_t totalDuration,
 
   if (shutdownWindow == nullptr) {
     shutdownWindow =
-        new Window(MainWindow::instance(), {0, 0, LCD_W, LCD_H});
+        new (std::nothrow) Window(MainWindow::instance(), {0, 0, LCD_W, LCD_H});
+    if (!shutdownWindow) return;
     shutdownWindow->setWindowFlag(OPAQUE);
     etx_solid_bg(shutdownWindow->getLvObj(), COLOR_THEME_PRIMARY1_INDEX);
 
@@ -191,11 +197,12 @@ void drawShutdownAnimation(uint32_t duration, uint32_t totalDuration,
                            shutdownSplashImg->width(),
                            shutdownSplashImg->height(), LV_IMG_CF_TRUE_COLOR);
     }
-    (new StaticIcon(shutdownWindow, 0, 0, ICON_SHUTDOWN, COLOR_THEME_PRIMARY2_INDEX))
-        ->center(LCD_W, LCD_H);
+    if (auto icon = new (std::nothrow) StaticIcon(
+            shutdownWindow, 0, 0, ICON_SHUTDOWN, COLOR_THEME_PRIMARY2_INDEX))
+      icon->center(LCD_W, LCD_H);
 
     for (int i = 0; i < 4; i += 1) {
-      shutdownAnim[i] = new StaticIcon(
+      shutdownAnim[i] = new (std::nothrow) StaticIcon(
           shutdownWindow, LCD_W / 2 + bmp_shutdown_xo[i],
           LCD_H / 2 + bmp_shutdown_yo[i],
           (EdgeTxIcon)(ICON_SHUTDOWN_CIRCLE0 + i), COLOR_THEME_PRIMARY2_INDEX);
@@ -204,18 +211,21 @@ void drawShutdownAnimation(uint32_t duration, uint32_t totalDuration,
 
   int quarter = 4 - (duration * 5) / totalDuration;
   if (quarter < 0) quarter = 0;
-  for (int i = 3; i >= quarter; i -= 1) shutdownAnim[i]->hide();
+  for (int i = 3; i >= quarter; i -= 1) {
+    if (shutdownAnim[i]) shutdownAnim[i]->hide();
+  }
 
   MainWindow::instance()->run();
 }
 
 Window* drawFatalErrorScreen(const char* message)
 {
-  auto w = new Window(MainWindow::instance(), {0, 0, LCD_W, LCD_H});
+  auto w = new (std::nothrow) Window(MainWindow::instance(), {0, 0, LCD_W, LCD_H});
+  if (!w) return nullptr;
   w->setWindowFlag(OPAQUE);
   etx_solid_bg(w->getLvObj(), COLOR_BLACK_INDEX);
 
-  new StaticText(w, rect_t{0, LCD_H / 2 - EdgeTxStyles::STD_FONT_HEIGHT, LCD_W, EdgeTxStyles::STD_FONT_HEIGHT * 2},
+  new (std::nothrow) StaticText(w, rect_t{0, LCD_H / 2 - EdgeTxStyles::STD_FONT_HEIGHT, LCD_W, EdgeTxStyles::STD_FONT_HEIGHT * 2},
                  message, COLOR_WHITE_INDEX, FONT(XL) | CENTERED);
 
   return w;

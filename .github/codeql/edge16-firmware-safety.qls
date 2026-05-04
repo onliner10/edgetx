@@ -1,0 +1,9 @@
+- description: Edge16 firmware safety CodeQL queries
+- queries: .
+  from: codeql/cpp-queries
+- apply: code-scanning-selectors.yml
+  from: codeql/suite-helpers
+- apply: codeql-suites/exclude-slow-queries.yml
+  from: codeql/cpp-queries
+- query: Likely Bugs/InconsistentCheckReturnNull.ql
+  from: codeql/cpp-queries

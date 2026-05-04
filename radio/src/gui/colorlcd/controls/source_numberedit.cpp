@@ -24,6 +24,8 @@
 #include "edgetx.h"
 #include "sourcechoice.h"
 
+#include <new>
+
 SourceNumberEdit::SourceNumberEdit(Window* parent,
                                    int32_t vmin, int32_t vmax,
                                    std::function<int32_t()> getValue,
@@ -47,7 +49,7 @@ SourceNumberEdit::SourceNumberEdit(Window* parent,
   lv_obj_set_size(lvobj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
 
   // Source field
-  source_field = new SourceChoice(
+  source_field = new (std::nothrow) SourceChoice(
       this, {0, 0, EdgeTxStyles::EDIT_FLD_WIDTH_NARROW, 0}, sourceMin, INPUTSRC_LAST,
       [=]() {
         SourceNumVal v;
@@ -59,7 +61,7 @@ SourceNumberEdit::SourceNumberEdit(Window* parent,
         setValue(v.rawValue);
       }, true);
 
-  num_field = new NumberEdit(
+  num_field = new (std::nothrow) NumberEdit(
       this, {0, 0, EdgeTxStyles::EDIT_FLD_WIDTH_NARROW, 0}, vmin, vmax,
       [=]() {
         SourceNumVal v;
@@ -71,14 +73,14 @@ SourceNumberEdit::SourceNumberEdit(Window* parent,
         setValue(v.rawValue);
       },
       textFlags);
-  num_field->setDefault(vdefault);
+  if (num_field) num_field->setDefault(vdefault);
 
   // The Source button
-  m_srcBtn = new TextButton(this, {EdgeTxStyles::EDIT_FLD_WIDTH_NARROW + PAD_TINY, 0, SRC_BTN_W, 0}, "SRC", [=]() {
+  m_srcBtn = new (std::nothrow) TextButton(this, {EdgeTxStyles::EDIT_FLD_WIDTH_NARROW + PAD_TINY, 0, SRC_BTN_W, 0}, "SRC", [=]() {
     switchSourceMode();
     return isSource();
   });
-  m_srcBtn->check(isSource());
+  if (m_srcBtn) m_srcBtn->check(isSource());
 
   // update field type based on value
   update();
@@ -106,29 +108,31 @@ void SourceNumberEdit::switchSourceMode()
 
 void SourceNumberEdit::setSuffix(const std::string& value)
 {
-  num_field->setSuffix(value);
+  if (num_field) num_field->setSuffix(value);
 }
 
 void SourceNumberEdit::update()
 {
   bool has_focus = act_field && act_field->hasFocus();
 
-  source_field->hide();
-  num_field->hide();
+  if (source_field) source_field->hide();
+  if (num_field) num_field->hide();
 
   if (isSource()) {
+    if (!source_field) return;
     // Source mode
     act_field = source_field;
     source_field->show();
     source_field->update();
   } else {
+    if (!num_field) return;
     // number edit mode
     act_field = num_field;
     num_field->show();
     num_field->update();
   }
 
-  m_srcBtn->check(isSource());
+  if (m_srcBtn) m_srcBtn->check(isSource());
 
   if (has_focus) {
     lv_group_focus_obj(act_field->getLvObj());

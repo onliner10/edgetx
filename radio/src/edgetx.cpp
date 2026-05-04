@@ -75,6 +75,7 @@
 #if !defined(SIMU)
 #include <malloc.h>
 #endif
+#include <new>
 
 #if defined(LUA)
 #include "lua/lua_states.h"
@@ -757,7 +758,7 @@ void checkAll(bool isBootCheck)
 
 #if defined(COLORLCD)
   if (!waitKeysReleased()) {
-    auto dlg = new FullScreenDialog(WARNING_TYPE_ALERT, STR_KEYSTUCK);
+    auto dlg = new (std::nothrow) FullScreenDialog(WARNING_TYPE_ALERT, STR_KEYSTUCK);
     LED_ERROR_BEGIN();
     AUDIO_ERROR_MESSAGE(AU_ERROR);
 
@@ -771,15 +772,22 @@ void checkAll(bool isBootCheck)
       }
     }
 
-    dlg->setMessage(strKeys.c_str());
-    MainWindow::instance()->blockUntilClose(true, [=]() {
-      if (dlg->deleted()) return true;
-      if ((tgtime < get_tmr10ms()) || !keyDown()) {
-        dlg->deleteLater();
-        return true;
+    if (dlg) {
+      dlg->setMessage(strKeys.c_str());
+      MainWindow::instance()->blockUntilClose(true, [=]() {
+        if (dlg->deleted()) return true;
+        if ((tgtime < get_tmr10ms()) || !keyDown()) {
+          dlg->deleteLater();
+          return true;
+        }
+        return false;
+      });
+    } else {
+      while (keyDown() && tgtime >= get_tmr10ms()) {
+        sleep_ms(1);
+        WDG_RESET();
       }
-      return false;
-    });
+    }
     LED_ERROR_END();
   }
 #else
@@ -842,34 +850,42 @@ bool isThrottleWarningAlertNeeded()
 #if defined(COLORLCD)
 void checkThrottleStick()
 {
-  char throttleNotIdle[strlen(STR_THROTTLE_NOT_IDLE) + 9];
+  char throttleNotIdle[128];
   if (isThrottleWarningAlertNeeded()) {
     if (g_model.enableCustomThrottleWarning) {
-    sprintf(throttleNotIdle, "%s (%d%%)", STR_THROTTLE_NOT_IDLE, g_model.customThrottleWarningPosition);
+      snprintf(throttleNotIdle, sizeof(throttleNotIdle), "%s (%d%%)", STR_THROTTLE_NOT_IDLE, g_model.customThrottleWarningPosition);
     }
     else {
-      strcpy(throttleNotIdle, STR_THROTTLE_NOT_IDLE);
+      snprintf(throttleNotIdle, sizeof(throttleNotIdle), "%s", STR_THROTTLE_NOT_IDLE);
     }
     LED_ERROR_BEGIN();
-    auto dialog = new ThrottleWarnDialog(throttleNotIdle);
-    MainWindow::instance()->blockUntilClose(true, [=]() {
-      return dialog->deleted();
-    });
+    auto dialog = new (std::nothrow) ThrottleWarnDialog(throttleNotIdle);
+    if (dialog) {
+      MainWindow::instance()->blockUntilClose(true, [=]() {
+        return dialog->deleted();
+      });
+    } else {
+      AUDIO_ERROR_MESSAGE(AU_THROTTLE_ALERT);
+      while (isThrottleWarningAlertNeeded()) {
+        sleep_ms(1);
+        WDG_RESET();
+      }
+    }
     LED_ERROR_END();
   }
 }
 #else
 void checkThrottleStick()
 {
-  char throttleNotIdle[strlen(STR_THROTTLE_NOT_IDLE) + 9];
+  char throttleNotIdle[128];
   if (!isThrottleWarningAlertNeeded()) {
     return;
   }
   if (g_model.enableCustomThrottleWarning) {
-    sprintf(throttleNotIdle, "%s (%d%%)", STR_THROTTLE_NOT_IDLE, g_model.customThrottleWarningPosition);
+    snprintf(throttleNotIdle, sizeof(throttleNotIdle), "%s (%d%%)", STR_THROTTLE_NOT_IDLE, g_model.customThrottleWarningPosition);
   }
   else {
-    strcpy(throttleNotIdle, STR_THROTTLE_NOT_IDLE);
+    snprintf(throttleNotIdle, sizeof(throttleNotIdle), "%s", STR_THROTTLE_NOT_IDLE);
   }
   // first - display warning; also deletes inputs if any have been before
   LED_ERROR_BEGIN();

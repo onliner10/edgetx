@@ -29,6 +29,8 @@
 #include "menu.h"
 #include "sdcard.h"
 
+#include <new>
+
 // Used on startup to block until checklist is closed.
 static bool checkListOpen = false;
 
@@ -72,9 +74,9 @@ constexpr int maxTxtBuffSize = 64 * 1024;
 class TextViewer
 {
  public:
-  TextViewer(const std::string path, const std::string name) : name(std::move(name))
+  TextViewer(std::string path, std::string name) : name(std::move(name))
   {
-    fullPath = path + std::string(PATH_SEPARATOR) + name;
+    fullPath = path + std::string(PATH_SEPARATOR) + this->name;
     extractNameSansExt();
   }
 
@@ -209,7 +211,14 @@ class TextViewer
                 c = CHAR_DOWN[1];
                 escape = 0;
               } else if (escape == 3) {
-                int val = atoi(escape_chars);
+                int val = -1;
+                if (escape_chars[0] >= '0' && escape_chars[0] <= '9' &&
+                    escape_chars[1] >= '0' && escape_chars[1] <= '9' &&
+                    escape_chars[2] >= '0' && escape_chars[2] <= '9') {
+                  val = (escape_chars[0] - '0') * 100 +
+                        (escape_chars[1] - '0') * 10 +
+                        (escape_chars[2] - '0');
+                }
                 if (val >= 200 && val < 225) {
                   *ptr++ = '\302';
                   c = '\200' + val - 200;
@@ -244,9 +253,9 @@ ViewTextWindow::ViewTextWindow(const std::string path, const std::string name,
                                EdgeTxIcon icon) :
     Page(icon, PAD_ZERO)
 {
-  textViewer = new TextViewer(path, name);
+  textViewer = new (std::nothrow) TextViewer(path, name);
 
-  header->setTitle(name);
+  if (header) header->setTitle(name);
 
   delayLoad();
 };
@@ -427,14 +436,15 @@ class ViewChecklistWindow : public Page, public TextViewer
       }
 
       auto box =
-          new Window(window, rect_t{0, 0, lv_pct(100), LV_SIZE_CONTENT});
+          new (std::nothrow) Window(window, rect_t{0, 0, lv_pct(100), LV_SIZE_CONTENT});
+      if (!box) return;
       box->padAll(PAD_LARGE);
 
-      closeButton = new TextButton(box, rect_t{}, STR_EXIT, [=]() -> int8_t {
+      closeButton = new (std::nothrow) TextButton(box, rect_t{}, STR_EXIT, [=]() -> int8_t {
         this->onCancel();
         return 0;
       });
-      closeButton->setWidth(lv_pct(100));
+      if (closeButton) closeButton->setWidth(lv_pct(100));
 
       updateCheckboxes();
     }
@@ -493,9 +503,9 @@ static Window* _readModelNotes(bool fromMenu)
 
     if (isFileAvailable(fullPath.c_str())) {
       if (fromMenu || !g_model.checklistInteractive)
-        return new ViewTextWindow(std::string(MODELS_PATH), modelNotesName, ICON_MODEL);
+        return new (std::nothrow) ViewTextWindow(std::string(MODELS_PATH), modelNotesName, ICON_MODEL);
       else
-        return new ViewChecklistWindow(std::string(MODELS_PATH), modelNotesName, ICON_MODEL);
+        return new (std::nothrow) ViewChecklistWindow(std::string(MODELS_PATH), modelNotesName, ICON_MODEL);
     }
   }
   return nullptr;
@@ -525,7 +535,7 @@ ModelNotesPage::ModelNotesPage(const PageDef& pageDef) : PageGroupItem(pageDef, 
 
 void ModelNotesPage::build(Window* window)
 {
-  if (!textViewer) textViewer = new TextViewer(MODELS_PATH, getModelNotesFile());
+  if (!textViewer) textViewer = new (std::nothrow) TextViewer(MODELS_PATH, getModelNotesFile());
   if (textViewer) textViewer->build(window);
 }
 

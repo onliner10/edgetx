@@ -20,6 +20,8 @@
 
 #include "textedit.h"
 
+#include <new>
+
 constexpr coord_t KEYBOARD_HEIGHT = LCD_H * 2 / 5;
 TextKeyboard* TextKeyboard::_instance = nullptr;
 
@@ -109,7 +111,8 @@ void TextKeyboard::onLongPressPGDN() { cursorEnd(); }
 
 void TextKeyboard::open(FormField* field)
 {
-  if (!_instance) _instance = new TextKeyboard();
+  if (!_instance) _instance = new (std::nothrow) TextKeyboard();
+  if (!_instance) return;
 
   lv_obj_clear_flag(_instance->lvobj, LV_OBJ_FLAG_HIDDEN);
   lv_obj_clear_flag(_instance->keyboard, LV_OBJ_FLAG_HIDDEN);

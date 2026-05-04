@@ -34,6 +34,8 @@
 #include "hal/adc_driver.h"
 #include "hal/audio_driver.h"
 
+#include <string.h>
+
 #if defined(COLORLCD)
 #include "radio_tools.h"
 #endif
@@ -1528,8 +1530,9 @@ bool cfn_is_active(void* user, uint8_t* data, uint32_t bitoffs)
 static bool gvar_is_active(void* user, uint8_t* data, uint32_t bitoffs)
 {
   // TODO: no need to output 0 values for FM0
-  gvar_t* gvar = (gvar_t*)(data + (bitoffs>>3UL));
-  return *gvar != GVAR_MAX+1;
+  gvar_t gvar;
+  memcpy(&gvar, data + (bitoffs >> 3UL), sizeof(gvar));
+  return gvar != GVAR_MAX+1;
 }
 
 static bool fmd_is_active(void* user, uint8_t* data, uint32_t bitoffs)
@@ -2708,9 +2711,11 @@ static void r_serialMode(void* user, uint8_t* data, uint32_t bitoffs,
   auto m = yaml_parse_enum(_old_enum_UartModes, val, val_len);
   if (!m) return;
   
-  auto serialPort = reinterpret_cast<uint32_t*>(data);
-  *serialPort = (*serialPort & ~(0xF << port_nr * SERIAL_CONF_BITS_PER_PORT)) |
-                (m << port_nr * SERIAL_CONF_BITS_PER_PORT);
+  uint32_t serialPort;
+  memcpy(&serialPort, data, sizeof(serialPort));
+  serialPort = (serialPort & ~(0xF << port_nr * SERIAL_CONF_BITS_PER_PORT)) |
+               (m << port_nr * SERIAL_CONF_BITS_PER_PORT);
+  memcpy(data, &serialPort, sizeof(serialPort));
 }
 
 #if defined(FUNCTION_SWITCHES)

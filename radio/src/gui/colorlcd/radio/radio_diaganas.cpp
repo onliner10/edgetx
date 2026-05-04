@@ -72,7 +72,7 @@ class AnaViewWindow : public Window
     auto max_inputs =
         adcGetMaxInputs(ADC_INPUT_MAIN) + adcGetMaxInputs(ADC_INPUT_FLEX);
 
-    for (uint8_t i = 0; i < max_inputs; i++) {
+    for (int i = 0; i < max_inputs; i++) {
       if (i >= pot_offset && (POT_CONFIG(i - pot_offset) == FLEX_NONE))
         continue;
 
@@ -375,7 +375,7 @@ class AnaFilteredDevViewWindow : public AnaViewWindow
     auto max_inputs =
         adcGetMaxInputs(ADC_INPUT_MAIN) + adcGetMaxInputs(ADC_INPUT_FLEX);
 
-    for (uint8_t i = 0; i < max_inputs; i++) stats[i].clear();
+    for (int i = 0; i < max_inputs; i++) stats[i].clear();
   }
 
   void checkEvents() override
@@ -383,7 +383,7 @@ class AnaFilteredDevViewWindow : public AnaViewWindow
     auto max_inputs =
         adcGetMaxInputs(ADC_INPUT_MAIN) + adcGetMaxInputs(ADC_INPUT_FLEX);
 
-    for (uint8_t i = 0; i < max_inputs; i++) {
+    for (int i = 0; i < max_inputs; i++) {
       stats[i].write(getAnalogValue(i));
     }
     AnaViewWindow::checkEvents();
@@ -456,7 +456,7 @@ class AnaMinMaxViewWindow : public AnaViewWindow
     auto max_inputs =
         adcGetMaxInputs(ADC_INPUT_MAIN) + adcGetMaxInputs(ADC_INPUT_FLEX);
 
-    for (uint8_t i = 0; i < max_inputs; i++) minmax[i].clear();
+    for (int i = 0; i < max_inputs; i++) minmax[i].clear();
     checkEvents();
   }
 
@@ -476,7 +476,7 @@ class AnaMinMaxViewWindow : public AnaViewWindow
     auto max_inputs =
         adcGetMaxInputs(ADC_INPUT_MAIN) + adcGetMaxInputs(ADC_INPUT_FLEX);
 
-    for (uint8_t i = 0; i < max_inputs; i++) {
+    for (int i = 0; i < max_inputs; i++) {
       minmax[i].write(getAnalogValue(i));
     }
     AnaViewWindow::checkEvents();

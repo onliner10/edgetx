@@ -161,12 +161,12 @@ bool matchLogicalSwitchAudioFile(const char* filename, int& index, int& event)
   auto* c = filename;
   if (*c != 'L' && *c != 'l') return false;
   c += 1;
-  if (*c < '1' && *c > '9') return false;
+  if (*c < '1' || *c > '9') return false;
   int lsw = *c++ - '0';
   if (*c >= '0' && *c <= '9') {
     lsw = (lsw * 10) + (*c++ - '0');
   }
-  if (*c != '-' || lsw < 1) return false;
+  if (*c != '-' || lsw < 1 || lsw > MAX_LOGICAL_SWITCHES) return false;
 
   for (size_t e = 0; e < DIM(_suffixes); e++) {
     auto* s = c;

@@ -30,6 +30,8 @@
 
 #include "hal/adc_driver.h"
 
+#include <new>
+
 ViewMainDecoration::ViewMainDecoration(Window* parent, bool calibration) :
     Window(parent, {0, 0, parent->width(), parent->height()})
 {
@@ -39,7 +41,10 @@ ViewMainDecoration::ViewMainDecoration(Window* parent, bool calibration) :
   w_br = layoutBox(this, LV_ALIGN_BOTTOM_RIGHT, LV_FLEX_FLOW_COLUMN);
 
   w_bc = layoutBox(this, LV_ALIGN_BOTTOM_MID, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_flex_align(w_bc->getLvObj(), LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_AROUND);
+  if (w_bc) {
+    lv_obj_set_flex_align(w_bc->getLvObj(), LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_AROUND);
+  }
 
   if (!calibration) {
     createTrims(w_ml, w_mr, w_bl, w_br);
@@ -53,7 +58,9 @@ ViewMainDecoration::ViewMainDecoration(Window* parent, bool calibration) :
 Window* ViewMainDecoration::layoutBox(Window* parent, lv_align_t align,
                                       lv_flex_flow_t flow)
 {
-  auto w = new Window(parent, rect_t{0, 0, LV_SIZE_CONTENT, LV_SIZE_CONTENT});
+  if (!parent) return nullptr;
+  auto w = new (std::nothrow) Window(parent, rect_t{0, 0, LV_SIZE_CONTENT, LV_SIZE_CONTENT});
+  if (!w) return nullptr;
 
   lv_obj_set_align(w->getLvObj(), align);
   lv_obj_set_flex_flow(w->getLvObj(), flow);
@@ -161,8 +168,8 @@ void ViewMainDecoration::createSliders(Window* ml, Window* mr, Window* bl, Windo
   int pot = 0;
 
   // Bottom left horizontal slider
-  if (IS_POT_AVAILABLE(pot)) {
-    sliders[pot] = new MainViewHorizontalSlider(bl, pot);
+  if (IS_POT_AVAILABLE(pot) && bl) {
+    sliders[pot] = new (std::nothrow) MainViewHorizontalSlider(bl, pot);
   }
 #if defined(RADIO_PL18U)
   pot += 2;
@@ -174,13 +181,13 @@ void ViewMainDecoration::createSliders(Window* ml, Window* mr, Window* bl, Windo
   if (IS_POT_AVAILABLE(pot)) {
 #if defined(RADIO_PL18) || defined(RADIO_PL18EV) || defined(RADIO_PL18U)
     has6POS = true;
-    sliders[pot] = new MainViewHorizontalSlider(bc, pot);
+    if (bc) sliders[pot] = new (std::nothrow) MainViewHorizontalSlider(bc, pot);
     pot += 1;
 #else
-    if (IS_POT_MULTIPOS(pot)) {
+    if (IS_POT_MULTIPOS(pot) && bc) {
       has6POS = true;
       // Has 6POS - place bottom center
-      sliders[pot] = new MainView6POS(bc, pot);
+      sliders[pot] = new (std::nothrow) MainView6POS(bc, pot);
       pot += 1;
     }
 #endif
@@ -193,8 +200,8 @@ void ViewMainDecoration::createSliders(Window* ml, Window* mr, Window* bl, Windo
 #if defined(RADIO_PL18U)
   pot -= 2;
 #endif
-  if (IS_POT_AVAILABLE(pot)) {
-    sliders[pot] = new MainViewHorizontalSlider(br, pot);
+  if (IS_POT_AVAILABLE(pot) && br) {
+    sliders[pot] = new (std::nothrow) MainViewHorizontalSlider(br, pot);
   }
 #if defined(RADIO_PL18U)
   pot += 2;
@@ -209,31 +216,31 @@ void ViewMainDecoration::createSliders(Window* ml, Window* mr, Window* bl, Windo
     // create containers for the sliders, so that they are at the borders of the display
     // on top of each other, when there are two sliders to display per side
     auto leftPots = layoutBox(ml, LV_ALIGN_LEFT_MID, LV_FLEX_FLOW_COLUMN);
-    leftPots->setHeight(MainViewSlider::VERTICAL_SLIDERS_HEIGHT);
+    if (leftPots) leftPots->setHeight(MainViewSlider::VERTICAL_SLIDERS_HEIGHT);
 
     auto rightPots = layoutBox(mr, LV_ALIGN_RIGHT_MID, LV_FLEX_FLOW_COLUMN);
-    rightPots->setHeight(MainViewSlider::VERTICAL_SLIDERS_HEIGHT);
+    if (rightPots) rightPots->setHeight(MainViewSlider::VERTICAL_SLIDERS_HEIGHT);
 
     coord_t lsh = (IS_POT_AVAILABLE(pot + 2)) ? MainViewSlider::VERTICAL_SLIDERS_HEIGHT / 2 : MainViewSlider::VERTICAL_SLIDERS_HEIGHT;
     coord_t rsh = (IS_POT_AVAILABLE(pot + 3)) ? MainViewSlider::VERTICAL_SLIDERS_HEIGHT / 2 : MainViewSlider::VERTICAL_SLIDERS_HEIGHT;
 
-    if (IS_POT_AVAILABLE(pot)) {
-      sliders[pot] = new MainViewVerticalSlider(leftPots, rect_t{0, 0, MainViewSlider::SLIDER_BAR_SIZE, lsh}, pot);
+    if (IS_POT_AVAILABLE(pot) && leftPots) {
+      sliders[pot] = new (std::nothrow) MainViewVerticalSlider(leftPots, rect_t{0, 0, MainViewSlider::SLIDER_BAR_SIZE, lsh}, pot);
     }
     pot += 1;
 
-    if (IS_POT_AVAILABLE(pot)) {
-      sliders[pot] = new MainViewVerticalSlider(rightPots, rect_t{0, 0, MainViewSlider::SLIDER_BAR_SIZE, rsh}, pot);
+    if (IS_POT_AVAILABLE(pot) && rightPots) {
+      sliders[pot] = new (std::nothrow) MainViewVerticalSlider(rightPots, rect_t{0, 0, MainViewSlider::SLIDER_BAR_SIZE, rsh}, pot);
     }
     pot += 1;
 
-    if (IS_POT_AVAILABLE(pot)) {
-      sliders[pot] = new MainViewVerticalSlider(leftPots, rect_t{0, 0, MainViewSlider::SLIDER_BAR_SIZE, lsh}, pot);
+    if (IS_POT_AVAILABLE(pot) && leftPots) {
+      sliders[pot] = new (std::nothrow) MainViewVerticalSlider(leftPots, rect_t{0, 0, MainViewSlider::SLIDER_BAR_SIZE, lsh}, pot);
     }
     pot += 1;
 
-    if (IS_POT_AVAILABLE(pot)) {
-      sliders[pot] = new MainViewVerticalSlider(rightPots, rect_t{0, 0, MainViewSlider::SLIDER_BAR_SIZE, rsh}, pot);
+    if (IS_POT_AVAILABLE(pot) && rightPots) {
+      sliders[pot] = new (std::nothrow) MainViewVerticalSlider(rightPots, rect_t{0, 0, MainViewSlider::SLIDER_BAR_SIZE, rsh}, pot);
     }
   }
 }
@@ -241,17 +248,18 @@ void ViewMainDecoration::createSliders(Window* ml, Window* mr, Window* bl, Windo
 void ViewMainDecoration::createTrims(Window* ml, Window* mr, Window* bl, Window* br)
 {
   // Trim order TRIM_LH, TRIM_LV, TRIM_RV, TRIM_RH
-  trims[TRIMS_LH] = new MainViewHorizontalTrim(bl, TRIMS_LH);
-  trims[TRIMS_RH] = new MainViewHorizontalTrim(br, TRIMS_RH);
-  trims[TRIMS_LV] = new MainViewVerticalTrim(ml, TRIMS_LV);
-  trims[TRIMS_RV] = new MainViewVerticalTrim(mr, TRIMS_RV);
+  if (bl) trims[TRIMS_LH] = new (std::nothrow) MainViewHorizontalTrim(bl, TRIMS_LH);
+  if (br) trims[TRIMS_RH] = new (std::nothrow) MainViewHorizontalTrim(br, TRIMS_RH);
+  if (ml) trims[TRIMS_LV] = new (std::nothrow) MainViewVerticalTrim(ml, TRIMS_LV);
+  if (mr) trims[TRIMS_RV] = new (std::nothrow) MainViewVerticalTrim(mr, TRIMS_RV);
 }
 
 void ViewMainDecoration::createFlightMode(Window* bc)
 {
+  if (!bc) return;
   std::function<std::string()> getFM = []() -> std::string {
       return stringFromNtString(g_model.flightModeData[mixerCurrentFlightMode].name);
   };
 
-  flightMode = new DynamicText(bc, rect_t{}, getFM, COLOR_THEME_SECONDARY1_INDEX);
+  flightMode = new (std::nothrow) DynamicText(bc, rect_t{}, getFM, COLOR_THEME_SECONDARY1_INDEX);
 }

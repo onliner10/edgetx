@@ -741,6 +741,7 @@ static void _send_frame(etx_module_state_t* mod_st, uint8_t* buffer, uint32_t le
 {
   auto drv = modulePortGetSerialDrv(mod_st->tx);
   auto ctx = modulePortGetCtx(mod_st->tx);
+  if (!drv) return;
   drv->sendBuffer(ctx, buffer, len);
 }
 

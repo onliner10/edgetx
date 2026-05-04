@@ -25,6 +25,8 @@
 #include "menutoolbar.h"
 #include "edgetx.h"
 
+#include <new>
+
 class SourceChoiceMenuToolbar : public MenuToolbar
 {
  public:
@@ -94,8 +96,9 @@ class SourceChoiceMenuToolbar : public MenuToolbar
       addButton(STR_SELECT_MENU_CLR, 0, 0, nullptr, nullptr, true);
 
     if (choice->canInvert) {
-      invertBtn = new MenuToolbarButton(this, {0, 0, LV_PCT(100), 0},
+      invertBtn = new (std::nothrow) MenuToolbarButton(this, {0, 0, LV_PCT(100), 0},
                                         STR_SELECT_MENU_INV);
+      if (!invertBtn) return;
       invertBtn->check(choice->inverted);
       lv_obj_align(invertBtn->getLvObj(), LV_ALIGN_BOTTOM_MID, 0, 0);
 
@@ -169,20 +172,21 @@ void SourceChoice::openMenu()
   inverted = getIntValue() < 0;
   inMenu = true;
 
-  auto menu = new Menu();
+  auto menu = new (std::nothrow) Menu();
+  if (!menu) return;
   if (menuTitle) menu->setTitle(menuTitle);
 
-  auto tb = new SourceChoiceMenuToolbar(this, menu);
-  menu->setToolbar(tb);
+  auto tb = new (std::nothrow) SourceChoiceMenuToolbar(this, menu);
+  if (tb) menu->setToolbar(tb);
 
   if (canInvert)
-    menu->setLongPressHandler([=]() { tb->invertChoice(); });
+    menu->setLongPressHandler([=]() { if (tb) tb->invertChoice(); });
 
 #if defined(AUTOSOURCE)
   menu->setWaitHandler([=]() {
     int16_t val = getMovedSource(vmin);
     if (val) {
-      tb->resetFilter();
+      if (tb) tb->resetFilter();
       menu->select(getIndexFromValue(val));
     }
 #if defined(AUTOSWITCH)
@@ -191,7 +195,7 @@ void SourceChoice::openMenu()
       if (swtch && !IS_SWITCH_MULTIPOS(swtch)) {
         val = switchToMix(swtch);
         if (val && (val >= vmin) && (val <= vmax)) {
-          tb->resetFilter();
+          if (tb) tb->resetFilter();
           menu->select(getIndexFromValue(val));
         }
       }

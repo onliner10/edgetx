@@ -26,6 +26,8 @@
 #include "static.h"
 #include "quick_menu_def.h"
 
+#include <new>
+
 static void etx_quick_button_constructor(const lv_obj_class_t* class_p,
                                          lv_obj_t* obj)
 {
@@ -64,18 +66,18 @@ class QuickMenuButton : public ButtonBase
       ButtonBase(parent, {}, pressHandler, etx_quick_button_create),
       visibleHandler(std::move(visibleHandler))
   {
-    iconPtr = new StaticIcon(this, (QuickMenuGroup::QM_BUTTON_WIDTH - QuickMenuGroup::QM_ICON_SIZE) / 2, PAD_SMALL, icon, COLOR_THEME_QM_FG_INDEX);
+    iconPtr = new (std::nothrow) StaticIcon(this, (QuickMenuGroup::QM_BUTTON_WIDTH - QuickMenuGroup::QM_ICON_SIZE) / 2, PAD_SMALL, icon, COLOR_THEME_QM_FG_INDEX);
 #if VERSION_MAJOR > 2
-    etx_obj_add_style(iconPtr->getLvObj(), styles->qmdisabled, LV_PART_MAIN | LV_STATE_DISABLED);
+    if (iconPtr) etx_obj_add_style(iconPtr->getLvObj(), styles->qmdisabled, LV_PART_MAIN | LV_STATE_DISABLED);
 #endif
-    etx_img_color(iconPtr->getLvObj(), COLOR_THEME_QM_BG_INDEX, LV_STATE_USER_1);
+    if (iconPtr) etx_img_color(iconPtr->getLvObj(), COLOR_THEME_QM_BG_INDEX, LV_STATE_USER_1);
 
-    textPtr = new StaticText(this, {0, QuickMenuGroup::QM_ICON_SIZE + PAD_TINY * 2, QuickMenuGroup::QM_BUTTON_WIDTH - 1, 0},
+    textPtr = new (std::nothrow) StaticText(this, {0, QuickMenuGroup::QM_ICON_SIZE + PAD_TINY * 2, QuickMenuGroup::QM_BUTTON_WIDTH - 1, 0},
                    title, COLOR_THEME_QM_FG_INDEX, CENTERED | FONT(XS));
 #if VERSION_MAJOR > 2
-    etx_obj_add_style(textPtr->getLvObj(), styles->qmdisabled, LV_PART_MAIN | LV_STATE_DISABLED);
+    if (textPtr) etx_obj_add_style(textPtr->getLvObj(), styles->qmdisabled, LV_PART_MAIN | LV_STATE_DISABLED);
 #endif
-    etx_txt_color(textPtr->getLvObj(), COLOR_THEME_QM_BG_INDEX, LV_STATE_USER_1);
+    if (textPtr) etx_txt_color(textPtr->getLvObj(), COLOR_THEME_QM_BG_INDEX, LV_STATE_USER_1);
 
     lv_obj_add_event_cb(lvobj, QuickMenuButton::focused_cb, LV_EVENT_FOCUSED, nullptr);
     lv_obj_add_event_cb(lvobj, QuickMenuButton::defocused_cb, LV_EVENT_DEFOCUSED, nullptr);
@@ -99,26 +101,26 @@ class QuickMenuButton : public ButtonBase
 
   void setDisabled()
   {
-    iconPtr->enable(false);
-    textPtr->enable(false);
+    if (iconPtr) iconPtr->enable(false);
+    if (textPtr) textPtr->enable(false);
   }
 
   void setEnabled()
   {
-    iconPtr->enable(true);
-    textPtr->enable(true);
+    if (iconPtr) iconPtr->enable(true);
+    if (textPtr) textPtr->enable(true);
   }
 
   void setFocused()
   {
-    lv_obj_add_state(textPtr->getLvObj(), LV_STATE_USER_1);
-    lv_obj_add_state(iconPtr->getLvObj(), LV_STATE_USER_1);
+    if (textPtr) lv_obj_add_state(textPtr->getLvObj(), LV_STATE_USER_1);
+    if (iconPtr) lv_obj_add_state(iconPtr->getLvObj(), LV_STATE_USER_1);
   }
 
   void setDeFocused()
   {
-    lv_obj_clear_state(textPtr->getLvObj(), LV_STATE_USER_1);
-    lv_obj_clear_state(iconPtr->getLvObj(), LV_STATE_USER_1);
+    if (textPtr) lv_obj_clear_state(textPtr->getLvObj(), LV_STATE_USER_1);
+    if (iconPtr) lv_obj_clear_state(iconPtr->getLvObj(), LV_STATE_USER_1);
   }
 
   bool isVisible() {
@@ -150,7 +152,8 @@ ButtonBase* QuickMenuGroup::addButton(EdgeTxIcon icon, const char* title,
                                   std::function<bool(void)> visibleHandler,
                                   std::function<void(bool)> focusHandler)
 {
-  ButtonBase* b = new QuickMenuButton(this, icon, title, [=]() { pressHandler(); return 0; }, visibleHandler);
+  ButtonBase* b = new (std::nothrow) QuickMenuButton(this, icon, title, [=]() { pressHandler(); return 0; }, visibleHandler);
+  if (!b) return nullptr;
   b->setLongPressHandler([=]() { pressHandler(); return 0; });
   btns.push_back(b);
   if (group) lv_group_add_obj(group, b->getLvObj());

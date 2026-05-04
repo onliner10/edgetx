@@ -25,6 +25,8 @@
 #include "getset_helpers.h"
 #include "numberedit.h"
 
+#include <new>
+
 #define SET_DIRTY() storageDirty(EE_MODEL)
 
 inline int16_t ppmFrameLen(int8_t chCount)
@@ -47,22 +49,26 @@ ChannelRange::ChannelRange(Window* parent) : Window(parent, rect_t{})
 
 void ChannelRange::build()
 {
-  chStart = new NumberEdit(this, rect_t{0, 0, EdgeTxStyles::EDIT_FLD_WIDTH_NARROW, 0}, 1, 1,
+  chStart = new (std::nothrow) NumberEdit(this, rect_t{0, 0, EdgeTxStyles::EDIT_FLD_WIDTH_NARROW, 0}, 1, 1,
                            GET_DEFAULT(1 + getChannelsStart()));
-  chStart->setSetValueHandler([=](int newValue) { setStart(newValue); });
-  chStart->setPrefix(STR_CH);
+  if (chStart) {
+    chStart->setSetValueHandler([=](int newValue) { setStart(newValue); });
+    chStart->setPrefix(STR_CH);
+  }
 
   chEnd =
-      new NumberEdit(this, rect_t{0, 0, EdgeTxStyles::EDIT_FLD_WIDTH_NARROW, 0}, 8, 8,
+      new (std::nothrow) NumberEdit(this, rect_t{0, 0, EdgeTxStyles::EDIT_FLD_WIDTH_NARROW, 0}, 8, 8,
                      GET_DEFAULT(getChannelsStart() + 8 + getChannelsCount()));
 
-  chEnd->setPrefix(STR_CH);
-  chEnd->setSetValueHandler([=](int newValue) {
-    setEnd(newValue);
+  if (chEnd) {
+    chEnd->setPrefix(STR_CH);
+    chEnd->setSetValueHandler([=](int newValue) {
+      setEnd(newValue);
 
-    if (ppmFrameLenEditObject)
-      ppmFrameLenEditObject->setValue(ppmFrameLen(getChannelsCount()));
-  });
+      if (ppmFrameLenEditObject)
+        ppmFrameLenEditObject->setValue(ppmFrameLen(getChannelsCount()));
+    });
+  }
 }
 
 void ChannelRange::setStart(uint8_t newValue)
@@ -81,6 +87,7 @@ void ChannelRange::setEnd(uint8_t newValue)
 
 void ChannelRange::updateEnd()
 {
+  if (!chEnd) return;
   auto min_ch = getChannelsStart() + getChannelsMin();
   chEnd->setMin(min_ch);
 
@@ -95,6 +102,7 @@ void ChannelRange::updateEnd()
 
 void ChannelRange::updateStart()
 {
+  if (!chStart) return;
   chStart->setMax(MAX_OUTPUT_CHANNELS - getChannelsUsed() + 1);
 }
 
@@ -123,12 +131,13 @@ void ModuleChannelRange::update()
 #if defined(DSMP)
   if (isModuleDSMP(moduleIdx)) {
     // Disable Ch start, module asume starting in Ch1
-    chStart->enable(false);
+    if (chStart) chStart->enable(false);
   } 
 #endif   
 
   auto min_mod_ch = minModuleChannels(moduleIdx);
   auto max_mod_ch = maxModuleChannels(moduleIdx);
+  if (!chEnd) return;
   chEnd->enable(min_mod_ch < max_mod_ch);
 
   if (chEnd->getValue() > chEnd->getMax()) chEnd->setValue(chEnd->getMax());

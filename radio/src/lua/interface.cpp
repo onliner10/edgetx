@@ -1277,6 +1277,7 @@ bool luaTask(bool allowLcdUsage)
     case INTERPRETER_RELOAD_PERMANENT_SCRIPTS:
       init = true;
       luaState = INTERPRETER_LOADING;
+      [[fallthrough]];
    
     case INTERPRETER_LOADING:
       PROTECT_LUA() {
@@ -1289,6 +1290,7 @@ bool luaTask(bool allowLcdUsage)
     case INTERPRETER_START_RUNNING:
       init = true;
       luaState = INTERPRETER_RUNNING;
+      [[fallthrough]];
       
     case INTERPRETER_RUNNING:
       PROTECT_LUA() {

@@ -86,3 +86,10 @@ add_compile_definitions(LUA_COMPAT_5_2)
 foreach(FILE ${LUA_SRC})
   set(SRC ${SRC} ${LUA_DIR}/${FILE})
 endforeach()
+
+if(EDGE16_SAFETY_CHECKS)
+  foreach(FILE ${LUA_SRC})
+    set_source_files_properties(${LUA_DIR}/${FILE}
+      PROPERTIES COMPILE_OPTIONS "-Wno-implicit-fallthrough;-Wno-cast-align")
+  endforeach()
+endif()

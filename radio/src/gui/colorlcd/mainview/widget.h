@@ -22,6 +22,7 @@
 #pragma once
 
 #include <string.h>
+#include <new>
 #if !defined(BACKUP)
 #include <vector>
 #endif
@@ -200,7 +201,7 @@ class BaseWidgetFactory : public WidgetFactory
   Widget* createNew(Window* parent, const rect_t& rect,
                  int screenNum, int zoneNum) const override
   {
-    return new T(this, parent, rect, screenNum, zoneNum);
+    return new (std::nothrow) T(this, parent, rect, screenNum, zoneNum);
   }
 };
 

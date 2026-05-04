@@ -31,6 +31,8 @@
 #include "theme_manager.h"
 #include "widget.h"
 
+#include <new>
+
 //-----------------------------------------------------------------------------
 
 void TopBarPersistentData::clearZone(int idx)
@@ -88,7 +90,7 @@ SetupTopBarWidgetsPage::SetupTopBarWidgetsPage() :
   auto topbar = viewMain->getTopbar();
   for (unsigned i = 0; i < topbar->getZonesCount(); i++) {
     auto rect = topbar->getZone(i);
-    new SetupWidgetsPageSlot(this, rect, topbar, i);
+    new (std::nothrow) SetupWidgetsPageSlot(this, rect, topbar, i);
   }
 
 #if defined(HARDWARE_TOUCH)
@@ -124,7 +126,7 @@ TopBar::TopBar(Window * parent) :
   setWindowFlag(NO_FOCUS);
   etx_solid_bg(lvobj, COLOR_THEME_SECONDARY1_INDEX);
 
-  headerIcon = new HeaderIcon(parent, ICON_EDGETX, [=]() { QuickMenu::openQuickMenu(); });
+  headerIcon = new (std::nothrow) HeaderIcon(parent, ICON_EDGETX, [=]() { QuickMenu::openQuickMenu(); });
 }
 
 unsigned int TopBar::getZonesCount() const
@@ -169,7 +171,7 @@ void TopBar::setEdgeTxButtonVisible(float visible) // 0.0 -> 1.0
   } else if (visible > 0.0 && visible < 1.0){
     y = -(float)EdgeTxStyles::MENU_HEADER_HEIGHT * (1.0 - visible);
   }
-  if (y != headerIcon->top()) headerIcon->setTop(y);
+  if (headerIcon && y != headerIcon->top()) headerIcon->setTop(y);
 }
 
 coord_t TopBar::getVisibleHeight(float visible) const // 0.0 -> 1.0
@@ -213,6 +215,7 @@ void TopBar::removeWidget(unsigned int index)
 void TopBar::load()
 {
   unsigned int count = getZonesCount();
+  if (!widgets) return;
   for (unsigned int i = 0; i < count; i++) {
     // remove old widget
     if (widgets[i]) {
@@ -232,7 +235,7 @@ void TopBar::load()
 Widget* TopBar::createWidget(unsigned int index,
                       const WidgetFactory* factory)
 {
-  if (index >= zoneCount) return nullptr;
+  if (!widgets || index >= zoneCount) return nullptr;
 
   // remove old one if existing
   removeWidget(index);

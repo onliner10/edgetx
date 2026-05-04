@@ -218,6 +218,14 @@ const HitecSensor * getHitecSensor(uint16_t id)
   return nullptr;
 }
 
+static void setHitecSensorValue(uint16_t id, int32_t value)
+{
+  const HitecSensor *sensor = getHitecSensor(id);
+  if (!sensor) return;
+  setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, id, 0, 0, value, sensor->unit,
+                    sensor->precision);
+}
+
 void processHitecPacket(const uint8_t * packet)
 {
   static uint16_t rssi = 0, lqi = 0;
@@ -230,7 +238,6 @@ void processHitecPacket(const uint8_t * packet)
   lqi = ((packet[1] * 10) + (lqi * 90)) / 100; // quick filtering
   setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_TX_LQI, 0, 0, lqi, UNIT_RAW, 0);
 
-  const HitecSensor * sensor;
   int32_t value, deg, min, sec, alt, amp;
   static uint8_t second = 0;
   static int32_t last_alt = 0;
@@ -240,13 +247,11 @@ void processHitecPacket(const uint8_t * packet)
   switch (packet[2]) {
     case HITEC_FRAME_00:
       value = (((packet[6] << 8) | packet[7]) * 100) / 28;
-      sensor = getHitecSensor(HITEC_ID_RX_VOLTAGE);
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_RX_VOLTAGE, 0, 0, value, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_RX_VOLTAGE, value);
       return;
     case HITEC_FRAME_11:
       value = (((packet[6] << 8) | packet[7]) * 100) / 28;
-      sensor = getHitecSensor(HITEC_ID_RX_VOLTAGE);
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_RX_VOLTAGE, 0, 0, value, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_RX_VOLTAGE, value);
       return;
     case HITEC_FRAME_12:
       //value=(packet[5]<<24)|(packet[6]<<16)|(packet[3]<<8)|packet[4];
@@ -267,102 +272,79 @@ void processHitecPacket(const uint8_t * packet)
       value = deg * 1000000 + (min * 150000 + sec * 25) / 9;
       setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_GPS_LAT_LONG, 0, 0, value, UNIT_GPS_LONGITUDE, 0);
       value = packet[7] - 40;
-      sensor = getHitecSensor(HITEC_ID_TEMP2);
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_TEMP2, 0, 0, value, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_TEMP2, value);
       return;
     case HITEC_FRAME_14:
       value = (packet[3] << 8) | packet[4];
-      sensor = getHitecSensor(HITEC_ID_GPS_SPEED);
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_GPS_SPEED, 0, 0, value, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_GPS_SPEED, value);
       value = (packet[5] << 8) | packet[6];
-      sensor = getHitecSensor(HITEC_ID_GPS_ALTITUDE);
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_GPS_ALTITUDE, 0, 0, value, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_GPS_ALTITUDE, value);
       value = packet[7] - 40;
-      sensor = getHitecSensor(HITEC_ID_TEMP1);
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_TEMP1, 0, 0, value, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_TEMP1, value);
       return;
     case HITEC_FRAME_15:
       value = packet[3] * 25;
       if (value > 100) value = 100;
-      sensor = getHitecSensor(HITEC_ID_FUEL);
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_FUEL, 0, 0, value, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_FUEL, value);
       value = (packet[5] << 8) | packet[4];
-      sensor = getHitecSensor(HITEC_ID_RPM1);
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_RPM1, 0, 0, value, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_RPM1, value);
       value = (packet[7] << 8) | packet[6];
-      sensor = getHitecSensor(HITEC_ID_RPM2);
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_RPM2, 0, 0, value, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_RPM2, value);
       return;
     case HITEC_FRAME_16:
-      sensor = getHitecSensor(HITEC_ID_GPS_DATETIME);
       value = (packet[3] << 24) | (packet[4] << 16) | (packet[5] << 8) | 0x01;
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_GPS_DATETIME, 0, 0, value, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_GPS_DATETIME, value);
       value = (packet[6] << 24) | (packet[7] << 16) | (second << 8);
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_GPS_DATETIME, 0, 0, value, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_GPS_DATETIME, value);
       return;
     case HITEC_FRAME_17:
       value = (packet[3] << 8) | packet[4];
       if (value <= 359) { // Filter strange values received time to time
-        sensor = getHitecSensor(HITEC_ID_GPS_HEADING);
-        setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_GPS_HEADING, 0, 0, value, sensor->unit, sensor->precision);
+        setHitecSensorValue(HITEC_ID_GPS_HEADING, value);
       }
       value = packet[5];
-      sensor = getHitecSensor(HITEC_ID_GPS_COUNT);
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_GPS_COUNT, 0, 0, value, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_GPS_COUNT, value);
       value = packet[6] - 40;
-      sensor = getHitecSensor(HITEC_ID_TEMP3);
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_TEMP3, 0, 0, value, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_TEMP3, value);
       value = packet[7] - 40;
-      sensor = getHitecSensor(HITEC_ID_TEMP4);
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_TEMP4, 0, 0, value, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_TEMP4, value);
       return;
     case HITEC_FRAME_18:
       value = (packet[4] << 8) | packet[3];
       if (value) value += 2; // Measured voltage seems to be 0.2V lower than real
-      sensor = getHitecSensor(HITEC_ID_VOLTAGE);
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_VOLTAGE, 0, 0, value, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_VOLTAGE, value);
       //I'm adding below 3 amp sensors but there is only one really since I don't know how to really calculate them
       value = (int16_t) ((packet[6] << 8) | packet[5]);
-      sensor = getHitecSensor(HITEC_ID_AMP);
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_AMP, 0, 0, value, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_AMP, value);
       amp = ((value + 114.875) * 1.441) + 0.5;
-      sensor = getHitecSensor(HITEC_ID_C50);
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_C50, 0, 0, amp, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_C50, amp);
       amp = value * 3 + 165;
-      sensor = getHitecSensor(HITEC_ID_C200);
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_C200, 0, 0, amp, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_C200, amp);
       return;
     case HITEC_FRAME_19:
       value = packet[3];
-      sensor = getHitecSensor(HITEC_ID_AMP_S1);
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_AMP_S1, 0, 0, value, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_AMP_S1, value);
       value = packet[4];
-      sensor = getHitecSensor(HITEC_ID_AMP_S2);
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_AMP_S2, 0, 0, value, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_AMP_S2, value);
       value = packet[5];
-      sensor = getHitecSensor(HITEC_ID_AMP_S3);
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_AMP_S3, 0, 0, value, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_AMP_S3, value);
       value = packet[6];
-      sensor = getHitecSensor(HITEC_ID_AMP_S4);
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_AMP_S4, 0, 0, value, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_AMP_S4, value);
       return;
     case HITEC_FRAME_1A:
       value = (packet[5] << 8) | packet[6];
-      sensor = getHitecSensor(HITEC_ID_AIR_SPEED);
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_AIR_SPEED, 0, 0, value, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_AIR_SPEED, value);
       return;
     case HITEC_FRAME_1B:
       alt = (int16_t) ((packet[3] << 8) | packet[4]);
-      sensor = getHitecSensor(HITEC_ID_ALT);
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_ALT, 0, 0, alt, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_ALT, alt);
       current_ms = time_get_ms();
-      sensor = getHitecSensor(HITEC_ID_VARIO);
       value = (alt - last_alt) * 100;
-      if ((current_ms - last_ms) < 1000)
+      if ((current_ms - last_ms) > 0 && (current_ms - last_ms) < 1000)
         value /= (int32_t) (current_ms - last_ms);
       else
         value = 0;
-      setTelemetryValue(PROTOCOL_TELEMETRY_HITEC, HITEC_ID_VARIO, 0, 0, value, sensor->unit, sensor->precision);
+      setHitecSensorValue(HITEC_ID_VARIO, value);
       last_alt = alt;
       last_ms = current_ms;
       return;

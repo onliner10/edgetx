@@ -26,6 +26,8 @@
 #include "lua/lua_event.h"
 #include "view_main.h"
 
+#include <new>
+
 #if defined(_WIN32) || defined(_WIN64)
 #define strcasecmp _stricmp
 #define strncasecmp _strnicmp
@@ -151,20 +153,29 @@ StandaloneLuaWindow::StandaloneLuaWindow(bool useLvgl, int initFn, int runFn) :
     lv_obj_set_style_pad_top(lbl, (LCD_H - EdgeTxStyles::STD_FONT_HEIGHT) / 2, LV_PART_MAIN);
     lv_label_set_text(lbl, STR_LOADING);
   } else {
-    lcdBuffer = new BitmapBuffer(BMP_RGB565, LCD_W, LCD_H);
+    lcdBuffer = new (std::nothrow) BitmapBuffer(BMP_RGB565, LCD_W, LCD_H);
+    if (!lcdBuffer) {
+      if (lsStandalone) {
+        luaL_unref(lsStandalone, LUA_REGISTRYINDEX, initFunction);
+        luaL_unref(lsStandalone, LUA_REGISTRYINDEX, runFunction);
+      }
+      initFunction = LUA_REFNIL;
+      runFunction = LUA_REFNIL;
+      hasError = true;
+    } else {
+      lcdBuffer->clear();
+      lcdBuffer->drawText(LCD_W / 2, LCD_H / 2 - EdgeTxStyles::STD_FONT_HEIGHT, STR_LOADING,
+                        FONT(L) | COLOR_THEME_PRIMARY2 | CENTERED);
+      setWindowFlag(NO_FOCUS | NO_SCROLL);
 
-    lcdBuffer->clear();
-    lcdBuffer->drawText(LCD_W / 2, LCD_H / 2 - EdgeTxStyles::STD_FONT_HEIGHT, STR_LOADING,
-                      FONT(L) | COLOR_THEME_PRIMARY2 | CENTERED);
-    setWindowFlag(NO_FOCUS | NO_SCROLL);
+      auto canvas = lv_canvas_create(lvobj);
+      lv_obj_center(canvas);
+      lv_canvas_set_buffer(canvas, lcdBuffer->getData(),
+                           lcdBuffer->width(), lcdBuffer->height(), LV_IMG_CF_TRUE_COLOR);
 
-    auto canvas = lv_canvas_create(lvobj);
-    lv_obj_center(canvas);
-    lv_canvas_set_buffer(canvas, lcdBuffer->getData(),
-                         lcdBuffer->width(), lcdBuffer->height(), LV_IMG_CF_TRUE_COLOR);
-
-    lv_group_add_obj(lv_group_get_default(), lvobj);
-    lv_group_set_editing(lv_group_get_default(), true);
+      lv_group_add_obj(lv_group_get_default(), lvobj);
+      lv_group_set_editing(lv_group_get_default(), true);
+    }
   }
 
   // setup LUA event handler
@@ -183,8 +194,14 @@ StandaloneLuaWindow::StandaloneLuaWindow(bool useLvgl, int initFn, int runFn) :
 
 void StandaloneLuaWindow::setup(bool useLvgl, int initFn, int runFn)
 {
-  if (_instance == nullptr)
-    _instance = new StandaloneLuaWindow(useLvgl, initFn, runFn);
+  if (_instance == nullptr) {
+    _instance = new (std::nothrow) StandaloneLuaWindow(useLvgl, initFn, runFn);
+    if (!_instance && lsStandalone) {
+      luaL_unref(lsStandalone, LUA_REGISTRYINDEX, initFn);
+      luaL_unref(lsStandalone, LUA_REGISTRYINDEX, runFn);
+      luaClose(&lsStandalone);
+    }
+  }
 }
 
 StandaloneLuaWindow* StandaloneLuaWindow::instance()
@@ -331,7 +348,7 @@ bool StandaloneLuaWindow::displayPopup(event_t event, uint8_t type,
                                        const char* text, const char* info,
                                        bool& result)
 {
-  if (useLvgl) return true;
+  if (useLvgl || !lcdBuffer) return true;
 
   // transparent background
   lcdBuffer->drawFilledRect(0, 0, LCD_W, LCD_H, SOLID, COLOR_THEME_PRIMARY1,

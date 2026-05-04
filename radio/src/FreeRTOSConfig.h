@@ -53,11 +53,15 @@ extern uint32_t SystemCoreClock;
 #if !defined(DEBUG)
   #define configMAX_TASK_NAME_LEN         4
   #define configUSE_TRACE_FACILITY        0
-  #define configCHECK_FOR_STACK_OVERFLOW  0
+  #if defined(EDGE16_SAFETY_CHECKS)
+    #define configCHECK_FOR_STACK_OVERFLOW  2
+  #else
+    #define configCHECK_FOR_STACK_OVERFLOW  0
+  #endif
 #else
   #define configMAX_TASK_NAME_LEN         10
   #define configUSE_TRACE_FACILITY        1
-  #define configCHECK_FOR_STACK_OVERFLOW  0
+  #define configCHECK_FOR_STACK_OVERFLOW  2
 #endif
 
 #define configSUPPORT_DYNAMIC_ALLOCATION 0
@@ -115,9 +119,17 @@ to all Cortex-M ports, and do not rely on any particular library functions. */
 See http://www.FreeRTOS.org/RTOS-Cortex-M3-M4.html. */
 #define configMAX_SYSCALL_INTERRUPT_PRIORITY 	( configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY << (8 - configPRIO_BITS) )
 	
+#ifdef __cplusplus
+extern "C" {
+#endif
+void edge16_freertos_assert_failed(const char *file, int line);
+#ifdef __cplusplus
+}
+#endif
+
 /* Normal assert() semantics without relying on the provision of an assert.h
 header file. */
-#define configASSERT( x ) if( ( x ) == 0 ) { taskDISABLE_INTERRUPTS(); for( ;; ); }	
+#define configASSERT( x ) if( ( x ) == 0 ) { edge16_freertos_assert_failed(__FILE__, __LINE__); }
 	
 /* Definitions that map the FreeRTOS port interrupt handlers to their CMSIS
 standard names. */

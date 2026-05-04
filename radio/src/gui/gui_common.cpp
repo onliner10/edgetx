@@ -32,6 +32,8 @@
 #undef CPN
 #include "MultiSubtypeDefs.h"
 
+#include <new>
+
 uint8_t switchToMix(uint8_t source)
 {
   div_t qr = div(source-1, 3);
@@ -743,7 +745,8 @@ class AntennaSelectionMenu : public Menu
 
 static void runAntennaSelectionMenu()
 {
-  auto menu = new AntennaSelectionMenu();
+  auto menu = new (std::nothrow) AntennaSelectionMenu();
+  if (!menu) return;
 
   MainWindow::instance()->blockUntilClose(true, [=]() {
     return menu->deleted();
@@ -859,12 +862,14 @@ bool isModuleUsingSport(uint8_t moduleBay, uint8_t moduleType)
       if (moduleBay == EXTERNAL_MODULE)
         return false;
 #endif
+      [[fallthrough]];
 
     case MODULE_TYPE_CROSSFIRE:
 #if defined(HARDWARE_INTERNAL_MODULE)
       if (moduleBay == INTERNAL_MODULE)
         return false;
 #endif
+      [[fallthrough]];
 
     default:
       return true;

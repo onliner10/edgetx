@@ -130,10 +130,21 @@ bool checkSportPacket(const uint8_t * packet)
   return crc == 0x00FF;
 }
 
+static uint16_t read_u16_le(const uint8_t* data)
+{
+  return uint16_t(data[0]) | (uint16_t(data[1]) << 8);
+}
+
+static uint32_t read_u32_le(const uint8_t* data)
+{
+  return uint32_t(data[0]) | (uint32_t(data[1]) << 8) |
+         (uint32_t(data[2]) << 16) | (uint32_t(data[3]) << 24);
+}
+
 #define SPORT_DATA_U8(packet)   (packet[4])
-#define SPORT_DATA_S32(packet)  (*((int32_t *)(packet+4)))
-#define SPORT_DATA_U32(packet)  (*((uint32_t *)(packet+4)))
-#define HUB_DATA_U16(packet)    (*((uint16_t *)(packet+4)))
+#define SPORT_DATA_S32(packet)  ((int32_t)read_u32_le((packet) + 4))
+#define SPORT_DATA_U32(packet)  (read_u32_le((packet) + 4))
+#define HUB_DATA_U16(packet)    (read_u16_le((packet) + 4))
 
 uint16_t servosState;
 uint16_t rboxState;
@@ -258,7 +269,7 @@ void sportProcessTelemetryPacketWithoutCrc(uint8_t module, uint8_t origin, const
 {
   uint8_t physicalId = packet[0] & 0x1F;
   uint8_t primId = packet[1];
-  uint16_t dataId = *((uint16_t *)(packet+2));
+  uint16_t dataId = read_u16_le(packet + 2);
   uint32_t data = SPORT_DATA_S32(packet);
 
 #if defined(BLUETOOTH)

@@ -22,6 +22,8 @@
 #include "gvar_numberedit.h"
 #include "edgetx.h"
 
+#include <new>
+
 GVarNumberEdit::GVarNumberEdit(Window* parent, int32_t vmin,
                                int32_t vmax, std::function<int32_t()> getValue,
                                std::function<void(int32_t)> setValue,
@@ -37,7 +39,7 @@ GVarNumberEdit::GVarNumberEdit(Window* parent, int32_t vmin,
   padAll(PAD_TINY);
 
   // GVAR field
-  gvar_field = new Choice(
+  gvar_field = new (std::nothrow) Choice(
       this, {0, 0, EdgeTxStyles::EDIT_FLD_WIDTH_NARROW, 0}, -MAX_GVARS, MAX_GVARS - 1,
       [=]() {
         return GV_INDEX_FROM_VALUE(getValue());
@@ -45,22 +47,23 @@ GVarNumberEdit::GVarNumberEdit(Window* parent, int32_t vmin,
       [=](int idx) {
         setValue(GV_VALUE_FROM_INDEX(idx));
       });
-  gvar_field->setTextHandler(
-      [=](int32_t value) { return getGVarString(value); });
+  if (gvar_field)
+    gvar_field->setTextHandler(
+        [=](int32_t value) { return getGVarString(value); });
 
-  num_field = new NumberEdit(
+  num_field = new (std::nothrow) NumberEdit(
       this, {0, 0, EdgeTxStyles::EDIT_FLD_WIDTH_NARROW, 0}, vmin, vmax, [=]() { return getValue() + voffset; },
       nullptr, textFlags);
-  num_field->setDefault(vdefault);
+  if (num_field) num_field->setDefault(vdefault);
 
 #if defined(GVARS)
   // The GVAR button
   if (modelGVEnabled()) {
-    m_gvBtn = new TextButton(this, {EdgeTxStyles::EDIT_FLD_WIDTH_NARROW + PAD_TINY, 0, GV_BTN_W, 0}, STR_GV, [=]() {
+    m_gvBtn = new (std::nothrow) TextButton(this, {EdgeTxStyles::EDIT_FLD_WIDTH_NARROW + PAD_TINY, 0, GV_BTN_W, 0}, STR_GV, [=]() {
       switchGVarMode();
       return GV_IS_GV_VALUE(getValue());
     });
-    m_gvBtn->check(GV_IS_GV_VALUE(getValue()));
+    if (m_gvBtn) m_gvBtn->check(GV_IS_GV_VALUE(getValue()));
   }
 #endif
 
@@ -80,7 +83,7 @@ void GVarNumberEdit::switchGVarMode()
                    : GET_GVAR(value, vmin, vmax, mixerCurrentFlightMode))
             : GV_VALUE_FROM_INDEX(0));
 
-    m_gvBtn->check(GV_IS_GV_VALUE(value));
+    if (m_gvBtn) m_gvBtn->check(GV_IS_GV_VALUE(value));
 
     // update field type based on value
     update();
@@ -92,18 +95,20 @@ void GVarNumberEdit::update()
 {
   bool has_focus = act_field && act_field->hasFocus();
 
-  gvar_field->hide();
-  num_field->hide();
+  if (gvar_field) gvar_field->hide();
+  if (num_field) num_field->hide();
 
   int32_t value = getValue();
   if (GV_IS_GV_VALUE(value)) {
     // GVAR mode
+    if (!gvar_field || !num_field) return;
     act_field = gvar_field;
     num_field->setSetValueHandler(nullptr);
     gvar_field->update();
     gvar_field->show();
   } else {
     // number edit mode
+    if (!num_field) return;
     act_field = num_field;
     num_field->setSetValueHandler(
         [=](int32_t newValue) { return setValue(newValue - voffset); });
@@ -119,5 +124,5 @@ void GVarNumberEdit::update()
 
 void GVarNumberEdit::setDisplayHandler(std::function<std::string(int value)> function)
 {
-  num_field->setDisplayHandler(function);
+  if (num_field) num_field->setDisplayHandler(function);
 }

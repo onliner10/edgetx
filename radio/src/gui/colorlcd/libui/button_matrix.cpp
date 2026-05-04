@@ -18,6 +18,7 @@
 
 #include "button_matrix.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 #include "etx_lv_theme.h"
@@ -58,6 +59,7 @@ static lv_obj_t* btnmatrix_create(lv_obj_t* parent)
 static const char _filler[] = "0";
 static const char _newline[] = "\n";
 static const char _map_end[] = "";
+static const char* _empty_map[] = {_map_end};
 
 static void btn_matrix_event(lv_event_t* e)
 {
@@ -67,6 +69,7 @@ static void btn_matrix_event(lv_event_t* e)
     lv_obj_t* obj = lv_event_get_target(e);
     auto btn_id = *((uint8_t*)lv_event_get_param(e));
     auto btnm = (ButtonMatrix*)lv_event_get_user_data(e);
+    if (!btnm) return;
 
     bool edited = lv_obj_has_state(obj, LV_STATE_EDITED);
     bool is_pointer =
@@ -107,20 +110,39 @@ void ButtonMatrix::deallocate()
 void ButtonMatrix::initBtnMap(uint8_t cols, uint8_t btns)
 {
   deallocate();
+  if (cols == 0 || btns == 0) {
+    lv_btnmatrix_set_map(lvobj, _empty_map);
+    return;
+  }
 
   uint8_t rows = ((btns - 1) / cols) + 1;
   if (rows == 1) cols = btns;
-  txt_cnt = (cols + 1) * rows;
-  btn_cnt = btns;
+  uint16_t btnCount = uint16_t(cols) * rows;
+  uint16_t txtCount = uint16_t(cols + 1) * rows;
+  if (btnCount > UINT8_MAX || txtCount > UINT8_MAX) {
+    lv_btnmatrix_set_map(lvobj, _empty_map);
+    return;
+  }
 
-  lv_btnm_map = (char**)malloc(sizeof(char*) * txt_cnt);
+  lv_btnm_map = (char**)malloc(sizeof(char*) * txtCount);
   txt_index = (uint8_t*)malloc(sizeof(uint8_t) * cols * rows);
+  if (!lv_btnm_map || !txt_index) {
+    free(lv_btnm_map);
+    free(txt_index);
+    lv_btnm_map = nullptr;
+    txt_index = nullptr;
+    lv_btnmatrix_set_map(lvobj, _empty_map);
+    return;
+  }
+
+  txt_cnt = uint8_t(txtCount);
+  btn_cnt = btns;
 
   uint8_t col = 0;
   uint8_t btn = 0;
   uint8_t txt_i = 0;
 
-  while (btn < cols * rows) {
+  while (btn < btnCount) {
     if (col == cols) {
       lv_btnm_map[txt_i++] = (char*)_newline;
       col = 0;
@@ -137,11 +159,18 @@ void ButtonMatrix::initBtnMap(uint8_t cols, uint8_t btns)
 
 void ButtonMatrix::setText(uint8_t btn_id, const char* txt)
 {
-  if (btn_id < btn_cnt) lv_btnm_map[txt_index[btn_id]] = strdup(txt);
+  if (btn_id < btn_cnt && lv_btnm_map && txt_index) {
+    char* copy = strdup(txt);
+    if (copy) lv_btnm_map[txt_index[btn_id]] = copy;
+  }
 }
 
 void ButtonMatrix::update()
 {
+  if (!lv_btnm_map) {
+    lv_btnmatrix_set_map(lvobj, _empty_map);
+    return;
+  }
   lv_btnmatrix_set_map(lvobj, (const char**)lv_btnm_map);
   lv_btnmatrix_set_btn_ctrl_all(
       lvobj, LV_BTNMATRIX_CTRL_CLICK_TRIG | LV_BTNMATRIX_CTRL_NO_REPEAT);

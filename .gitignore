@@ -6,6 +6,11 @@
 /doc/
 /build*/
 /cmake-build-*/
+/*.bin
+/*.uf2
+/*.elf
+/*.hex
+/*.map
 /debian/
 /*.vscode
 radio/src/tests/googletest*

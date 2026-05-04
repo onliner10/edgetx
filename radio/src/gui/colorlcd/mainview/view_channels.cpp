@@ -28,6 +28,8 @@
 #include "view_logical_switches.h"
 #endif
 
+#include <new>
+
 // TODO: find better way to detect only used channels!
 #define ALL_CHANNELS true
 
@@ -98,8 +100,8 @@ class ChannelsViewPage : public PageGroupItem
 #endif
 
     // Channels bars
-    for (uint8_t i = 0, j = 0; j < rows * cols; i += 1) {
-      uint8_t chan = startChan + i;
+    for (int i = 0, j = 0; j < rows * cols; i += 1) {
+      int chan = startChan + i;
       if (chan >= MAX_OUTPUT_CHANNELS) break;
       if (ALL_CHANNELS || isChannelUsed(chan)) {
 #if PORTRAIT
@@ -109,7 +111,7 @@ class ChannelsViewPage : public PageGroupItem
         coord_t xPos = (j & 1) ? w + (PAD_SMALL * 2) : PAD_SMALL;
         coord_t yPos = (j / cols) * ((window->height() - ChannelsViewFooter::FOOTER_H) / rows);
 #endif
-        new ComboChannelBar(window, {xPos, yPos, w, CHANS_H}, chan);
+        new ComboChannelBar(window, {xPos, yPos, w, CHANS_H}, uint8_t(chan));
 
         j += 1;
       }
@@ -156,7 +158,8 @@ ChannelsViewMenu::ChannelsViewMenu() :
       end += 1;
     }
     sprintf(s, STR_MONITOR_CHANNELS, start + 1, last + 1);
-    addTab(new ChannelsViewPage(start, rows, cols, s));
+    auto page = new (std::nothrow) ChannelsViewPage(start, rows, cols, s);
+    if (page) addTab(page);
     pages += 1;
     i = end;
   }

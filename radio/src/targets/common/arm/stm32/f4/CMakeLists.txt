@@ -56,6 +56,9 @@ if(NOT NATIVE_BUILD)
     )
 
   target_compile_options(stm32cube_ll PRIVATE -DUSE_FULL_LL_DRIVER)
+  if(EDGE16_SAFETY_CHECKS)
+    target_compile_options(stm32cube_ll PRIVATE -Wno-cast-align)
+  endif()
   target_include_directories(stm32cube_ll PRIVATE
     ${THIRDPARTY_DIR}/CMSIS/Device/ST/STM32F4xx/Include
     ${THIRDPARTY_DIR}/CMSIS/Include)

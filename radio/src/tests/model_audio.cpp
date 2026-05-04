@@ -95,8 +95,12 @@ TEST(ModelAudio, logicalSwitches)
   EXPECT_EQ(0, event);
 
   EXPECT_FALSE(matchLogicalSwitchAudioFile("", idx, event));
+  EXPECT_FALSE(matchLogicalSwitchAudioFile("L", idx, event));
   EXPECT_FALSE(matchLogicalSwitchAudioFile("5", idx, event));
   EXPECT_FALSE(matchLogicalSwitchAudioFile("1L20", idx, event));
+  EXPECT_FALSE(matchLogicalSwitchAudioFile("L0-on.wav", idx, event));
+  EXPECT_FALSE(matchLogicalSwitchAudioFile("La-on.wav", idx, event));
+  EXPECT_FALSE(matchLogicalSwitchAudioFile("L65-on.wav", idx, event));
   EXPECT_FALSE(matchLogicalSwitchAudioFile("l24", idx, event));
   EXPECT_FALSE(matchLogicalSwitchAudioFile("l24-o.wav", idx, event));
 }

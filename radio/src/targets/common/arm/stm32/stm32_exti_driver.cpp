@@ -32,7 +32,7 @@
 
 #define _EXTI_HANDLERS(irq_name) _handlers_ ## irq_name
 
-#define _PR_MASK(first, last) (((1 << (last - first + 1))-1))
+#define _PR_MASK(first, last) (((1U << (last - first + 1))-1))
 
 #define _DEFINE_EXTI_IRQ_HANDLER(irq_name, first, last)    \
   static stm32_exti_handler_t _EXTI_HANDLERS(irq_name) [last - first + 1] = { nullptr }; \
@@ -239,9 +239,23 @@ void stm32_exti_trigger_swi(uint32_t line)
 
 #if defined(EXTI_PR1_PR) || defined(EXTI_PR1_PR0)
 
-#pragma GCC diagnostic push // disable warning created by codepaths never run when those warning would be correct
-#pragma GCC diagnostic ignored "-Wshift-count-overflow"
-#pragma GCC diagnostic ignored "-Wshift-count-negative"
+#define _CUSTOM_EXTI_MAX_LINE 95U
+
+#if CUSTOM_EXTI_IRQ_LINE < 32
+#define _CUSTOM_EXTI_PR_Reg PR1
+#define _CUSTOM_EXTI_LINE_POS(line) (line)
+#define _CUSTOM_EXTI_CLEAR_FLAG(mask) LL_EXTI_ClearFlag_0_31(mask)
+#elif CUSTOM_EXTI_IRQ_LINE < 64
+#define _CUSTOM_EXTI_PR_Reg PR2
+#define _CUSTOM_EXTI_LINE_POS(line) ((line) - 32U)
+#define _CUSTOM_EXTI_CLEAR_FLAG(mask) LL_EXTI_ClearFlag_32_63(mask)
+#elif CUSTOM_EXTI_IRQ_LINE < 96
+#define _CUSTOM_EXTI_PR_Reg PR3
+#define _CUSTOM_EXTI_LINE_POS(line) ((line) - 64U)
+#define _CUSTOM_EXTI_CLEAR_FLAG(mask) LL_EXTI_ClearFlag_64_95(mask)
+#else
+#error "CUSTOM_EXTI_IRQ_LINE must be between 0 and 95"
+#endif
 
 #define _DEFINE_CUSTOM_EXTI_IRQ_HANDLER(irq_name, first, last)    \
   __DEFINE_CUSTOM_EXTI_IRQ_HANDLER(irq_name, first, last)
@@ -251,34 +265,15 @@ void stm32_exti_trigger_swi(uint32_t line)
   {                                                                     \
     /* Read Pending register */                                         \
     /* (shifted by start line) */                                       \
-    /* since first and last are macro parameters */                     \
-    /* the strange looking code should be optimized away */             \
-    uint32_t pr = 0;                                                    \
-    int region = 0;                                                     \
-                                                                        \
-    if (first < 32) {                                                   \
-      region = 0;                                                       \
-      pr = LL_EXTI_ReadReg(PR1) >> first;                               \
-      pr &=  _PR_MASK(first, last);                                     \
-    } else if (first < 64) {                                            \
-      region = 1;                                                       \
-      pr = LL_EXTI_ReadReg(PR2) >> (first - 32);                        \
-      pr &=  _PR_MASK(first - 32, last - 32);                           \
-    } else {                                                            \
-      region = 2;                                                       \
-      pr = LL_EXTI_ReadReg(PR3) >> (first - 64);                        \
-      pr &=  _PR_MASK(first - 64, last - 64);                           \
-    }                                                                   \
+    uint32_t pr = LL_EXTI_ReadReg(_CUSTOM_EXTI_PR_Reg) >>               \
+                  _CUSTOM_EXTI_LINE_POS(first);                         \
+    pr &=  _PR_MASK(_CUSTOM_EXTI_LINE_POS(first),                       \
+                    _CUSTOM_EXTI_LINE_POS(last));                       \
     while (pr) {                                                        \
       uint32_t i = POSITION_VAL(pr);                                    \
       /* Clear Pending Flag */                                          \
-      if(region == 0)                                                   \
-        LL_EXTI_ClearFlag_0_31(1 << (first + i));                       \
-      else if (region == 1)                                             \
-        LL_EXTI_ClearFlag_32_63(1 << (first - 32 + i));                 \
-      else                                                              \
-        LL_EXTI_ClearFlag_64_95(1 << (first - 64 + i));                 \
-      pr &= ~(1 << i);                                                  \
+      _CUSTOM_EXTI_CLEAR_FLAG(1U << (_CUSTOM_EXTI_LINE_POS(first) + i)); \
+      pr &= ~(1U << i);                                                 \
       /* ... and trigger handler */                                     \
       stm32_exti_handler_t h_fct = _EXTI_HANDLERS(irq_name) [i];        \
       if (h_fct) h_fct();                                               \
@@ -288,6 +283,7 @@ void stm32_exti_trigger_swi(uint32_t line)
 
 #else
 # define _PR_Reg PR
+# define _CUSTOM_EXTI_MAX_LINE 31U
 
 
 #define _DEFINE_CUSTOM_EXTI_IRQ_HANDLER(irq_name, first, last)    \
@@ -301,8 +297,8 @@ void stm32_exti_trigger_swi(uint32_t line)
     while (pr) {                                                        \
       uint32_t i = POSITION_VAL(pr);                                    \
       /* Clear Pending Flag */                                          \
-      LL_EXTI_ClearFlag_0_31(1 << (first + i));                         \
-      pr &= ~(1 << i);                                                  \
+      LL_EXTI_ClearFlag_0_31(1U << (first + i));                        \
+      pr &= ~(1U << i);                                                 \
       /* ... and trigger handler */                                     \
       stm32_exti_handler_t h_fct = _EXTI_HANDLERS(irq_name) [i];        \
       if (h_fct) h_fct();                                               \
@@ -325,8 +321,8 @@ void stm32_exti_trigger_swi(uint32_t line)
 #define _CLEAR_CUSTOM_EXTI_IRQ_HANDLER(irq_name, first, last, line_pos)        \
     __CLEAR_CUSTOM_EXTI_IRQ_HANDLER(irq_name, first, last, line_pos)
 #define __CLEAR_CUSTOM_EXTI_IRQ_HANDLER(irq_name, first, last, line_pos)       \
-  if (line >= first && line <= last) {                          \
-    _EXTI_HANDLERS(irq_name)[line - first] = nullptr;               \
+  if (line_pos >= first && line_pos <= last) {                          \
+    _EXTI_HANDLERS(irq_name)[line_pos - first] = nullptr;               \
     if (!_has_handler(_EXTI_HANDLERS(irq_name), last - first + 1)) {    \
       NVIC_DisableIRQ(irq_name ## n);                                   \
     }                                                                   \
@@ -334,11 +330,15 @@ void stm32_exti_trigger_swi(uint32_t line)
 
 _DEFINE_CUSTOM_EXTI_IRQ_HANDLER(CUSTOM_EXTI_IRQ_NAME, CUSTOM_EXTI_IRQ_LINE, CUSTOM_EXTI_IRQ_LINE);
 
-
-#pragma GCC diagnostic pop // re-enable all warnings
+static inline bool _is_valid_custom_exti_line(uint32_t line)
+{
+  return line == CUSTOM_EXTI_IRQ_LINE && line <= _CUSTOM_EXTI_MAX_LINE;
+}
 
 void stm32_exti_custom_enable(uint32_t line, uint8_t trigger, stm32_exti_handler_t cb)
 {
+  if (!_is_valid_custom_exti_line(line)) return;
+
 #if defined(LL_APB2_GRP1_PERIPH_EXTI)
   LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_EXTI);
 #elif defined(LL_CKGA_PERIPH_EXTI)
@@ -349,12 +349,12 @@ void stm32_exti_custom_enable(uint32_t line, uint8_t trigger, stm32_exti_handler
   LL_EXTI_InitTypeDef EXTI_init;
   LL_EXTI_StructInit(&EXTI_init);
 
-  if(line < 32) {
-    EXTI_init.Line_0_31 = 1 << line;
+  if (line < 32) {
+    EXTI_init.Line_0_31 = 1U << line;
   } else if (line < 64) {
-    EXTI_init.Line_32_63 = 1 << (line - 32);
+    EXTI_init.Line_32_63 = 1U << (line - 32);
   } else {
-    EXTI_init.Line_64_95 = 1 << (line - 64);
+    EXTI_init.Line_64_95 = 1U << (line - 64);
   }
   EXTI_init.Mode = LL_EXTI_MODE_IT;
   EXTI_init.Trigger = trigger;
@@ -367,24 +367,28 @@ void stm32_exti_custom_enable(uint32_t line, uint8_t trigger, stm32_exti_handler
 
 void stm32_exti_custom_disable(uint32_t line)
 {
+  if (!_is_valid_custom_exti_line(line)) return;
+
   _CLEAR_CUSTOM_EXTI_IRQ_HANDLER(CUSTOM_EXTI_IRQ_NAME, CUSTOM_EXTI_IRQ_LINE, CUSTOM_EXTI_IRQ_LINE, line);
 
-  if(line < 32)
-    LL_EXTI_DisableIT_0_31(1 << line);
+  if (line < 32)
+    LL_EXTI_DisableIT_0_31(1U << line);
   else if (line < 64)
-    LL_EXTI_DisableIT_32_63(1 << (line - 32));
+    LL_EXTI_DisableIT_32_63(1U << (line - 32));
   else
-    LL_EXTI_DisableIT_64_95(1 << (line - 64));
+    LL_EXTI_DisableIT_64_95(1U << (line - 64));
 }
 
 void stm32_exti_custom_trigger_swi(uint32_t line)
 {
-  if(line < 32)
-    LL_EXTI_GenerateSWI_0_31(1<<line);
+  if (!_is_valid_custom_exti_line(line)) return;
+
+  if (line < 32)
+    LL_EXTI_GenerateSWI_0_31(1U << line);
   else if (line < 64)
-    LL_EXTI_GenerateSWI_32_63(1<<(line-32));
+    LL_EXTI_GenerateSWI_32_63(1U << (line - 32));
   else
-    LL_EXTI_GenerateSWI_64_95(1<<(line-64));
+    LL_EXTI_GenerateSWI_64_95(1U << (line - 64));
 }
 
 #endif

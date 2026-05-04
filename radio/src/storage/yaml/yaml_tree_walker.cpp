@@ -59,6 +59,8 @@ static void yaml_set_attr(void* user, uint8_t* ptr, uint32_t bit_ofs,
                           const YamlNode* node, const char* val,
                           uint16_t val_len)
 {
+  if (!node) return;
+
   uint32_t i = 0;
 
   // TRACE("set(%s, %.*s, bit-ofs=%u, bits=%u)\n",
@@ -410,10 +412,15 @@ void YamlTreeWalker::toNextAttr()
 {
     const struct YamlNode* node = getNode();
     const struct YamlNode* attr = NULL;
+    if (!node)
+        return;
 
     if (node->type != YDT_UNION) {
     
         attr = getAttr();
+        if (!attr)
+            return;
+
         uint32_t attr_bit_ofs = getAttrOfs();
 
         if (attr->type == YDT_ARRAY)
@@ -428,6 +435,9 @@ void YamlTreeWalker::toNextAttr()
 
     // anonymous union handling
     attr = getAttr();
+    if (!attr)
+        return;
+
     if ((attr->type == YDT_UNION) && (strlen(attr->tag) == 0)) {
         toChild();
         anon_union++;
@@ -448,6 +458,9 @@ void YamlTreeWalker::setAttrValue(const char* buf, uint16_t len)
         return;
 
     const YamlNode* attr = getAttr();
+    if (!attr)
+        return;
+
     if (attr->type == YDT_IDX) {
 
         uint32_t i = 0;
@@ -475,6 +488,8 @@ bool YamlTreeWalker::generate(yaml_writer_func wf, void* opaque)
     
     while (true) {
         const struct YamlNode* attr = getAttr();
+        if (!attr)
+            return false;
 
         if (attr->type == YDT_PADDING) {
             toNextAttr();
@@ -548,6 +563,8 @@ bool YamlTreeWalker::generate(yaml_writer_func wf, void* opaque)
                 setAttrIdx(idx);
 
                 attr = getAttr();
+                if (!attr)
+                    return false;
                 for(int i=1; i < getLevel(); i++)
                     if (!wf(opaque, "   ", 3))
                         return false;
@@ -708,4 +725,3 @@ const YamlParserCalls* YamlTreeWalker::get_parser_calls()
 {
     return &YamlTreeWalkerCalls;
 }
-

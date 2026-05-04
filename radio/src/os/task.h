@@ -22,6 +22,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include "thread_annotations.h"
 
 // OS specific implementation
 #if defined(NATIVE_THREADS)
@@ -41,9 +42,9 @@ unsigned task_get_stack_size(task_handle_t* h);
 bool scheduler_is_running();
 
 void mutex_create(mutex_handle_t* h);
-bool mutex_lock(mutex_handle_t* h);
-void mutex_unlock(mutex_handle_t* h);
-bool mutex_trylock(mutex_handle_t* h);
+bool mutex_lock(mutex_handle_t* h) ETX_TRY_ACQUIRE(true, h);
+void mutex_unlock(mutex_handle_t* h) ETX_RELEASE(h);
+bool mutex_trylock(mutex_handle_t* h) ETX_TRY_ACQUIRE(true, h);
 
 
 // this helper class is only to be used on the stack and never to be shared outside the scope where it was created
@@ -96,13 +97,13 @@ bool mutex_trylock(mutex_handle_t* h);
  * }
  */
 
-class MutexLock
+class ETX_SCOPED_CAPABILITY MutexLock
 {
 public:
-  static MutexLock MakeInstance(mutex_handle_t* mtx) {return MutexLock(mtx);}
-  ~MutexLock() {if(!scheduler_is_running()) return; if(locked) mutex_unlock(mutex);}
-  void lock() {if(!scheduler_is_running()) return; if(!locked) mutex_lock(mutex); locked=true;}
-  void unlock() {if(!scheduler_is_running()) return; if(locked) mutex_unlock(mutex); locked=false;}
+  static MutexLock MakeInstance(mutex_handle_t* mtx) ETX_NO_THREAD_SAFETY_ANALYSIS {return MutexLock(mtx);}
+  ~MutexLock() ETX_RELEASE() ETX_NO_THREAD_SAFETY_ANALYSIS {if(!scheduler_is_running()) return; if(locked) mutex_unlock(mutex);}
+  void lock() ETX_ACQUIRE() ETX_NO_THREAD_SAFETY_ANALYSIS {if(!scheduler_is_running()) return; if(!locked) mutex_lock(mutex); locked=true;}
+  void unlock() ETX_RELEASE() ETX_NO_THREAD_SAFETY_ANALYSIS {if(!scheduler_is_running()) return; if(locked) mutex_unlock(mutex); locked=false;}
 
   MutexLock(const MutexLock&)               = delete;
   MutexLock(MutexLock&&)                    = delete;
@@ -113,8 +114,7 @@ public:
   static void  operator delete  (void*)     = delete;
   static void  operator delete[](void*)     = delete;
 private:
-  MutexLock(mutex_handle_t* mtx):mutex(mtx),locked(false) {if(!scheduler_is_running()) return; mutex_lock(mutex); locked = true;}
+  MutexLock(mutex_handle_t* mtx) ETX_ACQUIRE(mtx) ETX_NO_THREAD_SAFETY_ANALYSIS:mutex(mtx),locked(false) {if(!scheduler_is_running()) return; locked = mutex_lock(mutex);}
   mutex_handle_t* mutex;
   bool locked;
 };
-

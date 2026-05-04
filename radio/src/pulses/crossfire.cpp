@@ -222,6 +222,7 @@ static void crossfireSendPulses(void* ctx, uint8_t* buffer, int16_t* channels, u
 
   auto drv = modulePortGetSerialDrv(mod_st->tx);
   auto drv_ctx = modulePortGetCtx(mod_st->tx);
+  if (!drv) return;
   drv->sendBuffer(drv_ctx, buffer, p_buf - buffer);
 }
 

@@ -22,6 +22,7 @@
 #pragma once
 
 #include "time_native.h"
+#include "thread_annotations.h"
 
 #include <thread>
 #include <mutex>
@@ -36,7 +37,8 @@ struct task_handle_t {
   uint32_t      _stack_size;
 };
 
-typedef std::mutex mutex_handle_t;
+struct ETX_CAPABILITY("mutex") mutex_handle_t : public std::mutex {
+};
 
 bool task_running();
 

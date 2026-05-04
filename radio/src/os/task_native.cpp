@@ -93,11 +93,10 @@ struct run_context {
 static void* _task_stub(run_context* p)
 {
   std::unique_ptr<run_context> ctx{(run_context*)p};
-  auto name = ctx->name.c_str();
 
-  TRACE("<%s> started", name);
+  TRACE("<%s> started", ctx->name.c_str());
   ctx->func();
-  TRACE("<%s> stopped", name);
+  TRACE("<%s> stopped", ctx->name.c_str());
 
   return nullptr;
 }
@@ -105,6 +104,8 @@ static void* _task_stub(run_context* p)
 void task_create(task_handle_t* h, task_func_t func, const char* name,
                  void* stack, unsigned stack_size, unsigned priority)
 {
+  (void)stack;
+  (void)priority;
   std::lock_guard lock(_tasks_m);
   if (_stop_tasks) return;
 
@@ -121,6 +122,7 @@ bool task_running()
 
 unsigned task_get_stack_usage(task_handle_t* h)
 {
+  (void)h;
   // fake...
   return 0;
 }
@@ -140,23 +142,22 @@ void mutex_create(mutex_handle_t* h)
   (void)h;
 }
 
-bool mutex_lock(mutex_handle_t* h)
+bool mutex_lock(mutex_handle_t* h) ETX_NO_THREAD_SAFETY_ANALYSIS
 {
   if (!h) return false;
   h->lock();
   return true;
 }
 
-void mutex_unlock(mutex_handle_t* h)
+void mutex_unlock(mutex_handle_t* h) ETX_NO_THREAD_SAFETY_ANALYSIS
 {
   if (!h) return;
   h->unlock();
 }
 
-bool mutex_trylock(mutex_handle_t* h)
+bool mutex_trylock(mutex_handle_t* h) ETX_NO_THREAD_SAFETY_ANALYSIS
 {
   if (!h) return false;
   return h->try_lock();
 }
-
 

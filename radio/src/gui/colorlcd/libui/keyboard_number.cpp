@@ -22,6 +22,8 @@
 #include "numberedit.h"
 #include "keys.h"
 
+#include <new>
+
 constexpr coord_t KEYBOARD_HEIGHT = LCD_H;
 constexpr coord_t HEADER_HEIGHT = LAYOUT_SCALE(72);
 constexpr coord_t TITLE_Y = PAD_LARGE;
@@ -288,7 +290,8 @@ NumberKeyboard::~NumberKeyboard() { _instance = nullptr; }
 
 void NumberKeyboard::open(FormField* field, NumberEdit* edit)
 {
-  if (!_instance) _instance = new NumberKeyboard();
+  if (!_instance) _instance = new (std::nothrow) NumberKeyboard();
+  if (!_instance) return;
 
   _instance->numberEdit = edit;
   set_keyboard_map(_instance->keyboard, edit);

@@ -24,6 +24,8 @@
 #include "menutoolbar.h"
 #include "edgetx.h"
 
+#include <new>
+
 class SwitchChoiceMenuToolbar : public MenuToolbar
 {
  public:
@@ -60,8 +62,9 @@ class SwitchChoiceMenuToolbar : public MenuToolbar
         choice->isValueAvailable(0))
       addButton(STR_SELECT_MENU_CLR, 0, 0, nullptr, nullptr, true);
 
-    invertBtn = new MenuToolbarButton(this, {0, 0, LV_PCT(100), 0},
+    invertBtn = new (std::nothrow) MenuToolbarButton(this, {0, 0, LV_PCT(100), 0},
                                       STR_SELECT_MENU_INV);
+    if (!invertBtn) return;
     invertBtn->check(choice->inverted);
     lv_obj_align(invertBtn->getLvObj(), LV_ALIGN_BOTTOM_MID, 0, 0);
 
@@ -122,16 +125,17 @@ void SwitchChoice::openMenu()
 {
   setEditMode(true);  // this needs to be done first before menu is created.
 
-  auto menu = new Menu();
+  auto menu = new (std::nothrow) Menu();
+  if (!menu) return;
   if (menuTitle) menu->setTitle(menuTitle);
 
   inverted = _getValue() < 0;
   inMenu = true;
 
-  auto tb = new SwitchChoiceMenuToolbar(this, menu);
-  menu->setToolbar(tb);
+  auto tb = new (std::nothrow) SwitchChoiceMenuToolbar(this, menu);
+  if (tb) menu->setToolbar(tb);
 
-  menu->setLongPressHandler([=]() { tb->invertChoice(); });
+  menu->setLongPressHandler([=]() { if (tb) tb->invertChoice(); });
 
 #if defined(AUTOSWITCH)
   menu->setWaitHandler([=]() {
@@ -147,7 +151,7 @@ void SwitchChoice::openMenu()
         val = swtch;
       }
       if (val && (!isValueAvailable || isValueAvailable(val))) {
-        tb->resetFilter();
+        if (tb) tb->resetFilter();
         menu->select(getIndexFromValue(val));
       }
     }

@@ -56,7 +56,11 @@ void default_isr_handler()
       __asm__("bkpt 2");
     }
   }
-  while (1) {}
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wanalyzer-infinite-loop"
+  while (1) {
+  }
+#pragma GCC diagnostic pop
 }
 
 typedef struct __attribute__((packed)) ContextStateFrame {

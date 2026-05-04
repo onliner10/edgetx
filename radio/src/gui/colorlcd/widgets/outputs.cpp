@@ -24,6 +24,8 @@
 #include "edgetx.h"
 #include "messaging.h"
 
+#include <new>
+
 constexpr int16_t OUTPUT_INVALID_VALUE = INT16_MIN;
 
 #define ETX_STATE_BG_FILL LV_STATE_USER_1
@@ -223,7 +225,7 @@ class OutputsWidget : public Widget
       for (uint8_t c = 0; c < cols && chan <= lastChan; c += 1) {
         for (uint8_t r = 0; r < rows && chan <= lastChan;
              r += 1, chan += 1) {
-          new ChannelValue(this, c, r, colWidth, chan - 1, txtColor, barColor);
+          new (std::nothrow) ChannelValue(this, c, r, colWidth, chan - 1, txtColor, barColor);
         }
       }
     }
@@ -275,7 +277,7 @@ class OutputsWidgetFactory : public WidgetFactory
   Widget* createNew(Window* parent, const rect_t& rect,
                  int screenNum, int zoneNum) const override
   {
-    return new T(this, parent, rect, screenNum, zoneNum);
+    return new (std::nothrow) T(this, parent, rect, screenNum, zoneNum);
   }
 
   // Fix the options loaded from the model file to account for

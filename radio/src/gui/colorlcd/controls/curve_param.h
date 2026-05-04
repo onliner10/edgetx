@@ -53,9 +53,9 @@ class CurveParam : public Window
   CurveRef* ref;
 
   // Controls
-  SourceNumberEdit* value_edit;
-  Choice* func_choice;
-  Choice* cust_choice;
+  SourceNumberEdit* value_edit = nullptr;
+  Choice* func_choice = nullptr;
+  Choice* cust_choice = nullptr;
   Window* act_field = nullptr;
 
   void update();

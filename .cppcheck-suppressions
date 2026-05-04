@@ -1,0 +1,11 @@
+comparePointers:radio/src/thirdparty/CMSIS/Include/cmsis_gcc.h
+preprocessorErrorDirective:radio/src/datastructs_private.h
+preprocessorErrorDirective:radio/src/pulses/pulses.h
+preprocessorErrorDirective:radio/src/targets/common/arm/stm32/rotary_encoder_driver.cpp
+preprocessorErrorDirective:radio/src/targets/common/arm/stm32/stm32_gpio.cpp
+preprocessorErrorDirective:radio/src/targets/common/arm/stm32/usb_driver.cpp
+uninitvar:radio/src/thirdparty/stb/stb_image.h
+nullPointerArithmeticOutOfMemory:radio/src/gui/colorlcd/libui/bitmapbuffer.cpp
+nullPointerOutOfMemory:radio/src/gui/colorlcd/libui/button_matrix.cpp
+nullPointerOutOfMemory:radio/src/gui/colorlcd/bitmaps.cpp
+nullPointerArithmeticOutOfMemory:radio/src/gui/colorlcd/bitmaps.cpp

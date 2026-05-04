@@ -65,6 +65,6 @@ static inline bool _lock_mutex(mutex_handle_t* h, TickType_t xTickToWait)
   return xSemaphoreTake(h->_rtos_handle, xTickToWait) == pdTRUE;
 }
 
-bool mutex_lock(mutex_handle_t* h) { return _lock_mutex(h, portMAX_DELAY); }
-bool mutex_trylock(mutex_handle_t* h) { return _lock_mutex(h, (TickType_t)0); }
-void mutex_unlock(mutex_handle_t* h) { xSemaphoreGive(h->_rtos_handle); }
+bool mutex_lock(mutex_handle_t* h) ETX_NO_THREAD_SAFETY_ANALYSIS { return _lock_mutex(h, portMAX_DELAY); }
+bool mutex_trylock(mutex_handle_t* h) ETX_NO_THREAD_SAFETY_ANALYSIS { return _lock_mutex(h, (TickType_t)0); }
+void mutex_unlock(mutex_handle_t* h) ETX_NO_THREAD_SAFETY_ANALYSIS { xSemaphoreGive(h->_rtos_handle); }

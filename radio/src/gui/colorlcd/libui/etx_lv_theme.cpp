@@ -28,6 +28,8 @@
 #include "../colors.h"
 #include "fonts.h"
 
+#include <new>
+
 extern lv_color_t makeLvColor(uint32_t colorFlags);
 
 /**********************
@@ -377,20 +379,28 @@ void setAllFonts()
 void usePreviewStyle()
 {
   if (!previewStyles) {
-    previewStyles = new EdgeTxStyles();
-    previewStyles->init();
+    previewStyles = new (std::nothrow) EdgeTxStyles();
+    if (previewStyles) {
+      previewStyles->init();
+    }
   }
-  styles = previewStyles;
-  styles->applyColors();
+  if (previewStyles) {
+    styles = previewStyles;
+    styles->applyColors();
+  }
 }
 
 void useMainStyle()
 {
   if (!mainStyles) {
-    mainStyles = new EdgeTxStyles();
-    mainStyles->init();
+    mainStyles = new (std::nothrow) EdgeTxStyles();
+    if (mainStyles) {
+      mainStyles->init();
+    }
   }
-  styles = mainStyles;
+  if (mainStyles) {
+    styles = mainStyles;
+  }
 }
 
 /**********************

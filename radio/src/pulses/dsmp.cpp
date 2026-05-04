@@ -289,8 +289,12 @@ static void setupPulsesLemonDSMP(uint8_t module, uint8_t*& p_buf)
 static void dsmpSendPulses(void* ctx, uint8_t* buffer, int16_t* channels, uint8_t nChannels)
 {
     auto mod_st = (etx_module_state_t*)ctx;
+    if (!mod_st) return;
+
     auto module = modulePortGetModule(mod_st);
     auto drv = modulePortGetSerialDrv(mod_st->tx);
+    if (!drv) return;
+
     auto drvCtx = modulePortGetCtx(mod_st->tx);
 
     auto p_data = buffer;

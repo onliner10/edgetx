@@ -226,20 +226,25 @@ LAYOUT_ORIENTATION_SCALED(VERCHK_X, 168, 112)
 LAYOUT_ORIENTATION_SCALED(VERCHK_Y, 138, 240)
 LAYOUT_ORIENTATION_SCALED(VERCHK_ICN_X, 78, 22)
 
-const uint8_t __bmp_plug_usb[] {
+alignas(LZ4Bitmap) const uint8_t __bmp_plug_usb[] {
   #include "bmp_bootloader_plug_usb.lbm"
 };
 LZ4BitmapBuffer BMP_PLUG_USB(BMP_ARGB4444);
 
-const uint8_t __bmp_usb_plugged[] {
+alignas(LZ4Bitmap) const uint8_t __bmp_usb_plugged[] {
   #include "bmp_bootloader_usb_plugged.lbm"
 };
 LZ4BitmapBuffer BMP_USB_PLUGGED(BMP_ARGB4444);
 
+static const LZ4Bitmap* lz4Bitmap(const uint8_t* data)
+{
+  return static_cast<const LZ4Bitmap*>(static_cast<const void*>(data));
+}
+
 void bootloaderInitScreen()
 {
-  BMP_PLUG_USB.load((LZ4Bitmap*)__bmp_plug_usb);
-  BMP_USB_PLUGGED.load((LZ4Bitmap*)__bmp_usb_plugged);
+  BMP_PLUG_USB.load(lz4Bitmap(__bmp_plug_usb));
+  BMP_USB_PLUGGED.load(lz4Bitmap(__bmp_usb_plugged));
 
   lcdInitDisplayDriver();
   backlightEnable(BACKLIGHT_LEVEL_MAX);

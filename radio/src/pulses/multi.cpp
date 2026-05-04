@@ -267,6 +267,7 @@ static void multiSendPulses(void* ctx, uint8_t* buffer, int16_t* channels, uint8
 
   auto drv = modulePortGetSerialDrv(mod_st->tx);
   auto drv_ctx = modulePortGetCtx(mod_st->tx);
+  if (!drv) return;
   drv->sendBuffer(drv_ctx, buffer, data - buffer);
 }
 
@@ -471,4 +472,3 @@ void sendDSM(uint8_t*& p_buf, uint8_t module)
   }
 }
 #endif
-

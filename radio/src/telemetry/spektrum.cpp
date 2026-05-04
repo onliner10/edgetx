@@ -24,6 +24,17 @@
 #include "hal/module_port.h"
 #include "tasks/mixer_task.h"
 
+static uint16_t read_u16_le(const uint8_t* data)
+{
+  return uint16_t(data[0]) | (uint16_t(data[1]) << 8);
+}
+
+static uint32_t read_u32_le(const uint8_t* data)
+{
+  return uint32_t(data[0]) | (uint32_t(data[1]) << 8) |
+         (uint32_t(data[2]) << 16) | (uint32_t(data[3]) << 24);
+}
+
 /*
  * Documentation of the Spektrum protocol is available under
  * https://www.spektrumrc.com/ProdInfo/Files/SPM_Telemetry_Developers_Specs.pdf
@@ -408,11 +419,11 @@ static int32_t spektrumGetValue(const uint8_t *packet, int startByte, SpektrumDa
     case uint32:
       return ((uint32_t) (data[3] + (data[2] << 8) + (data[1] << 16) + (data[0] << 24)));
     case uint16bcd:
-      return bcdToInt16(*(uint16_t *)data);
+      return bcdToInt16(read_u16_le(data));
     case uint8bcd:
       return bcdToInt8(*(uint8_t *)data);
     case uint32bcd:
-      return bcdToInt32(*(uint32_t *)data);
+      return bcdToInt32(read_u32_le(data));
     case int16le:
       return (int16_t) ((int16_t) (data[0] + (data[1] << 8)));
     case uint16le:

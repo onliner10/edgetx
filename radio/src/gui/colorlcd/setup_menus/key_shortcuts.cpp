@@ -29,6 +29,8 @@
 #include "qmpagechoice.h"
 #include "radio_tools.h"
 
+#include <new>
+
 #define SET_DIRTY() storageDirty(EE_GENERAL)
 
 static bool hasKey(event_t event)
@@ -48,7 +50,7 @@ void QMKeyShortcutsPage::addKey(event_t event, std::vector<std::string> qmPages,
     event = keyMapping(event);
 
     setupLine(nm, [=](Window* parent, coord_t x, coord_t y) {
-          auto c = new QMPageChoice(
+          auto c = new (std::nothrow) QMPageChoice(
               parent, {LCD_W / 4, y, LCD_W * 2 / 3, 0}, qmPages, QM_NONE, qmPages.size() - 1,
               [=]() -> int {
                 auto pg = g_eeGeneral.getKeyShortcut(event);
@@ -71,13 +73,15 @@ void QMKeyShortcutsPage::addKey(event_t event, std::vector<std::string> qmPages,
                 SET_DIRTY();
               }, STR_KEY_SHORTCUTS);
 
-          c->setAvailableHandler(
+          if (c) {
+            c->setAvailableHandler(
               [=](int pg) {
                 if (pg == QM_NONE) return true;
                 if (g_eeGeneral.hasKeyShortcut((QMPage)pg, event))
                   return false;
                 return pg <= QM_UI_SCREEN1 || pg > QM_UI_ADD_PG; }
               );
+          }
         });
   }
 }
@@ -97,7 +101,7 @@ QMKeyShortcutsPage::QMKeyShortcutsPage():
   addKey(EVT_KEY_LONG(KEY_MODEL), qmPages, "MDL");
   addKey(EVT_KEY_LONG(KEY_TELE), qmPages, "TELE");
 
-  new TextButton(body, {LV_PCT(10), y + PAD_LARGE, LV_PCT(80), 0}, STR_SF_RESET,
+  new (std::nothrow) TextButton(body, {LV_PCT(10), y + PAD_LARGE, LV_PCT(80), 0}, STR_SF_RESET,
                   [=]() {
                     g_eeGeneral.defaultKeyShortcuts();
                     SET_DIRTY();

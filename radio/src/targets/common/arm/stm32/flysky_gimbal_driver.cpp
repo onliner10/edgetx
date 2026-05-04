@@ -41,6 +41,11 @@
 #define RESAMPLING_SWITCHING_THRESHOLD   200  // us
 #define MODE_CHANGE_DELAY                 50  // ms
 
+static int16_t read_i16_le(const unsigned char* data)
+{
+  return (int16_t)(uint16_t(data[0]) | (uint16_t(data[1]) << 8));
+}
+
 static const stm32_usart_t fsUSART = {
   .USARTx = FLYSKY_HALL_SERIAL_USART,
   .txGPIO = FLYSKY_HALL_SERIAL_TX_GPIO,
@@ -127,7 +132,7 @@ static void _fs_parse(STRUCT_HALL *hallBuffer, unsigned char ch)
       hallBuffer->checkSum = 0;
       hallBuffer->dataIndex = 0;
       hallBuffer->status = GET_CHECKSUM;
-      // fall through!
+      [[fallthrough]];
 
     case GET_CHECKSUM:
       hallBuffer->checkSum |= ch << ((hallBuffer->dataIndex++) * 8);
@@ -202,17 +207,17 @@ static void flysky_gimbal_loop(void*)
       switch (HallProtocol.hallID.hall_Id.receiverID) {
         case TRANSFER_DIR_TXMCU:
         case TRANSFER_DIR_RFMODULE:
-          int16_t* p_values = (int16_t*)HallProtocol.data;
           if (HallProtocol.hallID.hall_Id.packetID == FLYSKY_PACKET_CHANNEL_ID) {
             _fs_gimbal_cmd_finished = true;
             uint16_t* adcValues = getAnalogValues();
             for (uint8_t i = 0; i < 4; i++) {
-              adcValues[i] = FLYSKY_OFFSET_VALUE - p_values[i];
+              adcValues[i] =
+                  FLYSKY_OFFSET_VALUE - read_i16_le(&HallProtocol.data[i * 2]);
             }
           } else if (HallProtocol.hallID.hall_Id.packetID == FLYSKY_PACKET_VERSION_ID) {
             _fs_gimbal_cmd_finished = true;
-            uint16_t minorVersion = p_values[6];
-            uint16_t majorVersion = p_values[7];
+            uint16_t minorVersion = read_i16_le(&HallProtocol.data[12]);
+            uint16_t majorVersion = read_i16_le(&HallProtocol.data[14]);
             if (majorVersion == 2 && minorVersion >= 1) {
               _fs_gimbal_version = GIMBAL_V2;
             }

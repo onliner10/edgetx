@@ -31,6 +31,8 @@
 #include "os/time.h"
 #include "keys.h"
 
+#include <new>
+
 #define MAX_INSTRUCTIONS (20000 / 100)
 
 LuaScriptManager *luaScriptManager = nullptr;
@@ -609,7 +611,8 @@ bool LuaScriptManager::callRefs(lua_State *L)
 void LuaScriptManager::createTelemetryQueue()
 {
   if (luaInputTelemetryFifo == nullptr) {
-    luaInputTelemetryFifo = new TelemetryQueue();
+    luaInputTelemetryFifo = new (std::nothrow) TelemetryQueue();
+    if (!luaInputTelemetryFifo) return;
     registerTelemetryQueue(luaInputTelemetryFifo);
   }
 }

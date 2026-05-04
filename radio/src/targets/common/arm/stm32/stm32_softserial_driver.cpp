@@ -322,7 +322,7 @@ static void _conv_byte_pxx1(stm32_softserial_tx_state* st, uint8_t b)
 {
   uint32_t bits = st->serial_size < 8 ? st->serial_size : 8;
 
-  for (uint8_t i = 0; i < bits; i++) {
+  for (uint32_t i = 0; i < bits; i++) {
     // MSB first
     if (b & 0x80)
       _set_level(st, PXX1_BIT_ONE);
@@ -430,7 +430,7 @@ static uint16_t _fill_pulses(stm32_softserial_tx_state* st)
     size = STM32_SOFTSERIAL_BUFFERED_PULSES;
   }
 
-  for (uint8_t i = 0; i < size; i++) {
+  for (uint32_t i = 0; i < size; i++) {
     st->conv_byte(st, *st->serial_data++);
   }
 

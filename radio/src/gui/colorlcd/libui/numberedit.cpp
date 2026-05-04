@@ -26,6 +26,8 @@
 #include "strhelpers.h"
 #include "etx_lv_theme.h"
 
+#include <new>
+
 class NumberArea : public FormField
 {
  public:
@@ -265,10 +267,11 @@ NumberEdit::NumberEdit(Window* parent, const rect_t& rect, int vmin, int vmax,
 void NumberEdit::openEdit()
 {
   if (edit == nullptr) {
-    edit = new NumberArea(
+    edit = new (std::nothrow) NumberArea(
         this,
         {-(PAD_MEDIUM + 2), -(PAD_BORDER * 2),
         lv_obj_get_width(lvobj), lv_obj_get_height(lvobj)});
+    if (!edit) return;
     edit->setChangeHandler([=]() {
       update();
       if (onEdited) onEdited(currentValue);
@@ -378,7 +381,7 @@ void NumberEdit::setValueFromEditVal(const char* text)
     if (*text >= '0' && *text <= '9') {
       if (!afterDecimal) {
         if (value < VALUE_LIMIT) {
-          value = value * 10 + (*text - '0') * scale;
+          value = value * 10 + int64_t(*text - '0') * scale;
           if (value > VALUE_LIMIT) value = VALUE_LIMIT;
         }
       } else if (decimalDigits < (scale == 100 ? 2 : scale == 10 ? 1 : 0)) {

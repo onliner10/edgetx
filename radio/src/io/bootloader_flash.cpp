@@ -62,7 +62,7 @@ bool isBootloader(const char * filename)
 void BootloaderFirmwareUpdate::flashFirmware(const char * filename, ProgressHandler progressHandler)
 {
   FIL file;
-  uint8_t buffer[1024];
+  alignas(uint32_t) uint8_t buffer[1024];
   UINT count;
 
   pulsesStop();
@@ -94,7 +94,9 @@ void BootloaderFirmwareUpdate::flashFirmware(const char * filename, ProgressHand
     }
     for (UINT j = 0; j < count; j += FLASH_PAGESIZE) {
       WDG_ENABLE(3000);
-      flashWrite(CONVERT_UINT_PTR(BOOTLOADER_ADDRESS + i + j), CONVERT_UINT_PTR(buffer + j));
+      const auto page = static_cast<const uint32_t*>(
+          static_cast<const void*>(buffer + j));
+      flashWrite(CONVERT_UINT_PTR(BOOTLOADER_ADDRESS + i + j), page);
       WDG_ENABLE(WDG_DURATION);
     }
     progressHandler("Bootloader", STR_WRITING, i, flash_size);

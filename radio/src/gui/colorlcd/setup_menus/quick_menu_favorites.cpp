@@ -28,6 +28,8 @@
 #include "qmpagechoice.h"
 #include "radio_tools.h"
 
+#include <new>
+
 #define SET_DIRTY() storageDirty(EE_GENERAL)
 
 QMFavoritesPage::QMFavoritesPage():
@@ -39,7 +41,7 @@ QMFavoritesPage::QMFavoritesPage():
     char nm[50];
     strAppendUnsigned(strAppend(strAppend(nm, "#"), " "), i + 1);
     setupLine(nm, [=](Window* parent, coord_t x, coord_t y) {
-          auto c = new QMPageChoice(
+          auto c = new (std::nothrow) QMPageChoice(
               parent, {LCD_W / 4, y, LCD_W * 2 / 3, 0}, qmPages, QM_NONE, qmPages.size() - 1,
               [=]() -> int {
                 auto pg = g_eeGeneral.qmFavorites[i].shortcut;
@@ -63,7 +65,8 @@ QMFavoritesPage::QMFavoritesPage():
                 SET_DIRTY();
               }, STR_QUICK_MENU_FAVORITES);
 
-          c->setAvailableHandler(
+          if (c) {
+            c->setAvailableHandler(
               [=](int pg) {
                 if (pg == QM_NONE) return true;
                 if (pg < QM_APP) {
@@ -80,6 +83,7 @@ QMFavoritesPage::QMFavoritesPage():
                 }
                 return pg != QM_OPEN_QUICK_MENU; }
               );
+          }
         });
   }
 

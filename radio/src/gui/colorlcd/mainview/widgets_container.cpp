@@ -22,18 +22,21 @@
 #include "widgets_container.h"
 #include "widget.h"
 
+#include <new>
+
 WidgetsContainer::WidgetsContainer(Window* parent, const rect_t& rect, uint8_t zoneCount) :
   Window(parent, rect), zoneCount(zoneCount)
 {
-  widgets = new Widget*[zoneCount];
-  for (int i = 0; i < zoneCount; i += 1) widgets[i] = nullptr;
+  widgets = new (std::nothrow) Widget*[zoneCount]();
 }
 
 void WidgetsContainer::deleteLater()
 {
   if (deleted()) return;
-  for (int i = 0; i < zoneCount; i += 1)
-    if (widgets[i]) widgets[i]->deleteLater();
+  if (widgets) {
+    for (int i = 0; i < zoneCount; i += 1)
+      if (widgets[i]) widgets[i]->deleteLater();
+  }
   if (widgets) delete[] widgets;
   widgets = nullptr;
   Window::deleteLater();
@@ -41,14 +44,14 @@ void WidgetsContainer::deleteLater()
 
 Widget* WidgetsContainer::getWidget(unsigned int index)
 {
-  if (index < zoneCount) return widgets[index];
+  if (widgets && index < zoneCount) return widgets[index];
 
   return nullptr;
 }
 
 void WidgetsContainer::removeWidget(unsigned int index)
 {
-  if (index >= zoneCount) return;
+  if (!widgets || index >= zoneCount) return;
 
   if (widgets[index]) {
     widgets[index]->deleteLater();
@@ -66,7 +69,7 @@ void WidgetsContainer::removeAllWidgets()
 void WidgetsContainer::updateZones()
 {
   for (int i = 0; i < zoneCount; i++) {
-    if (widgets[i]) {
+    if (widgets && widgets[i]) {
       auto zone = getZone(i);
       widgets[i]->setRect(zone);
       widgets[i]->updateZoneRect(zone);
@@ -77,7 +80,7 @@ void WidgetsContainer::updateZones()
 void WidgetsContainer::showWidgets(bool visible)
 {
   for (int i = 0; i < zoneCount; i++) {
-    if (widgets[i]) {
+    if (widgets && widgets[i]) {
       widgets[i]->show(visible);
     }
   }
@@ -87,7 +90,7 @@ void WidgetsContainer::refreshWidgets(bool inForeground)
 {
   if (!_deleted) {
     for (int i = 0; i < zoneCount; i++) {
-      if (widgets[i]) {
+      if (widgets && widgets[i]) {
         if ((inForeground && widgets[i]->isOnScreen()) || widgets[i]->isFullscreen())
           widgets[i]->foreground();
         else

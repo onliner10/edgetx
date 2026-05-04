@@ -30,20 +30,24 @@
 #include "pagegroup.h"
 #include "screen_setup.h"
 
+#include <new>
+
 SetupWidgetsPageSlot::SetupWidgetsPageSlot(Window* parent, const rect_t& rect,
                                            WidgetsContainer* container,
                                            uint8_t slotIndex) :
     ButtonBase(parent, rect)
 {
   setPressHandler([=]() -> uint8_t {
+    if (!container) return 0;
     if (container->getWidget(slotIndex)) {
-      Menu* menu = new Menu();
+      Menu* menu = new (std::nothrow) Menu();
+      if (!menu) return 0;
       menu->addLine(STR_SELECT_WIDGET,
                     [=]() { addNewWidget(container, slotIndex); });
       auto widget = container->getWidget(slotIndex);
       if (widget->hasOptions())
         menu->addLine(STR_WIDGET_SETTINGS,
-                      [=]() { new WidgetSettings(widget); });
+                      [=]() { new (std::nothrow) WidgetSettings(widget); });
       menu->addLine(STR_REMOVE_WIDGET,
                     [=]() { container->removeWidget(slotIndex); });
     } else {
@@ -70,8 +74,10 @@ SetupWidgetsPageSlot::SetupWidgetsPageSlot(Window* parent, const rect_t& rect,
   borderPts[4] = {1, 1};
 
   border = lv_line_create(lvobj);
-  lv_obj_add_style(border, &borderStyle, LV_PART_MAIN);
-  lv_line_set_points(border, borderPts, 5);
+  if (border) {
+    lv_obj_add_style(border, &borderStyle, LV_PART_MAIN);
+    lv_line_set_points(border, borderPts, 5);
+  }
 
   setFocusState();
 
@@ -80,6 +86,7 @@ SetupWidgetsPageSlot::SetupWidgetsPageSlot(Window* parent, const rect_t& rect,
 
 void SetupWidgetsPageSlot::setFocusState()
 {
+  if (!border) return;
   if (hasFocus()) {
     lv_obj_add_flag(border, LV_OBJ_FLAG_HIDDEN);
   } else {
@@ -90,11 +97,13 @@ void SetupWidgetsPageSlot::setFocusState()
 void SetupWidgetsPageSlot::addNewWidget(WidgetsContainer* container,
                                         uint8_t slotIndex)
 {
+  if (!container) return;
   const char* cur = nullptr;
   auto w = container->getWidget((slotIndex));
   if (w) cur = w->getFactory()->getDisplayName();
 
-  Menu* menu = new Menu();
+  Menu* menu = new (std::nothrow) Menu();
+  if (!menu) return;
   menu->setTitle(STR_SELECT_WIDGET);
   int selected = -1;
   int index = 0;
@@ -102,8 +111,8 @@ void SetupWidgetsPageSlot::addNewWidget(WidgetsContainer* container,
     menu->addLine(factory->getDisplayName(), [=]() {
       container->createWidget(slotIndex, factory);
       auto widget = container->getWidget(slotIndex);
-      if (widget->hasOptions())
-        new WidgetSettings(widget);
+      if (widget && widget->hasOptions())
+        new (std::nothrow) WidgetSettings(widget);
     });
     if (cur && strcmp(cur, factory->getDisplayName()) == 0)
       selected = index;
@@ -124,16 +133,19 @@ SetupWidgetsPage::SetupWidgetsPage(uint8_t customScreenIdx) :
   if (screen) {
     setRect(screen->getRect());
     auto viewMain = ViewMain::instance();
-    savedView = viewMain->getCurrentMainView();
-    viewMain->setCurrentMainView(customScreenIdx);
-    if (!viewMain->hasTopbar()) viewMain->hideTopBarEdgeTxButton();
+    if (viewMain) {
+      savedView = viewMain->getCurrentMainView();
+      viewMain->setCurrentMainView(customScreenIdx);
+      if (!viewMain->hasTopbar()) viewMain->hideTopBarEdgeTxButton();
+    }
   }
 
+  if (!screen) return;
   SetupWidgetsPageSlot* firstSlot = nullptr;
   for (unsigned i = 0; i < screen->getZonesCount(); i++) {
     auto rect = screen->getZone(i);
     auto widget_container = customScreens[customScreenIdx];
-    auto slot = new SetupWidgetsPageSlot(this, rect, widget_container, i);
+    auto slot = new (std::nothrow) SetupWidgetsPageSlot(this, rect, widget_container, i);
     if (i == 0) firstSlot = slot;
   }
   if (firstSlot) lv_group_focus_obj(firstSlot->getLvObj());

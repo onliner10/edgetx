@@ -174,6 +174,7 @@ static void sbusSendPulses(void* ctx, uint8_t* buffer, int16_t* channels, uint8_
 
   auto drv = modulePortGetSerialDrv(mod_st->tx);
   auto drv_ctx = modulePortGetCtx(mod_st->tx);
+  if (!drv) return;
 
   auto port = mod_st->tx.port;
   if (port && port->set_inverted) {

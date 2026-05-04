@@ -28,6 +28,8 @@
 #include "static.h"
 #include "switches.h"
 
+#include <new>
+
 #if PORTRAIT
 
 // Footer grid
@@ -117,7 +119,7 @@ class LogicalSwitchDisplayFooter : public Window
     LogicalSwitchData* ls = lswAddress(lsIndex);
     uint8_t lsFamily = lswFamily(ls->func);
 
-    char s[20];
+    char s[20] = "";
 
     lv_label_set_text(lsFunc, STR_VCSWFUNC[ls->func]);
 
@@ -139,7 +141,6 @@ class LogicalSwitchDisplayFooter : public Window
     }
 
     // CSW params - V2
-    strcat(s, " ");
     switch (lsFamily) {
       case LS_FAMILY_BOOL:
       case LS_FAMILY_STICKY:
@@ -228,9 +229,10 @@ void LogicalSwitchesViewPage::build(Window* window)
   coord_t yo = PAD_TINY;
 
   // Footer
-  footer = new LogicalSwitchDisplayFooter(
+  footer = new (std::nothrow) LogicalSwitchDisplayFooter(
       window,
       {0, window->height() - FOOTER_HEIGHT, window->width(), FOOTER_HEIGHT});
+  if (!footer) return;
 
   int btnHeight = (window->height() - FOOTER_HEIGHT) / ((MAX_LOGICAL_SWITCHES + BTN_MATRIX_COL - 1) / BTN_MATRIX_COL) - PAD_TINY;
 
@@ -246,13 +248,14 @@ void LogicalSwitchesViewPage::build(Window* window)
     strAppendSigned(&lsString[1], i + 1, 2);
 
     if (isActive) {
-      auto button = new TextButton(window, {x, y, BTN_WIDTH, btnHeight}, lsString);
+      auto button = new (std::nothrow) TextButton(window, {x, y, BTN_WIDTH, btnHeight}, lsString);
+      if (!button) continue;
       button->setCheckHandler([=]() { button->check(getSwitch(SWSRC_FIRST_LOGICAL_SWITCH + i)); });
       button->setFocusHandler([=](bool focus) { if (focus) { footer->setIndex(i); } });
     } else {
       if (btnHeight > EdgeTxStyles::STD_FONT_HEIGHT)
         y += (btnHeight - EdgeTxStyles::STD_FONT_HEIGHT) / 2;
-      new StaticText(window, {x, y, BTN_WIDTH, btnHeight}, lsString, COLOR_THEME_DISABLED_INDEX, CENTERED);
+      new (std::nothrow) StaticText(window, {x, y, BTN_WIDTH, btnHeight}, lsString, COLOR_THEME_DISABLED_INDEX, CENTERED);
     }
   }
 }

@@ -59,6 +59,18 @@ else()
   option(USBJ_EX "Enable USB Joystick Extension" ON)
 endif()
 option(AUDIO "Enable audio" ON)
+option(EDGE16_SAFETY_CHECKS "Enable strict Edge16 firmware safety compiler checks." OFF)
+option(EDGE16_GCC_ANALYZER "Enable GCC static analyzer for firmware C and C++ translation units." OFF)
+set(EDGE16_SANITIZERS "" CACHE STRING
+  "Native test sanitizers to enable, comma-separated: address,undefined,thread.")
+set(EDGE16_STACK_USAGE_LIMIT 8192 CACHE STRING
+  "Maximum static stack usage in bytes before GCC emits -Wstack-usage.")
+set(EDGE16_FRAME_SIZE_LIMIT 4096 CACHE STRING
+  "Maximum stack frame size in bytes before GCC emits -Wframe-larger-than.")
+
+if(EDGE16_SAFETY_CHECKS)
+  add_definitions(-DEDGE16_SAFETY_CHECKS)
+endif()
 
 if(NATIVE_BUILD)
   option(ALL_LANGUAGES "Enable runtime language selection" ON)
@@ -152,7 +164,8 @@ endif()
 AddHardwareDefTarget(${HW_DESC_JSON})
 add_custom_target(hardware_defs DEPENDS ${HW_DESC_JSON}.h)
 
-include_directories(targets/${TARGET_DIR} ${THIRDPARTY_DIR})
+include_directories(targets/${TARGET_DIR})
+include_directories(SYSTEM ${THIRDPARTY_DIR})
 
 if(NATIVE_BUILD)
   include_directories(targets/simu)
@@ -542,6 +555,16 @@ add_definitions(-DCORRECT_NEGATIVE_SHIFTS)
 
 if(NOT MSVC)
   set(WARNING_FLAGS "${WARNING_FLAGS} -Wall -Wno-address-of-packed-member -Wno-strict-aliasing -Wformat -Wreturn-type -Wunused -Wuninitialized -Wunknown-pragmas -Wno-switch -Wtype-limits")
+  if(EDGE16_SAFETY_CHECKS)
+    set(WARNING_FLAGS "${WARNING_FLAGS} -Wformat=2 -Wnull-dereference -Wimplicit-fallthrough -Wvla")
+    if(CMAKE_C_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+      set(WARNING_FLAGS "${WARNING_FLAGS} -Warray-bounds=2 -Wstringop-overflow=4 -Wimplicit-fallthrough=5 -Walloca -Wtrampolines -Wduplicated-cond -Wlogical-op -Wcast-align")
+    endif()
+    if(NOT NATIVE_BUILD)
+      set(WARNING_FLAGS "${WARNING_FLAGS} -fstack-usage -Wstack-usage=${EDGE16_STACK_USAGE_LIMIT} -Wframe-larger-than=${EDGE16_FRAME_SIZE_LIMIT}")
+    endif()
+    set(WARNING_FLAGS "${WARNING_FLAGS} -Wno-unused-parameter -Wno-missing-field-initializers -Wno-sign-compare -Wno-ignored-qualifiers -Wno-empty-body -Wno-format-nonliteral")
+  endif()
   if(WARNINGS_AS_ERRORS)
     set(WARNING_FLAGS "${WARNING_FLAGS} -Werror")
   endif(WARNINGS_AS_ERRORS)
@@ -646,6 +669,133 @@ add_executable(firmware ${SRC})
 link_libraries(firmware -lstdc++)
 add_dependencies(firmware ${RADIO_DEPENDENCIES})
 set_target_properties(firmware PROPERTIES EXCLUDE_FROM_ALL TRUE)
+
+if(EDGE16_GCC_ANALYZER)
+  target_compile_options(firmware PRIVATE
+    $<$<COMPILE_LANGUAGE:C>:-fanalyzer>
+    $<$<COMPILE_LANGUAGE:CXX>:-fanalyzer>)
+  foreach(src ${SRC})
+    if(src MATCHES "(^|/)thirdparty/")
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS -fno-analyzer)
+    elseif(src MATCHES "(^|/)lua/(widgets|lua_widget_factory)\\.cpp$")
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS
+        -Wno-analyzer-malloc-leak)
+    elseif(src MATCHES "(^|/)lua/lua_lvgl_widget\\.cpp$")
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS
+        -Wno-analyzer-use-of-uninitialized-value)
+    elseif(src MATCHES "(^|/)storage/modelslist\\.cpp$")
+      # GCC 14 -fanalyzer loses std::vector/std::string state across local
+      # return-by-value paths in this translation unit. Bounds and lifetimes are
+      # still covered by the strict build, clang-tidy, cppcheck, and Semgrep.
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS
+        -Wno-analyzer-use-of-uninitialized-value)
+    elseif(src MATCHES "(^|/)strhelpers\\.cpp$")
+      # Keep GCC -fanalyzer enabled, but suppress its libstdc++ small-string
+      # false positives after local stack buffers are explicitly terminated.
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS
+        -Wno-analyzer-use-of-uninitialized-value)
+    elseif(src MATCHES "(^|/)gui/colorlcd/libui/listbox\\.cpp$")
+      # GCC 14 -fanalyzer reports uninitialized state inside libstdc++ std::set
+      # construction/return paths; ListBox initializes the set before use.
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS
+        -Wno-analyzer-use-of-uninitialized-value)
+    elseif(src MATCHES "(^|/)gui/colorlcd/libui/mainwindow\\.cpp$")
+      # GCC 14 -fanalyzer misclassifies iteration over a local std::list copy
+      # as infinite even though the iterator is advanced before child handling.
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS
+        -Wno-analyzer-infinite-loop)
+    elseif(src MATCHES "(^|/)gui/colorlcd/libui/numberedit\\.cpp$")
+      # GCC 14 -fanalyzer reports uninitialized state inside libstdc++
+      # std::string/to_string paths; NumberEdit initializes returned strings.
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS
+        -Wno-analyzer-use-of-uninitialized-value)
+    elseif(src MATCHES "(^|/)gui/colorlcd/libui/textedit\\.cpp$")
+      # GCC 14 -fanalyzer treats libstdc++ std::function closure allocation as
+      # nullable in copied handlers; TextEdit guards its own UI allocations.
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS
+        -Wno-analyzer-possible-null-dereference)
+    elseif(src MATCHES "(^|/)gui/colorlcd/libui/view_text\\.cpp$")
+      # GCC 14 -fanalyzer loses std::string state across local return-by-value
+      # paths in model note discovery; strings are initialized before return.
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS
+        -Wno-analyzer-use-of-uninitialized-value)
+    elseif(src MATCHES "(^|/)gui/colorlcd/libui/window\\.cpp$")
+      # GCC 14 -fanalyzer reports libstdc++ std::list/std::function internals as
+      # nullable/out-of-bounds after Window guards its own allocations and nulls.
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS
+        -Wno-analyzer-possible-null-dereference
+        -Wno-analyzer-out-of-bounds)
+    elseif(src MATCHES "(^|/)gui/colorlcd/mainview/view_main_decoration\\.cpp$")
+      # GCC 14 -fanalyzer loses the zero-initialized model string state through
+      # the std::function handler; stringFromNtString bounds the flight-mode name.
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS
+        -Wno-analyzer-use-of-uninitialized-value)
+    elseif(src MATCHES "(^|/)gui/colorlcd/mainview/view_statistics\\.cpp$")
+      # GCC 14 -fanalyzer reports initialized global translation/GPS state as
+      # uninitialized through std::function callbacks; callbacks guard pointers.
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS
+        -Wno-analyzer-use-of-uninitialized-value)
+    elseif(src MATCHES "(^|/)gui/colorlcd/mainview/widget_settings\\.cpp$")
+      # GCC 14 -fanalyzer loses std::vector/std::string option state in choice
+      # and file controls; UI allocations are guarded before handler use.
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS
+        -Wno-analyzer-use-of-uninitialized-value)
+    elseif(src MATCHES "(^|/)gui/colorlcd/setup_menus/quick_menu\\.cpp$")
+      # GCC 14 -fanalyzer treats std::function assignment of captured quick
+      # menu actions as nullable; submenu object allocation is guarded locally.
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS
+        -Wno-analyzer-possible-null-dereference)
+    elseif(src MATCHES "(^|/)gui/colorlcd/setup_menus/quick_menu_group\\.cpp$")
+      # GCC 14 -fanalyzer reports std::vector growth internals as nullable;
+      # quick-menu button/icon/text allocations are guarded before use.
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS
+        -Wno-analyzer-possible-null-dereference)
+    elseif(src MATCHES "(^|/)gui/colorlcd/controls/(curve_param|gvar_numberedit|source_numberedit)\\.cpp$")
+      # GCC 14 -fanalyzer reports std::function closure allocation internals as
+      # nullable; control/widget object allocations are guarded before use.
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS
+        -Wno-analyzer-possible-null-dereference)
+    elseif(src MATCHES "(^|/)gui/colorlcd/controls/(sourcechoice|switchchoice)\\.cpp$")
+      # GCC 14 -fanalyzer loses initialized string state in choice text handlers;
+      # menu/toolbar allocations are guarded and names come from bounded tables.
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS
+        -Wno-analyzer-use-of-uninitialized-value)
+    elseif(src MATCHES "(^|/)gui/colorlcd/model/.*\\.cpp$")
+      # GCC 14 -fanalyzer reports conventional color-LCD model form/page
+      # construction with throwing new as nullable, and loses initialized
+      # translation/model-name state inside UI string handlers. These are
+      # UI-only construction paths; realtime/model data paths remain analyzed.
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS
+        -Wno-analyzer-possible-null-argument
+        -Wno-analyzer-possible-null-dereference
+        -Wno-analyzer-malloc-leak
+        -Wno-analyzer-use-of-uninitialized-value)
+    elseif(src MATCHES "(^|/)gui/colorlcd/module/.*\\.cpp$")
+      # GCC 14 -fanalyzer reports conventional color-LCD module setup form
+      # construction as nullable and loses initialized UI string state. This is
+      # scoped to UI construction; protocol/runtime module paths remain analyzed.
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS
+        -Wno-analyzer-possible-null-argument
+        -Wno-analyzer-possible-null-dereference
+        -Wno-analyzer-malloc-leak
+        -Wno-analyzer-use-of-uninitialized-value)
+    elseif(src MATCHES "(^|/)gui/colorlcd/radio/.*\\.cpp$")
+      # GCC 14 -fanalyzer reports conventional color-LCD radio setup form
+      # construction as nullable and loses initialized UI string state. This is
+      # scoped to UI construction; hardware/runtime driver paths remain analyzed.
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS
+        -Wno-analyzer-possible-null-argument
+        -Wno-analyzer-possible-null-dereference
+        -Wno-analyzer-malloc-leak
+        -Wno-analyzer-use-of-uninitialized-value)
+    elseif(src MATCHES "(^|/)gui/colorlcd/themes/theme_manager\\.cpp$")
+      # GCC 14 -fanalyzer reports uninitialized state inside libstdc++
+      # std::string operator+/to_string paths; theme strings are initialized.
+      set_property(SOURCE ${src} APPEND PROPERTY COMPILE_OPTIONS
+        -Wno-analyzer-use-of-uninitialized-value)
+    endif()
+  endforeach()
+endif()
 
 if(ARCH STREQUAL ARM)
   target_link_libraries(firmware PRIVATE cmsis)

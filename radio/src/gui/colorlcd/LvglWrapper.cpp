@@ -29,6 +29,8 @@
 #include "os/time.h"
 #include "view_main.h"
 
+#include <new>
+
 LvglWrapper* LvglWrapper::_instance = nullptr;
 
 static lv_indev_drv_t touchDriver;
@@ -378,7 +380,7 @@ LvglWrapper::LvglWrapper()
 
 LvglWrapper* LvglWrapper::instance()
 {
-  if (!_instance) _instance = new LvglWrapper();
+  if (!_instance) _instance = new (std::nothrow) LvglWrapper();
   return _instance;
 }
 

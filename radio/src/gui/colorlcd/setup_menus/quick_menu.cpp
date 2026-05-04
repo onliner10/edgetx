@@ -32,6 +32,8 @@
 #include "view_channels.h"
 #include "view_main.h"
 
+#include <new>
+
 //-----------------------------------------------------------------------------
 
 bool QMMainDef::isSubMenu(QMPage page) const
@@ -126,6 +128,7 @@ class QuickSubMenu
   void setCurrent(QMPage n)
   {
     if (!subMenu) buildSubMenu();
+    if (!subMenu) return;
     quickMenu->getTopMenu()->setCurrent(menuButton);
     quickMenu->getTopMenu()->setDisabled(false);
     subMenu->setCurrent(getIndex(n));
@@ -135,6 +138,7 @@ class QuickSubMenu
   void activate()
   {
     if (!subMenu) buildSubMenu();
+    if (!subMenu) return;
     quickMenu->getTopMenu()->setCurrent(menuButton);
     quickMenu->getTopMenu()->setDisabled(false);
     quickMenu->getTopMenu()->clearFocus();
@@ -143,7 +147,8 @@ class QuickSubMenu
 
   void buildSubMenu()
   {
-    subMenu = new QuickMenuGroup(parent);
+    subMenu = new (std::nothrow) QuickMenuGroup(parent);
+    if (!subMenu) return;
 
     for (int i = 0; mainDef->subMenuItems[i].icon < EDGETX_ICONS_COUNT; i += 1) {
       auto pg = mainDef->subMenuItems[i].qmPage;
@@ -263,9 +268,10 @@ QuickMenu::QuickMenu() :
   lv_obj_set_size(sep, QM_W, PAD_THREE);
 
   auto mask = getBuiltinIcon(ICON_TOP_LOGO);
-  new StaticIcon(this, (QM_W - mask->width) / 2, 0, ICON_TOP_LOGO, COLOR_THEME_QM_FG_INDEX);
+  new (std::nothrow) StaticIcon(this, (QM_W - mask->width) / 2, 0,
+                                ICON_TOP_LOGO, COLOR_THEME_QM_FG_INDEX);
 
-  new ButtonBase(
+  new (std::nothrow) ButtonBase(
     this, {0, 0, QM_W, EdgeTxStyles::UI_ELEMENT_HEIGHT},
     [=]() -> uint8_t {
       inSubMenu = false;
@@ -274,12 +280,14 @@ QuickMenu::QuickMenu() :
     },
     window_create);
 
-  auto box = new Window(this, {QM_MAIN_X, QM_MAIN_Y, QM_MAIN_W, QM_MAIN_H});
+  auto box = new (std::nothrow) Window(this, {QM_MAIN_X, QM_MAIN_Y, QM_MAIN_W, QM_MAIN_H});
+  if (!box) return;
 
-  mainMenu = new QuickMenuGroup(box);
+  mainMenu = new (std::nothrow) QuickMenuGroup(box);
+  if (!mainMenu) return;
 
 #if VERSION_MAJOR > 2
-  box = new Window(this, {QM_SUB_X, QM_SUB_Y, QM_SUB_W, QM_SUB_H});
+  box = new (std::nothrow) Window(this, {QM_SUB_X, QM_SUB_Y, QM_SUB_W, QM_SUB_H});
 
   updateFavorites();
 #endif
@@ -290,7 +298,9 @@ QuickMenu::QuickMenu() :
                   [=]() { onSelect(true); qmTopItems[i].action(); }, qmTopItems[i].enabled);
 #if VERSION_MAJOR > 2
     } else {
-      auto sub = new QuickSubMenu(box, this, &qmTopItems[i]);
+      if (!box) continue;
+      auto sub = new (std::nothrow) QuickSubMenu(box, this, &qmTopItems[i]);
+      if (!sub) continue;
       sub->addButton();
       subMenus.emplace_back(sub);
 #endif

@@ -1009,9 +1009,10 @@ void formatNumberAsString(char *buffer, uint8_t buffer_size, int32_t val,
                           LcdFlags flags, uint8_t len, const char *prefix,
                           const char *suffix)
 {
-  if (buffer) {
-    char str[48 + 1];  // max=16 for the prefix, 16 chars for the number, 16
-                       // chars for the suffix
+  if (buffer && buffer_size > 0) {
+    buffer[0] = '\0';
+    char str[48 + 1] = {};  // max=16 for the prefix, 16 chars for the number,
+                             // 16 chars for the suffix, and NUL terminator
     char *s = str + 32;
     *s = '\0';
     int idx = 0;
@@ -1042,16 +1043,26 @@ void formatNumberAsString(char *buffer, uint8_t buffer_size, int32_t val,
       }
     }
     if (suffix) {
-      strncpy(&str[32], suffix, 16);
+      size_t suffixLen = 0;
+      while (suffixLen < 16 && suffix[suffixLen] != '\0') {
+        ++suffixLen;
+      }
+      memcpy(&str[32], suffix, suffixLen);
+      str[32 + suffixLen] = '\0';
     }
-    strncpy(buffer, s, buffer_size);
+    size_t copyLen = 0;
+    while (copyLen + 1 < buffer_size && s[copyLen] != '\0') {
+      buffer[copyLen] = s[copyLen];
+      ++copyLen;
+    }
+    buffer[copyLen] = '\0';
   }
 }
 
 std::string formatNumberAsString(int32_t val, LcdFlags flags, uint8_t len,
                                  const char *prefix, const char *suffix)
 {
-  char s[49];
+  char s[49] = {};
   formatNumberAsString(s, 49, val, flags, len, prefix, suffix);
   return std::string(s);
 }
@@ -1108,7 +1119,7 @@ std::string getGPSCoord(int32_t value, const char *direction, bool seconds)
   }
   *tmp++ = direction[value >= 0 ? 0 : 1];
   *tmp = '\0';
-  return std::string(s);
+  return std::string(s, tmp - s);
 }
 
 std::string getGPSSensorValue(int32_t longitude, int32_t latitude, LcdFlags flags)
@@ -1294,11 +1305,13 @@ int8_t maxTimezone() { return 14 * 4; }
 
 std::string timezoneDisplay(int tz)
 {
-  char s[16];
+  char s[16] = {};
   int h = abs(tz / 4);
   int m = abs(tz % 4) * 15;
-  sprintf(s, "%s%d:%02d", (tz < 0) ? "-" : "", h, m);
-  return std::string(s);
+  int len = snprintf(s, sizeof(s), "%s%d:%02d", (tz < 0) ? "-" : "", h, m);
+  if (len < 0) return std::string();
+  if (static_cast<size_t>(len) >= sizeof(s)) len = sizeof(s) - 1;
+  return std::string(s, len);
 }
 
 int timezoneIndex(int8_t tzHour, int8_t tzMinute)

@@ -22,6 +22,7 @@
 #include <cinttypes>
 
 #include <stdio.h>
+#include <string.h>
 #include "yaml_bits.h"
 #include "yaml_parser.h"
 
@@ -111,7 +112,9 @@ bool yaml_is_zero(uint8_t* data, uint32_t bitoffs, uint32_t bits)
 
   if(_IS_ALIGNED(data)) {
     while (bits >= 32) {
-      if (*(uint32_t*)data) return false;
+      uint32_t word;
+      memcpy(&word, data, sizeof(word));
+      if (word) return false;
       data += 4;
       bits -= 32;
     }

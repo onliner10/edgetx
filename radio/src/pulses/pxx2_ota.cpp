@@ -65,6 +65,7 @@ const char* Pxx2OtaUpdate::nextStep(uint8_t step, const char* rxName,
 
     auto drv = modulePortGetSerialDrv(mod_st->tx);
     auto ctx = modulePortGetCtx(mod_st->tx);
+    if (!drv) return "Module port unavailable";
     drv->sendBuffer(ctx, module_buffer, pxx2.getSize());
 
     if (waitStep(step + 1, 20)) {
@@ -158,5 +159,4 @@ void Pxx2OtaUpdate::flashFirmware(const char * filename, ProgressHandler progres
 
   mixerTaskStart();
 }
-
 

@@ -194,16 +194,16 @@ static void ghostSendPulses(void* ctx, uint8_t* buffer, int16_t* channels, uint8
 
 #if defined(LUA)
   if (outputTelemetryBuffer.destination == TELEMETRY_ENDPOINT_SPORT) {
-    auto len = outputTelemetryBuffer.size;
-    auto f_data = outputTelemetryBuffer.data;
-    while (len >= 12) { // type(1B) + payload(10B) + crc(1B)
-      // insert address byte
+    constexpr uint8_t payloadSize = 12;
+    constexpr uint8_t frameSize = payloadSize + 2;
+    const uint8_t chunks =
+        min<uint8_t>(outputTelemetryBuffer.size / payloadSize,
+                     MODULE_BUFFER_SIZE / frameSize);
+    for (uint8_t i = 0; i < chunks; i += 1) {
       *p_data++ = getGhostModuleAddr();
-      // and length
-      *p_data++ = 12;
-      memcpy(p_data, f_data, 12);
-      p_data += 12; f_data += 12;
-      len -= 12;
+      *p_data++ = payloadSize;
+      memcpy(p_data, outputTelemetryBuffer.data + i * payloadSize, payloadSize);
+      p_data += payloadSize;
     }
     outputTelemetryBuffer.reset();
   } else
@@ -218,6 +218,7 @@ static void ghostSendPulses(void* ctx, uint8_t* buffer, int16_t* channels, uint8
 
   auto drv = modulePortGetSerialDrv(mod_st->tx);
   auto drv_ctx = modulePortGetCtx(mod_st->tx);
+  if (!drv) return;
   drv->sendBuffer(drv_ctx, buffer, p_data - buffer);
 }
 

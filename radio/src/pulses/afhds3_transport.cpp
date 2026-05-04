@@ -267,6 +267,7 @@ void Transport::sendBuffer()
 #if !defined(SIMU)
   auto drv = modulePortGetSerialDrv(mod_st->tx);
   auto ctx = modulePortGetCtx(mod_st->tx);
+  if (!drv) return;
   drv->sendBuffer(ctx, (uint8_t*)trsp.trsp_buffer, trsp.getFrameSize());
 #endif
 }

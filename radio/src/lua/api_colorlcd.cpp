@@ -22,8 +22,12 @@
 #define LUA_LIB
 
 #include <cctype>
+#include <cstdint>
 #include <cstdio>
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
+#include <new>
 
 #include "edgetx.h"
 #include "widget.h"
@@ -35,6 +39,41 @@
 #define BITMAP_METATABLE "BITMAP*"
 
 BitmapBuffer* luaLcdBuffer  = nullptr;
+
+static uint16_t luaReadU16Le(const char* data)
+{
+  const auto* bytes = reinterpret_cast<const uint8_t*>(data);
+  return uint16_t(bytes[0]) | (uint16_t(bytes[1]) << 8);
+}
+
+static const MaskBitmap* luaCheckMaskBitmap(lua_State* L, int index,
+                                            uint8_t** alignedCopy)
+{
+  size_t len = 0;
+  const char* data = luaL_checklstring(L, index, &len);
+  *alignedCopy = nullptr;
+  if (!data || len < sizeof(MaskBitmap)) return nullptr;
+
+  const size_t headerSize = sizeof(MaskBitmap);
+  const uint16_t width = luaReadU16Le(data);
+  const uint16_t height = luaReadU16Le(data + sizeof(uint16_t));
+  if (height != 0 && size_t(width) > (len - headerSize) / height) {
+    return nullptr;
+  }
+
+  const size_t requiredLen = headerSize + size_t(width) * height;
+  if (len < requiredLen) return nullptr;
+
+  if ((reinterpret_cast<uintptr_t>(data) % alignof(MaskBitmap)) == 0) {
+    return reinterpret_cast<const MaskBitmap*>(static_cast<const void*>(data));
+  }
+
+  *alignedCopy = static_cast<uint8_t*>(malloc(requiredLen));
+  if (!*alignedCopy) return nullptr;
+
+  memcpy(*alignedCopy, data, requiredLen);
+  return reinterpret_cast<const MaskBitmap*>(static_cast<const void*>(*alignedCopy));
+}
 
 /*luadoc
 @function lcd.refresh()
@@ -510,7 +549,7 @@ static int luaOpenBitmap(lua_State *L)
   const char *filename = luaL_checkstring(L, 1);
 
   BitmapBuffer **b =
-      (BitmapBuffer **)lua_newuserdata(L, sizeof(BitmapBuffer *));
+      (BitmapBuffer **)lua_newuserdata(L, sizeof(std::uintptr_t));
 
   if (luaExtraMemoryUsage > LUA_MEM_EXTRA_MAX) {
     // already allocated more than max allowed, fail
@@ -598,7 +637,8 @@ static int luaBitmapResize(lua_State * L)
     return 1;
   }
 
-  BitmapBuffer **n = (BitmapBuffer**)lua_newuserdata(L, sizeof(void*));
+  BitmapBuffer **n =
+      (BitmapBuffer**)lua_newuserdata(L, sizeof(std::uintptr_t));
 
   if (luaExtraMemoryUsage > LUA_MEM_EXTRA_MAX) {
     // already allocated more than max allowed, fail
@@ -606,9 +646,11 @@ static int luaBitmapResize(lua_State * L)
           luaExtraMemoryUsage, LUA_MEM_EXTRA_MAX);
     *n = 0;
   } else {
-    *n = new BitmapBuffer(BMP_ARGB4444, w, h);
-    (*n)->clear();
-    (*n)->drawScaledBitmap(b, 0, 0, w, h);
+    *n = new (std::nothrow) BitmapBuffer(BMP_ARGB4444, w, h);
+    if (*n) {
+      (*n)->clear();
+      (*n)->drawScaledBitmap(b, 0, 0, w, h);
+    }
   }
 
   if (*n) {
@@ -642,7 +684,12 @@ static int luaBitmapTo8bitMask(lua_State * L)
   if (b) {
     size_t size;
     auto mask = b->to8bitMask(&size);
-    lua_pushlstring(L, (char*)mask, size);
+    if (mask) {
+      lua_pushlstring(L, (char*)mask, size);
+      free(mask);
+    } else {
+      lua_pushlstring(L, "\x00\x00\x00\x00", 4);
+    }
   }
   else {
     lua_pushlstring(L, "\x00\x00\x00\x00", 4);
@@ -727,16 +774,18 @@ static int luaLcdDrawBitmapPattern(lua_State *L)
   if (!luaLcdAllowed || !luaLcdBuffer)
     return 0;
 
-  const char* m = luaL_checkstring(L, 1);
+  uint8_t* alignedCopy = nullptr;
+  const MaskBitmap* m = luaCheckMaskBitmap(L, 1, &alignedCopy);
 
   if (m) {
     auto x = luaL_checkinteger(L, 2);
     auto y = luaL_checkinteger(L, 3);
     auto flags = (LcdFlags)luaL_optinteger(L, 4, 0);
     flags = colorToRGB(flags);
-    luaLcdBuffer->drawBitmapPattern(x, y, reinterpret_cast<const MaskBitmap*>(m), flags);
+    luaLcdBuffer->drawBitmapPattern(x, y, m, flags);
   }
 
+  free(alignedCopy);
   return 0;
 }
 
@@ -764,7 +813,8 @@ static int luaLcdDrawBitmapPatternPie(lua_State *L)
   if (!luaLcdAllowed || !luaLcdBuffer)
     return 0;
 
-  const char* m = luaL_checkstring(L, 1);
+  uint8_t* alignedCopy = nullptr;
+  const MaskBitmap* m = luaCheckMaskBitmap(L, 1, &alignedCopy);
 
   if (m) {
     coord_t x = luaL_checkinteger(L, 2);
@@ -773,9 +823,10 @@ static int luaLcdDrawBitmapPatternPie(lua_State *L)
     int endAngle = luaL_checkinteger(L, 5);
     LcdFlags flags = luaL_optinteger(L, 6, 0);
     flags = colorToRGB(flags);
-    luaLcdBuffer->drawBitmapPatternPie(x, y, reinterpret_cast<const MaskBitmap*>(m), flags, startAngle, endAngle);
+    luaLcdBuffer->drawBitmapPatternPie(x, y, m, flags, startAngle, endAngle);
   }
 
+  free(alignedCopy);
   return 0;
 }
 

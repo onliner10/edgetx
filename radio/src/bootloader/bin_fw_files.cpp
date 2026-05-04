@@ -50,7 +50,7 @@ struct FWFileInfo {
 
 // 'public' variables
 static FWFileInfo  fwFiles[MAX_FW_FILES];
-static uint8_t     Block_buffer[BLOCK_LEN];
+alignas(uint32_t) static uint8_t     Block_buffer[BLOCK_LEN];
 static UINT        BlockCount;
 
 static void flashWriteBlock()
@@ -59,7 +59,9 @@ static void flashWriteBlock()
   uint32_t blockOffset = 0;
 #if !defined(SIMU)
   while (BlockCount) {
-    flashWrite((uint32_t *)firmwareAddress, (uint32_t *)&Block_buffer[blockOffset]);
+    const auto page = static_cast<const uint32_t*>(
+        static_cast<const void*>(&Block_buffer[blockOffset]));
+    flashWrite((uint32_t *)firmwareAddress, page);
     blockOffset += FLASH_PAGESIZE;
     firmwareAddress += FLASH_PAGESIZE;
     if (BlockCount > FLASH_PAGESIZE) {
@@ -280,4 +282,3 @@ bool firmwareWriteBlock(uint32_t* progress)
 
   return false;
 }
-

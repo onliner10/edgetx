@@ -24,6 +24,8 @@
 #include "view_main.h"
 #include "widget.h"
 
+#include <new>
+
 WidgetsContainer* customScreens[MAX_CUSTOM_SCREENS] = {};
 
 const LayoutOption defaultLayoutOptions[] = {LAYOUT_COMMON_OPTIONS,
@@ -216,6 +218,7 @@ LayoutFactory::LayoutFactory(const char* id, const char* name, const LayoutOptio
   getRegisteredLayouts().push_back(this);
 
   bitmap = (MaskBitmap*)malloc(align32(BM_W * BM_H + sizeof(MaskBitmap)));
+  if (!bitmap) return;
   bitmap->width = BM_W;
   bitmap->height = BM_H;
 
@@ -312,7 +315,7 @@ Layout::Layout(Window* parent, const LayoutFactory* factory,
     factory(factory),
     zoneMap(zoneMap), screenNum(screenNum)
 {
-  decoration = new ViewMainDecoration(this);
+  decoration = new (std::nothrow) ViewMainDecoration(this);
   setWindowFlag(NO_FOCUS);
   decorationUpdateMsg.subscribe(Messaging::DECORATION_UPDATE, [=](uint32_t param) { updateDecorations(); });
   updateDecorations();
@@ -321,6 +324,7 @@ Layout::Layout(Window* parent, const LayoutFactory* factory,
 
 void Layout::updateDecorations()
 {
+  if (!decoration) return;
   // Set visible decoration
   decoration->setSlidersVisible(hasSliders());
   decoration->setTrimsVisible(hasTrims());
@@ -330,7 +334,7 @@ void Layout::updateDecorations()
 
 void Layout::show(bool visible)
 {
-  decoration->show(visible);
+  if (decoration) decoration->show(visible);
   if (visible && zoneUpdateRequired) {
     zoneUpdateRequired = false;
     // and update relevant windows
@@ -351,7 +355,8 @@ rect_t Layout::getWidgetsZone() const
   if (hasFullScreenWidget())
     return {0, 0, LCD_W, LCD_H};
 
-  return decoration->getWidgetsZone(hasTopbar());
+  if (decoration) return decoration->getWidgetsZone(hasTopbar());
+  return {0, 0, LCD_W, LCD_H};
 }
 
 rect_t Layout::getZone(unsigned int index) const
@@ -393,7 +398,7 @@ void Layout::removeWidget(unsigned int index)
 Widget* Layout::createWidget(unsigned int index,
                       const WidgetFactory* factory)
 {
-  if (index >= zoneCount) return nullptr;
+  if (!widgets || index >= zoneCount) return nullptr;
 
   // remove old one if existing
   removeWidget(index);
@@ -411,6 +416,7 @@ Widget* Layout::createWidget(unsigned int index,
 void Layout::load()
 {
   unsigned int count = getZonesCount();
+  if (!widgets) return;
   for (unsigned int i = 0; i < count; i++) {
     // remove old widget
     if (widgets[i]) {

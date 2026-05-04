@@ -21,6 +21,8 @@
 #include "form.h"
 #include "etx_lv_theme.h"
 
+#include <new>
+
 //-----------------------------------------------------------------------------
 
 void SliderBase::slider_changed_cb(lv_event_t* e)
@@ -61,7 +63,7 @@ void SliderBase::update()
 void SliderBase::deleteLater()
 {
   if (!deleted()) {
-    if (tickPts) delete tickPts;
+    if (tickPts) delete[] tickPts;
     Window::deleteLater();
   }
 }
@@ -99,7 +101,7 @@ void SliderBase::setColor(LcdFlags color)
   etx_bg_color_from_flags(slider, color, LV_PART_KNOB);
   if (tickPts)
     for (int i = 0; i < (vmax - vmin - 1); i += 1)
-      etx_bg_color_from_flags(tickPts[i], color);
+      if (tickPts[i]) etx_bg_color_from_flags(tickPts[i], color);
 }
 
 //-----------------------------------------------------------------------------
@@ -164,7 +166,9 @@ Slider::Slider(Window* parent, coord_t width, int32_t vmin, int32_t vmax,
   padLeft(PAD_LARGE);
   padRight(PAD_LARGE);
 
-  slider = (new FormField(this, rect_t{}, slider_create))->getLvObj();
+  auto sliderField = new (std::nothrow) FormField(this, rect_t{}, slider_create);
+  if (!sliderField) return;
+  slider = sliderField->getLvObj();
   lv_obj_set_width(slider, lv_pct(100));
 
   lv_obj_add_event_cb(slider, SliderBase::slider_changed_cb, LV_EVENT_VALUE_CHANGED, this);
@@ -173,13 +177,17 @@ Slider::Slider(Window* parent, coord_t width, int32_t vmin, int32_t vmax,
   delayLoad();
 
   int range = vmax - vmin;
-  if (range < 10) {
-    tickPts = new lv_obj_t*[range - 1];
-    for (int n = 1; n < range; n += 1) {
-      lv_obj_t* p = lv_obj_create(lvobj);
-      lv_obj_set_size(p, PAD_TINY, PAD_MEDIUM);
-      etx_solid_bg(p, COLOR_THEME_PRIMARY2_INDEX);
-      tickPts[n - 1] = p;
+  if (range > 1 && range < 10) {
+    tickPts = new (std::nothrow) lv_obj_t*[range - 1];
+    if (tickPts) {
+      for (int n = 1; n < range; n += 1) {
+        lv_obj_t* p = lv_obj_create(lvobj);
+        if (p) {
+          lv_obj_set_size(p, PAD_TINY, PAD_MEDIUM);
+          etx_solid_bg(p, COLOR_THEME_PRIMARY2_INDEX);
+        }
+        tickPts[n - 1] = p;
+      }
     }
   }
 
@@ -191,9 +199,10 @@ void Slider::delayedInit()
   coord_t w = lv_obj_get_width(lvobj) - PAD_LARGE * 2;
   coord_t x = -1;
   int range = vmax - vmin;
-  if (range < 10) {
+  if (tickPts && range > 1 && range < 10) {
     for (int n = 1; n < range; n += 1) {
-      lv_obj_set_pos(tickPts[n - 1], x + (w * n) / range, 1);
+      if (tickPts[n - 1])
+        lv_obj_set_pos(tickPts[n - 1], x + (w * n) / range, 1);
     }
   }
 }
@@ -260,7 +269,9 @@ VerticalSlider::VerticalSlider(Window* parent, coord_t height, int32_t vmin, int
   padTop(PAD_LARGE);
   padBottom(PAD_LARGE);
 
-  slider = (new FormField(this, rect_t{}, vslider_create))->getLvObj();
+  auto sliderField = new (std::nothrow) FormField(this, rect_t{}, vslider_create);
+  if (!sliderField) return;
+  slider = sliderField->getLvObj();
   lv_obj_set_height(slider, lv_pct(100));
 
   lv_obj_add_event_cb(slider, SliderBase::slider_changed_cb, LV_EVENT_VALUE_CHANGED, this);
@@ -269,13 +280,17 @@ VerticalSlider::VerticalSlider(Window* parent, coord_t height, int32_t vmin, int
   delayLoad();
 
   int range = vmax - vmin;
-  if (range < 10) {
-    tickPts = new lv_obj_t*[range - 1];
-    for (int n = 1; n < range; n += 1) {
-      lv_obj_t* p = lv_obj_create(lvobj);
-      lv_obj_set_size(p, PAD_MEDIUM, PAD_TINY);
-      etx_solid_bg(p, COLOR_THEME_PRIMARY2_INDEX);
-      tickPts[n - 1] = p;
+  if (range > 1 && range < 10) {
+    tickPts = new (std::nothrow) lv_obj_t*[range - 1];
+    if (tickPts) {
+      for (int n = 1; n < range; n += 1) {
+        lv_obj_t* p = lv_obj_create(lvobj);
+        if (p) {
+          lv_obj_set_size(p, PAD_MEDIUM, PAD_TINY);
+          etx_solid_bg(p, COLOR_THEME_PRIMARY2_INDEX);
+        }
+        tickPts[n - 1] = p;
+      }
     }
   }
 
@@ -287,9 +302,10 @@ void VerticalSlider::delayedInit()
   coord_t h = lv_obj_get_height(lvobj) - PAD_LARGE * 2;
   coord_t y = -1;
   int range = vmax - vmin;
-  if (range < 10) {
+  if (tickPts && range > 1 && range < 10) {
     for (int n = 1; n < range; n += 1) {
-      lv_obj_set_pos(tickPts[n - 1], 1, y + (h * n) / range);
+      if (tickPts[n - 1])
+        lv_obj_set_pos(tickPts[n - 1], 1, y + (h * n) / range);
     }
   }
 }
