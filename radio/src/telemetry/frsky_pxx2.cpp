@@ -519,6 +519,10 @@ static void processOtaUpdateFrame(uint8_t module, const uint8_t * frame)
     }
   }
   else if (destination->step == OTA_UPDATE_EOF) {
+    if (!pxx2FrameHasIndex(frame, 3)) {
+      return;
+    }
+
     if (frame[3] == 0x02) {
       destination->step = OTA_UPDATE_EOF_ACK;
     }
