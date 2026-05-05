@@ -48,7 +48,7 @@ enum {
 void mlinkSetDefault(int index, uint16_t id, uint8_t subId, uint8_t instance);
 
 // Used by multi protocol
-void processMLinkPacket(const uint8_t *packet, bool multi);
+void processMLinkPacket(const uint8_t *packet, bool multi, uint8_t len);
 
 // used by telemetry driver
 #define MSB_EXT_MODULE_PACKET_LEN  18   // packet length minus start and stop byte
