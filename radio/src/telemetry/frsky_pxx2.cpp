@@ -573,6 +573,10 @@ static void processModuleFrame(uint8_t module, const uint8_t *frame,
 
 static void processToolsFrame(uint8_t module, const uint8_t * frame)
 {
+  if (!pxx2FrameHasIndex(frame, 2)) {
+    return;
+  }
+
   switch (frame[2]) {
     case PXX2_TYPE_ID_POWER_METER:
       processPowerMeterFrame(module, frame);

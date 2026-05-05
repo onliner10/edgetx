@@ -745,6 +745,19 @@ TEST_F(PulsesTest, pxx2RejectsModuleFrameWithoutId)
   SUCCEED();
 }
 
+TEST_F(PulsesTest, pxx2RejectsToolsFrameWithoutId)
+{
+  GuardedPxx2Frame guardedFrame(1);
+  ASSERT_TRUE(guardedFrame.isValid());
+
+  uint8_t * frame = guardedFrame.data();
+  frame[1] = PXX2_TYPE_C_POWER_METER;
+
+  processPXX2Frame(INTERNAL_MODULE, frame, nullptr, nullptr);
+
+  SUCCEED();
+}
+
 TEST_F(PulsesTest, pxx2RejectsShortModuleSettingsFrame)
 {
   ModuleSettings moduleSettings = {};
