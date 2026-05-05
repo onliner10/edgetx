@@ -203,6 +203,10 @@ static void processModuleSettingsFrame(uint8_t module, const uint8_t * frame)
 
   ModuleSettings * destination = moduleState[module].moduleSettings;
 
+  if (!pxx2FrameHasIndex(frame, 5)) {
+    return;
+  }
+
   // Flag1
   if (frame[4] & PXX2_TX_SETTINGS_FLAG1_EXTERNAL_ANTENNA)
     destination->externalAntenna = 1;
