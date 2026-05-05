@@ -18,6 +18,7 @@
 
 #include "choice.h"
 
+#include "mainwindow.h"
 #include "menu.h"
 #include "etx_lv_theme.h"
 
@@ -46,6 +47,18 @@ static lv_obj_t* choice_create(lv_obj_t* parent)
   return etx_create(&choice_class, parent);
 }
 
+#if defined(SIMU)
+static bool forceChoiceImageCreateFailureForTest = false;
+#endif
+
+static lv_obj_t* choice_img_create(lv_obj_t* parent)
+{
+#if defined(SIMU)
+  if (forceChoiceImageCreateFailureForTest) return nullptr;
+#endif
+  return lv_img_create(parent);
+}
+
 ChoiceBase::ChoiceBase(Window* parent, const rect_t& rect,
                        int vmin, int vmax, const char* title,
                        std::function<int()> _getValue,
@@ -60,10 +73,12 @@ ChoiceBase::ChoiceBase(Window* parent, const rect_t& rect,
   padRight(PAD_SMALL);
 
   // Add image
-  lv_obj_t* img = lv_img_create(lvobj);
-  lv_img_set_src(
-      img, type == CHOICE_TYPE_DROPOWN ? LV_SYMBOL_DOWN : LV_SYMBOL_DIRECTORY);
-  lv_obj_set_pos(img, 0, PAD_TINY);
+  lv_obj_t* img = choice_img_create(lvobj);
+  if (img) {
+    lv_img_set_src(
+        img, type == CHOICE_TYPE_DROPOWN ? LV_SYMBOL_DOWN : LV_SYMBOL_DIRECTORY);
+    lv_obj_set_pos(img, 0, PAD_TINY);
+  }
 
   // Add label
   label = etx_label_create(lvobj);
@@ -236,3 +251,18 @@ void Choice::openMenu()
 
   menu->setCloseHandler([=]() { setEditMode(false); });
 }
+
+#if defined(SIMU)
+bool choiceImageCreateFailureLeavesChoiceUsableForTest()
+{
+  forceChoiceImageCreateFailureForTest = true;
+  auto choice = new (std::nothrow) Choice(
+      MainWindow::instance(), rect_t{0, 0, 100, EdgeTxStyles::UI_ELEMENT_HEIGHT},
+      0, 1, [] { return 0; });
+  forceChoiceImageCreateFailureForTest = false;
+
+  bool ok = choice && choice->getLvObj() != nullptr && choice->isVisible();
+  delete choice;
+  return ok;
+}
+#endif
