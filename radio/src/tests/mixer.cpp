@@ -1206,6 +1206,32 @@ TEST_F(MixerTest, TrainerChannelsDoesNotReadPastTrainerInputs)
   EXPECT_EQ(channelOutputs[MAX_OUTPUT_CHANNELS - 1], 0);
 }
 
+TEST_F(MixerTest, InvalidTrainerStickSourceDoesNotOverrideStick)
+{
+  const uint8_t stick = 0;
+  anaSetFiltered(inputMappingConvertMode(stick), 512);
+
+  g_eeGeneral.trainer.mix[stick].srcChn = MAX_STICKS;
+  g_eeGeneral.trainer.mix[stick].mode = TRAINER_REPL;
+  g_eeGeneral.trainer.mix[stick].studWeight = 100;
+  trainerInput[MAX_STICKS] = -512;
+
+  g_model.customFn[0].swtch = SWSRC_ON;
+  g_model.customFn[0].func = FUNC_TRAINER;
+  g_model.customFn[0].all.param = stick + 1;
+  g_model.customFn[0].active = true;
+  g_model.mixData[0].destCh = 0;
+  g_model.mixData[0].mltpx = MLTPX_REPL;
+  g_model.mixData[0].srcRaw = MIXSRC_FIRST_STICK + stick;
+  g_model.mixData[0].weight = makeSourceNumVal(100);
+  trainerSetTimer(1);
+
+  evalMixes(1);
+  evalMixes(1);
+
+  EXPECT_EQ(channelOutputs[0], 512);
+}
+
 TEST_F(MixerTest, flightModeTransition)
 {
   int sw;

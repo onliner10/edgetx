@@ -624,7 +624,7 @@ void evalInputs(uint8_t mode)
           isTrainerValid()) {
         // trainer mode
         TrainerMix* td = &g_eeGeneral.trainer.mix[ch];
-        if (td->mode) {
+        if (td->mode && td->srcChn < DIM(g_eeGeneral.trainer.calib)) {
           uint8_t chStud = td->srcChn;
           int32_t vStud =
               (trainerInput[chStud] - g_eeGeneral.trainer.calib[chStud]);
