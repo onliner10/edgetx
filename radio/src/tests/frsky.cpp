@@ -21,9 +21,70 @@
 
 #include "gtests.h"
 
+#include <sys/mman.h>
+#include <unistd.h>
+
 void frskyDProcessPacket(const uint8_t *packet);
 bool checkSportPacket(const uint8_t *packet);
 bool checkSportPacket(const uint8_t *packet);
+
+namespace {
+
+class GuardedFrSkyDFrame
+{
+ public:
+  explicit GuardedFrSkyDFrame(size_t size):
+      mappingSize(0),
+      mapping(nullptr),
+      frame(nullptr)
+  {
+    long pageSize = sysconf(_SC_PAGESIZE);
+    if (pageSize <= 0 || size > static_cast<size_t>(pageSize)) {
+      return;
+    }
+
+    mappingSize = static_cast<size_t>(pageSize * 2);
+    mapping = mmap(nullptr, mappingSize, PROT_READ | PROT_WRITE,
+                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (mapping == MAP_FAILED) {
+      mapping = nullptr;
+      mappingSize = 0;
+      return;
+    }
+
+    if (mprotect(static_cast<uint8_t *>(mapping) + pageSize, pageSize,
+                 PROT_NONE) != 0) {
+      munmap(mapping, mappingSize);
+      mapping = nullptr;
+      mappingSize = 0;
+      return;
+    }
+
+    frame = static_cast<uint8_t *>(mapping) + pageSize - size;
+    memset(frame, 0, size);
+  }
+
+  ~GuardedFrSkyDFrame()
+  {
+    if (mapping != nullptr) {
+      munmap(mapping, mappingSize);
+    }
+  }
+
+  bool isValid() const { return frame != nullptr; }
+
+  uint8_t * data()
+  {
+    return frame;
+  }
+
+ private:
+  size_t mappingSize;
+  void * mapping;
+  uint8_t * frame;
+};
+
+}  // namespace
 
 TEST(FrSky, TelemetryValueWithMinAveraging)
 {
@@ -49,6 +110,17 @@ TEST(FrSky, TelemetryValueWithMinAveraging)
     testVal.set(100);
     EXPECT_EQ(testVal.value(), expected[testPos++]);
   }
+}
+
+TEST(FrSky, shortUserPacketDoesNotReadPastFrame)
+{
+  GuardedFrSkyDFrame frame(4);
+  ASSERT_TRUE(frame.isValid());
+
+  frame.data()[0] = USRPKT;
+  frame.data()[1] = 7;
+
+  frskyDProcessPacket(EXTERNAL_MODULE, frame.data(), 4);
 }
 
 TEST(FrSky, Vfas_0x39_HiPrecision)
@@ -513,4 +585,3 @@ TEST(FrSkySPORT, frskyCurrent)
   EXPECT_EQ(telemetryItems[0].valueMin, 5);
   EXPECT_EQ(telemetryItems[0].valueMax, 505);
 }
-
