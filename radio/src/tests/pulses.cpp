@@ -780,6 +780,25 @@ TEST_F(PulsesTest, pxx2RejectsShortResetFrame)
   EXPECT_EQ(moduleState[INTERNAL_MODULE].mode, MODULE_MODE_RESET);
 }
 
+TEST_F(PulsesTest, pxx2RejectsShortPowerMeterFrame)
+{
+  moduleState[INTERNAL_MODULE].mode = MODULE_MODE_POWER_METER;
+  reusableBuffer.powerMeter.power = 12;
+  reusableBuffer.powerMeter.peak = 34;
+
+  GuardedPxx2Frame guardedFrame(7);
+  ASSERT_TRUE(guardedFrame.isValid());
+
+  uint8_t * frame = guardedFrame.data();
+  frame[1] = PXX2_TYPE_C_POWER_METER;
+  frame[2] = PXX2_TYPE_ID_POWER_METER;
+
+  processPXX2Frame(INTERNAL_MODULE, frame, nullptr, nullptr);
+
+  EXPECT_EQ(reusableBuffer.powerMeter.power, 12);
+  EXPECT_EQ(reusableBuffer.powerMeter.peak, 34);
+}
+
 TEST_F(PulsesTest, pxx2RejectsShortTelemetryFrame)
 {
   GuardedPxx2Frame guardedFrame(3);

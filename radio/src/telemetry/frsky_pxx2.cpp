@@ -473,6 +473,10 @@ static void processPowerMeterFrame(uint8_t module, const uint8_t * frame)
     return;
   }
 
+  if (!pxx2FrameHasIndex(frame, 9)) {
+    return;
+  }
+
   reusableBuffer.powerMeter.power = (int16_t)read_u16_le(&frame[8]);
   if (!reusableBuffer.powerMeter.peak || reusableBuffer.powerMeter.power > reusableBuffer.powerMeter.peak) {
     reusableBuffer.powerMeter.peak = reusableBuffer.powerMeter.power;
