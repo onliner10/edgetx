@@ -588,6 +588,21 @@ TEST_F(PulsesTest, pxx2RejectsShortHardwareInfoFrame)
 
   EXPECT_EQ(moduleInformation.information.modelID, 0);
 }
+
+TEST_F(PulsesTest, pxx2RejectsShortTelemetryFrame)
+{
+  GuardedPxx2Frame guardedFrame(3);
+  ASSERT_TRUE(guardedFrame.isValid());
+
+  uint8_t * frame = guardedFrame.data();
+  frame[1] = PXX2_TYPE_C_MODULE;
+  frame[2] = PXX2_TYPE_ID_TELEMETRY;
+  frame[3] = 0;
+
+  processPXX2Frame(INTERNAL_MODULE, frame, nullptr, nullptr);
+
+  SUCCEED();
+}
 #endif
 
 #if defined(AFHDS3) && defined(HARDWARE_EXTERNAL_MODULE)

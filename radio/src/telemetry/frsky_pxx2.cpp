@@ -23,6 +23,7 @@
 
 #if defined(PXX2)
 
+#include "io/frsky_sport.h"
 #include "pulses/pxx2.h"
 #include "pulses/pxx2_transport.h"
 
@@ -357,6 +358,10 @@ static void processResetFrame(uint8_t module, const uint8_t * frame)
 
 static void processTelemetryFrame(uint8_t module, const uint8_t * frame)
 {
+  if (!pxx2FrameHasIndex(frame, 4 + sizeof(SportTelemetryPacket) - 1)) {
+    return;
+  }
+
   uint8_t origin = frame[3] & 0x03;
   sportProcessTelemetryPacketWithoutCrc(module, origin, &frame[4]);
 }
