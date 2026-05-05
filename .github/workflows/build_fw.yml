@@ -1,5 +1,5 @@
 ---
-name: Run tests and package firmware
+name: TX16S MK2/MK3 Firmware CI
 on:
   push:
     branches:
@@ -27,18 +27,23 @@ on:
   pull_request:
     paths: *trigger-paths
 
+env:
+  EDGE16_SUPPORTED_FLAVORS: 'tx16s;tx16smk3'
+
 jobs:
   test:
-    name: Run tests
+    name: Commit tests (${{ matrix.radio }})
     runs-on: ubuntu-latest
     if: |
       github.event_name != 'pull_request' ||
       !contains(github.event.pull_request.labels.*.name, 'ci: skip-fw')
     strategy:
       matrix:
-        target:
-          - tx16s
-          - tx16smk3
+        include:
+          - target: tx16s
+            radio: RadioMaster TX16S MK2
+          - target: tx16smk3
+            radio: RadioMaster TX16S MK3
     container:
       image: ghcr.io/edgetx/edgetx-dev:latest
       volumes:
@@ -52,7 +57,7 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
 
-      - name: Test ${{ matrix.target }}
+      - name: Test ${{ matrix.radio }}
         env:
           FLAVOR: ${{ matrix.target }}
           EDGE16_UV_ACTIVE: 1
@@ -63,16 +68,18 @@ jobs:
           uv run --with-requirements requirements.txt bash ./tools/commit-tests.sh
 
   native-sanitizers:
-    name: Native sanitizer tests (${{ matrix.target }})
+    name: Native sanitizer tests (${{ matrix.radio }})
     runs-on: ubuntu-latest
     if: |
       github.event_name != 'pull_request' ||
       !contains(github.event.pull_request.labels.*.name, 'ci: skip-fw')
     strategy:
       matrix:
-        target:
-          - tx16s
-          - tx16smk3
+        include:
+          - target: tx16s
+            radio: RadioMaster TX16S MK2
+          - target: tx16smk3
+            radio: RadioMaster TX16S MK3
     container:
       image: ghcr.io/edgetx/edgetx-dev:latest
       volumes:
@@ -98,16 +105,18 @@ jobs:
           uv run --with-requirements requirements.txt bash ./tools/commit-tests.sh
 
   native-tsan:
-    name: Native TSan tests (${{ matrix.target }})
+    name: Native TSan tests (${{ matrix.radio }})
     runs-on: ubuntu-latest
     if: |
       github.event_name != 'pull_request' &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     strategy:
       matrix:
-        target:
-          - tx16s
-          - tx16smk3
+        include:
+          - target: tx16s
+            radio: RadioMaster TX16S MK2
+          - target: tx16smk3
+            radio: RadioMaster TX16S MK3
     container:
       image: ghcr.io/edgetx/edgetx-dev:latest
       volumes:
@@ -132,16 +141,18 @@ jobs:
           uv run --with-requirements requirements.txt bash ./tools/commit-tests.sh
 
   firmware-safety:
-    name: Firmware safety analyzers (${{ matrix.target }})
+    name: Firmware safety analyzers (${{ matrix.radio }})
     runs-on: ubuntu-latest
     if: |
       github.event_name != 'pull_request' ||
       !contains(github.event.pull_request.labels.*.name, 'ci: skip-fw')
     strategy:
       matrix:
-        target:
-          - tx16s
-          - tx16smk3
+        include:
+          - target: tx16s
+            radio: RadioMaster TX16S MK2
+          - target: tx16smk3
+            radio: RadioMaster TX16S MK3
     container:
       image: ghcr.io/edgetx/edgetx-dev:latest
       volumes:
@@ -235,16 +246,18 @@ jobs:
           if-no-files-found: ignore
 
   gcc-analyzer:
-    name: GCC analyzer (${{ matrix.target }})
+    name: GCC analyzer (${{ matrix.radio }})
     runs-on: ubuntu-latest
     if: |
       github.event_name != 'pull_request' ||
       !contains(github.event.pull_request.labels.*.name, 'ci: skip-fw')
     strategy:
       matrix:
-        target:
-          - tx16s
-          - tx16smk3
+        include:
+          - target: tx16s
+            radio: RadioMaster TX16S MK2
+          - target: tx16smk3
+            radio: RadioMaster TX16S MK3
     container:
       image: ghcr.io/edgetx/edgetx-dev:latest
       volumes:
@@ -298,9 +311,9 @@ jobs:
           build-mode: manual
           config-file: ./.github/codeql/edge16-firmware.yml
 
-      - name: Build supported firmware for CodeQL
+      - name: Build TX16S MK2/MK3 firmware for CodeQL
         env:
-          FLAVOR: tx16s;tx16smk3
+          FLAVOR: ${{ env.EDGE16_SUPPORTED_FLAVORS }}
           FIRMWARE_TARGET: firmware
           EDGE16_UV_ACTIVE: 1
           EXTRA_OPTIONS: "-DWARNINGS_AS_ERRORS=YES -DEDGE16_SAFETY_CHECKS=ON"
@@ -382,7 +395,7 @@ jobs:
           if-no-files-found: ignore
 
   build:
-    name: Run builds
+    name: Firmware build (${{ matrix.radio }})
     needs:
       - test
       - native-sanitizers
@@ -395,9 +408,11 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'ci: skip-fw')
     strategy:
       matrix:
-        target:
-          - tx16s
-          - tx16smk3
+        include:
+          - target: tx16s
+            radio: RadioMaster TX16S MK2
+          - target: tx16smk3
+            radio: RadioMaster TX16S MK3
     container:
       image: ghcr.io/edgetx/edgetx-dev:latest
       volumes:
@@ -411,7 +426,7 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
 
-      - name: Build ${{ matrix.target }}
+      - name: Build ${{ matrix.radio }}
         env:
           FLAVOR: ${{ matrix.target }}
           EDGE16_UV_ACTIVE: 1
@@ -421,25 +436,25 @@ jobs:
           echo "Running firmware build"
           uv run --with-requirements requirements.txt bash ./tools/build-gh.sh
 
-      - name: Upload ${{ matrix.target }}
+      - name: Upload ${{ matrix.radio }} firmware
         uses: actions/upload-artifact@v7
         with:
           name: firmware-${{ matrix.target }}
           path: |
             fw.json
             LICENSE
-            *.bin
-            *.uf2
+            ${{ matrix.target }}-*.bin
+            ${{ matrix.target }}-*.uf2
           retention-days: 15
           if-no-files-found: error
 
   package:
-    name: Package firmwares
+    name: Package TX16S MK2/MK3 firmware
     needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Compose release filename
-        run: echo "artifact_name=edgetx-firmware-${GITHUB_REF##*/}" >> "$GITHUB_ENV"
+        run: echo "artifact_name=edge16-firmware-${GITHUB_REF##*/}" >> "$GITHUB_ENV"
 
       - name: Merge firmware artifact packages
         uses: actions/upload-artifact/merge@v7

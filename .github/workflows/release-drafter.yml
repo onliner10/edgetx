@@ -1,4 +1,4 @@
-name: Create Release Draft
+name: Draft Edge16 TX16S MK2/MK3 Release
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   release:
-    name: Create draft release
+    name: Create Edge16 release draft
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -105,14 +105,27 @@ jobs:
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
-      - name: Download all release artifacts
+      - name: Download TX16S MK2/MK3 release artifacts
         run: |
           TAG="${{ inputs.tag }}"
           COMMIT_SHA=$(git rev-parse "${TAG}^{commit}")
           echo "Tag $TAG points to commit: $COMMIT_SHA"
 
-          # Get the latest successful run ID for each unique workflow
-          WORKFLOW_RUNS=$(gh run list --commit "$COMMIT_SHA" --status success --json workflowName,databaseId,createdAt --jq 'group_by(.workflowName) | map(sort_by(.createdAt) | last) | .[].databaseId')
+          WORKFLOW_RUNS=$(gh run list --commit "$COMMIT_SHA" --status success --limit 100 --json workflowName,databaseId,createdAt --jq '
+            map(select(
+              .workflowName == "TX16S MK2/MK3 Firmware CI" or
+              .workflowName == "TX16S MK2/MK3 Companion" or
+              .workflowName == "Publish TX16S MK2/MK3 Firmware Release"
+            ))
+            | group_by(.workflowName)
+            | map(sort_by(.createdAt) | last)
+            | .[].databaseId
+          ')
+
+          if [ -z "$WORKFLOW_RUNS" ]; then
+            echo "::error::No successful TX16S MK2/MK3 release artifact workflows found for $COMMIT_SHA"
+            exit 1
+          fi
 
           mkdir -p release-assets
 
@@ -123,9 +136,11 @@ jobs:
 
           cd release-assets
 
-          # Clean up: Delete any folders ending in "-logs" BEFORE we start zipping
-          echo "Cleaning up log artifacts..."
-          rm -rf *-logs/
+          echo "Keeping only Edge16 release artifacts for TX16S MK2/MK3..."
+          find . -mindepth 1 -maxdepth 1 -type d \
+            ! -name 'edge16-firmware-*' \
+            ! -name 'edge16-cpn-*' \
+            -exec rm -rf {} +
 
           # Package remaining folders into zips
           for dir in */; do
@@ -164,50 +179,41 @@ jobs:
           tag_name: ${{ inputs.tag }}
           draft: true
           prerelease: ${{ contains(inputs.tag, '-rc') || contains(inputs.tag, '-beta') || contains(inputs.tag, '-alpha') }}
-          name: EdgeTX "${{ steps.version.outputs.codename }}" ${{ steps.version.outputs.version }}
+          name: Edge16 "${{ steps.version.outputs.codename }}" ${{ steps.version.outputs.version }}
           body: |
-            We are pleased to offer EdgeTX "${{ steps.version.outputs.codename }}" ${{ steps.version.outputs.version }}.
+            Edge16 "${{ steps.version.outputs.codename }}" ${{ steps.version.outputs.version }} is firmware and Companion support for RadioMaster TX16S MK2 and RadioMaster TX16S MK3 only.
 
             ${{ (contains(inputs.tag, '-rc') || contains(inputs.tag, '-beta') || contains(inputs.tag, '-alpha')) && '> [!WARNING]
-            > As this is a pre-release, it is virtually guaranteed there will still be some minor issues that need resolving before final release - some may be documented already under "known issues" section of these release notes or the associated tracking issue. During pre-releases, the matching SD card pack and voice pack versions to use are those marked/tagged ''Latest''.
-            >
-            > We **need** _your_ help in testing this release to ensure there are no major bugs or faults that will cause problems during flight.  Please ensure you back up your model and radio settings before updating, fully bench-test your models after updating, and report any issues you encounter. It is only with your feedback and testing by you, our community (and the assistance provided by partner manufacturers) which will allow us to identify and squash both new and old bugs, and progress onto a stable release version!! We simply cannot do this without you! :hugs: :beers:' || '' }}
+            > This is a pre-release for TX16S MK2/MK3 testers. Back up your radio and model settings before flashing, bench-test your models after updating, and report regressions before using it in the field.' || '' }}
 
             > [!WARNING]
-            > If you are using a STM32 F2 based radio, *stop right now*, this release is not for you! EdgeTX v2.11 is the last release series to support these radios. Check [this list](https://hackmd.io/@edgetx/B12oQyQKye) if you are unsure if this affects you. Because of this, EdgeTX v2.11 will continue to be supported alongside 2.12, 3.0, etc., with a focus on bug fixes.
+            > Supported radios are exactly RadioMaster TX16S MK2 and RadioMaster TX16S MK3. Do not flash these firmware files on any other EdgeTX radio.
 
             > [!WARNING]
-            > Radios based on STM32H7 MCUs update differently to older radios. Do **not** use the "Flash via USB" option in EdgeTX Buddy with them (yet). To update radios such as the Flysky PA01 & ST16, Jumper T15 Pro, RM TX15 and RM TX16S MK3, please follow the instructions in the [EdgeTX Manual](https://manual.edgetx.org/installing-and-updating-edgetx/updating-your-stm32h7-radio).
+            > TX16S MK3 is an STM32H7 radio and updates differently from TX16S MK2. Use the firmware file that matches your exact radio.
 
             > [!NOTE]
-            > For MacOS users, Companion is now only compiled for MacOS 12 and above. Stay with v2.10.5 or earlier if you need support for an older version of MacOS.
-
-            > [!NOTE]
-            > **Migration Information**
-            > - If you have an old OpenTX Companion (`.otx`) file you need to convert or open, you will need to use EdgeTX Companion v2.10 or earlier.
-            > - If you wish to upgrade from OpenTX 2.3 or EdgeTX 2.4/2.5, you must use either EdgeTX v2.8.x firmware or EdgeTX Companion v2.10.x.
-            >
-            > See the [EdgeTX Manual](https://manual.edgetx.org/installing-and-updating-edgetx) for more information.
+            > Companion artifacts are built only with TX16S MK2/MK3 WASM modules.
 
             ## Changes
 
             ${{ steps.changelog.outputs.changelog }}
 
             ## Supported radios
-            The full list of supported radios and their support status can be viewed [here on the EdgeTX website](https://edgetx.org/supportedradios).
+            - RadioMaster TX16S MK2 uses `tx16s-*.bin`.
+            - RadioMaster TX16S MK3 uses `tx16smk3-*`.
+
+            No other radio target is supported by this release.
 
             ## Installation Guide
-            https://manual.edgetx.org/edgetx-user-manual/installing-and-updating-edgetx
+            Download the release zip, extract it, choose the firmware file for your exact TX16S model, copy it to the radio SD card `FIRMWARE/` folder, then flash it from the bootloader.
 
-            ## Flash firmware via Chrome based browser
-            https://buddy.edgetx.org/#/flash?version=${{ steps.version.outputs.version }}
-
-            ## Language and Custom builds
-            [CloudBuild option in EdgeTX Buddy](https://buddy.edgetx.org/) will allow you build your own (supported) language firmware, with just a few clicks. Additionally, EdgeTX Companion also has some support for CloudBuild, and will automatically fetch firmware for a supported language when you use the "Update components" option. But you can also build your own firmware online [following this guide](https://github.com/EdgeTX/edgetx/wiki/Building-radio-firmware-in-a-web-browser-with-GitHub-CodeSpaces), request a specific build at TODO or ask on Discord for someone to build one for you.
+            ## Release assets
+            Firmware assets are intentionally limited to TX16S MK2/MK3 outputs. Safety, analyzer, and unsupported upstream artifacts are not attached to this draft.
 
             ## Known Limitations and Issues
             ${{ (contains(inputs.tag, '-rc') || contains(inputs.tag, '-beta') || contains(inputs.tag, '-alpha')) && '> [!WARNING]
-            - Please check TODO during the release candidate phase for any other release candidate-specific issues and status of fixes.' || '' }}
+            - Please track release-candidate issues before publishing this release as stable.' || '' }}
 
             ## UI/UX behavioral changes and/or new capabilities:
           files: release-assets/*.zip

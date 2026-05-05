@@ -1,14 +1,30 @@
-name: Sync from EdgeTX upstream
+name: Manual EdgeTX Upstream Sync
 
 on:
-  schedule:
-    - cron: '0 2 * * 1' # Weekly on Monday at 2 AM UTC
-  workflow_dispatch: # Manual trigger option
+  workflow_dispatch:
+    inputs:
+      branches:
+        description: 'Space-separated local branches to hard reset from EdgeTX upstream'
+        required: true
+        default: 'main'
+        type: string
+      confirm:
+        description: 'Type "hard reset from upstream" to confirm this destructive sync'
+        required: true
+        type: string
 
 jobs:
   sync:
+    name: Hard reset selected branches from upstream
     runs-on: ubuntu-latest
     steps:
+      - name: Confirm destructive sync
+        run: |
+          if [ "${{ inputs.confirm }}" != "hard reset from upstream" ]; then
+            echo "::error::Confirmation text did not match. This workflow hard-resets branches and must be run deliberately."
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v6
         with:
@@ -17,34 +33,28 @@ jobs:
 
       - name: Configure git
         run: |
-          git config user.name "EdgeTX Sync Bot"
-          git config user.email "sync-bot@edgetx.org"
+          git config user.name "Edge16 Sync Bot"
+          git config user.email "sync-bot@edge16.local"
 
-      - name: Sync branches from upstream (hard reset)
+      - name: Sync branches from upstream
         env:
-          BRANCHES: "main 2.11" # Add/modify branches here as needed
+          BRANCHES: ${{ inputs.branches }}
         run: |
           git remote add upstream https://github.com/EdgeTX/edgetx.git
           git fetch upstream
 
           for branch in $BRANCHES; do
-            echo "=== Syncing branch: $branch ==="
+            echo "Syncing branch: $branch"
 
-            # Check if upstream has this branch
-            if ! git ls-remote --heads upstream | grep -q "refs/heads/$branch"; then
-              echo "⚠️  Branch $branch does not exist in upstream, skipping..."
+            if ! git ls-remote --exit-code --heads upstream "$branch" >/dev/null 2>&1; then
+              echo "Branch $branch does not exist in upstream, skipping."
               continue
             fi
 
-            # Hard reset to upstream (creates exact copy with same SHA)
-            git checkout -B $branch upstream/$branch
+            git checkout -B "$branch" "upstream/$branch"
+            git push origin "$branch" --force
 
-            # Force push to origin
-            git push origin $branch --force
-
-            echo "✓ Branch $branch synced (SHA: $(git rev-parse HEAD))"
+            echo "Branch $branch synced to $(git rev-parse HEAD)"
           done
 
-          echo ""
-          echo "=== Sync Complete ==="
-          echo "All specified branches are now exact copies of upstream"
+          echo "Manual upstream sync complete."

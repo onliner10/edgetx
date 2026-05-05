@@ -1,4 +1,4 @@
-name: Deploy Documentation
+name: Deploy Edge16 Documentation
 
 on:
   push:

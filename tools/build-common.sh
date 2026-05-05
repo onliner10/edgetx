@@ -1,4 +1,5 @@
 EDGE16_SUPPORTED_TARGETS="tx16s tx16smk3"
+# Edge16 product support is limited to RadioMaster TX16S MK2 and TX16S MK3.
 
 ensure_uv_build_env() {
     if [[ "${EDGE16_UV_ACTIVE:-}" == "1" || "${EDGE16_SKIP_UV:-}" == "1" ]]; then

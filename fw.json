@@ -1,6 +1,6 @@
 {
     "targets": [
-        ["RadioMaster TX16S", "tx16s-"],
+        ["RadioMaster TX16S MK2", "tx16s-"],
         ["RadioMaster TX16S MK3", "tx16smk3-"]
     ],
     "changelog": "- Major initial bug fixes"
