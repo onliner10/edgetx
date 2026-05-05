@@ -25,6 +25,16 @@
 
 #include "edgetx.h"
 #include "etx_lv_theme.h"
+#include "mainwindow.h"
+
+#if defined(SIMU)
+static bool forceFmBufferMallocFailure = false;
+
+void listLineButtonForceFmBufferMallocFailureForTest(bool force)
+{
+  forceFmBufferMallocFailure = force;
+}
+#endif
 
 static void input_mix_line_constructor(const lv_obj_class_t* class_p,
                                        lv_obj_t* obj)
@@ -145,8 +155,29 @@ void InputMixButtonBase::setFlightModes(uint16_t modes)
   }
 
   if (!fm_canvas) {
-    fm_canvas = lv_canvas_create(lvobj);
-    fm_buffer = malloc(FM_CANVAS_WIDTH * FM_CANVAS_HEIGHT);
+    auto newCanvas = lv_canvas_create(lvobj);
+    if (!newCanvas) {
+      fm_modes = 0;
+      updateHeight();
+      return;
+    }
+
+#if defined(SIMU)
+    auto newBuffer = forceFmBufferMallocFailure
+                         ? nullptr
+                         : malloc(FM_CANVAS_WIDTH * FM_CANVAS_HEIGHT);
+#else
+    auto newBuffer = malloc(FM_CANVAS_WIDTH * FM_CANVAS_HEIGHT);
+#endif
+    if (!newBuffer) {
+      lv_obj_del(newCanvas);
+      fm_modes = 0;
+      updateHeight();
+      return;
+    }
+
+    fm_canvas = newCanvas;
+    fm_buffer = newBuffer;
     lv_canvas_set_buffer(fm_canvas, fm_buffer, FM_CANVAS_WIDTH,
                          FM_CANVAS_HEIGHT, LV_IMG_CF_ALPHA_8BIT);
     lv_obj_set_pos(fm_canvas, FM_X, FM_Y);
@@ -192,6 +223,37 @@ void InputMixButtonBase::setFlightModes(uint16_t modes)
 
   updateHeight();
 }
+
+#if defined(SIMU)
+bool listLineButtonMissingFmBufferLeavesNoCanvasForTest()
+{
+  class TestInputMixButton : public InputMixButtonBase
+  {
+   public:
+    TestInputMixButton(Window* parent) : InputMixButtonBase(parent, 0) {}
+
+    void refresh() override {}
+    void updatePos(coord_t, coord_t) override {}
+    void swapLvglGroup(InputMixButtonBase*) override {}
+
+    bool hasFlightModeCanvas() const { return fm_canvas != nullptr; }
+    bool hasFlightModeBuffer() const { return fm_buffer != nullptr; }
+
+   protected:
+    bool isActive() const override { return false; }
+  };
+
+  g_eeGeneral.modelFMDisabled = 0;
+  g_model.modelFMDisabled = OVERRIDE_ON;
+
+  auto button = new TestInputMixButton(MainWindow::instance());
+  listLineButtonForceFmBufferMallocFailureForTest(true);
+  button->setFlightModes(1);
+  listLineButtonForceFmBufferMallocFailureForTest(false);
+
+  return !button->hasFlightModeCanvas() && !button->hasFlightModeBuffer();
+}
+#endif
 
 void InputMixButtonBase::checkEvents()
 {
