@@ -186,40 +186,56 @@ bool Keyboard::attachKeyboard()
   if (!acceptsKeyboardInput()) return false;
 
   if (activeKeyboard) {
-    if (activeKeyboard == this) return false;
-    hide(false);
+    if (activeKeyboard == this) {
+      clearField(false);
+    } else {
+      hide(false);
+    }
   }
 
   activeKeyboard = this;
   return true;
 }
 
-void Keyboard::setField(FormField* newField)
+void Keyboard::showKeyboard()
+{
+  lv_obj_clear_flag(lvobj, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_clear_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+}
+
+bool Keyboard::bindField(FormField* newField, FieldBinding& binding) const
 {
   if (!newField || !newField->acceptsEvents() || !acceptsKeyboardInput())
-    return;
+    return false;
 
   lv_obj_t* obj = newField->getLvObj();
-  if (!obj) return;
+  if (!obj) return false;
 
   Window* newFieldContainer = nullptr;
   if (!fullScreen) {
     newFieldContainer = newField->getFullScreenWindow();
-    if (!newFieldContainer || !newFieldContainer->acceptsEvents()) return;
+    if (!newFieldContainer || !newFieldContainer->acceptsEvents())
+      return false;
   }
 
-  if (!attachKeyboard()) return;
+  binding = {newField, obj, newFieldContainer};
+  return true;
+}
+
+bool Keyboard::setField(const FieldBinding& binding)
+{
+  if (!attachKeyboard()) return false;
 
   if (fullScreen) {
     setTop(0);
     lv_obj_set_parent(lvobj, lv_layer_top());
     fieldContainer = nullptr;
   } else {
-    fieldContainer = newFieldContainer;
+    fieldContainer = binding.container;
     attach(fieldContainer);
 
     lv_area_t coords;
-    lv_obj_get_coords(obj, &coords);
+    lv_obj_get_coords(binding.obj, &coords);
 
     // place keyboard bellow the field with some margin
     setTop(max(coords.y2 + 21, LCD_H - height()));
@@ -229,12 +245,14 @@ void Keyboard::setField(FormField* newField)
     lv_obj_scroll_to_view(lvobj, LV_ANIM_OFF);
   }
 
-  newField->setEditMode(true);
+  binding.field->setEditMode(true);
 
-  lv_keyboard_set_textarea(keyboard, obj);
-  lv_obj_add_event_cb(obj, field_focus_leave, LV_EVENT_DEFOCUSED, nullptr);
+  lv_keyboard_set_textarea(keyboard, binding.obj);
+  lv_obj_add_event_cb(binding.obj, field_focus_leave, LV_EVENT_DEFOCUSED,
+                      nullptr);
   assignLvGroup(group, false);
 
-  field = newField;
-  fieldGroup = (lv_group_t*)lv_obj_get_group(obj);
+  field = binding.field;
+  fieldGroup = (lv_group_t*)lv_obj_get_group(binding.obj);
+  return true;
 }

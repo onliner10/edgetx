@@ -266,9 +266,7 @@ NumberKeyboard::NumberKeyboard() : Keyboard(KEYBOARD_HEIGHT, true)
 {
   if (!acceptsKeyboardInput()) return;
 
-  withAvailableLvObj([](lv_obj_t* obj) {
-    etx_solid_bg(obj, COLOR_THEME_SECONDARY3_INDEX);
-  });
+  etx_solid_bg(lvobj, COLOR_THEME_SECONDARY3_INDEX);
 
   if (!initRequiredLvObj(titleLabel,
                          [](lv_obj_t* parent) {
@@ -307,31 +305,14 @@ NumberKeyboard::~NumberKeyboard() { _instance = nullptr; }
 
 void NumberKeyboard::open(FormField* field, NumberEdit* edit)
 {
-  if (!field || !field->acceptsEvents()) return;
-
-  if (!_instance) {
-    _instance = Window::makeLive<NumberKeyboard>();
-    if (!_instance || !_instance->acceptsKeyboardInput()) {
-      _instance = nullptr;
-      return;
+  openKeyboard<NumberKeyboard>(_instance, field, [&](NumberKeyboard& keyboard) {
+    keyboard.numberEdit = edit;
+    set_keyboard_map(keyboard.keyboard, edit);
+    if (!directMode) {
+      lv_keyboard_set_textarea(keyboard.keyboard, nullptr);
     }
-  } else if (!_instance->acceptsKeyboardInput()) {
-    delete _instance;
-    _instance = nullptr;
-    return;
-  }
-
-  _instance->numberEdit = edit;
-  set_keyboard_map(_instance->keyboard, edit);
-
-  lv_obj_clear_flag(_instance->lvobj, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_clear_flag(_instance->keyboard, LV_OBJ_FLAG_HIDDEN);
-
-  _instance->setField(field);
-  if (!directMode) {
-    lv_keyboard_set_textarea(_instance->keyboard, nullptr);
-  }
-  refresh_edit_value(_instance->keyboard, edit);
+    refresh_edit_value(keyboard.keyboard, edit);
+  });
 }
 
 void NumberKeyboard::setTitleText(const char* value)

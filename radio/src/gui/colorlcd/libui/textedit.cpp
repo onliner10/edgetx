@@ -64,18 +64,14 @@ class TextArea : public FormField
   {
     // value may not be null-terminated
     std::string txt(value, length);
-    withAvailableLvObj([&](lv_obj_t* obj) {
-      lv_textarea_set_text(obj, txt.c_str());
-    });
+    lv_textarea_set_text(lvobj, txt.c_str());
   }
 
   void onClicked() override {
-    if (!acceptsEvents()) return;
     setEditMode(true);
   }
 
   void openKeyboard() {
-    if (!acceptsEvents()) return;
     TextKeyboard::open(this);
   }
 
@@ -102,13 +98,7 @@ class TextArea : public FormField
   void changeEnd(bool forceChanged = false) override
   {
     bool changed = false;
-    const char* text = nullptr;
-    if (!withAvailableLvObj([&](lv_obj_t* obj) {
-          text = lv_textarea_get_text(obj);
-        }) ||
-        !text) {
-      return;
-    }
+    auto text = lv_textarea_get_text(lvobj);
 
     if (strncmp(value, text, length) != 0) {
       changed = true;
@@ -166,8 +156,6 @@ void TextEdit::update()
 
 void TextEdit::openEdit()
 {
-  if (!acceptsEvents()) return;
-
   if (edit == nullptr) {
     auto newEdit = Window::makeLive<TextArea>(
         this, rect_t{0, 0, width(), height()}, text, length);
@@ -176,22 +164,18 @@ void TextEdit::openEdit()
     edit->setChangeHandler([=]() {
       update();
       if (updateHandler) updateHandler();
-      withAvailableLvObj([](lv_obj_t* obj) {
-        lv_group_focus_obj(obj);
-      });
+      focus();
       edit->hide();
     });
     edit->setCancelHandler([=]() {
-      withAvailableLvObj([](lv_obj_t* obj) {
-        lv_group_focus_obj(obj);
-      });
+      focus();
       edit->hide();
     });
   }
   if (!syncOverlay(edit)) return;
   edit->show();
-  if (auto editObj = edit->getLvObj()) {
-    lv_group_focus_obj(editObj);
+  if (edit->focus()) {
+    auto editObj = edit->getLvObj();
     lv_obj_add_state(editObj, LV_STATE_FOCUSED | LV_STATE_EDITED);
   }
   edit->openKeyboard();
@@ -205,8 +189,8 @@ void TextEdit::preview(bool edited, char* text, uint8_t length)
       this, rect_t{0, 0, width(), height()}, text, length);
   if (!edit) return;
   edit->setWindowFlag(NO_CLICK);
-  if (auto editObj = edit->getLvObj()) {
-    lv_group_focus_obj(editObj);
+  if (edit->focus()) {
+    auto editObj = edit->getLvObj();
     lv_obj_add_state(editObj, LV_STATE_FOCUSED);
     if (edited) lv_obj_add_state(editObj, LV_STATE_EDITED);
   }

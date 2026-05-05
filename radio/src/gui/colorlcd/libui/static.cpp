@@ -292,14 +292,15 @@ StaticImage::StaticImage(Window* parent, const rect_t& rect,
 
 void StaticImage::setSource(std::string filename)
 {
-  if (!acceptsEvents()) return;
+  auto obj = liveLvObj();
+  if (!obj) return;
 
   if (!filename.empty()) {
     std::string fullpath = std::string("A");
     if (filename[0] != PATH_SEPARATOR[0]) fullpath += PATH_SEPARATOR;
     fullpath += filename;
 
-    if (!image) image = createStaticImageObject(lvobj);
+    if (!image) image = createStaticImageObject(obj);
     if (!image) return;
 
     lv_obj_set_pos(image, 0, 0);
@@ -356,7 +357,8 @@ StaticBitmap::StaticBitmap(Window* parent, const rect_t& rect,
 
 void StaticBitmap::setSource(const char *filename)
 {
-  if (!acceptsEvents()) return;
+  auto obj = liveLvObj();
+  if (!obj) return;
 
   if (filename) {
     if (filename[0] == '\0') {
@@ -372,7 +374,7 @@ void StaticBitmap::setSource(const char *filename)
         return;
       }
 
-      lv_obj_t* newCanvas = lv_canvas_create(lvobj);
+      lv_obj_t* newCanvas = lv_canvas_create(obj);
       if (!newCanvas) {
         delete newImg;
         return;

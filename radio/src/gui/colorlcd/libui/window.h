@@ -114,6 +114,7 @@ class Window
   virtual void deleteLater();
 
   bool hasFocus() const;
+  bool focus();
 
   void setRect(rect_t value)
   {
@@ -213,6 +214,7 @@ class Window
   bool isAvailable() const { return availability == Availability::Available; }
   bool hasLiveLvObj() const { return !_deleted && lvobj; }
   bool acceptsEvents() const { return isAvailable() && hasLiveLvObj(); }
+  bool loadLvglScreen();
 
 #if defined(HARDWARE_TOUCH)
   void addBackButton();
@@ -289,6 +291,7 @@ class Window
   virtual void addChild(Window *window);
 
   bool hasLvObj() const { return lvobj != nullptr; }
+  lv_obj_t* liveLvObj() const { return acceptsEvents() ? lvobj : nullptr; }
   bool requireLvObj(lv_obj_t* obj);
   void failClosed();
   bool syncOverlay(Window* overlay);

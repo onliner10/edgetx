@@ -74,13 +74,9 @@ void TableField::table_event(const lv_obj_class_t* class_p, lv_event_t* e)
 {
   lv_obj_t* obj = lv_event_get_target(e);
   if (obj) {
-    TableField* tf = (TableField*)lv_obj_get_user_data(obj);
+    auto tf = static_cast<TableField*>(Window::fromAvailableLvObj(obj));
     if (tf) {
       lv_event_code_t code = lv_event_get_code(e);
-      if (!tf->acceptsEvents()) {
-        lv_obj_event_base(&table_class, e);
-        return;
-      }
 
       switch (code) {
         case LV_EVENT_VALUE_CHANGED: {
@@ -283,7 +279,7 @@ int TableField::getSelected() const
 
 bool TableField::onLongPress()
 {
-  if (!acceptsEvents()) return false;
+  if (!liveLvObj()) return false;
 
   TRACE("LONG_PRESS");
   if (longPressHandler) {
@@ -296,13 +292,18 @@ bool TableField::onLongPress()
 
 void TableField::setAutoEdit()
 {
-  if (autoedit || !acceptsEvents()) return;
+  auto obj = liveLvObj();
+  if (autoedit || !obj) return;
 
   autoedit = true;
 
   oldGroup = lv_group_get_default();
   group = lv_group_create();
-  lv_group_add_obj(group, lvobj);
+  if (!group) {
+    autoedit = false;
+    return;
+  }
+  lv_group_add_obj(group, obj);
   assignLvGroup(group, true);
 
   lv_group_set_editing(group, true);

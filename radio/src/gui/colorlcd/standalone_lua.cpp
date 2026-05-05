@@ -173,9 +173,10 @@ StandaloneLuaWindow::StandaloneLuaWindow(bool useLvgl, int initFn, int runFn) :
     useLvgl(useLvgl), initFunction(initFn), runFunction(runFn)
 {
   setWindowFlag(OPAQUE);
-  if (!acceptsEvents()) return;
+  auto obj = liveLvObj();
+  if (!obj) return;
 
-  etx_solid_bg(lvobj);
+  etx_solid_bg(obj);
 
   auto setSetupError = [this]() {
     if (lsStandalone) {
@@ -193,9 +194,9 @@ StandaloneLuaWindow::StandaloneLuaWindow(bool useLvgl, int initFn, int runFn) :
 
   if (useLvglLayout()) {
     padAll(PAD_ZERO);
-    etx_scrollbar(lvobj);
+    etx_scrollbar(obj);
 
-    lv_obj_t* lbl = createStandaloneLuaLoadingLabel(lvobj);
+    lv_obj_t* lbl = nullptr;
     if (!initRequiredLvObj(lbl, createStandaloneLuaLoadingLabel,
                            [&](lv_obj_t* obj) {
                              lv_obj_set_pos(obj, 0, 0);
@@ -221,7 +222,7 @@ StandaloneLuaWindow::StandaloneLuaWindow(bool useLvgl, int initFn, int runFn) :
                         FONT(L) | COLOR_THEME_PRIMARY2 | CENTERED);
       setWindowFlag(NO_FOCUS | NO_SCROLL);
 
-      auto canvas = createStandaloneLuaCanvas(lvobj);
+      auto canvas = createStandaloneLuaCanvas(obj);
       if (!canvas) {
         setSetupError();
       } else {
@@ -243,7 +244,7 @@ StandaloneLuaWindow::StandaloneLuaWindow(bool useLvgl, int initFn, int runFn) :
   if (focusStandaloneCanvas) {
     auto group = lv_group_get_default();
     if (group) {
-      lv_group_add_obj(group, lvobj);
+      lv_group_add_obj(group, obj);
       lv_group_set_editing(group, true);
     }
   }

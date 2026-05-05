@@ -73,8 +73,6 @@ class NumberArea : public FormField
 
   void onEvent(event_t event) override
   {
-    if (!acceptsEvents() || !numEdit) return;
-
     TRACE_WINDOWS("%s received event 0x%X", getWindowDebugString().c_str(),
                   event);
 
@@ -162,8 +160,6 @@ class NumberArea : public FormField
 
   void onClicked() override
   {
-    if (!acceptsEvents()) return;
-
     lv_indev_type_t indev_type = lv_indev_get_type(lv_indev_get_act());
     if (indev_type == LV_INDEV_TYPE_POINTER) {
       setEditMode(true);
@@ -175,30 +171,21 @@ class NumberArea : public FormField
 
   void openKeyboard()
   {
-    if (!acceptsEvents()) return;
-
     editTextIsRaw = numEdit->useDirectKeyboard();
-    withAvailableLvObj([&](lv_obj_t* obj) {
-      lv_textarea_set_text(obj, editTextIsRaw ? numEdit->getEditVal().c_str()
+    lv_textarea_set_text(lvobj, editTextIsRaw ? numEdit->getEditVal().c_str()
                                               : numEdit->getDisplayVal().c_str());
-    });
     NumberKeyboard::open(this, numEdit);
   }
 
   void directEdit()
   {
-    if (!acceptsEvents()) return;
-
     editTextIsRaw = false;
     FormField::onClicked();
   }
 
   void update()
   {
-    if (!numEdit) return;
-    withAvailableLvObj([&](lv_obj_t* obj) {
-      lv_textarea_set_text(obj, numEdit->getDisplayVal().c_str());
-    });
+    lv_textarea_set_text(lvobj, numEdit->getDisplayVal().c_str());
   }
 
  protected:
@@ -208,14 +195,7 @@ class NumberArea : public FormField
   void changeEnd(bool forceChanged = false) override
   {
     if (editTextIsRaw) {
-      const char* text = nullptr;
-      if (!withAvailableLvObj([&](lv_obj_t* obj) {
-            text = lv_textarea_get_text(obj);
-          }) ||
-          !text) {
-        return;
-      }
-      numEdit->setValueFromEditVal(text);
+      numEdit->setValueFromEditVal(lv_textarea_get_text(lvobj));
       editTextIsRaw = false;
     }
     FormField::changeEnd(forceChanged);
@@ -228,8 +208,9 @@ class NumberArea : public FormField
 
   static void numberedit_cb(lv_event_t* e)
   {
-    NumberArea* numEdit = (NumberArea*)lv_event_get_user_data(e);
-    if (!numEdit || !numEdit->acceptsEvents()) return;
+    auto numEdit =
+        static_cast<NumberArea*>(Window::fromAvailableLvObj(lv_event_get_target(e)));
+    if (!numEdit) return;
 
     uint32_t key = lv_event_get_key(e);
     switch (key) {
@@ -288,8 +269,6 @@ NumberEdit::NumberEdit(Window* parent, const rect_t& rect, int vmin, int vmax,
 
 void NumberEdit::openEdit()
 {
-  if (!acceptsEvents()) return;
-
   if (edit == nullptr) {
     auto newEdit = Window::makeLive<NumberArea>(
         this, rect_t{0, 0, width(), height()});
@@ -298,18 +277,15 @@ void NumberEdit::openEdit()
     edit->setChangeHandler([=]() {
       update();
       if (onEdited) onEdited(currentValue);
-      if (edit->hasFocus())
-        withAvailableLvObj([](lv_obj_t* obj) {
-          lv_group_focus_obj(obj);
-        });
+      if (edit->hasFocus()) focus();
       edit->hide();
     });
   }
   if (!syncOverlay(edit)) return;
   edit->update();
   edit->show();
-  if (auto editObj = edit->getLvObj()) {
-    lv_group_focus_obj(editObj);
+  if (edit->focus()) {
+    auto editObj = edit->getLvObj();
     lv_obj_add_state(editObj, LV_STATE_FOCUSED | LV_STATE_EDITED);
   }
   lv_indev_type_t indev_type =

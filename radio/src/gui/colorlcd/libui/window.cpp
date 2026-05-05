@@ -504,6 +504,13 @@ bool Window::syncOverlay(Window* overlay)
   return true;
 }
 
+bool Window::loadLvglScreen()
+{
+  if (!acceptsEvents()) return false;
+  lv_scr_load(lvobj);
+  return true;
+}
+
 void Window::deleteLater()
 {
   if (_deleted) return;
@@ -546,6 +553,13 @@ void Window::deleteChildren()
 bool Window::hasFocus() const
 {
   return isAvailable() && lvobj && lv_obj_has_state(lvobj, LV_STATE_FOCUSED);
+}
+
+bool Window::focus()
+{
+  if (!acceptsEvents()) return false;
+  lv_group_focus_obj(lvobj);
+  return true;
 }
 
 void Window::padLeft(coord_t pad)

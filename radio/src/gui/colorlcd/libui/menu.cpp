@@ -414,14 +414,16 @@ class MenuWindowContent : public NavWindow, public MenuContent
 
   void updatePosition(MenuToolbar* toolbar) override
   {
-    if (!toolbar || !toolbar->acceptsEvents()) return;
+    if (!toolbar) return;
+    auto toolbarObj = toolbar->getLvObj();
+    if (Window::fromAvailableLvObj(toolbarObj) != toolbar) return;
 
     coord_t cw = lv_obj_get_width(getLvObj());
     coord_t ch = lv_obj_get_height(getLvObj());
-    coord_t tw = lv_obj_get_width(toolbar->getLvObj());
-    coord_t th = lv_obj_get_height(toolbar->getLvObj());
+    coord_t tw = lv_obj_get_width(toolbarObj);
+    coord_t th = lv_obj_get_height(toolbarObj);
 
-    lv_obj_align(toolbar->getLvObj(), LV_ALIGN_CENTER, -cw / 2, 0);
+    lv_obj_align(toolbarObj, LV_ALIGN_CENTER, -cw / 2, 0);
     lv_obj_align(getLvObj(), LV_ALIGN_CENTER, tw / 2, 0);
 
     toolbar->setHeight(max(ch, th));
@@ -577,8 +579,7 @@ void Menu::select(int index)
 void Menu::checkEvents()
 {
   ModalWindow::checkEvents();
-  if (acceptsEvents() && waitHandler)
-    waitHandler();
+  if (liveLvObj() && waitHandler) waitHandler();
 }
 
 #if defined(SIMU)

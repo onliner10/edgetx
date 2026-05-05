@@ -63,9 +63,9 @@ static lv_obj_t* menu_button_create(lv_obj_t* parent)
 
 static void toolbar_btn_defocus(lv_event_t* event)
 {
-  auto obj = lv_event_get_target(event);
-  auto btn = (MenuToolbarButton*)lv_obj_get_user_data(obj);
-  if (btn && btn->isAvailable()) btn->check(false);
+  auto btn = static_cast<MenuToolbarButton*>(
+      Window::fromAvailableLvObj(lv_event_get_target(event)));
+  if (btn) btn->check(false);
 }
 
 MenuToolbarButton::MenuToolbarButton(Window* parent, const rect_t& rect,
@@ -124,10 +124,11 @@ MenuToolbar::~MenuToolbar()
 
 void MenuToolbar::resetFilter()
 {
-  if (!acceptsEvents() || !group || !choice || !menu) return;
+  auto obj = liveLvObj();
+  if (!obj || !group || !choice || !menu) return;
 
-  if (lv_group_get_focused(group) != lvobj) {
-    lv_group_focus_obj(lvobj);
+  if (lv_group_get_focused(group) != obj) {
+    lv_group_focus_obj(obj);
     choice->fillMenu(menu);
     menu->setTitle(choice->getTitle());
   }
@@ -135,7 +136,7 @@ void MenuToolbar::resetFilter()
 
 void MenuToolbar::nextFilter()
 {
-  if (!acceptsEvents() || !group) return;
+  if (!liveLvObj() || !group) return;
 
   lv_group_focus_next(group);
   if (auto window = Window::fromAvailableLvObj(lv_group_get_focused(group)))
@@ -144,7 +145,7 @@ void MenuToolbar::nextFilter()
 
 void MenuToolbar::prevFilter()
 {
-  if (!acceptsEvents() || !group) return;
+  if (!liveLvObj() || !group) return;
 
   lv_group_focus_prev(group);
   if (auto window = Window::fromAvailableLvObj(lv_group_get_focused(group)))
@@ -172,7 +173,9 @@ bool MenuToolbar::filterMenu(MenuToolbarButton* btn, int16_t filtermin,
                              const Choice::FilterFct& filterFunc,
                              const char* title)
 {
-  if (!acceptsEvents() || !btn || !btn->acceptsEvents() || !choice || !menu)
+  auto obj = liveLvObj();
+  auto btnObj = btn ? btn->getLvObj() : nullptr;
+  if (!obj || Window::fromAvailableLvObj(btnObj) != btn || !choice || !menu)
     return false;
 
   btn->check(!btn->checked());
@@ -187,11 +190,10 @@ bool MenuToolbar::filterMenu(MenuToolbarButton* btn, int16_t filtermin,
       if (filterFunc) return filterFunc(index);
       return index == 0 || (abs(index) >= filtermin && abs(index) <= filtermax);
     };
-    lv_group_focus_obj(btn->getLvObj());
+    lv_group_focus_obj(btnObj);
     choice->fillMenu(menu, filter);
   } else {
-    if (allBtn && allBtn->acceptsEvents())
-      allBtn->sendLvEvent(LV_EVENT_CLICKED);
+    if (allBtn) allBtn->sendLvEvent(LV_EVENT_CLICKED);
   }
 
   return btn->checked();
@@ -202,7 +204,7 @@ void MenuToolbar::addButton(const char* picto, int16_t filtermin,
                             const Choice::FilterFct& filterFunc,
                             const char* title, bool wideButton)
 {
-  if (!acceptsEvents() || !group || !choice || !menu) return;
+  if (!liveLvObj() || !group || !choice || !menu) return;
 
   int vmin = choice->getMin();
   int vmax = choice->getMax();

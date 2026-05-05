@@ -46,12 +46,47 @@ class Keyboard : public NavWindow
   lv_coord_t scroll_pos = 0;
   bool fullScreen = false;
 
+  struct FieldBinding {
+    FormField* field;
+    lv_obj_t* obj;
+    Window* container;
+  };
+
   bool acceptsKeyboardInput() const
   {
     return acceptsEvents() && keyboard != nullptr;
   }
 
-  void setField(FormField* newField);
+  void showKeyboard();
+  bool bindField(FormField* newField, FieldBinding& binding) const;
+
+  template <typename T>
+  static T* liveKeyboard(T*& instance)
+  {
+    if (!instance) instance = Window::makeLive<T>();
+    if (instance && instance->acceptsKeyboardInput()) return instance;
+
+    delete instance;
+    instance = nullptr;
+    return nullptr;
+  }
+
+  template <typename T, typename Configure>
+  static T* openKeyboard(T*& instance, FormField* newField,
+                         Configure&& configure)
+  {
+    auto keyboard = liveKeyboard(instance);
+
+    FieldBinding binding{};
+    if (!keyboard || !keyboard->bindField(newField, binding)) return nullptr;
+
+    if (!keyboard->setField(binding)) return nullptr;
+    configure(*keyboard);
+    keyboard->showKeyboard();
+    return keyboard;
+  }
+
+  bool setField(const FieldBinding& binding);
   bool attachKeyboard();
   void deleteLater() override;
 };

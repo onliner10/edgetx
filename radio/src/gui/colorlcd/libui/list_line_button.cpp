@@ -101,7 +101,7 @@ InputMixButtonBase::~InputMixButtonBase()
 bool InputMixButtonBase::ensureLineLabel(lv_obj_t*& label, coord_t x, coord_t y,
                                          coord_t w, coord_t h)
 {
-  if (!acceptsEvents()) return false;
+  if (!liveLvObj()) return false;
   if (label) return true;
 
   return initRequiredLvObj(label, list_line_label_create, [&](lv_obj_t* obj) {
@@ -152,7 +152,8 @@ void InputMixButtonBase::setOpts(const char* s)
 
 void InputMixButtonBase::setFlightModes(uint16_t modes)
 {
-  if (!acceptsEvents()) {
+  auto obj = liveLvObj();
+  if (!obj) {
     fm_modes = 0;
     return;
   }
@@ -172,7 +173,7 @@ void InputMixButtonBase::setFlightModes(uint16_t modes)
   }
 
   if (!fm_canvas) {
-    auto newCanvas = lv_canvas_create(lvobj);
+    auto newCanvas = lv_canvas_create(obj);
     if (!newCanvas) {
       fm_modes = 0;
       updateHeight();
@@ -335,15 +336,13 @@ bool listLineGroupLabelAllocationFailureFailsClosedForTest()
 void InputMixButtonBase::checkEvents()
 {
   ListLineButton::checkEvents();
-  if (acceptsEvents()) {
-    if (fm_canvas) {
-      bool chkd = lv_obj_get_state(fm_canvas) & LV_STATE_CHECKED;
-      if (chkd != this->checked()) {
-        if (chkd)
-          lv_obj_clear_state(fm_canvas, LV_STATE_CHECKED);
-        else
-          lv_obj_add_state(fm_canvas, LV_STATE_CHECKED);
-      }
+  if (liveLvObj() && fm_canvas) {
+    bool chkd = lv_obj_get_state(fm_canvas) & LV_STATE_CHECKED;
+    if (chkd != this->checked()) {
+      if (chkd)
+        lv_obj_clear_state(fm_canvas, LV_STATE_CHECKED);
+      else
+        lv_obj_add_state(fm_canvas, LV_STATE_CHECKED);
     }
   }
 }
@@ -392,7 +391,7 @@ InputMixGroupBase::InputMixGroupBase(Window* parent, mixsrc_t idx) :
 
 void InputMixGroupBase::_adjustHeight(coord_t y)
 {
-  if (!acceptsEvents()) return;
+  if (!liveLvObj()) return;
 
   if (getLineCount() == 0) setHeight(ListLineButton::BTN_H + PAD_SMALL * 2);
 
@@ -412,7 +411,7 @@ void InputMixGroupBase::adjustHeight()
 
 void InputMixGroupBase::addLine(InputMixButtonBase* line)
 {
-  if (!line || !line->acceptsEvents()) return;
+  if (!line || Window::fromAvailableLvObj(line->getLvObj()) != line) return;
 
   auto l = std::find_if(lines.begin(), lines.end(),
                         [=](const InputMixButtonBase* l) -> bool {
@@ -444,7 +443,7 @@ bool InputMixGroupBase::removeLine(InputMixButtonBase* line)
 
 void InputMixGroupBase::refresh()
 {
-  if (!acceptsEvents() || !label) return;
+  if (!liveLvObj() || !label) return;
 
   char* s = getSourceString(idx);
   if (getTextWidth(s, 0, FONT(STD)) > InputMixButtonBase::LN_X - PAD_TINY)

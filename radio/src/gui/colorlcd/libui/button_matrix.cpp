@@ -117,10 +117,11 @@ void ButtonMatrix::deallocate()
 void ButtonMatrix::initBtnMap(uint8_t cols, uint8_t btns)
 {
   deallocate();
-  if (!acceptsEvents()) return;
+  auto obj = liveLvObj();
+  if (!obj) return;
 
   if (cols == 0 || btns == 0) {
-    lv_btnmatrix_set_map(lvobj, _empty_map);
+    lv_btnmatrix_set_map(obj, _empty_map);
     return;
   }
 
@@ -129,7 +130,7 @@ void ButtonMatrix::initBtnMap(uint8_t cols, uint8_t btns)
   uint16_t btnCount = uint16_t(cols) * rows;
   uint16_t txtCount = uint16_t(cols + 1) * rows;
   if (btnCount > UINT8_MAX || txtCount > UINT8_MAX) {
-    lv_btnmatrix_set_map(lvobj, _empty_map);
+    lv_btnmatrix_set_map(obj, _empty_map);
     return;
   }
 
@@ -140,7 +141,7 @@ void ButtonMatrix::initBtnMap(uint8_t cols, uint8_t btns)
     free(txt_index);
     lv_btnm_map = nullptr;
     txt_index = nullptr;
-    lv_btnmatrix_set_map(lvobj, _empty_map);
+    lv_btnmatrix_set_map(obj, _empty_map);
     return;
   }
 
@@ -176,21 +177,22 @@ void ButtonMatrix::setText(uint8_t btn_id, const char* txt)
 
 void ButtonMatrix::update()
 {
-  if (!acceptsEvents()) return;
+  auto obj = liveLvObj();
+  if (!obj) return;
 
   if (!lv_btnm_map) {
-    lv_btnmatrix_set_map(lvobj, _empty_map);
+    lv_btnmatrix_set_map(obj, _empty_map);
     return;
   }
-  lv_btnmatrix_set_map(lvobj, (const char**)lv_btnm_map);
+  lv_btnmatrix_set_map(obj, (const char**)lv_btnm_map);
   lv_btnmatrix_set_btn_ctrl_all(
-      lvobj, LV_BTNMATRIX_CTRL_CLICK_TRIG | LV_BTNMATRIX_CTRL_NO_REPEAT);
+      obj, LV_BTNMATRIX_CTRL_CLICK_TRIG | LV_BTNMATRIX_CTRL_NO_REPEAT);
   int btn = 0;
   for (int i = 0; lv_btnm_map[i] != _map_end; i += 1) {
     if (lv_btnm_map[i] == _filler)
-      lv_btnmatrix_set_btn_ctrl(lvobj, btn, LV_BTNMATRIX_CTRL_HIDDEN);
+      lv_btnmatrix_set_btn_ctrl(obj, btn, LV_BTNMATRIX_CTRL_HIDDEN);
     else
-      lv_btnmatrix_clear_btn_ctrl(lvobj, btn, LV_BTNMATRIX_CTRL_HIDDEN);
+      lv_btnmatrix_clear_btn_ctrl(obj, btn, LV_BTNMATRIX_CTRL_HIDDEN);
     if (lv_btnm_map[i] != _newline) btn += 1;
   }
 }
@@ -205,12 +207,13 @@ void ButtonMatrix::onClicked()
 
 void ButtonMatrix::setChecked(uint8_t btn_id)
 {
-  if (!acceptsEvents()) return;
+  auto obj = liveLvObj();
+  if (!obj) return;
 
   if (isActive(btn_id))
-    lv_btnmatrix_set_btn_ctrl(lvobj, btn_id, LV_BTNMATRIX_CTRL_CHECKED);
+    lv_btnmatrix_set_btn_ctrl(obj, btn_id, LV_BTNMATRIX_CTRL_CHECKED);
   else
-    lv_btnmatrix_clear_btn_ctrl(lvobj, btn_id, LV_BTNMATRIX_CTRL_CHECKED);
+    lv_btnmatrix_clear_btn_ctrl(obj, btn_id, LV_BTNMATRIX_CTRL_CHECKED);
 }
 
 #if defined(SIMU)

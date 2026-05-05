@@ -210,17 +210,16 @@ bool touchLongPressStateIsPerWindowForTest()
         return 0;
       });
 
-  if (!first || !first->acceptsEvents() || !second ||
-      !second->acceptsEvents()) {
+  if (!first || !second) {
     delete second;
     delete first;
     return false;
   }
 
-  lv_event_send(first->getLvObj(), LV_EVENT_LONG_PRESSED, nullptr);
-  lv_event_send(second->getLvObj(), LV_EVENT_CLICKED, nullptr);
+  bool sent = first->sendLvEvent(LV_EVENT_LONG_PRESSED) &&
+              second->sendLvEvent(LV_EVENT_CLICKED);
 
-  bool ok = !firstPressed && secondPressed;
+  bool ok = sent && !firstPressed && secondPressed;
   delete second;
   delete first;
   return ok;

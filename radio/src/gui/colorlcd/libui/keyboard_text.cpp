@@ -112,25 +112,9 @@ void TextKeyboard::onLongPressPGDN() { cursorEnd(); }
 
 void TextKeyboard::open(FormField* field)
 {
-  if (!field || !field->acceptsEvents()) return;
-
-  if (!_instance) {
-    _instance = Window::makeLive<TextKeyboard>();
-    if (!_instance || !_instance->acceptsKeyboardInput()) {
-      _instance = nullptr;
-      return;
-    }
-  } else if (!_instance->acceptsKeyboardInput()) {
-    delete _instance;
-    _instance = nullptr;
-    return;
-  }
-
-  lv_obj_clear_flag(_instance->lvobj, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_clear_flag(_instance->keyboard, LV_OBJ_FLAG_HIDDEN);
-  lv_keyboard_set_mode(_instance->keyboard, LV_KEYBOARD_MODE_TEXT_LOWER);
-
-  _instance->setField(field);
+  openKeyboard<TextKeyboard>(_instance, field, [](TextKeyboard& keyboard) {
+    lv_keyboard_set_mode(keyboard.keyboard, LV_KEYBOARD_MODE_TEXT_LOWER);
+  });
 }
 
 #if defined(SIMU)

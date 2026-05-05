@@ -114,7 +114,8 @@ int ListBox::getActiveItem() const { return activeItem; }
 
 void ListBox::onPress(uint16_t row, uint16_t col)
 {
-  if (!acceptsEvents()) return;
+  auto obj = liveLvObj();
+  if (!obj) return;
   if (row == LV_TABLE_CELL_NONE) return;
 
   TRACE("SHORT_PRESS");
@@ -122,14 +123,11 @@ void ListBox::onPress(uint16_t row, uint16_t col)
   if (multiSelect && row < getRowCount()) {
     std::set<uint32_t> lastSelection = getSelection();
 
-    withAvailableLvObj([&](lv_obj_t* obj) {
-      bool chk =
-          lv_table_has_cell_ctrl(obj, row, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
-      if (chk)
-        lv_table_clear_cell_ctrl(obj, row, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
-      else
-        lv_table_add_cell_ctrl(obj, row, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
-    });
+    bool chk = lv_table_has_cell_ctrl(obj, row, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
+    if (chk)
+      lv_table_clear_cell_ctrl(obj, row, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
+    else
+      lv_table_add_cell_ctrl(obj, row, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
 
     if (_multiSelectHandler) {
       _multiSelectHandler(getSelection(), lastSelection);
@@ -143,30 +141,33 @@ void ListBox::onPress(uint16_t row, uint16_t col)
 
 void ListBox::onClicked()
 {
-  withAvailableLvObj([](lv_obj_t* obj) {
-    lv_group_set_editing((lv_group_t*)lv_obj_get_group(obj), true);
-  });
+  auto obj = liveLvObj();
+  if (!obj) return;
+  lv_group_set_editing((lv_group_t*)lv_obj_get_group(obj), true);
 }
 
 void ListBox::onCancel()
 {
+  auto obj = liveLvObj();
+  if (!obj) return;
+
   bool handled = false;
-  withAvailableLvObj([&](lv_obj_t* obj) {
-    auto group = (lv_group_t*)lv_obj_get_group(obj);
-    if (!isAutoEdit() && group && lv_group_get_editing(group)) {
-      lv_group_set_editing(group, false);
-      handled = true;
-    }
-  });
+  auto group = (lv_group_t*)lv_obj_get_group(obj);
+  if (!isAutoEdit() && group && lv_group_get_editing(group)) {
+    lv_group_set_editing(group, false);
+    handled = true;
+  }
   if (!handled) TableField::onCancel();
 }
 
 void ListBox::onDrawEnd(uint16_t row, uint16_t col, lv_obj_draw_part_dsc_t* dsc)
 {
-  if (!acceptsEvents()) return;
+  auto obj = liveLvObj();
+  if (!obj) return;
+
   if ((multiSelect == false && row != activeItem) ||
       (multiSelect == true &&
-       !lv_table_has_cell_ctrl(lvobj, dsc->id, 0, LV_TABLE_CELL_CTRL_CUSTOM_1)))
+       !lv_table_has_cell_ctrl(obj, dsc->id, 0, LV_TABLE_CELL_CTRL_CUSTOM_1)))
     return;
 
   lv_area_t coords;

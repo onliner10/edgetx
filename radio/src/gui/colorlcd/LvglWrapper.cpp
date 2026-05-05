@@ -396,6 +396,15 @@ static void init_lvgl_drivers()
   keyboardDevice = lv_indev_drv_register(&keyboard_drv);
 }
 
+static bool loadMainWindowIfAvailable(Window* window)
+{
+  if (!window || !window->loadLvglScreen()) return false;
+
+  // create ViewMain window
+  ViewMain::instance();
+  return true;
+}
+
 LvglWrapper::LvglWrapper()
 {
   init_lvgl_drivers();
@@ -419,12 +428,22 @@ LvglWrapper::LvglWrapper()
   lv_stb_init();
 
   // Create main window and load that screen
-  auto window = MainWindow::instance();
-  lv_scr_load(window->getLvObj());
-
-  // create ViewMain window
-  ViewMain::instance();
+  loadMainWindowIfAvailable(MainWindow::instance());
 }
+
+#if defined(SIMU)
+bool lvglWrapperUnavailableMainWindowIsNotLoadedForTest()
+{
+  class UnavailableWindow : public Window
+  {
+   public:
+    UnavailableWindow() : Window(rect_t{}) { failClosed(); }
+  };
+
+  UnavailableWindow window;
+  return !loadMainWindowIfAvailable(&window);
+}
+#endif
 
 LvglWrapper* LvglWrapper::instance()
 {
