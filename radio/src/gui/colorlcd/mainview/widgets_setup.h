@@ -22,9 +22,10 @@
 #pragma once
 
 #include "button.h"
+#include "widgets_container.h"
 
 class ScreenMenu;
-class WidgetsContainer;
+class SetupTopBarWidgetsPage;
 
 class SetupWidgetsPage : public NavWindow
 {
@@ -63,10 +64,12 @@ class SetupWidgetsPageSlot : public ButtonBase
 {
  public:
   SetupWidgetsPageSlot(Window* parent, const rect_t& rect,
-                       WidgetsContainer* container, uint8_t slotIndex);
+                       WidgetsContainer* container, uint8_t slotIndex,
+                       SetupTopBarWidgetsPage* topBarSetupPage = nullptr);
 
  protected:
   WidgetsContainer* container = nullptr;
+  SetupTopBarWidgetsPage* topBarSetupPage = nullptr;
   uint8_t slotIndex = 0;
   bool openSettings = false;
   lv_style_t borderStyle;
@@ -76,6 +79,6 @@ class SetupWidgetsPageSlot : public ButtonBase
   void setFocusState();
 
   void addNewWidget(WidgetsContainer* container, uint8_t slotIndex);
-  void moveTopBarWidget(WidgetsContainer* container, uint8_t slotIndex,
-                        int8_t direction);
+  void moveWidget(WidgetsContainer* container, uint8_t slotIndex,
+                  WidgetMoveDirection direction);
 };

@@ -727,6 +727,8 @@
 #define TR_LABEL_MODEL                 "Catégorie Modèle"
 #define TR_MOVE_UP                     "Déplacer -> haut"
 #define TR_MOVE_DOWN                   "Déplacer -> bas"
+#define TR_MOVE_LEFT                   "Move left"
+#define TR_MOVE_RIGHT                  "Move right"
 #define TR_ENTER_LABEL                 "Entrer Catégorie"
 #define TR_LABEL                       "Catégorie"
 #define TR_LABELS                      "Catégories"

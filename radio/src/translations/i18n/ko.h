@@ -757,6 +757,8 @@
 #define TR_LABEL_MODEL                    "모델 라벨"
 #define TR_MOVE_UP                        "위로 이동"
 #define TR_MOVE_DOWN                      "아래로 이동"
+#define TR_MOVE_LEFT                   "Move left"
+#define TR_MOVE_RIGHT                  "Move right"
 #define TR_ENTER_LABEL                    "라벨 입력"
 #define TR_LABEL                          "라벨"
 #define TR_LABELS                         "라벨 목록"

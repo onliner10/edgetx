@@ -36,6 +36,24 @@
 
 //-----------------------------------------------------------------------------
 
+namespace {
+
+int moveDirectionOffset(WidgetMoveDirection direction)
+{
+  switch (direction) {
+    case WidgetMoveDirection::Left:
+      return -1;
+    case WidgetMoveDirection::Right:
+      return 1;
+  }
+
+  return 0;
+}
+
+}  // namespace
+
+//-----------------------------------------------------------------------------
+
 void TopBarPersistentData::clearZone(int idx)
 {
   zones[idx].clear();
@@ -113,7 +131,8 @@ void SetupTopBarWidgetsPage::refreshSlots()
       if (slots[i]) {
         slots[i]->setRect(rect);
       } else {
-        slots[i] = new (std::nothrow) SetupWidgetsPageSlot(this, rect, topbar, i);
+        slots[i] =
+            new (std::nothrow) SetupWidgetsPageSlot(this, rect, topbar, i, this);
       }
     } else if (slots[i]) {
       slots[i]->deleteLater();
@@ -343,36 +362,32 @@ void TopBar::removeWidget(unsigned int index)
   WidgetsContainer::removeWidget(index);
 }
 
-bool TopBar::moveWidget(unsigned int index, int8_t direction)
+bool TopBar::canMoveWidget(unsigned int index,
+                           WidgetMoveDirection direction) const
 {
-  if (!widgets || index >= zoneCount) return false;
+  if (index >= zoneCount) return false;
 
-  int targetIndex = (int)index + direction;
+  int offset = moveDirectionOffset(direction);
+  if (offset == 0) return false;
+
+  int targetIndex = (int)index + offset;
   if (targetIndex < 0 || targetIndex >= zoneCount) return false;
 
   auto topbarData = g_eeGeneral.getTopbarData();
-  if (!topbarData->hasWidget(index) || !topbarData->hasWidget(targetIndex))
+  return topbarData->hasWidget(index) && topbarData->hasWidget(targetIndex);
+}
+
+bool TopBar::moveWidget(unsigned int index, WidgetMoveDirection direction)
+{
+  if (!widgets || !canMoveWidget(index, direction))
     return false;
 
+  auto topbarData = g_eeGeneral.getTopbarData();
+  int targetIndex = (int)index + moveDirectionOffset(direction);
   std::swap(topbarData->zones[index], topbarData->zones[targetIndex]);
 
-  const unsigned int target = (unsigned int)targetIndex;
-  for (auto i : {index, target}) {
-    if (widgets[i]) {
-      widgets[i]->deleteLater();
-      widgets[i] = nullptr;
-    }
-  }
-
-  for (auto i : {index, target}) {
-    if (topbarData->hasWidget(i)) {
-      widgets[i] = WidgetFactory::newWidget(topbarData->getWidgetName(i),
-                                            this, getZone(i), -1, i);
-    }
-  }
-
-  updateZones();
   storageDirty(EE_GENERAL);
+  load();
   return true;
 }
 

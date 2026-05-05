@@ -728,6 +728,8 @@
 #define TR_LABEL_MODEL                 "Label zuordnen"
 #define TR_MOVE_UP                     "Verschiebe nach oben"
 #define TR_MOVE_DOWN                   "Verschiebe nach unten"
+#define TR_MOVE_LEFT                   "Move left"
+#define TR_MOVE_RIGHT                  "Move right"
 #define TR_ENTER_LABEL                 "Label eingeben"
 #define TR_LABEL                       "Label"
 #define TR_LABELS                      "Labels"

@@ -733,7 +733,9 @@
 #define STR_MONITOR_SWITCHES currentLangStrings->STR_MONITOR_SWITCHES
 #define STR_MORE_OPTIONS_AVAILABLE currentLangStrings->STR_MORE_OPTIONS_AVAILABLE
 #define STR_MOVE_DOWN currentLangStrings->STR_MOVE_DOWN
+#define STR_MOVE_LEFT currentLangStrings->STR_MOVE_LEFT
 #define STR_MOVE_MODEL currentLangStrings->STR_MOVE_MODEL
+#define STR_MOVE_RIGHT currentLangStrings->STR_MOVE_RIGHT
 #define STR_MOVE_UP currentLangStrings->STR_MOVE_UP
 #define STR_MOVE currentLangStrings->STR_MOVE
 #define STR_MOVESTICKSPOTS currentLangStrings->STR_MOVESTICKSPOTS

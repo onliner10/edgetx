@@ -728,6 +728,8 @@
 #define TR_LABEL_MODEL                  "Sätt modelletikett"
 #define TR_MOVE_UP                      "Flytta upp"
 #define TR_MOVE_DOWN                    "Flytta ner"
+#define TR_MOVE_LEFT                   "Move left"
+#define TR_MOVE_RIGHT                  "Move right"
 #define TR_ENTER_LABEL                  "Ange etikett"
 #define TR_LABEL                        "Etikett"
 #define TR_LABELS                       "Etiketter"

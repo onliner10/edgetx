@@ -84,7 +84,9 @@ class TopBar: public WidgetsContainer
   bool isTopBar() override { return true; }
 
   void removeWidget(unsigned int index) override;
-  bool moveWidget(unsigned int index, int8_t direction);
+  bool canMoveWidget(unsigned int index,
+                     WidgetMoveDirection direction) const override;
+  bool moveWidget(unsigned int index, WidgetMoveDirection direction) override;
 
   Widget* createWidget(unsigned int index, const WidgetFactory* factory) override;
 
