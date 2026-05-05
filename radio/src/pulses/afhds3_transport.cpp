@@ -149,6 +149,12 @@ bool FrameTransport::processTelemetryData(uint8_t byte, uint8_t* rxBuffer,
   }
 
   if (rxBufferCount > 1 && byte == END) {
+    if (rxBufferCount >= maxSize) {
+      TRACE("AFHDS3 [BUFFER OVERFLOW]");
+      rxBufferCount = 0;
+      return false;
+    }
+
     rxBuffer[rxBufferCount++] = byte;
 
     if (!_checkCRC(rxBuffer, rxBufferCount - 2)) {

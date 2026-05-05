@@ -1020,6 +1020,26 @@ TEST_F(PulsesTest, afhds3RejectsTooShortResponseFrame)
   SUCCEED();
 }
 
+TEST_F(PulsesTest, afhds3RejectsFullRxFrameBeforeTerminator)
+{
+  uint8_t txBuffer[16] = {};
+  afhds3::FrameTransport transport;
+  transport.init(txBuffer, 0);
+
+  constexpr uint8_t maxSize = 8;
+  GuardedAfhds3RxBuffer rxBuffer(maxSize);
+  ASSERT_TRUE(rxBuffer.isValid());
+
+  uint8_t len = 0;
+  EXPECT_FALSE(transport.processTelemetryData(0xC0, rxBuffer.data(), len, maxSize));
+  for (uint8_t i = 1; i < maxSize; i++) {
+    EXPECT_FALSE(transport.processTelemetryData(i, rxBuffer.data(), len, maxSize));
+  }
+  ASSERT_EQ(len, maxSize);
+
+  EXPECT_FALSE(transport.processTelemetryData(0xC0, rxBuffer.data(), len, maxSize));
+}
+
 TEST_F(PulsesTest, afhds3RejectsInvalidRfPower)
 {
   modulePortInit();
