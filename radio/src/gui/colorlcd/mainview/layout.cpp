@@ -20,6 +20,7 @@
  */
 
 #include "edgetx.h"
+#include "mainwindow.h"
 #include "topbar.h"
 #include "view_main.h"
 #include "widget.h"
@@ -344,11 +345,32 @@ void Layout::show(bool visible)
 
 bool Layout::hasFullScreenWidget() const
 {
+  if (!widgets) return false;
   for (int i = 0; i < zoneCount; i += 1)
     if (widgets[i] && widgets[i]->isFullscreen())
       return true;
   return false;
 }
+
+#if defined(SIMU)
+void widgetsContainerForceArrayAllocationFailureForTest(bool force);
+
+bool layoutWidgetsArrayAllocationFailureHasNoFullscreenWidgetForTest()
+{
+  static uint8_t zoneMap[] = {
+      LAYOUT_MAP_0, LAYOUT_MAP_0, LAYOUT_MAP_FULL, LAYOUT_MAP_FULL};
+
+  widgetsContainerForceArrayAllocationFailureForTest(true);
+  auto layout = new (std::nothrow) Layout(MainWindow::instance(), nullptr, 0, 1,
+                                          zoneMap);
+  widgetsContainerForceArrayAllocationFailureForTest(false);
+
+  if (!layout) return false;
+  bool result = !layout->hasFullScreenWidget();
+  layout->deleteLater();
+  return result;
+}
+#endif
 
 rect_t Layout::getWidgetsZone() const
 {

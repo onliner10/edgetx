@@ -24,10 +24,25 @@
 
 #include <new>
 
+#if defined(SIMU)
+static bool forceWidgetsArrayAllocationFailure = false;
+
+void widgetsContainerForceArrayAllocationFailureForTest(bool force)
+{
+  forceWidgetsArrayAllocationFailure = force;
+}
+#endif
+
 WidgetsContainer::WidgetsContainer(Window* parent, const rect_t& rect, uint8_t zoneCount) :
   Window(parent, rect), zoneCount(zoneCount)
 {
+#if defined(SIMU)
+  widgets = forceWidgetsArrayAllocationFailure
+                ? nullptr
+                : new (std::nothrow) Widget*[zoneCount]();
+#else
   widgets = new (std::nothrow) Widget*[zoneCount]();
+#endif
 }
 
 void WidgetsContainer::deleteLater()
