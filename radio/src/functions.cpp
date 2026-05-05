@@ -189,9 +189,16 @@ void evalFunctions(CustomFunctionData * functions, CustomFunctionsContext & func
       if (active) {
         switch (CFN_FUNC(cfn)) {
 #if defined(OVERRIDE_CHANNEL_FUNCTION)
-          case FUNC_OVERRIDE_CHANNEL:
-            safetyCh[CFN_CH_INDEX(cfn)] = CFN_PARAM(cfn);
+          case FUNC_OVERRIDE_CHANNEL: {
+            uint8_t channel = CFN_CH_INDEX(cfn);
+            if (channel < MAX_OUTPUT_CHANNELS) {
+              safetyCh[channel] = CFN_PARAM(cfn);
+            } else {
+              TRACE("Invalid override channel! Disabling...");
+              cfn->active = false;
+            }
             break;
+          }
 #endif
 
           case FUNC_TRAINER: {
