@@ -722,6 +722,16 @@ TEST_F(PulsesTest, pxx2RejectsShortHardwareInfoFrame)
   EXPECT_EQ(moduleInformation.information.modelID, 0);
 }
 
+TEST_F(PulsesTest, pxx2RejectsEmptyFrame)
+{
+  GuardedPxx2Frame guardedFrame(0);
+  ASSERT_TRUE(guardedFrame.isValid());
+
+  processPXX2Frame(INTERNAL_MODULE, guardedFrame.data(), nullptr, nullptr);
+
+  SUCCEED();
+}
+
 TEST_F(PulsesTest, pxx2RejectsShortModuleSettingsFrame)
 {
   ModuleSettings moduleSettings = {};

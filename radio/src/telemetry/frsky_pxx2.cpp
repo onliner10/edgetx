@@ -583,6 +583,9 @@ static void processToolsFrame(uint8_t module, const uint8_t * frame)
 void processPXX2Frame(uint8_t module, const uint8_t * frame,
                       const etx_serial_driver_t* drv, void* ctx)
 {
+  if (!pxx2FrameHasIndex(frame, 1)) {
+    return;
+  }
 
   switch (frame[1]) {
     case PXX2_TYPE_C_MODULE:
