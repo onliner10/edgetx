@@ -1,21 +1,23 @@
-name: Validate hw_defs
+name: Validate Edge16 hw_defs
 on:
   push:
     branches:
       - 'main'
       - '[0-9]+.[0-9]+'
     paths:
+      - '.github/workflows/validate_hw_defs.yml'
       - 'radio/util/hw_defs/**'
       - 'radio/src/boards/hw_defs/**'
   pull_request:
     paths:
+      - '.github/workflows/validate_hw_defs.yml'
       - 'radio/util/hw_defs/**'
       - 'radio/src/boards/hw_defs/**'
   workflow_dispatch:
 
 jobs:
   validate:
-    name: Validate hw_defs
+    name: Validate supported hardware definitions
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -37,5 +39,5 @@ jobs:
       - name: Validate JSON schemas
         run: uv run python3 json_validator.py ../../src/boards/hw_defs
 
-      - name: Test template generation (all boards x all templates)
+      - name: Test template generation
         run: uv run python3 test_templates.py ../../src/boards/hw_defs
