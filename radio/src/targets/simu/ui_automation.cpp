@@ -1,4 +1,4 @@
-#include "ui_automation.h"
+#include "simu_ui_automation.h"
 
 #if defined(COLORLCD)
 #include "gui/colorlcd/libui/window.h"

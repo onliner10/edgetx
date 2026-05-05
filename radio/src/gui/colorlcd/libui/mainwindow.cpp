@@ -32,7 +32,7 @@
 #include "sdcard.h"
 
 #if defined(SIMU)
-#include "targets/simu/ui_automation.h"
+#include "targets/simu/simu_ui_automation.h"
 #endif
 
 MainWindow* MainWindow::_instance = nullptr;

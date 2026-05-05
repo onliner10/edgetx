@@ -86,7 +86,7 @@
 #include "edgetx.h"
 
 #include "arg_parser.h"
-#include "ui_automation.h"
+#include "simu_ui_automation.h"
 
 #define TIMER_INTERVAL 10 // 10ms
 

@@ -35,7 +35,7 @@
 #if defined(SIMU)
 #include "targets/simu/simulib.h"
 #if defined(COLORLCD)
-#include "targets/simu/ui_automation.h"
+#include "targets/simu/simu_ui_automation.h"
 #endif
 #endif
 
