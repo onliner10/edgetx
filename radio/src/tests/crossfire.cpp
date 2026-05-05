@@ -53,6 +53,8 @@ TEST(Crossfire, crc8)
 #include "pulses/crossfire.h"
 #include "pulses/pulses.h"
 #include "telemetry/crossfire.h"
+#include <sys/mman.h>
+#include <unistd.h>
 
 struct crsf_frame_test {
   void* ctx = nullptr;
@@ -82,6 +84,49 @@ struct crsf_frame_test {
       CrossfireDriver.deinit(ctx);
     }
   }
+};
+
+class GuardedCrossfireFrame
+{
+ public:
+  explicit GuardedCrossfireFrame(size_t size):
+      pageSize(sysconf(_SC_PAGESIZE)),
+      mappingSize(pageSize * 2),
+      frameSize(size)
+  {
+    mapping = static_cast<uint8_t*>(
+        mmap(nullptr, mappingSize, PROT_READ | PROT_WRITE,
+             MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+    if (mapping == MAP_FAILED) {
+      mapping = nullptr;
+      return;
+    }
+    if (mprotect(mapping + pageSize, pageSize, PROT_NONE) != 0) {
+      munmap(mapping, mappingSize);
+      mapping = nullptr;
+      return;
+    }
+    frame = mapping + pageSize - frameSize;
+    memset(frame, 0, frameSize);
+  }
+
+  ~GuardedCrossfireFrame()
+  {
+    if (mapping) {
+      munmap(mapping, mappingSize);
+    }
+  }
+
+  bool isValid() const { return frame != nullptr; }
+  uint8_t* data() { return frame; }
+  uint8_t& operator[](size_t index) { return frame[index]; }
+
+ private:
+  long pageSize = 0;
+  size_t mappingSize = 0;
+  size_t frameSize = 0;
+  uint8_t* mapping = nullptr;
+  uint8_t* frame = nullptr;
 };
 
 TEST(Crossfire, sendPulsesHonorsChannelCount)
@@ -289,6 +334,20 @@ TEST(Crossfire, shortRadioTimingFrameDoesNotUpdateModuleSync)
   EXPECT_EQ(status.refreshRate, 4000);
   EXPECT_EQ(status.inputLag, 25);
   EXPECT_EQ(status.currentLag, 25);
+}
+
+TEST(Crossfire, shortFlightModeFrameDoesNotWritePastFrame)
+{
+  GuardedCrossfireFrame frame(4);
+  ASSERT_TRUE(frame.isValid());
+  frame[0] = RADIO_ADDRESS;
+  frame[1] = 16;
+  frame[2] = FLIGHT_MODE_ID;
+  frame[3] = 'A';
+
+  processCrossfireTelemetryFrame(EXTERNAL_MODULE, frame.data(), 4);
+
+  SUCCEED();
 }
 
 static uint8_t jumboFrame1[]={
