@@ -1,12 +1,12 @@
 ---
-name: Build Edge16 firmware release
+name: Publish TX16S MK2/MK3 Firmware Release
 
 on:
   workflow_dispatch:
     inputs:
       release_tag:
         description: GitHub release tag to create or replace
-        default: tx16s-custom
+        default: edge16-tx16s-custom
         required: true
       version_suffix:
         description: Firmware version suffix shown on the radio
@@ -14,21 +14,31 @@ on:
         required: true
 
 concurrency:
-  group: tx16s-firmware-release
+  group: edge16-tx16s-mk2-mk3-firmware-release
   cancel-in-progress: true
+
+env:
+  EDGE16_SUPPORTED_FLAVORS: 'tx16s;tx16smk3'
 
 jobs:
   native-safety:
-    name: Native safety tests (${{ matrix.target }}, ${{ matrix.sanitizer }})
+    name: Native safety tests (${{ matrix.radio }}, ${{ matrix.sanitizer }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target:
-          - tx16s
-          - tx16smk3
-        sanitizer:
-          - address,undefined
-          - thread
+        include:
+          - target: tx16s
+            radio: RadioMaster TX16S MK2
+            sanitizer: address,undefined
+          - target: tx16s
+            radio: RadioMaster TX16S MK2
+            sanitizer: thread
+          - target: tx16smk3
+            radio: RadioMaster TX16S MK3
+            sanitizer: address,undefined
+          - target: tx16smk3
+            radio: RadioMaster TX16S MK3
+            sanitizer: thread
     container:
       image: ghcr.io/edgetx/edgetx-dev:latest
       volumes:
@@ -54,7 +64,7 @@ jobs:
         run: uv run --with-requirements requirements.txt bash ./tools/commit-tests.sh
 
   build:
-    name: Build Edge16 firmware
+    name: Build TX16S MK2/MK3 firmware
     needs: native-safety
     runs-on: ubuntu-latest
     container:
@@ -70,9 +80,9 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
 
-      - name: Build Edge16 firmware
+      - name: Build TX16S MK2/MK3 firmware
         env:
-          FLAVOR: tx16s;tx16smk3
+          FLAVOR: ${{ env.EDGE16_SUPPORTED_FLAVORS }}
           FIRMWARE_TARGET: firmware
           EDGETX_VERSION_SUFFIX: ${{ inputs.version_suffix }}
           EDGE16_UV_ACTIVE: 1
@@ -133,10 +143,16 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.release_tag }}
-          name: Edge16 custom firmware
+          name: Edge16 TX16S MK2/MK3 custom firmware
           prerelease: true
           body: |
             Custom Edge16 firmware for RadioMaster TX16S MK2 and TX16S MK3 built from `${{ github.sha }}`.
+
+            Supported radios are exactly:
+            - RadioMaster TX16S MK2 (`tx16s-*.bin`)
+            - RadioMaster TX16S MK3 (`tx16smk3-*`)
+
+            Do not flash this firmware on any other EdgeTX radio.
 
             Download the zip, extract the firmware for your exact radio, copy it to the radio SD card `FIRMWARE/` folder, then flash it from the bootloader.
           files: edge16-firmware-*.zip

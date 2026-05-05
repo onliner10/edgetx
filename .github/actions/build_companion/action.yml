@@ -56,12 +56,12 @@ runs:
         tools/build-companion.sh "$(pwd)" "$(pwd)/output/"
 
     - name: Compose release filename
-      run: echo "artifact_name=edgetx-cpn-${{ inputs.os }}-${GITHUB_REF##*/}" >> $GITHUB_ENV
+      run: echo "artifact_name=edge16-cpn-${{ inputs.os }}-${GITHUB_REF##*/}" >> $GITHUB_ENV
       shell: bash
 
     - name: Archive production artifacts
       uses: actions/upload-artifact@v7
       with:
         name: "${{ env.artifact_name }}"
-        path:  ${{github.workspace}}/output
+        path: ${{ github.workspace }}/output
         retention-days: 15
