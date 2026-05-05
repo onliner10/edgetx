@@ -340,6 +340,11 @@ static void processDSMPBindPacket(uint8_t module, uint8_t* packet)
     uint8_t channels = packet[2];
     uint8_t txMode   = packet[3];
 
+    if (channels == 0) {
+      TRACE("[DSMP] invalid bind channel count: 0");
+      return;
+    }
+
     // save flags, only the TXMode Part
     g_model.moduleData[module].dsmp.flags = flags & DSMP_FLAGS_TXMODE;
 

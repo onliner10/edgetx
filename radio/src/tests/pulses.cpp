@@ -38,6 +38,7 @@
 
 #if defined(DSMP)
 #include "pulses/dsmp.h"
+#include "telemetry/spektrum.h"
 #endif
 
 #if defined(PXX1)
@@ -378,6 +379,32 @@ TEST_F(PulsesTest, dsmpSetupRejectsInvalidChannelCount)
   ASSERT_TRUE(setupSent);
   EXPECT_EQ(buffer[4], 12);
 
+  DSMPDriver.deinit(ctx);
+}
+
+TEST_F(PulsesTest, dsmpBindRejectsZeroChannelCount)
+{
+  modulePortInit();
+  g_model.moduleData[EXTERNAL_MODULE].type = MODULE_TYPE_LEMON_DSMP;
+  g_model.moduleData[EXTERNAL_MODULE].channelsCount = 0;
+  moduleState[EXTERNAL_MODULE].mode = MODULE_MODE_BIND;
+
+  auto ctx = DSMPDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  uint8_t rxBuffer[TELEMETRY_RX_PACKET_SIZE] = {};
+  uint8_t len = 0;
+  const uint8_t bindPacket[DSM_BIND_PACKET_LENGTH] = {
+      0xAA, 0x80, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+  for (uint8_t byte : bindPacket) {
+    DSMPDriver.processData(ctx, byte, rxBuffer, &len);
+  }
+
+  EXPECT_EQ(g_model.moduleData[EXTERNAL_MODULE].channelsCount, 0);
+  EXPECT_EQ(moduleState[EXTERNAL_MODULE].mode, MODULE_MODE_BIND);
+
+  moduleState[EXTERNAL_MODULE].mode = MODULE_MODE_NORMAL;
   DSMPDriver.deinit(ctx);
 }
 #endif
