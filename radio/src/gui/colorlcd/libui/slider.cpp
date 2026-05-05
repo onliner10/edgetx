@@ -20,8 +20,26 @@
 
 #include "form.h"
 #include "etx_lv_theme.h"
+#include "mainwindow.h"
 
 #include <new>
+
+#if defined(SIMU)
+static bool forceSliderFormFieldCreateFailure = false;
+
+void sliderForceFormFieldCreateFailureForTest(bool force)
+{
+  forceSliderFormFieldCreateFailure = force;
+}
+#endif
+
+static FormField* createSliderFormField(Window* parent, LvglCreate create)
+{
+#if defined(SIMU)
+  if (forceSliderFormFieldCreateFailure) return nullptr;
+#endif
+  return new (std::nothrow) FormField(parent, rect_t{}, create);
+}
 
 //-----------------------------------------------------------------------------
 
@@ -49,7 +67,7 @@ SliderBase::SliderBase(Window* parent, coord_t width, coord_t height, int32_t vm
 
 void SliderBase::update()
 {
-  if (_getValue != nullptr) {
+  if (slider && _getValue != nullptr) {
     // Fix for lv_slider_set_value not working when using the rotary encoder to
     // update value
     auto bar = (lv_bar_t*)slider;
@@ -77,7 +95,7 @@ void SliderBase::setValue(int value)
 void SliderBase::checkEvents()
 {
   Window::checkEvents();
-  if (_getValue != nullptr) {
+  if (slider && _getValue != nullptr) {
     int v = _getValue();
     if (v != lv_slider_get_value(slider))
       update();
@@ -98,7 +116,8 @@ void SliderBase::enable(bool enabled)
 
 void SliderBase::setColor(LcdFlags color)
 {
-  etx_bg_color_from_flags(slider, color, LV_PART_KNOB);
+  if (slider)
+    etx_bg_color_from_flags(slider, color, LV_PART_KNOB);
   if (tickPts)
     for (int i = 0; i < (vmax - vmin - 1); i += 1)
       if (tickPts[i]) etx_bg_color_from_flags(tickPts[i], color);
@@ -175,7 +194,7 @@ Slider::Slider(Window* parent, coord_t width, int32_t vmin, int32_t vmax,
   padLeft(PAD_LARGE);
   padRight(PAD_LARGE);
 
-  auto sliderField = new (std::nothrow) FormField(this, rect_t{}, slider_create);
+  auto sliderField = createSliderFormField(this, slider_create);
   if (!sliderField) return;
   slider = sliderField->getLvObj();
   lv_obj_set_width(slider, lv_pct(100));
@@ -287,7 +306,7 @@ VerticalSlider::VerticalSlider(Window* parent, coord_t height, int32_t vmin, int
   padTop(PAD_LARGE);
   padBottom(PAD_LARGE);
 
-  auto sliderField = new (std::nothrow) FormField(this, rect_t{}, vslider_create);
+  auto sliderField = createSliderFormField(this, vslider_create);
   if (!sliderField) return;
   slider = sliderField->getLvObj();
   lv_obj_set_height(slider, lv_pct(100));
@@ -314,6 +333,30 @@ VerticalSlider::VerticalSlider(Window* parent, coord_t height, int32_t vmin, int
 
   update();
 }
+
+#if defined(SIMU)
+bool sliderFormFieldCreateFailureLeavesNoSliderForTest()
+{
+  class TestSlider : public Slider
+  {
+   public:
+    TestSlider(Window* parent) :
+        Slider(parent, 100, 0, 5, []() { return 3; }, [](int) {})
+    {
+    }
+
+    bool hasSlider() const { return slider != nullptr; }
+  };
+
+  sliderForceFormFieldCreateFailureForTest(true);
+  auto slider = new TestSlider(MainWindow::instance());
+  sliderForceFormFieldCreateFailureForTest(false);
+
+  if (!slider) return false;
+  slider->update();
+  return !slider->hasSlider();
+}
+#endif
 
 void VerticalSlider::delayedInit()
 {
