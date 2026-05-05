@@ -127,8 +127,9 @@ BitmapBuffer *BitmapBuffer::loadBitmap(const char *filename, BitmapFormats fmt)
   }
 
   BitmapBuffer *bmp = new (std::nothrow) BitmapBuffer(dst_fmt, w, h);
-  if (bmp == nullptr) {
+  if (bmp == nullptr || bmp->getData() == nullptr) {
     TRACE_ERROR("loadBitmap: malloc failed\n");
+    delete bmp;
     stbi_image_free(img);
     return nullptr;
   }

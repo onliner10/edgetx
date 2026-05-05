@@ -30,6 +30,15 @@
 #include "edgetx_helpers.h"
 #include "strhelpers.h"
 
+#if defined(SIMU)
+static bool forceBitmapBufferDataMallocFailure = false;
+
+void bitmapBufferForceDataMallocFailureForTest(bool force)
+{
+  forceBitmapBufferDataMallocFailure = force;
+}
+#endif
+
 BitmapBuffer::BitmapBuffer(uint8_t format, uint16_t width, uint16_t height) :
     format(format),
     _width(width),
@@ -42,7 +51,23 @@ BitmapBuffer::BitmapBuffer(uint8_t format, uint16_t width, uint16_t height) :
     leakReported(false)
 #endif
 {
+#if defined(SIMU)
+  data = forceBitmapBufferDataMallocFailure
+             ? nullptr
+             : (uint16_t *)malloc(align32(width * height * sizeof(uint16_t)));
+#else
   data = (uint16_t *)malloc(align32(width * height * sizeof(uint16_t)));
+#endif
+  if (!data) {
+    dataAllocated = false;
+    _width = 0;
+    _height = 0;
+    xmax = 0;
+    ymax = 0;
+    data_end = nullptr;
+    return;
+  }
+
   data_end = data + (width * height);
 
 #if !defined(BOOT)
