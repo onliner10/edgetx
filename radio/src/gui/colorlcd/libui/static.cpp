@@ -50,6 +50,23 @@ static uint8_t* allocStaticLZ4ImageBuffer(size_t size)
   return static_cast<uint8_t*>(lv_mem_alloc(size));
 }
 
+#if defined(SIMU)
+static bool forceStaticImageCreateFailure = false;
+
+void staticImageForceImageCreateFailureForTest(bool force)
+{
+  forceStaticImageCreateFailure = force;
+}
+#endif
+
+static lv_obj_t* createStaticImageObject(lv_obj_t* parent)
+{
+#if defined(SIMU)
+  if (forceStaticImageCreateFailure) return nullptr;
+#endif
+  return lv_img_create(parent);
+}
+
 //-----------------------------------------------------------------------------
 
 StaticText::StaticText(Window* parent, const rect_t& rect, std::string txt,
@@ -262,7 +279,9 @@ void StaticImage::setSource(std::string filename)
     if (filename[0] != PATH_SEPARATOR[0]) fullpath += PATH_SEPARATOR;
     fullpath += filename;
 
-    if (!image) image = lv_img_create(lvobj);
+    if (!image) image = createStaticImageObject(lvobj);
+    if (!image) return;
+
     lv_obj_set_pos(image, 0, 0);
     lv_obj_set_size(image, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_center(image);
@@ -431,6 +450,26 @@ bool staticLZ4ImageBufferAllocationFailureLeavesNoImageDataForTest()
   staticLZ4ImageForceBufferAllocationFailureForTest(false);
 
   return image && !image->hasImageData();
+}
+
+bool staticImageObjectCreateFailureLeavesNoImageForTest()
+{
+  class TestStaticImage : public StaticImage
+  {
+   public:
+    TestStaticImage(Window* parent) :
+        StaticImage(parent, {0, 0, 32, 32}, BITMAPS_PATH "/missing.png")
+    {
+    }
+
+    bool hasImageObject() const { return image != nullptr; }
+  };
+
+  staticImageForceImageCreateFailureForTest(true);
+  auto image = new (std::nothrow) TestStaticImage(MainWindow::instance());
+  staticImageForceImageCreateFailureForTest(false);
+
+  return image && !image->hasImageObject();
 }
 #endif
 
