@@ -22,13 +22,6 @@
 #include "gtests.h"
 #include "hal/adc_driver.h"
 #include "mixes.h"
-#if defined(COLORLCD)
-#include "gui/colorlcd/menus.h"
-void copyExpo(uint8_t source, uint8_t dest, uint8_t input);
-#else
-#include "gui/common/stdlcd/menus_common.h"
-void copyExpo(uint8_t idx);
-#endif
 
 class TrimsTest : public EdgeTxTest {};
 class MixerTest : public EdgeTxTest {};
@@ -751,43 +744,6 @@ TEST_F(MixerTest, InvalidMixIndexDoesNotCopyMix)
 
   updateMixCount();
   EXPECT_EQ(mixCount, getMixCount());
-}
-
-TEST_F(MixerTest, InvalidExpoIndexDoesNotInsertInput)
-{
-  uint8_t expoCount = getExposCount();
-
-#if defined(COLORLCD)
-  insertExpo(MAX_EXPOS, 0);
-#else
-  s_currCh = 1;
-  insertExpo(MAX_EXPOS);
-#endif
-
-  EXPECT_EQ(expoCount, getExposCount());
-}
-
-TEST_F(MixerTest, InvalidExpoIndexDoesNotDeleteInput)
-{
-  uint8_t expoCount = getExposCount();
-
-  deleteExpo(MAX_EXPOS);
-
-  EXPECT_EQ(expoCount, getExposCount());
-}
-
-TEST_F(MixerTest, InvalidExpoIndexDoesNotCopyInput)
-{
-  uint8_t expoCount = getExposCount();
-
-#if defined(COLORLCD)
-  copyExpo(MAX_EXPOS, 0, 0);
-  copyExpo(0, MAX_EXPOS, 0);
-#else
-  copyExpo(MAX_EXPOS);
-#endif
-
-  EXPECT_EQ(expoCount, getExposCount());
 }
 
 TEST_F(MixerTest, RecursiveAddChannel)

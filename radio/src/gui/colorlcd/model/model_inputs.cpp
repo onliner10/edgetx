@@ -52,9 +52,6 @@ uint8_t getExposCount()
 //
 void copyExpo(uint8_t source, uint8_t dest, uint8_t input)
 {
-  if (source >= MAX_EXPOS || dest >= MAX_EXPOS)
-    return;
-
   mixerTaskStop();
   ExpoData sourceExpo;
   memcpy(&sourceExpo, expoAddress(source), sizeof(ExpoData));
@@ -69,9 +66,6 @@ void copyExpo(uint8_t source, uint8_t dest, uint8_t input)
 
 void deleteExpo(uint8_t idx)
 {
-  if (idx >= MAX_EXPOS)
-    return;
-
   mixerTaskStop();
   ExpoData* expo = expoAddress(idx);
   int input = expo->chn;
@@ -89,9 +83,6 @@ int8_t s_currCh;
 
 void insertExpo(uint8_t idx, uint8_t input)
 {
-  if (idx >= MAX_EXPOS)
-    return;
-
   mixerTaskStop();
   ExpoData* expo = expoAddress(idx);
   memmove(expo + 1, expo, (MAX_EXPOS - (idx + 1)) * sizeof(ExpoData));

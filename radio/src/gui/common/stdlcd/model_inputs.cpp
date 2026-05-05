@@ -54,9 +54,6 @@ bool reachExposLimit()
 int8_t s_currCh;
 void insertExpo(uint8_t idx)
 {
-  if (idx >= MAX_EXPOS)
-    return;
-
   mixerTaskStop();
   ExpoData * expo = expoAddress(idx);
   memmove(expo+1, expo, (MAX_EXPOS-(idx+1))*sizeof(ExpoData));
@@ -81,9 +78,6 @@ void insertExpo(uint8_t idx)
 
 void copyExpo(uint8_t idx)
 {
-  if (idx >= MAX_EXPOS)
-    return;
-
   mixerTaskStop();
   ExpoData * expo = expoAddress(idx);
   memmove(expo+1, expo, (MAX_EXPOS-(idx+1))*sizeof(ExpoData));
@@ -135,9 +129,6 @@ bool swapExpos(uint8_t & idx, uint8_t up)
 
 void deleteExpo(uint8_t idx)
 {
-  if (idx >= MAX_EXPOS)
-    return;
-
   mixerTaskStop();
   ExpoData * expo = expoAddress(idx);
   int input = expo->chn;
