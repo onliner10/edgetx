@@ -350,6 +350,19 @@ TEST(Crossfire, shortFlightModeFrameDoesNotWritePastFrame)
   SUCCEED();
 }
 
+TEST(Crossfire, shortGpsFrameDoesNotReadPastFrame)
+{
+  GuardedCrossfireFrame frame(3);
+  ASSERT_TRUE(frame.isValid());
+  frame[0] = RADIO_ADDRESS;
+  frame[1] = 1;
+  frame[2] = GPS_ID;
+
+  processCrossfireTelemetryFrame(EXTERNAL_MODULE, frame.data(), 3);
+
+  SUCCEED();
+}
+
 static uint8_t jumboFrame1[]={
   0xEA, 0x3E, 0xFE, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
