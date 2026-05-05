@@ -34,6 +34,8 @@
 #include "telemetry/multi.h"
 #endif
 
+#include "trainer.h"
+
 #if defined(SBUS)
 #include "pulses/sbus.h"
 #endif
@@ -393,6 +395,21 @@ TEST_F(PulsesTest, multiDsmBindPacketIgnoredOutsideBindMode)
             MM_RF_DSM2_SUBTYPE_AUTO);
   EXPECT_EQ(g_model.moduleData[EXTERNAL_MODULE].channelsCount, 0);
   EXPECT_EQ(moduleState[EXTERNAL_MODULE].mode, MODULE_MODE_NORMAL);
+}
+
+TEST_F(PulsesTest, multiPartialRxChannelsPacketDoesNotUpdateTrainerInputs)
+{
+  constexpr uint8_t MultiRxChannelsPacket = 13;
+
+  g_model.trainerData.mode = TRAINER_MODE_MULTI;
+  trainerInput[0] = 123;
+
+  const uint8_t frame[] = {'M', 'P', MultiRxChannelsPacket, 4, 0, 0, 0, 1};
+  for (uint8_t byte : frame) {
+    processMultiTelemetryData(byte, EXTERNAL_MODULE);
+  }
+
+  EXPECT_EQ(trainerInput[0], 123);
 }
 #endif
 

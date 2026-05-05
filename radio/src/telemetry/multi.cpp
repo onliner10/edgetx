@@ -274,6 +274,8 @@ static void processMultiRxChannels(const uint8_t * data, uint8_t len)
       bits |= (uint32_t)(data[byteIdx++]) << (uint32_t)bitsavailable;
       bitsavailable += 8;
     }
+    if (bitsavailable < MULTI_CHAN_BITS)
+      break;
 
     int value = bits & ((1 << MULTI_CHAN_BITS) - 1);
     bitsavailable -= MULTI_CHAN_BITS;
