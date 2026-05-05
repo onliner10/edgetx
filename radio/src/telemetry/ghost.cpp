@@ -289,6 +289,10 @@ void processGhostTelemetryFrame(uint8_t module, uint8_t* buffer, uint32_t length
       GhostMenuFrame * packet;
       GhostMenuData * lineData;
       packet = (GhostMenuFrame * )buffer;
+      if (packet->lineIndex >= DIM(reusableBuffer.ghostMenu.line)) {
+        break;
+      }
+
       lineData = (GhostMenuData *) &reusableBuffer.ghostMenu.line[packet->lineIndex];
       lineData->splitLine = 0;
       reusableBuffer.ghostMenu.menuStatus = packet->menuStatus;

@@ -27,6 +27,7 @@
 #include "pulses/ghost.h"
 #include "pulses/pulses.h"
 #include "telemetry/ghost.h"
+#include "telemetry/ghost_menu.h"
 #include "telemetry/telemetry.h"
 #include <sys/mman.h>
 #include <unistd.h>
@@ -276,6 +277,29 @@ TEST(Ghost, shortMenuDescFrameDoesNotReadPastFrame)
   processGhostTelemetryFrame(EXTERNAL_MODULE, frame.data(), 4);
 
   SUCCEED();
+}
+
+TEST(Ghost, invalidMenuDescLineDoesNotOverwriteMenuControls)
+{
+  reusableBuffer.ghostMenu.menuStatus = 0xA5;
+  reusableBuffer.ghostMenu.menuAction = 0x5A;
+  reusableBuffer.ghostMenu.buttonAction = 0xC3;
+
+  uint8_t frame[sizeof(GhostMenuFrame)] = {};
+  frame[0] = GHST_ADDR_RADIO;
+  frame[1] = sizeof(GhostMenuFrame) - 2;
+  frame[2] = GHST_DL_MENU_DESC;
+  frame[3] = GHST_MENU_STATUS_OPENED;
+  frame[4] = GHST_LINE_FLAGS_VALUE_EDIT;
+  frame[5] = GHST_MENU_LINES + 1;
+  memset(&frame[6], 'A', GHST_MENU_CHARS);
+  frame[sizeof(frame) - 1] = crc8(&frame[2], frame[1] - 1);
+
+  processGhostTelemetryFrame(EXTERNAL_MODULE, frame, sizeof(frame));
+
+  EXPECT_EQ(reusableBuffer.ghostMenu.menuStatus, 0xA5);
+  EXPECT_EQ(reusableBuffer.ghostMenu.menuAction, 0x5A);
+  EXPECT_EQ(reusableBuffer.ghostMenu.buttonAction, 0xC3);
 }
 
 #endif
