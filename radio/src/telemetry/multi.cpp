@@ -443,10 +443,10 @@ static void processMultiTelemetryPaket(const uint8_t * packet, uint8_t module)
       break;
 
     case HottTelemetry:
-      if (len >= 14)
-        processHottPacket(data);
+      if (len >= 15)
+        processHottPacket(data, len);
       else
-        TRACE("[MP] Received HoTT telemetry len %d < 14", len);
+        TRACE("[MP] Received HoTT telemetry len %d < 15", len);
       break;
 
     case MLinkTelemetry:
