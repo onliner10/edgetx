@@ -625,6 +625,12 @@ bool containsData(enum FRAME_TYPE frameType)
       frameType == FRAME_TYPE::REQUEST_SET_NO_RESP);
 }
 
+size_t getPayloadLength(uint8_t rxBufferCount)
+{
+  constexpr size_t frameOverhead = offsetof(AfhdsFrame, value) + 2;
+  return rxBufferCount >= frameOverhead ? rxBufferCount - frameOverhead : 0;
+}
+
 void ProtoState::setState(ModuleState state)
 {
   if (state == this->state) {
@@ -668,11 +674,16 @@ void ProtoState::requestInfoAndRun(bool send)
 void ProtoState::parseData(uint8_t* rxBuffer, uint8_t rxBufferCount)
 {
   AfhdsFrame* responseFrame = reinterpret_cast<AfhdsFrame*>(rxBuffer);
+  uint8_t* payload = responseFrame->GetValue();
+  size_t payloadLength = getPayloadLength(rxBufferCount);
   if (containsData((enum FRAME_TYPE) responseFrame->frameType)) {
     switch (responseFrame->command) {
       case COMMAND::MODULE_READY:
 //         TRACE("AFHDS3 [MODULE_READY] %02X", responseFrame->value);
-        if (responseFrame->value == MODULE_STATUS_READY) {
+        if (payloadLength < 1) {
+          break;
+        }
+        if (payload[0] == MODULE_STATUS_READY) {
           setState(ModuleState::STATE_READY);
           // requestInfoAndRun();
         }
@@ -683,8 +694,14 @@ void ProtoState::parseData(uint8_t* rxBuffer, uint8_t rxBufferCount)
       case COMMAND::MODULE_GET_CONFIG: {
 //        modelcfgGet = false;
 //         TRACE("AFHDS3 [MODULE_GET_CONFIG]");
-        size_t len = min<size_t>(sizeof(cfg.buffer), rxBufferCount);
-        std::memcpy((void*) cfg.buffer, responseFrame->GetValue(), len);
+        if (payloadLength < 1) {
+          break;
+        }
+        size_t configSize = payload[0] == 1 ? sizeof(cfg.v1) : sizeof(cfg.v0);
+        if (payloadLength < configSize) {
+          break;
+        }
+        std::memcpy((void*) cfg.buffer, payload, configSize);
         moduleData->afhds3.emi = cfg.v0.EMIStandard;
         moduleData->afhds3.telemetry = cfg.v0.IsTwoWay;
         moduleData->afhds3.phyMode = cfg.v0.PhyMode;
@@ -694,20 +711,28 @@ void ProtoState::parseData(uint8_t* rxBuffer, uint8_t rxBufferCount)
         cfg.others.lastUpdated = get_tmr10ms();
       } break;
       case COMMAND::MODULE_VERSION:
-        std::memcpy((void*) &version, responseFrame->GetValue(), sizeof(version));
+        if (payloadLength >= sizeof(version)) {
+          std::memcpy((void*)&version, payload, sizeof(version));
+        }
 //         TRACE("AFHDS3 [MODULE_VERSION] Product %d, HW %d, BOOT %d, FW %d",
 //               version.productNumber, version.hardwareVersion,
 //               version.bootloaderVersion, version.firmwareVersion);
         break;
       case COMMAND::MODULE_RFPOWER:
-        {  uint8_t* value = responseFrame->GetValue();
-          RFCurrentPower = (value[1]<<8) + value[0];
+        {
+          if (payloadLength < 2) {
+            break;
+          }
+          RFCurrentPower = (payload[1]<<8) + payload[0];
         }
         break;
       case COMMAND::MODULE_STATE:
 //        TRACE("AFHDS3 [MODULE_STATE] %02X", responseFrame->value);
-        setState((ModuleState)responseFrame->value);
-        if(STATE_SYNC_DONE == (ModuleState)responseFrame->value){
+        if (payloadLength < 1) {
+          break;
+        }
+        setState((ModuleState)payload[0]);
+        if(STATE_SYNC_DONE == (ModuleState)payload[0]){
           if( !this->rx_state )
           {
               auto *cfg = this->getConfig();
@@ -728,7 +753,10 @@ void ProtoState::parseData(uint8_t* rxBuffer, uint8_t rxBufferCount)
         break;
       case COMMAND::MODULE_MODE:
 //         TRACE("AFHDS3 [MODULE_MODE] %02X", responseFrame->value);
-        if (responseFrame->value != CMD_RESULT::SUCCESS) {
+        if (payloadLength < 1) {
+          break;
+        }
+        if (payload[0] != CMD_RESULT::SUCCESS) {
           setState(ModuleState::STATE_NOT_READY);
         }
         else if( !RFCurrentPower && INTERNAL_MODULE==module_index )
@@ -737,14 +765,20 @@ void ProtoState::parseData(uint8_t* rxBuffer, uint8_t rxBufferCount)
         }
         break;
       case COMMAND::MODULE_SET_CONFIG:
-        if (responseFrame->value != CMD_RESULT::SUCCESS) {
+        if (payloadLength < 1) {
+          break;
+        }
+        if (payload[0] != CMD_RESULT::SUCCESS) {
           setState(ModuleState::STATE_NOT_READY);
         }
 //         TRACE("AFHDS3 [MODULE_SET_CONFIG], %02X", responseFrame->value);
         break;
       case COMMAND::MODEL_ID:
 //         TRACE("AFHDS3 [MODEL_ID]");
-        if (responseFrame->value == CMD_RESULT::SUCCESS) {
+        if (payloadLength < 1) {
+          break;
+        }
+        if (payload[0] == CMD_RESULT::SUCCESS) {
 //         TRACE("Enqueue get config");
 //          trsp.enqueue(COMMAND::MODULE_GET_CONFIG, FRAME_TYPE::REQUEST_GET_DATA);
 //          trsp.enqueue(COMMAND::MODULE_GET_CONFIG, FRAME_TYPE::REQUEST_GET_DATA);
@@ -753,14 +787,18 @@ void ProtoState::parseData(uint8_t* rxBuffer, uint8_t rxBufferCount)
         break;
       case COMMAND::TELEMETRY_DATA:
         {
-        uint8_t* telemetry = responseFrame->GetValue();
+        if (payloadLength < 1) {
+          break;
+        }
+        uint8_t* telemetry = payload;
+        uint8_t* telemetryEnd = payload + payloadLength;
 
         if (telemetry[0] == 0x22) {
           telemetry++;
-          while (telemetry < rxBuffer + rxBufferCount) {
+          while (telemetry < telemetryEnd) {
 
             uint8_t len = telemetry[0];
-            if (len < 4 || telemetry + len > rxBuffer + rxBufferCount)
+            if (len < 4 || telemetry + len > telemetryEnd)
             {
               break;
             }
@@ -772,7 +810,11 @@ void ProtoState::parseData(uint8_t* rxBuffer, uint8_t rxBufferCount)
       }
         break;
       case COMMAND::COMMAND_RESULT: {
-        uint8_t *data = responseFrame->GetValue();
+        if (payloadLength < 3) {
+          break;
+        }
+        uint8_t *data = payload;
+        uint8_t *dataEnd = payload + payloadLength;
         uint16_t cmd_code = *data++;
         cmd_code |= (*data++)<<8;
         uint8_t result  = *data++;
@@ -809,13 +851,14 @@ void ProtoState::parseData(uint8_t* rxBuffer, uint8_t rxBufferCount)
               clearDirtyFlag(DC_RX_CMD_BUS_TYPE_V0_2);
             } break;
           case RX_CMD_IBUS_DIRECTION:
-            if(RX_CMDRESULT::RXSUCCESS==*data++) {
+            if(data < dataEnd && RX_CMDRESULT::RXSUCCESS==*data++) {
               clearDirtyFlag(DC_RX_CMD_BUS_DIRECTION);
               DIRTY_CMD(cfg, DC_RX_CMD_BUS_TYPE_V0_2);
             }break;
           case RX_CMD_GET_VERSION :
             if(RX_CMDRESULT::RXSUCCESS==result) {
-              if(14==*data++)
+              if(data < dataEnd && 14==*data++ &&
+                 static_cast<size_t>(dataEnd - data) >= sizeof(rx_version))
               {
                 std::memcpy((void*) &rx_version, data, sizeof(rx_version));
                 clearDirtyFlag(DC_RX_CMD_GET_RX_VERSION);

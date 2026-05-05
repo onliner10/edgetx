@@ -53,6 +53,7 @@
 #if defined(AFHDS3)
 #include "pulses/afhds3.h"
 #include "pulses/afhds3_config.h"
+#include "pulses/afhds3_transport.h"
 namespace afhds3 {
 Config_u * getConfig(uint8_t module);
 void applyModelConfig(uint8_t module);
@@ -93,6 +94,32 @@ const etx_proto_driver_t ChannelBoundsDriver = {
     .onConfigChange = nullptr,
     .txCompleted = nullptr,
 };
+
+#if defined(AFHDS3)
+void feedShortAfhds3Response(void* ctx, afhds3::COMMAND command,
+                             uint8_t value)
+{
+  uint8_t frame[8] = {0xC0,
+                      0,
+                      0,
+                      afhds3::FRAME_TYPE::RESPONSE_DATA,
+                      command,
+                      value,
+                      0,
+                      0xC0};
+  uint8_t crc = 0;
+  for (uint8_t i = 1; i < 6; i++) {
+    crc += frame[i];
+  }
+  frame[6] = crc ^ 0xff;
+
+  uint8_t rxBuffer[8] = {};
+  uint8_t len = 0;
+  for (uint8_t byte : frame) {
+    afhds3::ProtoDriver.processData(ctx, byte, rxBuffer, &len);
+  }
+}
+#endif
 
 }  // namespace
 
@@ -459,6 +486,19 @@ TEST_F(PulsesTest, afhds3ApplyConfigRejectsInvalidChannelStart)
   auto cfg = afhds3::getConfig(EXTERNAL_MODULE);
   ASSERT_NE(cfg, nullptr);
   EXPECT_EQ(cfg->v0.FailSafe[0], 0);
+
+  afhds3::ProtoDriver.deinit(ctx);
+}
+
+TEST_F(PulsesTest, afhds3RejectsShortModuleVersionResponse)
+{
+  modulePortInit();
+  g_model.moduleData[EXTERNAL_MODULE].type = MODULE_TYPE_FLYSKY_AFHDS3;
+
+  auto ctx = afhds3::ProtoDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  feedShortAfhds3Response(ctx, afhds3::COMMAND::MODULE_VERSION, 0);
 
   afhds3::ProtoDriver.deinit(ctx);
 }
