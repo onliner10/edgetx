@@ -72,6 +72,15 @@ void StaticText::setText(std::string value)
 
 const std::string& StaticText::getText() const { return text; }
 
+#if defined(SIMU)
+std::string StaticText::automationText() const
+{
+  auto label = Window::automationText();
+  if (!label.empty()) return label;
+  return text;
+}
+#endif
+
 //-----------------------------------------------------------------------------
 
 template <>

@@ -86,6 +86,7 @@ class ViewMain : public NavWindow
   TopBar* topbar = nullptr;
   bool widget_select = false;
   lv_timer_t* widget_select_timer = nullptr;
+  uint32_t nextBackgroundWidgetRefresh = 0;
 
   // Set topbar visibility [0.0 -> 1.0]
   void setTopbarVisible(float visible);

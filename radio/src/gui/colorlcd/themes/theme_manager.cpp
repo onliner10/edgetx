@@ -600,7 +600,7 @@ HeaderIcon::HeaderIcon(Window* parent, EdgeTxIcon icon, std::function<void()> ac
 #if defined(HARDWARE_TOUCH)
   if (this->action) {
     setWindowFlag(NO_CLICK);
-    addCustomButton(0, 0, [=]() { this->action(); });
+    addCustomButton(0, 0, [=]() { this->action(); }, "nav.quick_menu", "Quick menu");
   }
 #endif
 }
@@ -614,7 +614,7 @@ HeaderIcon::HeaderIcon(Window* parent, const char* iconFile, std::function<void(
 #if defined(HARDWARE_TOUCH)
   if (this->action) {
     setWindowFlag(NO_CLICK);
-    addCustomButton(0, 0, [=]() { this->action(); });
+    addCustomButton(0, 0, [=]() { this->action(); }, "nav.quick_menu", "Quick menu");
   }
 #endif
 }
@@ -627,7 +627,7 @@ HeaderBackIcon::HeaderBackIcon(Window* parent, std::function<void()> action) :
 #if defined(HARDWARE_TOUCH)
   if (this->action) {
     setWindowFlag(NO_CLICK);
-    addCustomButton(0, 0, [=]() { this->action(); });
+    addCustomButton(0, 0, [=]() { this->action(); }, "nav.back", "Back");
   }
 #endif
 }

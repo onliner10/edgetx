@@ -169,12 +169,12 @@ class ChannelValue : public Window
   Messaging refreshMsg;
 };
 
-class OutputsWidget : public Widget
+class OutputsWidget : public TrackedWidget
 {
  public:
   OutputsWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
                 WidgetLocation location) :
-      Widget(factory, parent, rect, location)
+      TrackedWidget(factory, parent, rect, location)
   {
     padAll(PAD_ZERO);
 
@@ -243,9 +243,33 @@ class OutputsWidget : public Widget
         }
       }
     }
+
+    requireRefresh();
   }
 
-  void foreground() override
+  uint32_t refreshKey() override
+  {
+    auto widgetData = getPersistentData();
+    uint8_t first = widgetData->options[0].value.unsignedValue;
+    uint8_t last = widgetData->options[1].value.unsignedValue;
+    if (first < 1) first = 1;
+    if (last > MAX_OUTPUT_CHANNELS) last = MAX_OUTPUT_CHANNELS;
+
+    WidgetRefreshKey key;
+    key.add((uint32_t)first)
+       .add((uint32_t)last)
+       .add((uint32_t)g_eeGeneral.ppmunit)
+       .add((bool)g_model.extendedLimits);
+
+    for (uint8_t channel = first; channel <= last; channel += 1) {
+      key.add((int32_t)channelOutputs[channel - 1])
+         .addBytes(g_model.limitData[channel - 1].name, LEN_CHANNEL_NAME);
+    }
+
+    return key.value();
+  }
+
+  void refresh() override
   {
     Messaging::send(Messaging::REFRESH_OUTPUTS_WIDGET);
   }
@@ -308,6 +332,7 @@ class OutputsWidgetFactory : public WidgetFactory
         widgetData->options[2] = widgetData->options[1];
         widgetData->options[1].type = WOV_Signed;
         widgetData->options[1].value.signedValue = MAX_OUTPUT_CHANNELS;
+        widgetData->markChanged();
         storageDirty(location.isTopBar() ? EE_GENERAL : EE_MODEL);
       }
     }

@@ -36,6 +36,10 @@ class ModalWindow : public Window
 
   void onClicked() override;
 
+#if defined(SIMU)
+  std::string automationRole() const override { return "dialog"; }
+#endif
+
  protected:
   bool closeWhenClickOutside;
 };

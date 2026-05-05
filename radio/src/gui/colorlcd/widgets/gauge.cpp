@@ -24,12 +24,12 @@
 #include "edgetx.h"
 #include "static.h"
 
-class GaugeWidget : public Widget
+class GaugeWidget : public TrackedWidget
 {
  public:
   GaugeWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
               WidgetLocation location) :
-      Widget(factory, parent, rect, location)
+      TrackedWidget(factory, parent, rect, location)
   {
     delayLoad();
   }
@@ -106,6 +106,8 @@ class GaugeWidget : public Widget
       lv_obj_clear_state(valueText->getLvObj(), LV_STATE_USER_1);
 
     etx_bg_color_from_flags(bar, widgetData->options[3].value.unsignedValue);
+    lastValue = -10000;
+    requireRefresh();
   }
 
   static const WidgetOption options[];
@@ -116,7 +118,14 @@ class GaugeWidget : public Widget
   DynamicNumber<int16_t>* valueText = nullptr;
   lv_obj_t* bar = nullptr;
 
-  void foreground() override
+  uint32_t refreshKey() override
+  {
+    WidgetRefreshKey key;
+    key.add((int32_t)getGuageValue());
+    return key.value();
+  }
+
+  void refresh() override
   {
     if (!loaded || _deleted) return;
 

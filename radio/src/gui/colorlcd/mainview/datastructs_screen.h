@@ -97,10 +97,13 @@ struct WidgetPersistentData {
 #else
 #if !defined(BACKUP)
   std::vector<WidgetOptionValueTyped> options;
+  uint32_t revision = 1;
   void addEntry(int idx);
   bool hasOption(int idx);
   void setDefault(int idx, const WidgetOption* opt, bool forced);
   void clear();
+  uint32_t getRevision() const { return revision; }
+  void markChanged() { revision += 1; }
   WidgetOptionValueEnum getType(int idx);
   void setType(int idx, WidgetOptionValueEnum typ);
   int32_t getSignedValue(int idx);

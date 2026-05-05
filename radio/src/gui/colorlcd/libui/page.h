@@ -53,6 +53,10 @@ class Page : public NavWindow
   void onCancel() override;
   void onClicked() override;
 
+#if defined(SIMU)
+  std::string automationRole() const override { return "page"; }
+#endif
+
   void enableRefresh();
 
  protected:

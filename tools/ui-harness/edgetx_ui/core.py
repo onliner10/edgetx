@@ -232,8 +232,17 @@ class SdlAutomationSession:
             text=True,
             bufsize=1,
         )
-        time.sleep(0.5)
-        return self.status()
+        deadline = time.monotonic() + 5.0
+        last_error: Exception | None = None
+        while time.monotonic() < deadline:
+            try:
+                return self.status()
+            except HarnessError as exc:
+                last_error = exc
+                if self.process.poll() is not None:
+                    break
+                time.sleep(0.05)
+        raise HarnessError(f"simulator did not become responsive: {last_error}")
 
     def stop(self) -> dict[str, Any]:
         if not self.process:
@@ -297,6 +306,7 @@ class SdlAutomationSession:
             "target": self.target.name,
             "backend": "sdl-automation",
             "running": bool(response.get("running")),
+            "startup_completed": bool(response.get("startup_completed", False)),
             "width": int(response.get("width", 0)),
             "height": int(response.get("height", 0)),
             "depth": int(response.get("depth", 0)),
@@ -334,6 +344,62 @@ class SdlAutomationSession:
     def wait(self, ms: int) -> dict[str, Any]:
         return self.command(f"wait {int(ms)}")
 
+    def ui_tree(self) -> dict[str, Any]:
+        response = self.command("ui_tree", timeout=5.0)
+        return response.get("ui", {"nodes": []})
+
+    def find_node(self, selector: dict[str, Any] | str, action: str | None = None) -> dict[str, Any]:
+        normalized = normalize_selector(selector)
+        tree = self.ui_tree()
+        nodes = [node for node in tree.get("nodes", []) if node_matches(node, normalized)]
+        required_action = action or normalized.get("action")
+        if required_action:
+            nodes = [node for node in nodes if required_action in node.get("actions", [])]
+
+        if "index" in normalized:
+            index = int(normalized["index"])
+            if index < len(nodes):
+                return nodes[index]
+        elif nodes:
+            return nodes[-1] if required_action else nodes[0]
+
+        raise HarnessError(
+            f"could not find UI node matching {json.dumps(normalized, sort_keys=True)}"
+            + (f" with action `{required_action}`" if required_action else "")
+            + "\nVisible nodes:\n"
+            + summarize_ui_nodes(tree.get("nodes", []))
+        )
+
+    def ui_click(self, selector: dict[str, Any] | str, duration_ms: int = 0) -> dict[str, Any]:
+        node = self.find_node(selector, "click")
+        response = self.command(f"ui_click {node['id']} {int(duration_ms)}", timeout=5.0)
+        return response | {"matched": node}
+
+    def ui_long_click(self, selector: dict[str, Any] | str, duration_ms: int = 0) -> dict[str, Any]:
+        node = self.find_node(selector, "long_click")
+        response = self.command(f"ui_long_click {node['id']} {int(duration_ms)}", timeout=5.0)
+        return response | {"matched": node}
+
+    def assert_visible(self, selector: dict[str, Any] | str) -> dict[str, Any]:
+        return {"matched": self.find_node(selector)}
+
+    def skip_storage_warning_if_present(self) -> dict[str, Any]:
+        results = []
+        for _ in range(5):
+            tree = self.ui_tree()
+            warning_text = " ".join(str(node.get("text", "")) for node in tree.get("nodes", [])).lower()
+            if "storage warning" not in warning_text and "press any key to skip" not in warning_text:
+                return {"skipped": bool(results), "count": len(results), "results": results}
+
+            try:
+                results.append({"method": "dialog.action", "result": self.ui_click({"automation_id": "dialog.action"})})
+            except HarnessError:
+                self.press("ENTER")
+                self.wait(500)
+                results.append({"method": "ENTER"})
+
+        raise HarnessError("storage warning still visible after 5 skip attempts")
+
     def screenshot(self, name: str, out_dir: Path) -> dict[str, Any]:
         out_dir.mkdir(parents=True, exist_ok=True)
         safe_name = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in name)
@@ -367,6 +433,56 @@ def normalize_key(key: str) -> str:
     if normalized not in KEYS:
         raise HarnessError(f"unknown key `{key}`; expected one of {', '.join(sorted(KEYS))}")
     return normalized
+
+
+def normalize_selector(selector: dict[str, Any] | str) -> dict[str, Any]:
+    if isinstance(selector, str):
+        return {"text": selector}
+    return dict(selector)
+
+
+def node_matches(node: dict[str, Any], selector: dict[str, Any]) -> bool:
+    node_id = str(node.get("id", ""))
+    automation_id = str(node.get("automation_id", ""))
+    text = str(node.get("text", ""))
+
+    if "id" in selector:
+        wanted = str(selector["id"])
+        if node_id != wanted and automation_id != wanted:
+            return False
+    if "automation_id" in selector and automation_id != str(selector["automation_id"]):
+        return False
+    if "role" in selector and str(node.get("role", "")) != str(selector["role"]):
+        return False
+    if "text" in selector and text != str(selector["text"]):
+        return False
+    if "text_contains" in selector and str(selector["text_contains"]) not in text:
+        return False
+    if "enabled" in selector and bool(node.get("enabled")) != bool(selector["enabled"]):
+        return False
+    if "checked" in selector and bool(node.get("checked")) != bool(selector["checked"]):
+        return False
+    if "focused" in selector and bool(node.get("focused")) != bool(selector["focused"]):
+        return False
+    return True
+
+
+def summarize_ui_nodes(nodes: list[dict[str, Any]], limit: int = 40) -> str:
+    lines = []
+    for node in nodes:
+        text = str(node.get("text", ""))
+        automation_id = str(node.get("automation_id", ""))
+        actions = ",".join(node.get("actions", []))
+        if not text and not automation_id and not actions:
+            continue
+        bounds = node.get("bounds", [])
+        lines.append(
+            f"- role={node.get('role', '')} id={automation_id or node.get('id', '')} "
+            f"text={text!r} actions=[{actions}] bounds={bounds}"
+        )
+        if len(lines) >= limit:
+            break
+    return "\n".join(lines) if lines else "(no visible labeled/actionable nodes)"
 
 
 def default_fixture_path(kind: str, target: str) -> Path:
@@ -442,6 +558,21 @@ class HarnessService:
     def wait(self, ms: int) -> dict[str, Any]:
         return self.require_session().wait(ms)
 
+    def ui_tree(self) -> dict[str, Any]:
+        return self.require_session().ui_tree()
+
+    def ui_click(self, selector: dict[str, Any] | str, duration_ms: int = 0) -> dict[str, Any]:
+        return self.require_session().ui_click(selector, duration_ms)
+
+    def ui_long_click(self, selector: dict[str, Any] | str, duration_ms: int = 0) -> dict[str, Any]:
+        return self.require_session().ui_long_click(selector, duration_ms)
+
+    def assert_visible(self, selector: dict[str, Any] | str) -> dict[str, Any]:
+        return self.require_session().assert_visible(selector)
+
+    def skip_storage_warning_if_present(self) -> dict[str, Any]:
+        return self.require_session().skip_storage_warning_if_present()
+
     def screenshot(self, name: str, out_dir: str | None = None) -> dict[str, Any]:
         output = Path(out_dir) if out_dir else REPO_ROOT / "build" / "ui-harness" / "screenshots"
         return self.require_session().screenshot(name, output)
@@ -473,6 +604,28 @@ class HarnessService:
         if "wait" in step:
             value = step["wait"]
             self.wait(int(value.get("ms", 250) if isinstance(value, dict) else value))
+        elif "ui_tree" in step:
+            self.ui_tree()
+        elif "click" in step:
+            value = step["click"]
+            if isinstance(value, str):
+                self.ui_click(value)
+            else:
+                selector = value.get("selector", value)
+                self.ui_click(selector, int(value.get("duration_ms", 0)))
+        elif "long_click" in step:
+            value = step["long_click"]
+            if isinstance(value, str):
+                self.ui_long_click(value)
+            else:
+                selector = value.get("selector", value)
+                self.ui_long_click(selector, int(value.get("duration_ms", 0)))
+        elif "assert_visible" in step:
+            self.assert_visible(step["assert_visible"])
+        elif "skip_storage_warning_if_present" in step:
+            self.skip_storage_warning_if_present()
+        elif step.get("invoke") == "skip_storage_warning_if_present":
+            self.skip_storage_warning_if_present()
         elif "press" in step:
             value = step["press"]
             if isinstance(value, str):

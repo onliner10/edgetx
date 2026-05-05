@@ -483,6 +483,44 @@ bool Window::onLongPress()
   return true;
 }
 
+#if defined(SIMU)
+void Window::setAutomationId(std::string value)
+{
+  automationId_ = std::move(value);
+}
+
+void Window::setAutomationRole(std::string value)
+{
+  automationRole_ = std::move(value);
+}
+
+void Window::setAutomationText(std::string value)
+{
+  automationText_ = std::move(value);
+}
+
+std::string Window::automationRole() const
+{
+  return automationRole_.empty() ? "window" : automationRole_;
+}
+
+std::string Window::automationText() const
+{
+  return automationText_;
+}
+
+bool Window::automationClickable() const
+{
+  if (!lvobj || hasWindowFlag(NO_CLICK) ||
+      !lv_obj_has_flag(lvobj, LV_OBJ_FLAG_CLICKABLE)) {
+    return false;
+  }
+
+  auto role = automationRole();
+  return role == "button" || role == "model_button";
+}
+#endif
+
 void Window::addChild(Window *window)
 {
   if (!window) return;
@@ -560,24 +598,34 @@ void Window::enable(bool enabled)
 #if defined(HARDWARE_TOUCH)
 void Window::addBackButton()
 {
-  new (std::nothrow) ButtonBase(
+  auto button = new (std::nothrow) ButtonBase(
       this, {0, 0, EdgeTxStyles::MENU_HEADER_HEIGHT, EdgeTxStyles::MENU_HEADER_HEIGHT},
       [=]() -> uint8_t {
         onCancel();
         return 0;
       },
       window_create);
+  if (button) {
+    button->setAutomationId("nav.back");
+    button->setAutomationText("Back");
+  }
 }
 
-void Window::addCustomButton(coord_t x, coord_t y, std::function<void()> action)
+void Window::addCustomButton(coord_t x, coord_t y, std::function<void()> action,
+                             const char* automationId,
+                             const char* automationText)
 {
-  new (std::nothrow) ButtonBase(
+  auto button = new (std::nothrow) ButtonBase(
     this, {x, y, EdgeTxStyles::MENU_HEADER_HEIGHT, EdgeTxStyles::MENU_HEADER_HEIGHT},
     [=]() -> uint8_t {
       action();
       return 0;
     },
     window_create);
+  if (button) {
+    if (automationId) button->setAutomationId(automationId);
+    if (automationText) button->setAutomationText(automationText);
+  }
 }
 #endif
 

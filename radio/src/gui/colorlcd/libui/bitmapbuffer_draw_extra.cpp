@@ -375,29 +375,53 @@ void BitmapBuffer::drawLine(coord_t x1, coord_t y1, coord_t x2, coord_t y2,
 
   if (dxabs >= dyabs) {
     /* the line is more horizontal than vertical */
-    for (int i = 0; i <= dxabs; i++) {
-      if ((1 << (px % 8)) & pat) {
+    if (pat == SOLID) {
+      for (int i = 0; i <= dxabs; i++) {
         drawPixelAbs(px, py, color);
+        y += dyabs;
+        if (y >= dxabs) {
+          y -= dxabs;
+          py += sdy;
+        }
+        px += sdx;
       }
-      y += dyabs;
-      if (y >= dxabs) {
-        y -= dxabs;
-        py += sdy;
+    } else {
+      for (int i = 0; i <= dxabs; i++) {
+        if ((1u << ((uint8_t)px & 7u)) & pat) {
+          drawPixelAbs(px, py, color);
+        }
+        y += dyabs;
+        if (y >= dxabs) {
+          y -= dxabs;
+          py += sdy;
+        }
+        px += sdx;
       }
-      px += sdx;
     }
   } else {
     /* the line is more vertical than horizontal */
-    for (int i = 0; i <= dyabs; i++) {
-      if ((1 << (py % 8)) & pat) {
+    if (pat == SOLID) {
+      for (int i = 0; i <= dyabs; i++) {
         drawPixelAbs(px, py, color);
+        x += dxabs;
+        if (x >= dyabs) {
+          x -= dyabs;
+          px += sdx;
+        }
+        py += sdy;
       }
-      x += dxabs;
-      if (x >= dyabs) {
-        x -= dyabs;
-        px += sdx;
+    } else {
+      for (int i = 0; i <= dyabs; i++) {
+        if ((1u << ((uint8_t)py & 7u)) & pat) {
+          drawPixelAbs(px, py, color);
+        }
+        x += dxabs;
+        if (x >= dyabs) {
+          x -= dyabs;
+          px += sdx;
+        }
+        py += sdy;
       }
-      py += sdy;
     }
   }
 }

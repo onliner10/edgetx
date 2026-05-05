@@ -34,6 +34,9 @@
 
 #if defined(SIMU)
 #include "targets/simu/simulib.h"
+#if defined(COLORLCD)
+#include "targets/simu/ui_automation.h"
+#endif
 #endif
 
 #if defined(COLORLCD)
@@ -42,6 +45,7 @@
 #endif
 #if defined(FREE_RTOS)
 #include "LvglWrapper.h"
+#include "mainwindow.h"
 #endif
 #include "startup_shutdown.h"
 #endif
@@ -84,7 +88,7 @@ static void pumpAdaptiveLvglUntilMenuDeadline(uint32_t cycleStart)
     uint32_t nextRun = lvgl->getNextRunDelay();
 
     if (lvgl->hasAdaptiveWork()) {
-      nextRun = lvgl->run();
+      nextRun = MainWindow::instance()->runActiveLoopTick();
     } else if (nextRun == 0) {
       nextRun = LVGL_ADAPTIVE_PUMP_MAX_SLEEP_MS;
     }
@@ -175,6 +179,9 @@ static void menusTask()
       sleep_ms(MENU_TASK_PERIOD);
 #else
     sleep_until(&next_tick, MENU_TASK_PERIOD);
+#endif
+#if defined(SIMU) && defined(COLORLCD)
+    SimuUiAutomation::menuTick();
 #endif
     resetForcePowerOffRequest();
   }

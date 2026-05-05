@@ -102,6 +102,7 @@ void FullScreenDialog::build()
           return 0;
         });
     if (btn) {
+      btn->setAutomationId("dialog.action");
       etx_bg_color(btn->getLvObj(), COLOR_THEME_SECONDARY3_INDEX);
       etx_txt_color(btn->getLvObj(), COLOR_THEME_PRIMARY1_INDEX);
     }

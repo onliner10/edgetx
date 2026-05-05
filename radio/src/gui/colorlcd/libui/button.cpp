@@ -124,6 +124,15 @@ void TextButton::setText(std::string value)
   }
 }
 
+#if defined(SIMU)
+std::string TextButton::automationText() const
+{
+  auto label = Window::automationText();
+  if (!label.empty()) return label;
+  return text;
+}
+#endif
+
 //-----------------------------------------------------------------------------
 
 IconButton::IconButton(Window* parent, EdgeTxIcon icon, coord_t x, coord_t y,

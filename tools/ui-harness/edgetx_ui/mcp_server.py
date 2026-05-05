@@ -74,6 +74,48 @@ TOOLS: dict[str, dict[str, Any]] = {
         "description": "Wait for a number of milliseconds.",
         "inputSchema": {"type": "object", "properties": {"ms": {"type": "integer"}}, "required": ["ms"]},
     },
+    "edgetx_ui_tree": {
+        "description": "Return the live color-LCD LVGL UI tree with roles, text, bounds, stable automation IDs, and available actions.",
+        "inputSchema": {"type": "object"},
+    },
+    "edgetx_click": {
+        "description": "Invoke a visible UI node click action by text, role, id, automation_id, or text_contains. Runs on the menu/UI thread without fixed sleeps.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "selector": {"type": "object"},
+                "text": {"type": "string"},
+                "text_contains": {"type": "string"},
+                "role": {"type": "string"},
+                "id": {"type": "string"},
+                "automation_id": {"type": "string"},
+                "duration_ms": {"type": "integer", "default": 0},
+            },
+        },
+    },
+    "edgetx_long_click": {
+        "description": "Invoke a visible UI node long-click action by text, role, id, automation_id, or text_contains. Runs on the menu/UI thread without fixed sleeps.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "selector": {"type": "object"},
+                "text": {"type": "string"},
+                "text_contains": {"type": "string"},
+                "role": {"type": "string"},
+                "id": {"type": "string"},
+                "automation_id": {"type": "string"},
+                "duration_ms": {"type": "integer", "default": 0},
+            },
+        },
+    },
+    "edgetx_assert_visible": {
+        "description": "Assert that a UI node selected by text, role, id, automation_id, or text_contains is visible.",
+        "inputSchema": {"type": "object", "properties": {"selector": {"type": "object"}, "text": {"type": "string"}, "text_contains": {"type": "string"}, "role": {"type": "string"}, "id": {"type": "string"}, "automation_id": {"type": "string"}}},
+    },
+    "edgetx_skip_storage_warning_if_present": {
+        "description": "If a storage warning dialog is visible, click its action button or press ENTER to skip it.",
+        "inputSchema": {"type": "object"},
+    },
     "edgetx_screenshot": {
         "description": "Capture a framebuffer screenshot as PNG.",
         "inputSchema": {
@@ -87,6 +129,14 @@ TOOLS: dict[str, dict[str, Any]] = {
         "inputSchema": {"type": "object", "properties": {"flow_path": {"type": "string"}}, "required": ["flow_path"]},
     },
 }
+
+
+def selector_from_args(args: dict[str, Any]) -> dict[str, Any]:
+    selector = dict(args.get("selector") or {})
+    for key in ("id", "automation_id", "role", "text", "text_contains", "enabled", "checked", "focused", "index"):
+        if key in args:
+            selector[key] = args[key]
+    return selector
 
 
 class McpServer:
@@ -139,6 +189,16 @@ class McpServer:
             )
         if name == "edgetx_wait":
             return self.service.wait(int(args["ms"]))
+        if name == "edgetx_ui_tree":
+            return self.service.ui_tree()
+        if name == "edgetx_click":
+            return self.service.ui_click(selector_from_args(args), int(args.get("duration_ms", 0)))
+        if name == "edgetx_long_click":
+            return self.service.ui_long_click(selector_from_args(args), int(args.get("duration_ms", 0)))
+        if name == "edgetx_assert_visible":
+            return self.service.assert_visible(selector_from_args(args))
+        if name == "edgetx_skip_storage_warning_if_present":
+            return self.service.skip_storage_warning_if_present()
         if name == "edgetx_screenshot":
             return self.service.screenshot(args["name"], args.get("out_dir"))
         if name == "edgetx_run_flow":

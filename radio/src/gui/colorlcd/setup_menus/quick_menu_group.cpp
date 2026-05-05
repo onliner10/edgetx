@@ -66,6 +66,10 @@ class QuickMenuButton : public ButtonBase
       ButtonBase(parent, {}, pressHandler, etx_quick_button_create),
       visibleHandler(std::move(visibleHandler))
   {
+#if defined(SIMU)
+    setAutomationText(title ? title : "");
+#endif
+
     iconPtr = new (std::nothrow) StaticIcon(this, (QuickMenuGroup::QM_BUTTON_WIDTH - QuickMenuGroup::QM_ICON_SIZE) / 2, PAD_SMALL, icon, COLOR_THEME_QM_FG_INDEX);
 #if VERSION_MAJOR > 2
     if (iconPtr) etx_obj_add_style(iconPtr->getLvObj(), styles->qmdisabled, LV_PART_MAIN | LV_STATE_DISABLED);

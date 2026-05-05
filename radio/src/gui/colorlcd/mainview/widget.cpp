@@ -68,6 +68,7 @@ void WidgetPersistentData::addEntry(int idx)
     wov.value.unsignedValue = 0;
     while ((int)options.size() <= idx)
       options.push_back(wov);
+    markChanged();
   }
 }
 
@@ -85,12 +86,16 @@ void WidgetPersistentData::setDefault(int idx, const WidgetOption* opt, bool for
     options[idx].type = optType;
     options[idx].value.unsignedValue = opt->deflt.unsignedValue;
     options[idx].value.stringValue = opt->deflt.stringValue;
+    markChanged();
   }
 }
 
 void WidgetPersistentData::clear()
 {
-  options.clear();
+  if (!options.empty()) {
+    options.clear();
+    markChanged();
+  }
 }
 
 WidgetOptionValueEnum WidgetPersistentData::getType(int idx)
@@ -102,7 +107,9 @@ WidgetOptionValueEnum WidgetPersistentData::getType(int idx)
 void WidgetPersistentData::setType(int idx, WidgetOptionValueEnum typ)
 {
   addEntry(idx);
+  if (options[idx].type == typ) return;
   options[idx].type = typ;
+  markChanged();
 }
 
 int32_t WidgetPersistentData::getSignedValue(int idx)
@@ -114,7 +121,9 @@ int32_t WidgetPersistentData::getSignedValue(int idx)
 void WidgetPersistentData::setSignedValue(int idx, int32_t newValue)
 {
   addEntry(idx);
+  if (options[idx].value.signedValue == newValue) return;
   options[idx].value.signedValue = newValue;
+  markChanged();
 }
 
 uint32_t WidgetPersistentData::getUnsignedValue(int idx)
@@ -126,7 +135,9 @@ uint32_t WidgetPersistentData::getUnsignedValue(int idx)
 void WidgetPersistentData::setUnsignedValue(int idx, uint32_t newValue)
 {
   addEntry(idx);
+  if (options[idx].value.unsignedValue == newValue) return;
   options[idx].value.unsignedValue = newValue;
+  markChanged();
 }
 
 bool WidgetPersistentData::getBoolValue(int idx)
@@ -138,7 +149,9 @@ bool WidgetPersistentData::getBoolValue(int idx)
 void WidgetPersistentData::setBoolValue(int idx, bool newValue)
 {
   addEntry(idx);
+  if (options[idx].value.boolValue == (uint32_t)newValue) return;
   options[idx].value.boolValue = newValue;
+  markChanged();
 }
 
 std::string WidgetPersistentData::getString(int idx)
@@ -150,7 +163,10 @@ std::string WidgetPersistentData::getString(int idx)
 void WidgetPersistentData::setString(int idx, const char* s)
 {
   addEntry(idx);
-  options[idx].value.stringValue = s;
+  const char* value = s ? s : "";
+  if (options[idx].value.stringValue == value) return;
+  options[idx].value.stringValue = value;
+  markChanged();
 }
 
 //-----------------------------------------------------------------------------
@@ -384,6 +400,31 @@ void Widget::enableFocus(bool enable)
 }
 
 WidgetPersistentData* Widget::getPersistentData() { return location.persistentData(); }
+
+uint32_t Widget::getPersistentDataRevision()
+{
+  auto widgetData = getPersistentData();
+  return widgetData ? widgetData->getRevision() : 0;
+}
+
+void TrackedWidget::foreground()
+{
+  if (!loaded || _deleted) return;
+
+  WidgetRefreshKey key;
+  key.add(getPersistentDataRevision())
+     .add((int32_t)width())
+     .add((int32_t)height())
+     .add(isFullscreen())
+     .add(refreshKey());
+
+  uint32_t currentKey = key.value();
+  if (!refreshPending && currentKey == lastRefreshKey) return;
+
+  lastRefreshKey = currentKey;
+  refreshPending = false;
+  refresh();
+}
 
 //-----------------------------------------------------------------------------
 

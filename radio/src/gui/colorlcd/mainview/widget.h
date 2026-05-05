@@ -34,6 +34,49 @@
 
 class WidgetFactory;
 
+class WidgetRefreshKey
+{
+ public:
+  WidgetRefreshKey& add(uint32_t value)
+  {
+    mix(value);
+    return *this;
+  }
+
+  WidgetRefreshKey& add(int32_t value)
+  {
+    return add((uint32_t)value);
+  }
+
+  WidgetRefreshKey& add(bool value)
+  {
+    return add((uint32_t)value);
+  }
+
+  WidgetRefreshKey& addBytes(const char* data, size_t len)
+  {
+    if (!data) return *this;
+    for (size_t i = 0; i < len; i += 1) {
+      state ^= (uint8_t)data[i];
+      state *= FNV_PRIME;
+    }
+    return *this;
+  }
+
+  uint32_t value() const { return state; }
+
+ private:
+  static constexpr uint32_t FNV_OFFSET = 2166136261u;
+  static constexpr uint32_t FNV_PRIME = 16777619u;
+
+  uint32_t state = FNV_OFFSET;
+
+  void mix(uint32_t value)
+  {
+    addBytes((const char*)&value, sizeof(value));
+  }
+};
+
 //-----------------------------------------------------------------------------
 
 struct MainViewWidgetLocation
@@ -140,6 +183,7 @@ class Widget : public ButtonBase
   virtual const char* getErrorMessage() const { return nullptr; }
 
   WidgetPersistentData* getPersistentData();
+  uint32_t getPersistentDataRevision();
 
 #if defined(DEBUG_WINDOWS)
   std::string getName() const override { return "Widget"; }
@@ -196,6 +240,26 @@ class Widget : public ButtonBase
 
   virtual void onFullscreen(bool enable) {}
   void openMenu();
+};
+
+//-----------------------------------------------------------------------------
+
+class TrackedWidget : public Widget
+{
+ public:
+  using Widget::Widget;
+
+  void foreground() final;
+
+ protected:
+  void requireRefresh() { refreshPending = true; }
+
+  virtual uint32_t refreshKey() = 0;
+  virtual void refresh() = 0;
+
+ private:
+  uint32_t lastRefreshKey = 0;
+  bool refreshPending = true;
 };
 
 //-----------------------------------------------------------------------------

@@ -21,8 +21,31 @@ tools/ui-harness/edgetx-mcp
 ```
 
 `edgetx-mcp` is a stdio MCP server. It exposes build/start/stop, key, rotary,
-touch, wait, screenshot, status, and run-flow tools. It uses the same Python
-core as the CLI.
+touch, wait, screenshot, status, live UI-tree, selector click, selector
+long-click, visibility assertion, storage-warning skip, and run-flow tools. It
+uses the same Python core as the CLI.
+
+For exploratory QA, keep one MCP simulator session running and use the live
+tree instead of guessing key paths or coordinates:
+
+```text
+edgetx_start_simulator target=tx16s
+edgetx_status  # wait until startup_completed is true before screenshot QA
+edgetx_skip_storage_warning_if_present
+edgetx_ui_tree
+edgetx_click automation_id=model.model2.yml
+edgetx_ui_tree
+edgetx_screenshot name=after-model-click
+```
+
+The `ui_tree` result is a snapshot of the running color-LCD LVGL tree. Nodes
+include role, visible text, stable `automation_id` where available, bounds,
+state, and available actions. Prefer `automation_id` selectors, then exact text
+or `text_contains`; use raw coordinates only when the tree lacks a meaningful
+node. Selector `click` and `long_click` invoke the selected action on the
+menu/UI thread without fixed sleeps; raw `touch` and `drag` remain available
+when the touch timing itself is under test. JSON flows are best treated as
+replay artifacts after the interactive path is known.
 
 Default sessions copy these fixtures into a temporary runtime directory before
 starting the simulator, so smoke runs do not modify tracked fixture files.

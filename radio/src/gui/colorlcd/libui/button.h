@@ -41,6 +41,11 @@ class ButtonBase : public FormField
   void onClicked() override;
   void checkEvents() override;
 
+#if defined(SIMU)
+  std::string automationRole() const override { return "button"; }
+  bool automationLongClickable() const override { return static_cast<bool>(longPressHandler); }
+#endif
+
   void check(bool checked = true);
   bool checked() const;
 
@@ -96,6 +101,10 @@ class TextButton : public ButtonBase
 #endif
 
   void setText(std::string value);
+
+#if defined(SIMU)
+  std::string automationText() const override;
+#endif
 
   void setFont(FontIndex font)
   {

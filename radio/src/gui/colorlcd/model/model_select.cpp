@@ -65,6 +65,11 @@ class ModelButton : public Button
   {
     padAll(PAD_ZERO);
     setWindowFlag(NO_FOCUS);
+#if defined(SIMU)
+    setAutomationRole("model_button");
+    setAutomationText(modelCell->modelName);
+    setAutomationId(std::string("model.") + modelCell->modelFilename);
+#endif
 
     delayLoad();
   }
@@ -509,6 +514,11 @@ class ModelLayoutButton : public IconButton
 
 ModelLabelsWindow::ModelLabelsWindow() : Page(ICON_MODEL_SELECT, PAD_ZERO, true)
 {
+#if defined(SIMU)
+  setAutomationId("page.manage_models");
+  setAutomationText(STR_MAIN_MENU_MANAGE_MODELS);
+#endif
+
   buildHead(header);
   buildBody(body);
 

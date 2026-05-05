@@ -86,14 +86,14 @@ void WidgetsContainer::showWidgets(bool visible)
   }
 }
 
-void WidgetsContainer::refreshWidgets(bool inForeground)
+void WidgetsContainer::refreshWidgets(bool inForeground, bool refreshBackground)
 {
   if (!_deleted) {
     for (int i = 0; i < zoneCount; i++) {
       if (widgets && widgets[i]) {
         if ((inForeground && widgets[i]->isOnScreen()) || widgets[i]->isFullscreen())
           widgets[i]->foreground();
-        else
+        else if (refreshBackground)
           widgets[i]->background();
       }
     }

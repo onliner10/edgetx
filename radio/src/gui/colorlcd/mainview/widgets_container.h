@@ -50,7 +50,7 @@ class WidgetsContainer: public Window
   void updateZones();
   void showWidgets(bool visible = true);
   void hideWidgets() { showWidgets(false); }
-  void refreshWidgets(bool inForeground);
+  void refreshWidgets(bool inForeground, bool refreshBackground);
 
   virtual bool isLayout() { return false; }
   virtual bool isAppMode() const { return false; }

@@ -26,12 +26,12 @@
 #define ETX_STATE_TELEM_STALE LV_STATE_USER_2
 #define ETX_STATE_LARGE_FONT LV_STATE_USER_3
 
-class ValueWidget : public Widget
+class ValueWidget : public TrackedWidget
 {
  public:
   ValueWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
               WidgetLocation location) :
-      Widget(factory, parent, rect, location)
+      TrackedWidget(factory, parent, rect, location)
   {
     delayLoad();
   }
@@ -78,7 +78,27 @@ class ValueWidget : public Widget
     foreground();
   }
 
-  void foreground() override
+  uint32_t refreshKey() override
+  {
+    auto widgetData = getPersistentData();
+    mixsrc_t field = widgetData->options[0].value.unsignedValue;
+
+    WidgetRefreshKey key;
+    key.add((int32_t)field).add((int32_t)getValue(field));
+
+    if (field >= MIXSRC_FIRST_TELEM) {
+      TelemetryItem& telemetryItem =
+          telemetryItems[(field - MIXSRC_FIRST_TELEM) / 3];
+      key.add(telemetryItem.isAvailable()).add(telemetryItem.isOld());
+    } else if (field >= MIXSRC_FIRST_TIMER && field <= MIXSRC_LAST_TIMER) {
+      TimerState& timerState = timersStates[field - MIXSRC_FIRST_TIMER];
+      key.add((int32_t)timerState.val);
+    }
+
+    return key.value();
+  }
+
+  void refresh() override
   {
     if (!loaded || _deleted) return;
 
@@ -299,6 +319,9 @@ class ValueWidget : public Widget
       lv_obj_add_flag(labelShadow, LV_OBJ_FLAG_HIDDEN);
       lv_obj_add_flag(valueShadow, LV_OBJ_FLAG_HIDDEN);
     }
+
+    lastValue = -10000;
+    requireRefresh();
   }
 };
 

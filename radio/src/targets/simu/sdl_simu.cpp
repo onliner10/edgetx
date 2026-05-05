@@ -28,6 +28,7 @@
 #include <imgui_impl_sdlrenderer2.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -85,6 +86,7 @@
 #include "edgetx.h"
 
 #include "arg_parser.h"
+#include "ui_automation.h"
 
 #define TIMER_INTERVAL 10 // 10ms
 
@@ -206,6 +208,7 @@ static void automation_handle_command(const std::string& line)
   if (command == "status") {
     std::ostringstream extra;
     extra << "\"running\":" << (simuIsRunning() ? "true" : "false")
+          << ",\"startup_completed\":" << (simuStartupCompleted() ? "true" : "false")
           << ",\"width\":" << simuLcdGetWidth()
           << ",\"height\":" << simuLcdGetHeight()
           << ",\"depth\":" << simuLcdGetDepth();
@@ -262,6 +265,32 @@ static void automation_handle_command(const std::string& line)
     in >> duration_ms;
     SDL_Delay(std::max(0, duration_ms));
     automation_reply_ok();
+  } else if (command == "ui_tree") {
+    std::string json;
+    std::string error;
+    if (!SimuUiAutomation::requestSnapshot(json, error)) {
+      automation_reply_error(error);
+      return;
+    }
+    automation_reply_ok(json);
+  } else if (command == "ui_click" || command == "ui_long_click") {
+    std::string node_id;
+    int duration_ms = 0;
+    in >> node_id;
+    in >> duration_ms;
+    (void)duration_ms;
+    if (node_id.empty()) {
+      automation_reply_error("missing UI node id");
+      return;
+    }
+    std::string error;
+    std::string extra;
+    const auto action = command == "ui_long_click" ? "long_click" : "click";
+    if (!SimuUiAutomation::requestAction(node_id, action, extra, error)) {
+      automation_reply_error(error);
+      return;
+    }
+    automation_reply_ok(extra);
   } else if (command == "screenshot_ppm") {
     std::string path;
     in >> path;

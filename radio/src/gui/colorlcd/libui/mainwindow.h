@@ -46,6 +46,7 @@ class MainWindow: public Window
 #endif
 
   uint32_t runMainLoopTick();
+  uint32_t runActiveLoopTick();
 
   bool setBackgroundImage(std::string& fileName);
 
@@ -77,14 +78,23 @@ class MainWindow: public Window
     ModalUiTick() = default;
   };
 
+  class ActiveUiTick
+  {
+    friend class MainWindow;
+    ActiveUiTick() = default;
+  };
+
   uint32_t run(NormalUiTick);
   uint32_t run(ModalUiTick);
+  uint32_t run(ActiveUiTick);
 
   template <class TickMode>
   uint32_t runUiTick(TickMode mode);
 
   void refreshModelWidgets(NormalUiTick);
   void refreshModelWidgets(ModalUiTick) {}
+  void refreshModelWidgets(ActiveUiTick) {}
   void collectDeletedWindows(NormalUiTick);
   void collectDeletedWindows(ModalUiTick) {}
+  void collectDeletedWindows(ActiveUiTick) {}
 };

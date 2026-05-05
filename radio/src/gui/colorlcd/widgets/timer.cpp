@@ -31,12 +31,12 @@
 #define ETX_NAME_COLOR_WHITE LV_STATE_USER_3
 #define ETX_VALUE_SMALL_FONT LV_STATE_USER_1
 
-class TimerWidget : public Widget
+class TimerWidget : public TrackedWidget
 {
  public:
   TimerWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
               WidgetLocation location) :
-      Widget(factory, parent, rect, location)
+      TrackedWidget(factory, parent, rect, location)
   {
     delayLoad();
   }
@@ -107,7 +107,22 @@ class TimerWidget : public Widget
     foreground();
   }
 
-  void foreground() override
+  uint32_t refreshKey() override
+  {
+    auto widgetData = getPersistentData();
+    uint32_t index = widgetData->options[0].value.unsignedValue;
+    TimerData& timerData = g_model.timers[index];
+    TimerState& timerState = timersStates[index];
+
+    WidgetRefreshKey key;
+    key.add((uint32_t)index)
+       .add((uint32_t)timerData.start)
+       .add((bool)timerData.showElapsed)
+       .add((int32_t)timerState.val);
+    return key.value();
+  }
+
+  void refresh() override
   {
     if (!loaded || _deleted) return;
 
@@ -303,6 +318,10 @@ class TimerWidget : public Widget
       formatNumberAsString(s, 16, index + 1, 1, 0, "TMR");
     }
     lv_label_set_text(nameLabel, s);
+
+    lastValue = 0;
+    lastStartValue = -1;
+    requireRefresh();
   }
 
   lv_obj_t* createUnitLabel()

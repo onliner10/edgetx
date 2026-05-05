@@ -87,10 +87,12 @@ Page::Page(EdgeTxIcon icon, PaddingSize padding, bool pauseRefresh) :
 
 #if defined(HARDWARE_TOUCH)
 #if VERSION_MAJOR == 2
-  addCustomButton(0, 0, [=]() { onCancel(); });
+  addCustomButton(0, 0, [=]() { onCancel(); }, "nav.back", "Back");
 #else
-  addCustomButton(0, 0, [=]() { QuickMenu::openQuickMenu(); });
-  addCustomButton(LCD_W - EdgeTxStyles::MENU_HEADER_HEIGHT, 0, [=]() { onCancel(); });
+  addCustomButton(0, 0, [=]() { QuickMenu::openQuickMenu(); },
+                  "nav.quick_menu", "Quick menu");
+  addCustomButton(LCD_W - EdgeTxStyles::MENU_HEADER_HEIGHT, 0,
+                  [=]() { onCancel(); }, "nav.back", "Back");
 #endif
 #endif
 

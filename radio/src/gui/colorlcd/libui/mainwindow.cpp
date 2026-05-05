@@ -31,6 +31,10 @@
 #include "os/time.h"
 #include "sdcard.h"
 
+#if defined(SIMU)
+#include "targets/simu/ui_automation.h"
+#endif
+
 MainWindow* MainWindow::_instance = nullptr;
 
 MainWindow* MainWindow::instance()
@@ -62,12 +66,22 @@ uint32_t MainWindow::runMainLoopTick()
   return run(NormalUiTick{});
 }
 
+uint32_t MainWindow::runActiveLoopTick()
+{
+  return run(ActiveUiTick{});
+}
+
 uint32_t MainWindow::run(NormalUiTick mode)
 {
   return runUiTick(mode);
 }
 
 uint32_t MainWindow::run(ModalUiTick mode)
+{
+  return runUiTick(mode);
+}
+
+uint32_t MainWindow::run(ActiveUiTick mode)
 {
   return runUiTick(mode);
 }
@@ -109,6 +123,10 @@ uint32_t MainWindow::runUiTick(TickMode mode)
   }
 
   collectDeletedWindows(mode);
+
+#if defined(SIMU)
+  SimuUiAutomation::menuTick();
+#endif
 
 #if defined(DEBUG_WINDOWS)
   auto delta = time_get_ms() - start;

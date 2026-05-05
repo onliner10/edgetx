@@ -149,6 +149,25 @@ class Window
   virtual bool onLongPress();
   virtual void checkEvents();
 
+#if defined(SIMU)
+  void setAutomationId(std::string value);
+  void setAutomationRole(std::string value);
+  void setAutomationText(std::string value);
+
+  const std::string& automationId() const { return automationId_; }
+  virtual std::string automationRole() const;
+  virtual std::string automationText() const;
+  virtual bool automationClickable() const;
+  virtual bool automationLongClickable() const { return false; }
+#else
+  void setAutomationId(const char*) {}
+  void setAutomationId(const std::string&) {}
+  void setAutomationRole(const char*) {}
+  void setAutomationRole(const std::string&) {}
+  void setAutomationText(const char*) {}
+  void setAutomationText(const std::string&) {}
+#endif
+
   void invalidate();
 
   void attach(Window *window);
@@ -159,7 +178,9 @@ class Window
 
 #if defined(HARDWARE_TOUCH)
   void addBackButton();
-  void addCustomButton(coord_t x, coord_t y, std::function<void()> action);
+  void addCustomButton(coord_t x, coord_t y, std::function<void()> action,
+                       const char* automationId = nullptr,
+                       const char* automationText = nullptr);
 #endif
 
   inline lv_obj_t *getLvObj() { return lvobj; }
@@ -212,6 +233,12 @@ class Window
   CloseHandler closeHandler;
   FocusHandler focusHandler;
   ScrollHandler scrollHandler;
+
+#if defined(SIMU)
+  std::string automationId_;
+  std::string automationRole_;
+  std::string automationText_;
+#endif
 
   void deleteChildren();
 

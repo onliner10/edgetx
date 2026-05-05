@@ -80,10 +80,6 @@ class BitmapBuffer
   inline void drawPixel(coord_t x, coord_t y, pixel_t value)
   {
     APPLY_OFFSET();
-
-    coord_t w = 1, h = 1;
-    if (!applyClippingRect(x, y, w, h)) return;
-
     drawPixelAbs(x, y, value);
   }
 
@@ -232,8 +228,18 @@ class BitmapBuffer
 
   inline void drawPixelAbs(coord_t x, coord_t y, pixel_t value)
   {
-    pixel_t* p = getPixelPtrAbs(x, y);
-    drawPixel(p, value);
+    if (!data || x < xmin || x >= xmax || y < ymin || y >= ymax) return;
+
+    if (x >= 0 && x < _width && y >= 0 && y < _height) {
+      *getPixelPtrAbs(x, y) = value;
+    }
+#if defined(DEBUG)
+    else if (!leakReported) {
+      leakReported = true;
+      TRACE("BitmapBuffer(%p).drawPixelAbs(): pixel outside buffer [%d,%d]",
+            this, x, y);
+    }
+#endif
   }
 
   void drawHorizontalLineAbs(coord_t x, coord_t y, coord_t w, uint8_t pat,

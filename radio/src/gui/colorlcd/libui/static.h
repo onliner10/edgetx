@@ -39,6 +39,11 @@ class StaticText : public Window
   void setText(std::string value);
   const std::string &getText() const;
 
+#if defined(SIMU)
+  std::string automationRole() const override { return "text"; }
+  std::string automationText() const override;
+#endif
+
  protected:
   std::string text;
 };

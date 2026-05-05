@@ -51,6 +51,10 @@ BaseDialog::BaseDialog(const char* title,
                        lv_coord_t maxHeight, bool flexLayout) :
     ModalWindow(closeIfClickedOutside)
 {
+#if defined(SIMU)
+  setAutomationText(title ? title : "");
+#endif
+
   form = this;
 
   auto content = new (std::nothrow) Window(this, rect_t{});

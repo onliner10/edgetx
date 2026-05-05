@@ -31,7 +31,20 @@
 #include "view_channels.h"
 #include "widget.h"
 
+#include "os/time.h"
+
 #include <new>
+
+namespace {
+
+constexpr uint32_t BACKGROUND_WIDGET_REFRESH_PERIOD_MS = 250;
+
+bool timeReached(uint32_t now, uint32_t target)
+{
+  return (int32_t)(now - target) >= 0;
+}
+
+}  // namespace
 
 static void tile_view_deleted_cb(lv_event_t* e)
 {
@@ -423,10 +436,19 @@ void ViewMain::hideTopBarEdgeTxButton()
 void ViewMain::_refreshWidgets()
 {
   if (!_deleted) {
-    if (topbar) topbar->refreshWidgets(isVisible && hasTopbar());
+    uint32_t now = time_get_ms();
+    bool refreshBackground = timeReached(now, nextBackgroundWidgetRefresh);
+    if (refreshBackground) {
+      nextBackgroundWidgetRefresh = now + BACKGROUND_WIDGET_REFRESH_PERIOD_MS;
+    }
+
+    if (topbar)
+      topbar->refreshWidgets(isVisible && topbar->isOnScreen(),
+                             refreshBackground);
     for (int i = 0; i < MAX_CUSTOM_SCREENS; i += 1) {
       if (customScreens[i])
-        customScreens[i]->refreshWidgets(isVisible);
+        customScreens[i]->refreshWidgets(isVisible && customScreens[i]->isOnScreen(),
+                                         refreshBackground);
     }
   }
 }

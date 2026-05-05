@@ -29,6 +29,7 @@ set(SIMU_DRIVERS
   simufatfs.cpp
   simudisk.cpp
   simulcd.cpp
+  ui_automation.cpp
   audio_driver.cpp
   switch_driver.cpp
   adc_driver.cpp

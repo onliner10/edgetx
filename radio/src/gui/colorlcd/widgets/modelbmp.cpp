@@ -28,12 +28,12 @@
 
 #define ETX_STATE_BG_FILL LV_STATE_USER_1
 
-class ModelBitmapWidget : public Widget
+class ModelBitmapWidget : public TrackedWidget
 {
  public:
   ModelBitmapWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
                     WidgetLocation location) :
-      Widget(factory, parent, rect, location)
+      TrackedWidget(factory, parent, rect, location)
   {
     etx_obj_add_style(lvobj, styles->bg_opacity_transparent, LV_PART_MAIN);
     etx_obj_add_style(lvobj, styles->bg_opacity_cover,
@@ -54,7 +54,15 @@ class ModelBitmapWidget : public Widget
     foreground();
   }
 
-  void foreground() override
+  uint32_t refreshKey() override
+  {
+    WidgetRefreshKey key;
+    key.addBytes(g_model.header.name, LEN_MODEL_NAME)
+       .add(getHash());
+    return key.value();
+  }
+
+  void refresh() override
   {
     if (!loaded || _deleted) return;
 

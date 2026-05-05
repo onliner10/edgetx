@@ -6,6 +6,37 @@
 - This machine has 24 build threads available. Prefer `cmake --build ... --parallel 24`, or set `CMAKE_BUILD_PARALLEL_LEVEL=24` when invoking project build scripts.
 - The UI harness writes simulator builds under `build/ui-harness` by default. Set `EDGETX_UI_BUILD_ROOT=/tmp/edgetx-ui-build` only when you intentionally want build output outside the worktree.
 
+## Simulator UI Harness
+
+For exploratory simulator UI testing, prefer a persistent `tools/ui-harness/edgetx-mcp` session over one-off JSON flows. JSON flows are replay artifacts after a path is understood; they are not the best discovery tool.
+
+Use this workflow:
+
+1. Build the simulator with Nix, for example `nix develop -c tools/ui-harness/edgetx-ui build tx16s`.
+2. Start one persistent MCP simulator session with `edgetx_start_simulator`.
+3. Call `edgetx_status` until `startup_completed: true` before screenshot QA. Before that, the UI tree may already contain real nodes while the framebuffer still shows splash/startup frames.
+4. If a red storage warning appears, call `edgetx_skip_storage_warning_if_present`. The warning can have more than one phase, especially on MK3. Do not fail the test just because the warning appeared; verify the post-warning UI instead.
+5. Call `edgetx_ui_tree` before interacting. Read the visible `role`, `text`, `automation_id`, `bounds`, and `actions`.
+6. Use `edgetx_click` or `edgetx_long_click` on a node that has the required action. These selector clicks run on the menu/UI thread without fixed sleeps.
+7. Call `edgetx_ui_tree` again after every meaningful interaction and confirm the expected node/page appeared.
+8. For visual QA, take screenshots and compare them. A tree change alone is not enough proof that the framebuffer changed.
+
+Selector rules:
+
+- Prefer stable `automation_id` selectors such as `nav.quick_menu`, `nav.back`, `dialog.action`, `page.manage_models`, or `model.model1.yml`.
+- Use exact `text` when the text is unique. Use `text_contains` only when exact text is awkward, and avoid vague matches like `Setup` unless you also specify `role` or `index`.
+- A node with no `click` or `long_click` action is not currently interactable. This is intentional. Background controls may still be listed, but modal dialogs and topmost overlays remove their actions.
+- If multiple actionable nodes match a selector, the harness chooses the topmost match by default. Add `index` only when you have inspected the tree and intentionally want a specific match.
+- Use raw `edgetx_touch` or `edgetx_drag` only when pointer timing, hit testing, or gesture behavior itself is under test. Do not use raw coordinates for normal menu navigation.
+
+Common traps:
+
+- Do not screenshot before `startup_completed: true`.
+- Do not click a background node while a dialog is visible. If the node has no action, first handle the dialog, usually with `dialog.action` or `nav.back`.
+- Do not add sleeps to make selector clicks work. If a semantic click needs a sleep, that is a harness or UI refresh bug to investigate.
+- Do not assume one storage-warning skip is enough. Use `edgetx_skip_storage_warning_if_present`.
+- Do not claim a navigation path works unless the tree changed and at least one screenshot or pixel diff confirms the visual state changed.
+
 ## Before Commit
 
 Run the CI-equivalent safety sweep before committing firmware, simulator, build-system, or docs changes. Use Nix for every command; do not rely on host tools. Use 24 threads locally via `CMAKE_BUILD_PARALLEL_LEVEL=24`, `--threads=24`, `--jobs 24`, or `-j 24` where the tool supports it.

@@ -43,6 +43,11 @@ class FullScreenDialog : public NavWindow
 
   void setMessage(const char* text);
 
+#if defined(SIMU)
+  std::string automationRole() const override { return "dialog"; }
+  std::string automationText() const override { return title; }
+#endif
+
   bool onLongPress() override;
   void onCancel() override { deleteLater(); }
 
