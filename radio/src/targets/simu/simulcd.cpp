@@ -24,9 +24,11 @@
 #include "simulib.h"
 #include "rtos.h"
 #include <string.h>
+#include <mutex>
 #include <utility>
 
 bool simuLcdRefresh = false;
+std::mutex simuLcdMutex;
 
 void toplcdOff() {}
 
@@ -42,6 +44,7 @@ void lcdInit() {}
 
 void lcdRefresh()
 {
+  std::lock_guard<std::mutex> lock(simuLcdMutex);
   memcpy(simuLcdBuf, displayBuf, DISPLAY_BUFFER_SIZE * sizeof(pixel_t));
 
   // Mark screen dirty and notify host for async refresh
@@ -53,13 +56,13 @@ void lcdRefresh()
 
 #include <lvgl/lvgl.h>
 
-#if defined(LCD_VERTICAL_INVERT)
 static pixel_t _LCD_BUF1[DISPLAY_BUFFER_SIZE] __SDRAM;
 static pixel_t _LCD_BUF2[DISPLAY_BUFFER_SIZE] __SDRAM;
 
 pixel_t* simuLcdBuf = _LCD_BUF1;
-pixel_t* simuLcdBackBuf = _LCD_BUF2;
+static pixel_t* simuLcdBackBuf = _LCD_BUF2;
 
+#if defined(LCD_VERTICAL_INVERT)
 static void _copy_screen_area(uint16_t* dst, uint16_t* src, const lv_area_t& copy_area)
 {
   lv_coord_t x1 = copy_area.x1;
@@ -92,68 +95,66 @@ static void _copy_area(uint16_t* dst, uint16_t* src, const rect_t& copy_area)
     px_src += copy_area.w;
   }
 }
-#else
-pixel_t* simuLcdBuf = nullptr;
 #endif
 
 static void simuRefreshLcd(lv_disp_drv_t * disp_drv, uint16_t *buffer, const rect_t& copy_area)
 {
+  {
+    std::lock_guard<std::mutex> lock(simuLcdMutex);
+
 #if !defined(LCD_VERTICAL_INVERT) // rename into "Use direct mode" ???
-  // Direct mode: driver flush is called on final LVGL flush
-
-  // simply set LVGL's buffer as our current frame buffer
-  simuLcdBuf = buffer;
-
-  // Trigger async refresh and notify host
-  simuLcdRefresh = true;
-  simuLcdNotify();
-
-#else
-  _copy_area(simuLcdBackBuf, buffer, copy_area);
-  
-  if (lv_disp_flush_is_last(disp_drv)) {
-    // swap back/front
-    if (simuLcdBuf == _LCD_BUF1) {
-      simuLcdBuf = _LCD_BUF2;
-      simuLcdBackBuf = _LCD_BUF1;
-    } else {
-      simuLcdBuf = _LCD_BUF1;
-      simuLcdBackBuf = _LCD_BUF2;
-    }
+    // Direct mode uses LVGL full-screen draw buffers. Copy into simulator-owned
+    // buffers so the host thread never reads LVGL memory after flush returns.
+    memcpy(simuLcdBackBuf, buffer, DISPLAY_BUFFER_SIZE * sizeof(pixel_t));
+    std::swap(simuLcdBuf, simuLcdBackBuf);
 
     // Trigger async refresh and notify host
     simuLcdRefresh = true;
     simuLcdNotify();
+#else
+    _copy_area(simuLcdBackBuf, buffer, copy_area);
 
-    // Copy refreshed & rotated areas into new back buffer
-    uint16_t* src = simuLcdBuf;
-    uint16_t* dst = simuLcdBackBuf;
+    if (lv_disp_flush_is_last(disp_drv)) {
+      // swap back/front
+      if (simuLcdBuf == _LCD_BUF1) {
+        simuLcdBuf = _LCD_BUF2;
+        simuLcdBackBuf = _LCD_BUF1;
+      } else {
+        simuLcdBuf = _LCD_BUF1;
+        simuLcdBackBuf = _LCD_BUF2;
+      }
 
-    lv_disp_t* disp = _lv_refr_get_disp_refreshing();
-    for(int i = 0; i < disp->inv_p; i++) {
-      if(disp->inv_area_joined[i]) continue;
+      // Trigger async refresh and notify host
+      simuLcdRefresh = true;
+      simuLcdNotify();
 
-      lv_area_t refr_area;
-      lv_area_copy(&refr_area, &disp->inv_areas[i]);
+      // Copy refreshed & rotated areas into new back buffer
+      uint16_t* src = simuLcdBuf;
+      uint16_t* dst = simuLcdBackBuf;
 
-      // TRACE("{%d,%d,%d,%d}", refr_area.x1,
-      //       refr_area.y1, refr_area.x2, refr_area.y2);
+      lv_disp_t* disp = _lv_refr_get_disp_refreshing();
+      for(int i = 0; i < disp->inv_p; i++) {
+        if(disp->inv_area_joined[i]) continue;
 
-      // _rotate_area_180(refr_area);
-      _copy_screen_area(dst, src, refr_area);
+        lv_area_t refr_area;
+        lv_area_copy(&refr_area, &disp->inv_areas[i]);
+
+        // TRACE("{%d,%d,%d,%d}", refr_area.x1,
+        //       refr_area.y1, refr_area.x2, refr_area.y2);
+
+        // _rotate_area_180(refr_area);
+        _copy_screen_area(dst, src, refr_area);
+      }
     }
-    
-  } else {
-    lv_disp_flush_ready(disp_drv);
-  }  
 #endif    
-}
+  }
 
-extern bool simu_shutdown;
+  lv_disp_flush_ready(disp_drv);
+}
 
 static void simuLcdExitHandler(lv_disp_drv_t* disp_drv)
 {
-  if (simu_shutdown) {
+  if (simuIsShuttingDown()) {
     lv_disp_flush_ready(disp_drv);
   }
 }

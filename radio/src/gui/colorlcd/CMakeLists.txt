@@ -53,6 +53,7 @@ set(GUI_SRC
   colors.cpp
   fonts.cpp
   lcd.cpp
+  lv_tick_source.cpp
   LvglWrapper.cpp
   startup_shutdown.cpp
 
@@ -216,6 +217,7 @@ set(BOOTLOADER_SRC ${BOOTLOADER_SRC}
   ${RADIO_SRC_DIR}/gui/colorlcd/fonts.cpp
   ${RADIO_SRC_DIR}/gui/colorlcd/colors.cpp
   ${RADIO_SRC_DIR}/gui/colorlcd/bitmaps.cpp
+  ${RADIO_SRC_DIR}/gui/colorlcd/lv_tick_source.cpp
   ${RADIO_SRC_DIR}/gui/colorlcd/libui/bitmapbuffer.cpp
   ${RADIO_SRC_DIR}/thirdparty/lz4/lz4.c
 )

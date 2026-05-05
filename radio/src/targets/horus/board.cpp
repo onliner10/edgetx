@@ -307,3 +307,8 @@ bool isBacklightEnabled()
 {
   return boardBacklightOn;
 }
+
+void boardBacklightSetEnabled(bool enabled)
+{
+  boardBacklightOn = enabled;
+}

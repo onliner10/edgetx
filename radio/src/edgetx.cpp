@@ -176,7 +176,8 @@ void per10ms()
   DEBUG_TIMER_START(debugTimerPer10ms);
   DEBUG_TIMER_SAMPLE(debugTimerPer10msPeriod);
 
-  g_tmr10ms++;
+  tmr10ms_t tmr10ms = inc_tmr10ms();
+  (void)tmr10ms;
 
 #if defined(GUI)
   if (lightOffCounter) lightOffCounter--;
@@ -196,8 +197,8 @@ void per10ms()
 
 #if defined(DEBUG_LATENCY_END_TO_END)
   static tmr10ms_t lastLatencyToggle = 0;
-  if (g_tmr10ms - lastLatencyToggle == 10) {
-    lastLatencyToggle = g_tmr10ms;
+  if (tmr10ms - lastLatencyToggle == 10) {
+    lastLatencyToggle = tmr10ms;
     toggleLatencySwitch();
   }
 #endif
@@ -232,9 +233,10 @@ void per10ms()
 
   // These moved here from evalFlightModeMixes() to improve beep trigger reliability.
 #if !defined(AUDIO)
-  if (mixWarning & 1) if(((g_tmr10ms&0xFF)==  0)) AUDIO_MIX_WARNING(1);
-  if (mixWarning & 2) if(((g_tmr10ms&0xFF)== 64) || ((g_tmr10ms&0xFF)== 72)) AUDIO_MIX_WARNING(2);
-  if (mixWarning & 4) if(((g_tmr10ms&0xFF)==128) || ((g_tmr10ms&0xFF)==136) || ((g_tmr10ms&0xFF)==144)) AUDIO_MIX_WARNING(3);
+  uint8_t tmr10msLow = uint8_t(tmr10ms);
+  if (mixWarning & 1) if((tmr10msLow==  0)) AUDIO_MIX_WARNING(1);
+  if (mixWarning & 2) if((tmr10msLow== 64) || (tmr10msLow== 72)) AUDIO_MIX_WARNING(2);
+  if (mixWarning & 4) if((tmr10msLow==128) || (tmr10msLow==136) || (tmr10msLow==144)) AUDIO_MIX_WARNING(3);
 #endif
 
 #if defined(LUMINOSITY_SENSOR)
@@ -1824,7 +1826,7 @@ uint32_t pwrPressedDuration()
 }
 
 #if defined(COLORLCD)
-inline tmr10ms_t getTicks() { return g_tmr10ms; }
+inline tmr10ms_t getTicks() { return get_tmr10ms(); }
 #endif
 
 bool pwrOffDueToInactivity()

@@ -218,6 +218,7 @@ void lcdCopy(void * dest, void * src);
 #endif
 
 extern bool boardBacklightOn;
+void boardBacklightSetEnabled(bool enabled);
 void backlightInit();
 void backlightEnable(uint8_t dutyCycle);
 void backlightFullOn();
@@ -225,13 +226,13 @@ bool isBacklightEnabled();
 
 #define BACKLIGHT_ENABLE()                                         \
   {                                                                \
-    boardBacklightOn = true;                                       \
+    boardBacklightSetEnabled(true);                                \
     backlightEnable(BACKLIGHT_LEVEL_MAX - currentBacklightBright); \
   }
 
 #define BACKLIGHT_DISABLE()                                               \
   {                                                                       \
-    boardBacklightOn = false;                                             \
+    boardBacklightSetEnabled(false);                                      \
     backlightEnable(((g_eeGeneral.blOffBright == BACKLIGHT_LEVEL_MIN) &&  \
                      (g_eeGeneral.backlightMode != e_backlight_mode_off)) \
                         ? 0                                               \

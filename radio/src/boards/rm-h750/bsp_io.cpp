@@ -46,12 +46,11 @@ struct bsp_io_expander {
     uint32_t state;
 };
 
-static volatile bool _poll_switches_in_queue = false;
-
 static bsp_io_expander _io_switches;
 static bsp_io_expander _io_fs_switches;
 
 #if !defined(BOOT)
+static AsyncExclusiveFlag _poll_switches_in_queue;
 static timer_handle_t _poll_timer = TIMER_INITIALIZER;
 #endif
 
@@ -105,7 +104,7 @@ typedef enum {
 static void _poll_switches(void *param1, uint32_t trigger_source)
 {
   if (trigger_source == TRIGGERED_BY_IRQ) {
-    _poll_switches_in_queue = false;
+    _poll_switches_in_queue.clear();
     timer_reset(&_poll_timer);
   }
 

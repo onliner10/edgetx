@@ -47,6 +47,10 @@ void WASM_EXPORT(simuInit)();
 void WASM_EXPORT(simuStart)(bool tests = true);
 void WASM_EXPORT(simuStop)();
 bool WASM_EXPORT(simuIsRunning)();
+bool simuIsShuttingDown();
+bool simuStartupCompleted();
+void simuStartupComplete();
+void simuWaitStartupComplete();
 
 // Set SD card and settings paths before simuStart() to avoid STORAGE WARNING.
 void WASM_EXPORT(simuFatfsSetPaths)(const char * sdPath, const char * settingsPath);

@@ -21,8 +21,21 @@
 
 #include "board.h"
 
+#include <atomic>
+
 bool boardBacklightOn = false;
-bool isBacklightEnabled() { return boardBacklightOn; }
+static std::atomic_bool simuBacklightOn{false};
+
+void boardBacklightSetEnabled(bool enabled)
+{
+  boardBacklightOn = enabled;
+  simuBacklightOn.store(enabled, std::memory_order_release);
+}
+
+bool isBacklightEnabled()
+{
+  return simuBacklightOn.load(std::memory_order_acquire);
+}
 
 bool getPeriodicLuxSensorValue() { return true; }
 
@@ -30,26 +43,30 @@ void backlightInit() {}
 
 #if !defined(COLORLCD)
 
-void backlightFullOn() { boardBacklightOn = true; }
+void backlightFullOn() { boardBacklightSetEnabled(true); }
 
 void backlightEnable(unsigned char)
 {
-  boardBacklightOn = true;
+  boardBacklightSetEnabled(true);
 }
 
 void backlightEnable(unsigned char, unsigned char)
 {
-  boardBacklightOn = true;  
+  boardBacklightSetEnabled(true);
 }
 
 void backlightDisable()
 {
-  boardBacklightOn = false;
+  boardBacklightSetEnabled(false);
 }
 
 #else
 
-void backlightFullOn() { backlightEnable(BACKLIGHT_LEVEL_MAX); }
+void backlightFullOn()
+{
+  boardBacklightSetEnabled(true);
+  backlightEnable(BACKLIGHT_LEVEL_MAX);
+}
 void backlightEnable(uint8_t) {}
 
 #endif

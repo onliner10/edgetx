@@ -646,7 +646,7 @@ TEST_F(MixerTest, InfiniteRecursiveChannels)
 TEST_F(MixerTest, InvalidThrottleTraceSourceDoesNotCrashPeriodicUpdate)
 {
   g_model.thrTraceSrc = 255;
-  g_tmr10ms += 1;
+  set_tmr10ms(get_tmr10ms() + 1);
 
   doMixerPeriodicUpdates();
 

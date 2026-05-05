@@ -69,8 +69,6 @@ void lcdSetFlushCb(void (*cb)(lv_disp_drv_t*, uint16_t*, const rect_t&))
   lcd_flush_cb = cb;
 }
 
-static lv_disp_drv_t* refr_disp = nullptr;
-
 static void flushLcd(lv_disp_drv_t* disp_drv, const lv_area_t* area,
                      lv_color_t* color_p)
 {
@@ -101,7 +99,6 @@ static void flushLcd(lv_disp_drv_t* disp_drv, const lv_area_t* area,
 #if defined(LVGL_ADAPTIVE_UI_PUMP_STATS)
     lvglAdaptiveUiPumpRecordFlush();
 #endif
-    refr_disp = disp_drv;
 
     rect_t copy_area = {area->x1, area->y1, area->x2 - area->x1 + 1,
                         area->y2 - area->y1 + 1};
@@ -176,12 +173,6 @@ void lcdInitDisplayDriver()
 
 void lcdFlushed()
 {
-  // Only used in simulator
-
-  // its possible to get here before flushLcd is ever called.
-  // so check for nullptr first. (Race condition if you put breakpoints in
-  // startup code)
-  if (refr_disp != nullptr) lv_disp_flush_ready(refr_disp);
 }
 
 #if defined(SIMU)

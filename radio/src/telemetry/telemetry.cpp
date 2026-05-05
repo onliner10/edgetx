@@ -38,6 +38,8 @@
 
 #include "spektrum.h"
 
+#include <atomic>
+
 #if defined(CROSSFIRE)
   #include "crossfire.h"
 #endif
@@ -148,10 +150,29 @@ rxStatStruct *getRxStatLabels() {
   return &rxStat;
 }
 
-// This can only be changed when the mixer is not
-// running as the priority of the timer task is
-// lower.
-volatile uint8_t _telemetryIsPolling = false;
+static std::atomic_uint telemetryPollingDepth{0};
+
+class TelemetryPollingGuard
+{
+  public:
+    TelemetryPollingGuard()
+    {
+      telemetryPollingDepth.fetch_add(1, std::memory_order_acq_rel);
+    }
+
+    ~TelemetryPollingGuard()
+    {
+      telemetryPollingDepth.fetch_sub(1, std::memory_order_acq_rel);
+    }
+
+    TelemetryPollingGuard(const TelemetryPollingGuard&) = delete;
+    TelemetryPollingGuard& operator=(const TelemetryPollingGuard&) = delete;
+};
+
+bool telemetryIsPolling()
+{
+  return telemetryPollingDepth.load(std::memory_order_acquire) > 0;
+}
 
 static void (*telemetryMirrorSendByte)(void*, uint8_t) = nullptr;
 static void* telemetryMirrorSendByteCtx = nullptr;
@@ -199,15 +220,15 @@ void telemetryStop()
   }
 }
 
-static volatile bool _poll_frame_queued[NUM_MODULES] = {false};
+static AsyncExclusiveFlag _poll_frame_queued[NUM_MODULES];
 
 static void _poll_frame(void *pvParameter1, uint32_t ulParameter2)
 {
-  _telemetryIsPolling = true;
+  TelemetryPollingGuard polling;
 
   auto drv = (const etx_proto_driver_t*)pvParameter1;
   auto module = (uint8_t)ulParameter2;
-  _poll_frame_queued[module] = false;
+  _poll_frame_queued[module].clear();
 
   auto mod = pulsesGetModuleDriver(module);
   if (!mod || !mod->drv || !mod->ctx || (drv != mod->drv))
@@ -237,7 +258,6 @@ static void _poll_frame(void *pvParameter1, uint32_t ulParameter2)
     drv->processFrame(ctx, frame, frame_len, rxBuffer, &rxBufferCount);
   }
 
-  _telemetryIsPolling = false;
 }
 
 void telemetryFrameTrigger_ISR(uint8_t module, const etx_proto_driver_t* drv)
@@ -288,13 +308,12 @@ static inline void pollTelemetry(uint8_t module, const etx_proto_driver_t* drv, 
 
 void telemetryWakeup()
 {
-  _telemetryIsPolling = true;
+  TelemetryPollingGuard polling;
   for (uint8_t i = 0; i < MAX_MODULES; i++) {
     auto mod = pulsesGetModuleDriver(i);
     if (!mod) continue;
     pollTelemetry(i, mod->drv, mod->ctx);
   }
-  _telemetryIsPolling = false;
 
   for (int i = 0; i < MAX_TELEMETRY_SENSORS; i++) {
     const TelemetrySensor& sensor = g_model.telemetrySensors[i];

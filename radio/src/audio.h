@@ -23,6 +23,7 @@
 
 #include <stddef.h>
 #include <string.h>
+#include <atomic>
 
 #include "ff.h"
 #include "edgetx_types.h"
@@ -346,22 +347,46 @@ class AudioFragmentFifo
   friend void printAudioVars();
 #endif
   private:
-    volatile uint8_t ridx;
-    volatile uint8_t widx;
     AudioFragment fragments[AUDIO_QUEUE_LENGTH];
+    std::atomic<uint8_t> ridx;
+    std::atomic<uint8_t> widx;
+
+    static_assert((AUDIO_QUEUE_LENGTH & (AUDIO_QUEUE_LENGTH - 1)) == 0,
+                  "AUDIO_QUEUE_LENGTH must be a power of two");
+
+    static constexpr uint8_t indexMask()
+    {
+      return AUDIO_QUEUE_LENGTH - 1;
+    }
+
+    static uint8_t boundedIdx(uint8_t idx)
+    {
+      return idx & indexMask();
+    }
 
     uint8_t nextIdx(uint8_t idx) const
     {
-      return (idx + 1) & (AUDIO_QUEUE_LENGTH - 1);
+      return boundedIdx(idx + 1);
+    }
+
+    uint8_t readIdx() const
+    {
+      return boundedIdx(ridx.load(std::memory_order_acquire));
+    }
+
+    uint8_t writeIdx() const
+    {
+      return boundedIdx(widx.load(std::memory_order_acquire));
     }
 
   public:
-    AudioFragmentFifo() : ridx(0), widx(0), fragments() {};
+    AudioFragmentFifo() : fragments(), ridx(0), widx(0) {};
 
     bool hasPromptId(uint8_t id)
     {
-      uint8_t i = ridx;
-      while (i != widx) {
+      uint8_t i = readIdx();
+      uint8_t end = writeIdx();
+      while (i != end) {
         AudioFragment & fragment = fragments[i];
         if (fragment.id == id) return true;
         i = nextIdx(i);
@@ -371,8 +396,9 @@ class AudioFragmentFifo
 
     bool removePromptById(uint8_t id)
     {
-      uint8_t i = ridx;
-      while (i != widx) {
+      uint8_t i = readIdx();
+      uint8_t end = writeIdx();
+      while (i != end) {
         AudioFragment & fragment = fragments[i];
         if (fragment.id == id) fragment.clear();
         i = nextIdx(i);
@@ -382,26 +408,27 @@ class AudioFragmentFifo
 
     bool empty() const
     {
-      return ridx == widx;
+      return readIdx() == writeIdx();
     }
 
     bool full() const
     {
-      return ridx == nextIdx(widx);
+      return readIdx() == nextIdx(writeIdx());
     }
 
     void clear()
     {
-      widx = ridx;                      // clean the queue
+      widx.store(readIdx(), std::memory_order_release);
     }
 
     const AudioFragment * get()
     {
-      if (!empty()) {
-        const AudioFragment * result = &fragments[ridx];
-        if (!fragments[ridx].repeat--) {
+      uint8_t read = readIdx();
+      if (read != writeIdx()) {
+        const AudioFragment * result = &fragments[read];
+        if (!fragments[read].repeat--) {
           // repeat is done, move to the next fragment
-          ridx = nextIdx(ridx);
+          ridx.store(nextIdx(read), std::memory_order_release);
         }
         return result;
       }
@@ -410,10 +437,12 @@ class AudioFragmentFifo
 
     void push(const AudioFragment & fragment)
     {
-      if (!full()) {
-        // TRACE("fragment %d at %d", fragment.type, widx);
-        fragments[widx] = fragment;
-        widx = nextIdx(widx);
+      uint8_t write = writeIdx();
+      uint8_t next = nextIdx(write);
+      if (readIdx() != next) {
+        // TRACE("fragment %d at %d", fragment.type, write);
+        fragments[write] = fragment;
+        widx.store(next, std::memory_order_release);
       }
     }
 
@@ -426,7 +455,7 @@ class AudioQueue {
 #endif
   public:
     AudioQueue();
-    void start() { _started = true; };
+    void start() { _started.store(true, std::memory_order_release); };
     void playTone(uint16_t freq, uint16_t len, uint16_t pause=0, uint8_t flags=0, int8_t freqIncr=0, int8_t fragmentVolume = USE_SETTINGS_VOLUME);
     void playFile(const char *filename, uint8_t flags=0, uint8_t id=0, int8_t fragmentVolume = USE_SETTINGS_VOLUME);
     void stopPlay(uint8_t id);
@@ -437,7 +466,7 @@ class AudioQueue {
     bool isPlaying(uint8_t id);
     bool isEmpty() const { return fragmentsFifo.empty(); };
     void wakeup();
-    bool started() const { return _started; };
+    bool started() const { return _started.load(std::memory_order_acquire); };
 #if defined(AUDIO_UNMUTE_DELAY)
     tmr10ms_t lastAudioPlayTime = 0;
 #endif
@@ -445,7 +474,7 @@ class AudioQueue {
     AudioBufferFifo buffersFifo;
 
   private:
-    volatile bool _started;
+    std::atomic_bool _started;
     MixedContext normalContext;
     WavContext   backgroundContext;
     ToneContext  priorityContext;

@@ -377,6 +377,16 @@ static void _audio_unlock()
   mutex_unlock(&audioMutex);
 }
 
+class AudioLockGuard
+{
+  public:
+    AudioLockGuard() { _audio_lock(); }
+    ~AudioLockGuard() { _audio_unlock(); }
+
+    AudioLockGuard(const AudioLockGuard&) = delete;
+    AudioLockGuard& operator=(const AudioLockGuard&) = delete;
+};
+
 #if !defined(__SSAT)
   #define _sat_s16(x) ((int16_t)limit<int32_t>(INT16_MIN, (x), INT16_MAX))
 #else
@@ -622,37 +632,39 @@ void AudioQueue::wakeup()
       buffer->data[i] = AUDIO_DATA_SILENCE; /* silence */
     }
 
-    // mix the priority context (only tones)
-    result = priorityContext.mixBuffer(buffer, g_eeGeneral.beepVolume, fade);
-    if (result > 0) {
-      size = result;
-      fade += 1;
-    }
+    {
+      AudioLockGuard lock;
 
-    // mix the normal context (tones and wavs)
-    if (normalContext.isEmpty() && !fragmentsFifo.empty()) {
-      _audio_lock();
-      normalContext.setFragment(fragmentsFifo.get());
-      _audio_unlock();
-    }
-    result = normalContext.mixBuffer(buffer, g_eeGeneral.beepVolume, g_eeGeneral.wavVolume, fade);
-    if (result > 0) {
-      size = max(size, result);
-      fade += 1;
-    }
+      // mix the priority context (only tones)
+      result = priorityContext.mixBuffer(buffer, g_eeGeneral.beepVolume, fade);
+      if (result > 0) {
+        size = result;
+        fade += 1;
+      }
 
-    // mix the vario context
-    result = varioContext.mixBuffer(buffer, g_eeGeneral.varioVolume, fade);
-    if (result > 0) {
-      size = max(size, result);
-      fade += 1;
-    }
-
-    // mix the background context
-    if (isFunctionActive(FUNCTION_BACKGND_MUSIC) && !isFunctionActive(FUNCTION_BACKGND_MUSIC_PAUSE)) {
-      result = backgroundContext.mixBuffer(buffer, g_eeGeneral.backgroundVolume, fade);
+      // mix the normal context (tones and wavs)
+      if (normalContext.isEmpty() && !fragmentsFifo.empty()) {
+        normalContext.setFragment(fragmentsFifo.get());
+      }
+      result = normalContext.mixBuffer(buffer, g_eeGeneral.beepVolume, g_eeGeneral.wavVolume, fade);
       if (result > 0) {
         size = max(size, result);
+        fade += 1;
+      }
+
+      // mix the vario context
+      result = varioContext.mixBuffer(buffer, g_eeGeneral.varioVolume, fade);
+      if (result > 0) {
+        size = max(size, result);
+        fade += 1;
+      }
+
+      // mix the background context
+      if (isFunctionActive(FUNCTION_BACKGND_MUSIC) && !isFunctionActive(FUNCTION_BACKGND_MUSIC_PAUSE)) {
+        result = backgroundContext.mixBuffer(buffer, g_eeGeneral.backgroundVolume, fade);
+        if (result > 0) {
+          size = max(size, result);
+        }
       }
     }
 
@@ -706,6 +718,8 @@ void AudioQueue::pause(uint16_t len)
 
 bool AudioQueue::isPlaying(uint8_t id)
 {
+  AudioLockGuard lock;
+
   return normalContext.hasPromptId(id) ||
          (isFunctionActive(FUNCTION_BACKGND_MUSIC) && backgroundContext.hasPromptId(id)) ||
          fragmentsFifo.hasPromptId(id);
@@ -713,7 +727,7 @@ bool AudioQueue::isPlaying(uint8_t id)
 
 void AudioQueue::playTone(uint16_t freq, uint16_t len, uint16_t pause, uint8_t flags, int8_t freqIncr, int8_t fragmentVolume)
 {
-  _audio_lock();
+  AudioLockGuard lock;
 
   freq = limit<uint16_t>(BEEP_MIN_FREQ, freq, BEEP_MAX_FREQ);
 
@@ -736,7 +750,6 @@ void AudioQueue::playTone(uint16_t freq, uint16_t len, uint16_t pause, uint8_t f
     }
   }
 
-  _audio_unlock();
 }
 
 void AudioQueue::playFile(const char * filename, uint8_t flags, uint8_t id, int8_t fragmentVolume)
@@ -752,7 +765,7 @@ void AudioQueue::playFile(const char * filename, uint8_t flags, uint8_t id, int8
     return;
   }
 
-  _audio_lock();
+  AudioLockGuard lock;
 
   if (flags & PLAY_BACKGROUND) {
     backgroundContext.clear();
@@ -762,17 +775,14 @@ void AudioQueue::playFile(const char * filename, uint8_t flags, uint8_t id, int8
     fragmentsFifo.push(AudioFragment(filename, flags & 0x0f, fragmentVolume, id));
   }
 
-  _audio_unlock();
 }
 
 void AudioQueue::stopPlay(uint8_t id)
 {
-  _audio_lock();
+  AudioLockGuard lock;
 
   fragmentsFifo.removePromptById(id);
   backgroundContext.stop(id);
-
-  _audio_unlock();
 }
 
 void AudioQueue::stopSD()
@@ -785,19 +795,17 @@ void AudioQueue::stopSD()
 void AudioQueue::stopAll()
 {
   flush();
-  _audio_lock();
+  AudioLockGuard lock;
   priorityContext.clear();
   normalContext.clear();
-  _audio_unlock();
 }
 
 void AudioQueue::flush()
 {
-  _audio_lock();
+  AudioLockGuard lock;
   fragmentsFifo.clear();
   varioContext.clear();
   backgroundContext.clear();
-  _audio_unlock();
 }
 
 void audioPlay(unsigned int index, uint8_t id)

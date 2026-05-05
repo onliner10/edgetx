@@ -26,7 +26,7 @@
 
 extern inline tmr10ms_t getTicks()
 {
-  return g_tmr10ms;
+  return get_tmr10ms();
 }
 
 FileCarosell::FileCarosell(Window *parent, const rect_t &rect,

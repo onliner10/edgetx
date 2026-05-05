@@ -21,16 +21,47 @@
 
 #pragma once
 
+#include <atomic>
 #include <stdint.h>
 #include <stdbool.h>
 
 typedef void (*async_func_t)(void* param1, uint32_t param2);
 
+class AsyncExclusiveFlag
+{
+  public:
+    AsyncExclusiveFlag() : queued(false) {}
+
+    AsyncExclusiveFlag(const AsyncExclusiveFlag&) = delete;
+    AsyncExclusiveFlag& operator=(const AsyncExclusiveFlag&) = delete;
+
+    bool tryClaim()
+    {
+      bool expected = false;
+      return queued.compare_exchange_strong(expected, true,
+                                            std::memory_order_acq_rel,
+                                            std::memory_order_acquire);
+    }
+
+    void clear()
+    {
+      queued.store(false, std::memory_order_release);
+    }
+
+  private:
+    static_assert(ATOMIC_BOOL_LOCK_FREE == 2,
+                  "AsyncExclusiveFlag must be lock-free");
+
+    std::atomic_bool queued;
+};
+
 // schedule a function call for later
 // return true if the async call could be stacked, false otherwise
-bool async_call(async_func_t func, volatile bool* excl_flag, void* param1,
+// If excl_flag is provided, the queued function must clear it when it is ready
+// to accept another pending call.
+bool async_call(async_func_t func, AsyncExclusiveFlag* excl_flag, void* param1,
                 uint32_t param2);
 
 // schedule a function call for later (interrupt handler)
-bool async_call_isr(async_func_t func, volatile bool* excl_flag, void* param1,
+bool async_call_isr(async_func_t func, AsyncExclusiveFlag* excl_flag, void* param1,
                     uint32_t param2);

@@ -27,6 +27,7 @@
 #include "switches.h"
 
 #include <assert.h>
+#include <atomic>
 #include <stdlib.h>
 #include <string.h>
 
@@ -42,7 +43,7 @@ struct hw_switch_def {
 
 #include "simu_switches.inc"
 
-int8_t switchesStates[MAX_SWITCHES];
+static std::atomic<int8_t> switchesStates[MAX_SWITCHES];
 
 #if defined(RADIO_GX12)
 void _poll_switches() {}
@@ -51,18 +52,21 @@ void _poll_switches() {}
 void simuSetSwitch(uint8_t swtch, int8_t state)
 {
   assert(swtch < switchGetMaxAllSwitches());
-  switchesStates[swtch] = state;
+  switchesStates[swtch].store(state, std::memory_order_relaxed);
 }
 
 void boardInitSwitches() {
-  memset(switchesStates, -1, sizeof(switchesStates));
+  for (auto& state : switchesStates) {
+    state.store(-1, std::memory_order_relaxed);
+  }
 }
 
 SwitchHwPos boardSwitchGetPosition(uint8_t idx)
 {
-  if (switchesStates[idx] < 0)
+  int8_t state = switchesStates[idx].load(std::memory_order_relaxed);
+  if (state < 0)
     return SWITCH_HW_UP;
-  else if (switchesStates[idx] == 0)
+  else if (state == 0)
     return SWITCH_HW_MID;
   else
     return SWITCH_HW_DOWN;

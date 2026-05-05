@@ -44,6 +44,9 @@
 #endif
 
 #include <assert.h>
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
 
 int g_snapshot_idx = 0;
 
@@ -51,16 +54,19 @@ extern uint8_t startOptions;
 
 char * main_thread_error = nullptr;
 
-bool simu_shutdown = false;
-bool simu_running = false;
+static std::atomic_bool simu_shutdown{false};
+static std::atomic_bool simu_running{false};
+static std::atomic_bool simu_startup_complete{false};
+static std::condition_variable simuStartupCv;
+static std::mutex simuStartupMutex;
 
 
-volatile rotenc_t rotencValue = 0;
+static std::atomic<rotenc_t> rotencValue{0};
 volatile uint32_t rotencDt = 0;
 
 rotenc_t rotaryEncoderGetValue()
 {
-  return rotencValue / ROTARY_ENCODER_GRANULARITY;
+  return rotencValue.load(std::memory_order_relaxed) / ROTARY_ENCODER_GRANULARITY;
 }
 
 extern const etx_hal_adc_driver_t simu_adc_driver;
@@ -71,7 +77,7 @@ void lcdFlushed();
 void simuInit()
 {
 #if defined(ROTARY_ENCODER_NAVIGATION)
-  rotencValue = 0;
+  rotencValue.store(0, std::memory_order_relaxed);
 #endif
 
   // Route firmware TRACE() output to host via WASM import
@@ -83,18 +89,18 @@ void simuInit()
   switchInit();
 }
 
-bool keysStates[MAX_KEYS] = { false };
+static std::atomic_bool keysStates[MAX_KEYS] = {};
 void simuSetKey(uint8_t key, bool state)
 {
   assert(key < DIM(keysStates));
-  keysStates[key] = state;
+  keysStates[key].store(state, std::memory_order_relaxed);
 }
 
-bool trimsStates[MAX_TRIMS * 2] = { false };
+static std::atomic_bool trimsStates[MAX_TRIMS * 2] = {};
 void simuSetTrim(uint8_t trim, bool state)
 {
   assert(trim < DIM(trimsStates));
-  trimsStates[trim] = state;
+  trimsStates[trim].store(state, std::memory_order_relaxed);
 }
 
 #if defined(SIMU_BOOTLOADER)
@@ -108,7 +114,7 @@ static void* bootloaderThread(void*)
 
 void simuStart(bool tests)
 {
-  if (simu_running)
+  if (simu_running.load(std::memory_order_acquire))
     return;
 
 #if !defined(COLORLCD)
@@ -116,7 +122,8 @@ void simuStart(bool tests)
 #endif
 
   startOptions = (tests ? 0 : OPENTX_START_NO_SPLASH | OPENTX_START_NO_CALIBRATION | OPENTX_START_NO_CHECKS);
-  simu_shutdown = false;
+  simu_shutdown.store(false, std::memory_order_release);
+  simu_startup_complete.store(false, std::memory_order_release);
 
   /*
     g_tmr10ms must be non-zero otherwise some SF functions (that use this timer as a marker when it was last executed)
@@ -129,8 +136,8 @@ void simuStart(bool tests)
     alone to continue from the previous simulator session value. See the issue #2446
 
   */
-  if (g_tmr10ms == 0) {
-    g_tmr10ms = 1;
+  if (get_tmr10ms() == 0) {
+    set_tmr10ms(1);
   }
 
 #if defined(RTCLOCK)
@@ -171,7 +178,7 @@ void simuStart(bool tests)
   pthread_create(&bl_pid, &attr, &bootloaderThread, nullptr);
 #endif
 
-  simu_running = true;
+  simu_running.store(true, std::memory_order_release);
 }
 
 extern task_handle_t mixerTaskId;
@@ -182,22 +189,50 @@ extern task_handle_t audioTaskId;
 
 void simuStop()
 {
-  if (!simu_running)
+  if (!simu_running.load(std::memory_order_acquire))
     return;
 
-  simu_shutdown = true;
+  simu_shutdown.store(true, std::memory_order_release);
   task_shutdown_all();
 
-  simu_running = false;
+  simu_running.store(false, std::memory_order_release);
 }
 
 bool simuIsRunning()
 {
-  return simu_running;
+  return simu_running.load(std::memory_order_acquire);
+}
+
+bool simuIsShuttingDown()
+{
+  return simu_shutdown.load(std::memory_order_acquire);
+}
+
+bool simuStartupCompleted()
+{
+  return simu_startup_complete.load(std::memory_order_acquire);
+}
+
+void simuStartupComplete()
+{
+  {
+    std::lock_guard<std::mutex> lock(simuStartupMutex);
+    simu_startup_complete.store(true, std::memory_order_release);
+  }
+  simuStartupCv.notify_all();
+}
+
+void simuWaitStartupComplete()
+{
+  std::unique_lock<std::mutex> lock(simuStartupMutex);
+  simuStartupCv.wait(lock, [] {
+    return simu_startup_complete.load(std::memory_order_acquire);
+  });
 }
 
 bool simuLcdChanged()
 {
+  std::lock_guard<std::mutex> lock(simuLcdMutex);
   bool changed = simuLcdRefresh;
   simuLcdRefresh = false;
   return changed;
@@ -205,6 +240,7 @@ bool simuLcdChanged()
 
 uint32_t simuLcdCopy(uint8_t* buf, uint32_t maxLen)
 {
+  std::lock_guard<std::mutex> lock(simuLcdMutex);
   uint32_t size = DISPLAY_BUFFER_SIZE * sizeof(pixel_t);
   if (size > maxLen) size = maxLen;
   memcpy(buf, simuLcdBuf, size);
@@ -249,7 +285,7 @@ void boardInit()
   switchInit();
 }
 
-uint32_t pwrCheck() { return simu_shutdown ? e_power_off : e_power_on; }
+uint32_t pwrCheck() { return simuIsShuttingDown() ? e_power_off : e_power_on; }
 
 bool pwrPressed() { return false; }
 bool pwrOffPressed()
@@ -292,7 +328,7 @@ uint32_t readKeys()
   uint32_t result = 0;
 
   for (int i = 0; i < MAX_KEYS; i++) {
-    if (keysStates[i]) {
+    if (keysStates[i].load(std::memory_order_relaxed)) {
       result |= 1 << i;
     }
   }
@@ -305,7 +341,7 @@ uint32_t readTrims()
   uint32_t trims = 0;
 
   for (int i = 0; i < keysGetMaxTrims() * 2; i++) {
-    if (trimsStates[i]) {
+    if (trimsStates[i].load(std::memory_order_relaxed)) {
       trims |= 1 << i;
     }
   }
@@ -477,15 +513,19 @@ const etx_serial_port_t* auxSerialGetPort(int port_nr)
 #if defined(HARDWARE_TOUCH)
 struct TouchState simTouchState = {};
 bool simTouchOccured = false;
+static std::mutex simTouchMutex;
 
 bool touchPanelInit()
 {
+  std::lock_guard<std::mutex> lock(simTouchMutex);
   simTouchState.x = simTouchState.y = 0;
+  simTouchOccured = false;
   return true;
 }
 
 bool touchPanelEventOccured()
 {
+  std::lock_guard<std::mutex> lock(simTouchMutex);
   if(simTouchOccured)
   {
     simTouchOccured = false;
@@ -496,6 +536,7 @@ bool touchPanelEventOccured()
 
 void touchPanelDown(short x, short y)
 {
+  std::lock_guard<std::mutex> lock(simTouchMutex);
   simTouchState.x = x;
   simTouchState.y = y;
   simTouchState.event = TE_DOWN;
@@ -504,12 +545,14 @@ void touchPanelDown(short x, short y)
 
 void touchPanelUp()
 {
+  std::lock_guard<std::mutex> lock(simTouchMutex);
   simTouchState.event = TE_UP;
   simTouchOccured = true;
 }
 
 struct TouchState touchPanelRead()
 {
+  std::lock_guard<std::mutex> lock(simTouchMutex);
   struct TouchState st = simTouchState;
   simTouchState.deltaX = 0;
   simTouchState.deltaY = 0;
@@ -518,6 +561,7 @@ struct TouchState touchPanelRead()
 
 struct TouchState getInternalTouchState()
 {
+  std::lock_guard<std::mutex> lock(simTouchMutex);
   return simTouchState;
 }
 #endif
@@ -539,7 +583,8 @@ void simuTouchUp()
 void simuRotaryEncoderEvent(int32_t steps)
 {
 #if defined(ROTARY_ENCODER_NAVIGATION)
-  rotencValue += steps * ROTARY_ENCODER_GRANULARITY;
+  rotencValue.fetch_add(steps * ROTARY_ENCODER_GRANULARITY,
+                        std::memory_order_relaxed);
 #endif
 }
 
