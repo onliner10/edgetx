@@ -630,6 +630,68 @@ void calcVolumeValue(int16_t source)
       2048;
 }
 
+#if defined(AUDIO)
+static void setSpeakerVolume(uint8_t volume)
+{
+  currentSpeakerVolume = requiredSpeakerVolume = volume;
+#if !defined(SOFTWARE_VOLUME)
+  audioSetVolume(currentSpeakerVolume);
+#endif
+}
+
+static void applyVolumeSource(int16_t source)
+{
+  if (source) {
+    calcVolumeValue(source);
+  } else {
+    requiredSpeakerVolume =
+        limit<int>(0, g_eeGeneral.speakerVolume + VOLUME_LEVEL_DEF,
+                   VOLUME_LEVEL_MAX);
+  }
+}
+
+static bool applyStartupVolumeFunctions(CustomFunctionData *functions)
+{
+  bool applied = false;
+
+  for (uint8_t i = 0; i < MAX_SPECIAL_FUNCTIONS; i++) {
+    CustomFunctionData *cfn = &functions[i];
+    swsrc_t swtch = CFN_SWITCH(cfn);
+    if (swtch && CFN_ACTIVE(cfn) && CFN_FUNC(cfn) == FUNC_VOLUME &&
+        getSwitch(swtch, 0)) {
+      calcVolumeValue(CFN_PARAM(cfn));
+      applied = true;
+    }
+  }
+
+  return applied;
+}
+
+void applyStartupSpeakerVolume()
+{
+  if (!mixerTaskRunning()) getADC();
+  evalInputs(e_perout_mode_notrainer);
+
+  bool volumeFunctionApplied = false;
+
+  if (radioGFEnabled()) {
+    volumeFunctionApplied = applyStartupVolumeFunctions(g_eeGeneral.customFn);
+  }
+
+  if (modelSFEnabled()) {
+    bool modelVolumeFunctionApplied =
+        applyStartupVolumeFunctions(g_model.customFn);
+    volumeFunctionApplied = modelVolumeFunctionApplied || volumeFunctionApplied;
+  }
+
+  if (!volumeFunctionApplied) {
+    applyVolumeSource(g_eeGeneral.volumeSrc);
+  }
+
+  setSpeakerVolume(requiredSpeakerVolume);
+}
+#endif
+
 void checkBacklight()
 {
   static uint8_t tmr10ms ;
@@ -1575,11 +1637,7 @@ void edgeTxInit()
   initSerialPorts();
 
 #if defined(AUDIO)
-  currentSpeakerVolume = requiredSpeakerVolume =
-      limit<int>(0, g_eeGeneral.speakerVolume + VOLUME_LEVEL_DEF, VOLUME_LEVEL_MAX);
-#if !defined(SOFTWARE_VOLUME)
-  audioSetVolume(currentSpeakerVolume);
-#endif
+  applyStartupSpeakerVolume();
 #endif
 
   referenceSystemAudioFiles();

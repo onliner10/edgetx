@@ -96,6 +96,19 @@ TEST_F(SpecialFunctionsTest, InvalidSetTimerDoesNotCrash)
   EXPECT_FALSE(g_model.customFn[0].active);
 }
 
+#if defined(AUDIO)
+TEST_F(SpecialFunctionsTest, StartupVolumeUsesConfiguredSourceBeforeWarnings)
+{
+  g_eeGeneral.volumeSrc = MIXSRC_FIRST_POT;
+  currentSpeakerVolume = requiredSpeakerVolume = VOLUME_LEVEL_MAX;
+
+  applyStartupSpeakerVolume();
+
+  EXPECT_EQ(0, currentSpeakerVolume);
+  EXPECT_EQ(0, requiredSpeakerVolume);
+}
+#endif
+
 #if defined(GVARS)
 TEST_F(SpecialFunctionsTest, InvalidAdjustGvarDoesNotCrash)
 {
