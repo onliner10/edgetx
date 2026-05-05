@@ -38,6 +38,8 @@ lua_State *lsStandalone = nullptr;
 #if defined(SIMU)
 static bool forceStandaloneLuaCanvasCreateFailure = false;
 
+void bitmapBufferForceDataMallocFailureForTest(bool force);
+
 void standaloneLuaForceCanvasCreateFailureForTest(bool force)
 {
   forceStandaloneLuaCanvasCreateFailure = force;
@@ -157,6 +159,18 @@ StandaloneLuaWindow::StandaloneLuaWindow(bool useLvgl, int initFn, int runFn) :
 
   MainWindow::instance()->enableWidgetRefresh(false);
 
+  auto setSetupError = [this]() {
+    if (lsStandalone) {
+      luaL_unref(lsStandalone, LUA_REGISTRYINDEX, initFunction);
+      luaL_unref(lsStandalone, LUA_REGISTRYINDEX, runFunction);
+    }
+    initFunction = LUA_REFNIL;
+    runFunction = LUA_REFNIL;
+    delete lcdBuffer;
+    lcdBuffer = nullptr;
+    hasError = true;
+  };
+
   if (useLvglLayout()) {
     padAll(PAD_ZERO);
     etx_scrollbar(lvobj);
@@ -171,14 +185,8 @@ StandaloneLuaWindow::StandaloneLuaWindow(bool useLvgl, int initFn, int runFn) :
     lv_label_set_text(lbl, STR_LOADING);
   } else {
     lcdBuffer = new (std::nothrow) BitmapBuffer(BMP_RGB565, LCD_W, LCD_H);
-    if (!lcdBuffer) {
-      if (lsStandalone) {
-        luaL_unref(lsStandalone, LUA_REGISTRYINDEX, initFunction);
-        luaL_unref(lsStandalone, LUA_REGISTRYINDEX, runFunction);
-      }
-      initFunction = LUA_REFNIL;
-      runFunction = LUA_REFNIL;
-      hasError = true;
+    if (!lcdBuffer || !lcdBuffer->getData()) {
+      setSetupError();
     } else {
       lcdBuffer->clear();
       lcdBuffer->drawText(LCD_W / 2, LCD_H / 2 - EdgeTxStyles::STD_FONT_HEIGHT, STR_LOADING,
@@ -187,15 +195,7 @@ StandaloneLuaWindow::StandaloneLuaWindow(bool useLvgl, int initFn, int runFn) :
 
       auto canvas = createStandaloneLuaCanvas(lvobj);
       if (!canvas) {
-        if (lsStandalone) {
-          luaL_unref(lsStandalone, LUA_REGISTRYINDEX, initFunction);
-          luaL_unref(lsStandalone, LUA_REGISTRYINDEX, runFunction);
-        }
-        initFunction = LUA_REFNIL;
-        runFunction = LUA_REFNIL;
-        delete lcdBuffer;
-        lcdBuffer = nullptr;
-        hasError = true;
+        setSetupError();
       } else {
         lv_obj_center(canvas);
         lv_canvas_set_buffer(canvas, lcdBuffer->getData(),
@@ -277,6 +277,25 @@ bool standaloneLuaCanvasCreateFailureSetsErrorForTest()
   standaloneLuaForceCanvasCreateFailureForTest(true);
   StandaloneLuaWindow::setup(false, LUA_REFNIL, LUA_REFNIL);
   standaloneLuaForceCanvasCreateFailureForTest(false);
+
+  auto window = StandaloneLuaWindow::instance();
+  bool result = window && window->hasErrorForTest() &&
+                !window->hasLcdBufferForTest();
+
+  if (window)
+    window->deleteLater();
+
+  return result;
+}
+
+bool standaloneLuaBitmapBufferDataFailureSetsErrorForTest()
+{
+  if (!lsStandalone)
+    luaStandaloneInit();
+
+  bitmapBufferForceDataMallocFailureForTest(true);
+  StandaloneLuaWindow::setup(false, LUA_REFNIL, LUA_REFNIL);
+  bitmapBufferForceDataMallocFailureForTest(false);
 
   auto window = StandaloneLuaWindow::instance();
   bool result = window && window->hasErrorForTest() &&
