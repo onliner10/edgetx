@@ -44,6 +44,8 @@ coord_t clampCoord(coord_t value, coord_t low, coord_t high)
   return value;
 }
 
+constexpr coord_t TOPBAR_CONTENT_PAD = PAD_TINY;
+
 lv_obj_t* makeStatusPart(lv_obj_t* parent)
 {
   auto obj = lv_obj_create(parent);
@@ -170,7 +172,7 @@ class LinkStatusWidget : public Widget
     if (_deleted) return;
 
     const bool topbar = isCompactTopBarWidget();
-    const coord_t pad = topbar ? PAD_TINY : PAD_SMALL;
+    const coord_t pad = topbar ? TOPBAR_CONTENT_PAD : PAD_SMALL;
     const coord_t labelW = width() > 2 * pad ? width() - 2 * pad : width();
 
     setLvVisible(title, !topbar && height() >= 54);
@@ -214,7 +216,7 @@ class LinkStatusWidget : public Widget
       }
     }
 
-    coord_t gap = topbar ? PAD_TINY : PAD_THREE;
+    coord_t gap = topbar ? TOPBAR_CONTENT_PAD : PAD_THREE;
     coord_t barW = (graphW - (LINK_BARS - 1) * gap) / LINK_BARS;
     barW = clampCoord(barW, topbar ? (coord_t)5 : (coord_t)6,
                       topbar ? (coord_t)12 : (coord_t)14);
@@ -305,7 +307,7 @@ class TxBatteryStatusWidget : public Widget
     if (_deleted) return;
 
     const bool topbar = isCompactTopBarWidget();
-    const coord_t pad = topbar ? PAD_TINY : PAD_SMALL;
+    const coord_t pad = topbar ? TOPBAR_CONTENT_PAD : PAD_SMALL;
 
     setLvVisible(title, !topbar && height() >= 54);
     setLvVisible(value, !topbar);
@@ -452,7 +454,7 @@ class VolumeStatusWidget : public Widget
     if (_deleted) return;
 
     const bool topbar = isCompactTopBarWidget();
-    const coord_t pad = topbar ? PAD_TINY : PAD_SMALL;
+    const coord_t pad = topbar ? TOPBAR_CONTENT_PAD : PAD_SMALL;
 
     setLvVisible(title, !topbar && height() >= 54);
     setLvVisible(value, !topbar);
@@ -921,9 +923,14 @@ class DateTimeWidget : public Widget
       Widget(factory, parent, rect, screenNum, zoneNum)
   {
     coord_t x = isCompactTopBarWidget()
-                    ? 0
+                    ? TOPBAR_CONTENT_PAD
                     : rect.w - HeaderDateTime::HDR_DATE_WIDTH - DT_XO;
-    dateTime = new (std::nothrow) HeaderDateTime(this, x, PAD_THREE);
+    coord_t dateTimeHeight =
+        HeaderDateTime::HDR_DATE_LINE2 + HeaderDateTime::HDR_DATE_HEIGHT + 2;
+    coord_t y = isCompactTopBarWidget()
+                    ? maxCoord((rect.h - dateTimeHeight) / 2, (coord_t)0)
+                    : PAD_THREE;
+    dateTime = new (std::nothrow) HeaderDateTime(this, x, y);
     update();
   }
 
@@ -946,11 +953,17 @@ class DateTimeWidget : public Widget
     if (!dateTime) return;
     dateTime->setColor(color);
     bool compact = isCompactTopBarWidget();
-    coord_t displayWidth = compact ? width() : HeaderDateTime::HDR_DATE_WIDTH;
-    coord_t x = compact ? 0 : width() - displayWidth - DT_XO;
+    coord_t pad = TOPBAR_CONTENT_PAD;
+    coord_t displayWidth =
+        compact ? maxCoord((coord_t)(width() - 2 * pad), (coord_t)1)
+                : HeaderDateTime::HDR_DATE_WIDTH;
+    coord_t x = compact ? pad : width() - displayWidth - DT_XO;
+    coord_t y = compact ? maxCoord((height() - dateTime->height()) / 2,
+                                   (coord_t)0)
+                        : PAD_THREE;
     dateTime->setDisplayWidth(displayWidth);
     dateTime->setTextAlign(LV_TEXT_ALIGN_LEFT);
-    dateTime->setPos(x, PAD_THREE);
+    dateTime->setPos(x, y);
   }
 
   HeaderDateTime* dateTime = nullptr;

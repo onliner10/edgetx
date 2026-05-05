@@ -97,6 +97,7 @@ class TopBar: public WidgetsContainer
   static LAYOUT_VAL_SCALED(HDR_DATE_XO, 48)
 
   static constexpr coord_t TOPBAR_ZONE_HEIGHT = EdgeTxStyles::MENU_HEADER_HEIGHT - 2 * PAD_THREE;
+  static constexpr coord_t TOPBAR_WIDGET_GAP = PAD_TINY;
   static LAYOUT_VAL_SCALED(TOPBAR_FLEX_MIN_WIDTH, 96)
   static LAYOUT_VAL_SCALED(TOPBAR_STATUS_WIDTH, 50)
   static LAYOUT_VAL_SCALED(TOPBAR_LINK_WIDTH, 48)

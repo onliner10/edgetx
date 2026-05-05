@@ -198,7 +198,7 @@ rect_t TopBar::getZone(unsigned int index) const
 
   const coord_t left = MENU_HEADER_BUTTONS_LEFT + 1;
   const coord_t right = LCD_W - PAD_TINY;
-  const coord_t gap = PAD_MEDIUM;
+  const coord_t gap = TOPBAR_WIDGET_GAP;
   const int first = firstLayoutWidget();
   const bool layoutWidget = hasLayoutWidget(index);
   const int pendingSetupIndex =
