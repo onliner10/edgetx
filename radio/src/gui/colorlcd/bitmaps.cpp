@@ -25,6 +25,15 @@
 #include "definitions.h"
 #include "edgetx_helpers.h"
 
+#if defined(SIMU)
+static bool forceMaskMallocFailure = false;
+
+void bitmapsForceMaskMallocFailureForTest(bool force)
+{
+  forceMaskMallocFailure = force;
+}
+#endif
+
 LZ4BitmapBuffer::LZ4BitmapBuffer(uint8_t format) :
     BitmapBuffer(format, 0, 0, nullptr)
 {
@@ -68,7 +77,13 @@ MaskBitmap* _decompressed_mask(const uint8_t* lz4_compressed)
   lz4_compressed += 8;
 
   uint32_t pixels = width * height;
+#if defined(SIMU)
+  MaskBitmap* raw = forceMaskMallocFailure
+                        ? nullptr
+                        : (MaskBitmap*)malloc(align32(pixels + 4));
+#else
   MaskBitmap* raw = (MaskBitmap*)malloc(align32(pixels + 4));
+#endif
   if (!raw) return nullptr;
 
   raw->width = width;
@@ -525,15 +540,52 @@ static const _BuiltinIcon _builtinIcons[EDGETX_ICONS_COUNT] = {
 
 static MaskBitmap* _builtinIconsDecompressed[EDGETX_ICONS_COUNT] = {0};
 
+static const MaskBitmap* emptyBuiltinIcon()
+{
+  struct EmptyMaskBitmap {
+    uint16_t width;
+    uint16_t height;
+    uint8_t data[1];
+  };
+  static constexpr EmptyMaskBitmap emptyIcon = {1, 1, {0}};
+  return reinterpret_cast<const MaskBitmap*>(&emptyIcon);
+}
+
 const MaskBitmap* getBuiltinIcon(EdgeTxIcon id)
 {
+  if (id < 0 || id >= EDGETX_ICONS_COUNT) return emptyBuiltinIcon();
+
   // Icons are stored LZ4 compressed and de-compresssed on first use
   if (_builtinIconsDecompressed[id] == nullptr) {
     _builtinIconsDecompressed[id] =
         _decompressed_mask(_builtinIcons[id].lz4_compressed_bitmap);
   }
 
-  return _builtinIconsDecompressed[id];
+  return _builtinIconsDecompressed[id] ? _builtinIconsDecompressed[id]
+                                       : emptyBuiltinIcon();
 }
+
+#if defined(SIMU)
+bool builtinIconAllocationFailureLeavesDrawableMaskForTest()
+{
+  const auto id = ICON_BTN_PREV;
+  auto previous = _builtinIconsDecompressed[id];
+  _builtinIconsDecompressed[id] = nullptr;
+
+  bitmapsForceMaskMallocFailureForTest(true);
+  auto mask = getBuiltinIcon(id);
+  bitmapsForceMaskMallocFailureForTest(false);
+
+  auto width = mask->width;
+  auto height = mask->height;
+  auto firstPixel = mask->data[0];
+
+  if (_builtinIconsDecompressed[id] && _builtinIconsDecompressed[id] != previous)
+    free(_builtinIconsDecompressed[id]);
+  _builtinIconsDecompressed[id] = previous;
+
+  return width > 0 && height > 0 && firstPixel == 0;
+}
+#endif
 
 #endif
