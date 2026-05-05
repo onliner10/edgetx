@@ -248,10 +248,19 @@ Window::Window(const rect_t &rect) : rect(rect), parent(nullptr)
 Window::Window(Window *parent, const rect_t &rect, LvglCreate objConstruct) :
     rect(rect), parent(parent)
 {
+  if (parent && !parent->lvobj) {
+    this->parent = nullptr;
+    return;
+  }
+
   lv_obj_t *lv_parent = parent ? parent->lvobj : nullptr;
 
   if (objConstruct == nullptr) objConstruct = window_create;
   lvobj = objConstruct(lv_parent);
+  if (!lvobj) {
+    this->parent = nullptr;
+    return;
+  }
 
   lv_obj_set_user_data(lvobj, this);
   lv_obj_add_event_cb(lvobj, Window::window_event_cb, LV_EVENT_ALL, nullptr);
@@ -280,6 +289,21 @@ Window::~Window()
   }
 }
 
+#if defined(SIMU)
+void etxCreateForceObjectAllocationFailureForTest(bool force);
+
+bool windowObjectAllocationFailureLeavesNoLvObjForTest()
+{
+  etxCreateForceObjectAllocationFailureForTest(true);
+  auto window = new (std::nothrow) Window(nullptr, {0, 0, 10, 10});
+  etxCreateForceObjectAllocationFailureForTest(false);
+
+  bool ok = window && window->getLvObj() == nullptr && !window->isVisible();
+  delete window;
+  return ok;
+}
+#endif
+
 void Window::delayLoader(lv_event_t* e)
 {
   auto w = (Window*)lv_obj_get_user_data(lv_event_get_target(e));
@@ -291,6 +315,7 @@ void Window::delayLoader(lv_event_t* e)
 
 void Window::delayLoad()
 {
+  if (!lvobj) return;
   lv_obj_add_event_cb(lvobj, Window::delayLoader, LV_EVENT_DRAW_MAIN_BEGIN, nullptr);
 }
 
@@ -324,6 +349,8 @@ std::string Window::getWindowDebugString(const char *name) const
 
 void Window::pushLayer(bool hideParent)
 {
+  if (!lvobj) return;
+
   if (!layerCreated) {
     parentHidden = hideParent;
     layerCreated = true;
@@ -365,6 +392,7 @@ Window *Window::getFullScreenWindow()
 void Window::setWindowFlag(WindowFlags flag)
 {
   windowFlags |= flag;
+  if (!lvobj) return;
 
   // honor the no focus flag of libopenui
   if (windowFlags & NO_FOCUS)
@@ -385,10 +413,12 @@ void Window::clearTextFlag(LcdFlags flag) { textFlags &= ~flag; }
 void Window::attach(Window *newParent)
 {
   if (parent) detach();
-  parent = newParent;
-  if (newParent) {
-    newParent->addChild(this);
+  if (!lvobj || !newParent || !newParent->lvobj) {
+    parent = nullptr;
+    return;
   }
+  parent = newParent;
+  newParent->addChild(this);
 }
 
 void Window::detach()
@@ -443,21 +473,30 @@ bool Window::hasFocus() const
   return lvobj && lv_obj_has_state(lvobj, LV_STATE_FOCUSED);
 }
 
-void Window::padLeft(coord_t pad) { lv_obj_set_style_pad_left(lvobj, pad, 0); }
+void Window::padLeft(coord_t pad)
+{
+  if (lvobj) lv_obj_set_style_pad_left(lvobj, pad, 0);
+}
 
 void Window::padRight(coord_t pad)
 {
-  lv_obj_set_style_pad_right(lvobj, pad, 0);
+  if (lvobj) lv_obj_set_style_pad_right(lvobj, pad, 0);
 }
 
-void Window::padTop(coord_t pad) { lv_obj_set_style_pad_top(lvobj, pad, 0); }
+void Window::padTop(coord_t pad)
+{
+  if (lvobj) lv_obj_set_style_pad_top(lvobj, pad, 0);
+}
 
 void Window::padBottom(coord_t pad)
 {
-  lv_obj_set_style_pad_bottom(lvobj, pad, 0);
+  if (lvobj) lv_obj_set_style_pad_bottom(lvobj, pad, 0);
 }
 
-void Window::padAll(PaddingSize pad) { etx_padding(lvobj, pad, LV_PART_MAIN); }
+void Window::padAll(PaddingSize pad)
+{
+  if (lvobj) etx_padding(lvobj, pad, LV_PART_MAIN);
+}
 
 void Window::checkEvents()
 {
@@ -534,7 +573,7 @@ bool Window::automationClickable() const
 
 void Window::addChild(Window *window)
 {
-  if (!window) return;
+  if (!lvobj || !window || !window->lvobj) return;
 
   auto lv_parent = lv_obj_get_parent(window->lvobj);
   if (lv_parent && (lv_parent != lvobj)) {
@@ -552,6 +591,8 @@ void Window::invalidate()
 void Window::setFlexLayout(lv_flex_flow_t flow, lv_coord_t padding,
                            coord_t width, coord_t height)
 {
+  if (!lvobj) return;
+
   lv_obj_set_flex_flow(lvobj, flow);
   if ((_LV_FLEX_COLUMN & flow) || (_LV_FLEX_WRAP & flow)) {
     lv_obj_set_style_pad_row(lvobj, padding, LV_PART_MAIN);

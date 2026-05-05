@@ -91,6 +91,7 @@ class Window
   void setRect(rect_t value)
   {
     rect = value;
+    if (!lvobj) return;
     lv_obj_set_pos(lvobj, rect.x, rect.y);
     lv_obj_set_size(lvobj, rect.w, rect.h);
   }
@@ -98,18 +99,21 @@ class Window
   void setWidth(coord_t value)
   {
     rect.w = value;
+    if (!lvobj) return;
     lv_obj_set_width(lvobj, rect.w);
   }
 
   void setHeight(coord_t value)
   {
     rect.h = value;
+    if (!lvobj) return;
     lv_obj_set_height(lvobj, rect.h);
   }
 
   void setTop(coord_t y)
   {
     rect.y = y;
+    if (!lvobj) return;
     lv_obj_set_pos(lvobj, rect.x, rect.y);
   }
 
@@ -117,6 +121,7 @@ class Window
   {
     rect.w = w;
     rect.h = h;
+    if (!lvobj) return;
     lv_obj_set_size(lvobj, w, h);
   }
 
@@ -124,6 +129,7 @@ class Window
   {
     rect.x = x;
     rect.y = y;
+    if (!lvobj) return;
     lv_obj_set_pos(lvobj, x, y);
   }
 

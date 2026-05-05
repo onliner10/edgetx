@@ -731,14 +731,19 @@ void etx_scrollbar(lv_obj_t* obj)
 // Object creators
 
 #if defined(SIMU)
-static bool etxCreateForceObjectAllocationFailureForTest = false;
+static bool forceEtxObjectAllocationFailureForTest = false;
+
+void etxCreateForceObjectAllocationFailureForTest(bool force)
+{
+  forceEtxObjectAllocationFailureForTest = force;
+}
 #endif
 
 lv_obj_t* etx_create(const lv_obj_class_t* class_p, lv_obj_t* parent)
 {
   lv_obj_t* obj =
 #if defined(SIMU)
-      etxCreateForceObjectAllocationFailureForTest ? nullptr :
+      forceEtxObjectAllocationFailureForTest ? nullptr :
 #endif
       lv_obj_class_create_obj(class_p, parent);
   if (!obj) return nullptr;
@@ -751,9 +756,9 @@ lv_obj_t* etx_create(const lv_obj_class_t* class_p, lv_obj_t* parent)
 #if defined(SIMU)
 bool etxCreateObjectAllocationFailureReturnsNullForTest()
 {
-  etxCreateForceObjectAllocationFailureForTest = true;
+  etxCreateForceObjectAllocationFailureForTest(true);
   lv_obj_t* obj = etx_create(&lv_obj_class, nullptr);
-  etxCreateForceObjectAllocationFailureForTest = false;
+  etxCreateForceObjectAllocationFailureForTest(false);
   return obj == nullptr;
 }
 #endif
