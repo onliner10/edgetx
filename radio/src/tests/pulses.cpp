@@ -836,6 +836,26 @@ TEST_F(PulsesTest, pxx2RejectsZeroSpectrumAnalyserStep)
   EXPECT_EQ(reusableBuffer.spectrumAnalyser.bars[0], 21);
 }
 
+TEST_F(PulsesTest, pxx2RejectsShortOtaStartFrame)
+{
+  OtaUpdateInformation otaUpdateInformation = {};
+  otaUpdateInformation.step = OTA_UPDATE_START;
+  strcpy(otaUpdateInformation.candidateReceiversNames[0], "RX123456");
+  moduleState[INTERNAL_MODULE].otaUpdateInformation = &otaUpdateInformation;
+  moduleState[INTERNAL_MODULE].mode = MODULE_MODE_OTA_UPDATE;
+
+  GuardedPxx2Frame guardedFrame(3);
+  ASSERT_TRUE(guardedFrame.isValid());
+
+  uint8_t * frame = guardedFrame.data();
+  frame[1] = PXX2_TYPE_C_OTA;
+  frame[3] = 0;
+
+  processPXX2Frame(INTERNAL_MODULE, frame, nullptr, nullptr);
+
+  EXPECT_EQ(otaUpdateInformation.step, OTA_UPDATE_START);
+}
+
 TEST_F(PulsesTest, pxx2RejectsShortTelemetryFrame)
 {
   GuardedPxx2Frame guardedFrame(3);

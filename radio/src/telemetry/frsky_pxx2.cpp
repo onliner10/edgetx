@@ -500,6 +500,10 @@ static void processOtaUpdateFrame(uint8_t module, const uint8_t * frame)
   OtaUpdateInformation * destination = moduleState[module].otaUpdateInformation;
 
   if (destination->step == OTA_UPDATE_START) {
+    if (!pxx2FrameHasIndex(frame, 4 + PXX2_LEN_RX_NAME - 1)) {
+      return;
+    }
+
     if (frame[3] == 0x00 && memcmp(destination->candidateReceiversNames[destination->selectedReceiverIndex], &frame[4], PXX2_LEN_RX_NAME) == 0) {
       destination->step = OTA_UPDATE_START_ACK;
     }
