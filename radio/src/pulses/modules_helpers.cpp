@@ -70,7 +70,8 @@ int8_t maxModuleChannels_M8(uint8_t moduleIdx)
   } else if (isModuleDSMP(moduleIdx)) {
     return 4; //  12 channels
   } else {
-    return maxChannelsModules_M8[g_model.moduleData[moduleIdx].type];
+    uint8_t type = g_model.moduleData[moduleIdx].type;
+    return type < DIM(maxChannelsModules_M8) ? maxChannelsModules_M8[type] : -8;
   }
 }
 

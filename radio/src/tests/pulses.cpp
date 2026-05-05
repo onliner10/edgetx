@@ -125,6 +125,18 @@ TEST_F(PulsesTest, getChannelValueRejectsInvalidChannel)
   EXPECT_EQ(getChannelValue(MAX_OUTPUT_CHANNELS), 0);
 }
 
+TEST_F(PulsesTest, setCustomFailsafeRejectsInvalidModuleType)
+{
+  g_model.moduleData[EXTERNAL_MODULE].type = MODULE_TYPE_COUNT + 1;
+  g_model.moduleData[EXTERNAL_MODULE].channelsStart = 0;
+  g_model.moduleData[EXTERNAL_MODULE].channelsCount = 0;
+  channelOutputs[0] = 1024;
+
+  setCustomFailsafe(EXTERNAL_MODULE);
+
+  EXPECT_EQ(g_model.failsafeChannels[0], 0);
+}
+
 #if defined(MULTIMODULE) && defined(HARDWARE_EXTERNAL_MODULE)
 TEST_F(PulsesTest, multiSendPulsesHonorsChannelCount)
 {
