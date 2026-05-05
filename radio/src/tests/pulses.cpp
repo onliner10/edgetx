@@ -502,6 +502,46 @@ TEST_F(PulsesTest, afhds3RejectsShortModuleVersionResponse)
 
   afhds3::ProtoDriver.deinit(ctx);
 }
+
+TEST_F(PulsesTest, afhds3RejectsInvalidRfPower)
+{
+  modulePortInit();
+  g_model.moduleData[EXTERNAL_MODULE].type = MODULE_TYPE_FLYSKY_AFHDS3;
+  g_model.moduleData[EXTERNAL_MODULE].afhds3.rfPower = 255;
+
+  auto ctx = afhds3::ProtoDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  uint8_t buffer[MODULE_BUFFER_SIZE] = {};
+  afhds3::ProtoDriver.sendPulses(ctx, buffer, nullptr, 0);
+  feedShortAfhds3Response(ctx, afhds3::COMMAND::MODULE_READY, 0x02);
+  feedShortAfhds3Response(ctx, afhds3::COMMAND::MODULE_STATE, 0x05);
+  afhds3::ProtoDriver.sendPulses(ctx, buffer, nullptr, 0);
+  feedShortAfhds3Response(ctx, afhds3::COMMAND::MODEL_ID, 0x02);
+  afhds3::ProtoDriver.sendPulses(ctx, buffer, nullptr, 0);
+  feedShortAfhds3Response(ctx, afhds3::COMMAND::MODULE_MODE, 0x02);
+  feedShortAfhds3Response(ctx, afhds3::COMMAND::MODULE_STATE, 0x04);
+
+  auto cfg = afhds3::getConfig(EXTERNAL_MODULE);
+  ASSERT_NE(cfg, nullptr);
+  cfg->others.dirtyFlag =
+      static_cast<uint32_t>(1) << afhds3::DirtyConfig::DC_RX_CMD_TX_PWR;
+
+  afhds3::ProtoDriver.sendPulses(ctx, buffer, nullptr, 0);
+  afhds3::ProtoDriver.sendPulses(ctx, buffer, nullptr, 0);
+  afhds3::ProtoDriver.sendPulses(ctx, buffer, nullptr, 0);
+
+  uint8_t* moduleBuffer = pulsesGetModuleBuffer(EXTERNAL_MODULE);
+  EXPECT_EQ(moduleBuffer[3], afhds3::FRAME_TYPE::REQUEST_SET_EXPECT_DATA);
+  EXPECT_EQ(moduleBuffer[4], afhds3::COMMAND::SEND_COMMAND);
+  EXPECT_EQ(moduleBuffer[5], 0x13);
+  EXPECT_EQ(moduleBuffer[6], 0x20);
+  EXPECT_EQ(moduleBuffer[7], 2);
+  EXPECT_EQ(moduleBuffer[8], 56);
+  EXPECT_EQ(moduleBuffer[9], 0);
+
+  afhds3::ProtoDriver.deinit(ctx);
+}
 #endif
 
 #if defined(PPM) && defined(HARDWARE_EXTERNAL_MODULE)
