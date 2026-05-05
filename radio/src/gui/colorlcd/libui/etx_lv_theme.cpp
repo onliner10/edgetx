@@ -28,6 +28,7 @@
 #include "../colors.h"
 #include "fonts.h"
 
+#include <iterator>
 #include <new>
 
 extern lv_color_t makeLvColor(uint32_t colorFlags);
@@ -428,7 +429,7 @@ void useMainStyle()
 lv_obj_t* etx_label_create(lv_obj_t* parent, FontIndex fontIdx)
 {
   lv_obj_t* lvobj = lv_label_create(parent);
-  etx_obj_add_style(lvobj, styles->font[fontIdx], LV_PART_MAIN);
+  etx_font(lvobj, fontIdx);
   return lvobj;
 }
 
@@ -446,8 +447,13 @@ void etx_solid_bg(lv_obj_t* obj, LcdColorIndex bg_color,
 
 void etx_font(lv_obj_t* obj, FontIndex fontIdx, lv_style_selector_t selector)
 {
+  const auto fontCount = static_cast<int>(std::size(styles->font));
+  if (fontIdx < FONT_STD_INDEX || fontIdx >= fontCount) {
+    fontIdx = FONT_STD_INDEX;
+  }
+
   // Remove old style first
-  for (int i = 0; i < TOTAL_COLOR_COUNT; i += 1)
+  for (int i = FONT_STD_INDEX; i < fontCount; i += 1)
     lv_obj_remove_style(obj, &styles->font[i], selector);
   etx_obj_add_style(obj, styles->font[fontIdx], selector);
 }

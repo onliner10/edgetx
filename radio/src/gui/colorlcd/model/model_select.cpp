@@ -32,8 +32,6 @@
 #include "view_channels.h"
 #include "view_main.h"
 
-inline tmr10ms_t getTicks() { return get_tmr10ms(); }
-
 struct ModelButtonLayout {
   uint16_t width;
   uint16_t height;
@@ -342,14 +340,8 @@ class ModelsPageBody : public Window
           TELEMETRY_STREAMING() && !g_eeGeneral.disableRssiPoweroffAlarm;
       if (modelConnected) {
         AUDIO_ERROR_MESSAGE(AU_MODEL_STILL_POWERED);
-        if (!confirmationDialog(STR_MODEL_STILL_POWERED, nullptr, false, []() {
-              tmr10ms_t startTime = getTicks();
-              while (!TELEMETRY_STREAMING()) {
-                if (getTicks() - startTime > TELEMETRY_CHECK_DELAY10ms) break;
-              }
-              return !TELEMETRY_STREAMING() ||
-                     g_eeGeneral.disableRssiPoweroffAlarm;
-            })) {
+        if (!confirmationDialog(STR_MODEL_STILL_POWERED, nullptr, false,
+                                TelemetryLostCloseCondition())) {
           return;  // stop if connected but not confirmed
         }
       }

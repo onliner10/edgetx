@@ -220,6 +220,34 @@ void alert(const char * title, const char * msg, uint8_t sound);
 
 #define TELEMETRY_CHECK_DELAY10ms 150
 
+class TelemetryLostCloseCondition
+{
+  public:
+    bool operator()()
+    {
+      if (g_eeGeneral.disableRssiPoweroffAlarm) return true;
+
+      const tmr10ms_t now = get_tmr10ms();
+      if (TELEMETRY_STREAMING()) {
+        telemetryWasLost = false;
+        telemetryLostTime = now;
+        return false;
+      }
+
+      if (!telemetryWasLost) {
+        telemetryWasLost = true;
+        telemetryLostTime = now;
+        return false;
+      }
+
+      return now - telemetryLostTime > TELEMETRY_CHECK_DELAY10ms;
+    }
+
+  private:
+    bool telemetryWasLost = false;
+    tmr10ms_t telemetryLostTime = 0;
+};
+
 bool confirmationDialog(const char *title, const char *msg, bool checkPwr = true, const std::function<bool(void)>& closeCondition = nullptr);
 
 void raiseAlert(const char *title, const char *msg, const char *info,

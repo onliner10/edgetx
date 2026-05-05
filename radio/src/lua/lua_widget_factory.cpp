@@ -50,8 +50,6 @@ LuaWidgetFactory::LuaWidgetFactory(const char* name, WidgetOption* widgetOptions
 }
 
 LuaWidgetFactory::~LuaWidgetFactory() {
-  unregisterWidget(this);
-
   luaL_unref(lsWidgets, LUA_REGISTRYINDEX, optionDefinitionsReference);
   luaL_unref(lsWidgets, LUA_REGISTRYINDEX, createFunction);
   luaL_unref(lsWidgets, LUA_REGISTRYINDEX, updateFunction);

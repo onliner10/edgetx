@@ -79,6 +79,27 @@
       }
     },
     {
+      "name": "san-msan",
+      "displayName": "Native MSan Tests",
+      "binaryDir": "build/san-msan",
+      "toolchainFile": "cmake/toolchain/native.cmake",
+      "cacheVariables": {
+        "EdgeTX_SUPERBUILD": false,
+        "NATIVE_BUILD": true,
+        "DISABLE_COMPANION": true,
+        "PCB": "X10",
+        "PCBREV": "TX16S",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "EDGE16_SANITIZERS": "memory",
+        "EDGE16_SAFETY_CHECKS": true
+      },
+      "warnings": {
+        "dev": false
+      }
+    },
+    {
       "name": "fuzzers",
       "displayName": "Native Clang Fuzzers",
       "binaryDir": "build/fuzzers",
@@ -146,6 +167,14 @@
       "configurePreset": "san-tsan",
       "targets": [
         "tests-radio"
+      ]
+    },
+    {
+      "name": "san-msan",
+      "displayName": "Native MSan Tests",
+      "configurePreset": "san-msan",
+      "targets": [
+        "gtests-radio"
       ]
     },
     {

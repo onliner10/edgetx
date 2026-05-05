@@ -385,7 +385,7 @@ const char *FrskyDeviceFirmwareUpdate::doFlashFirmware(
 const char *FrskyDeviceFirmwareUpdate::uploadFileToHorusXJT(
     const char *filename, FIL *file, ProgressHandler progressHandler)
 {
-  uint32_t buffer[1024 / sizeof(uint32_t)];
+  FirmwareBlock buffer;
   UINT count;
   uint8_t frame[8];
 
@@ -408,7 +408,7 @@ const char *FrskyDeviceFirmwareUpdate::uploadFileToHorusXJT(
   while (true) {
     progressHandler(getBasename(filename), STR_WRITING, file->fptr, file->obj.objsize);
 
-    if (f_read(file, buffer, 1024, &count) != FR_OK) {
+    if (f_read(file, buffer.bytes(), FirmwareBlock::SizeBytes, &count) != FR_OK) {
       return STR_DEVICE_FILE_ERROR;
     }
 
@@ -424,15 +424,16 @@ const char *FrskyDeviceFirmwareUpdate::uploadFileToHorusXJT(
       return nullptr;
     }
 
-    if (count < 1024)
-      memset(((uint8_t *)buffer) + count, 0, 1024 - count);
+    if (count < FirmwareBlock::SizeBytes)
+      memset(buffer.bytes() + count, 0, FirmwareBlock::SizeBytes - count);
 
     uart_drv->sendByte(uart_ctx, frame[0] + 0x80);
     uart_drv->sendByte(uart_ctx, frame[1]);
 
-    uint16_t crc_16 = crc16(CRC_1189, (uint8_t *)buffer, 1024, crc16(CRC_1189, &frame[1], 1));
-    for (size_t i = 0; i < sizeof(buffer); i++) {
-      uart_drv->sendByte(uart_ctx, ((uint8_t *)buffer)[i]);
+    uint16_t crc_16 = crc16(CRC_1189, buffer.bytes(), FirmwareBlock::SizeBytes,
+                            crc16(CRC_1189, &frame[1], 1));
+    for (uint32_t i = 0; i < FirmwareBlock::SizeBytes; i++) {
+      uart_drv->sendByte(uart_ctx, buffer.bytes()[i]);
     }
     uart_drv->sendByte(uart_ctx, crc_16 >> 8);
     uart_drv->sendByte(uart_ctx, crc_16);
@@ -441,11 +442,10 @@ const char *FrskyDeviceFirmwareUpdate::uploadFileToHorusXJT(
   }
 }
 
-void FrskyDeviceFirmwareUpdate::sendDataTransfer(uint32_t* buffer)
+void FrskyDeviceFirmwareUpdate::sendDataTransfer(const FirmwareBlock & buffer)
 {
   startFrame(PRIM_DATA_WORD);
-  uint32_t offset = (address & 1023) >> 2; // 32 bit word offset into buffer
-  write_u32_le(frame + 2, buffer[offset]);
+  write_u32_le(frame + 2, buffer.wordForByteAddress(address));
   frame[6] = address & 0x000000FF;
   state = SPORT_DATA_TRANSFER;
   sendFrame();
@@ -454,7 +454,7 @@ void FrskyDeviceFirmwareUpdate::sendDataTransfer(uint32_t* buffer)
 const char *FrskyDeviceFirmwareUpdate::uploadFileNormal(
     const char *filename, FIL *file, ProgressHandler progressHandler)
 {
-  uint32_t buffer[1024 / sizeof(uint32_t)];
+  FirmwareBlock buffer;
   UINT count;
 
   const char * result = sendPowerOn();
@@ -475,11 +475,11 @@ const char *FrskyDeviceFirmwareUpdate::uploadFileNormal(
   uint8_t retries = 0;
 
   while (true) {
-    if (f_read(file, buffer, 1024, &count) != FR_OK) {
+    if (f_read(file, buffer.bytes(), FirmwareBlock::SizeBytes, &count) != FR_OK) {
         return STR_DEVICE_FILE_ERROR;
     }
 
-    count >>= 2;
+    count /= sizeof(uint32_t);
 
     for (uint32_t i = 0; i < count; i++) {
 

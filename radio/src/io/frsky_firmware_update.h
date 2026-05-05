@@ -124,6 +124,33 @@ class FrskyDeviceFirmwareUpdate {
     ModuleIndex module;
     uint8_t frame[12];
 
+    struct FirmwareBlock {
+      static constexpr uint32_t SizeBytes = 1024;
+      static constexpr uint32_t WordCount = SizeBytes / sizeof(uint32_t);
+
+      static_assert(SizeBytes % sizeof(uint32_t) == 0,
+                    "Firmware block must contain complete 32-bit words");
+      static_assert((SizeBytes & (SizeBytes - 1)) == 0,
+                    "Firmware block size is used as an address mask");
+
+      uint32_t words[WordCount];
+
+      uint8_t * bytes()
+      {
+        return reinterpret_cast<uint8_t *>(words);
+      }
+
+      const uint8_t * bytes() const
+      {
+        return reinterpret_cast<const uint8_t *>(words);
+      }
+
+      uint32_t wordForByteAddress(uint32_t byteAddress) const
+      {
+        return words[(byteAddress & (SizeBytes - 1)) / sizeof(uint32_t)];
+      }
+    };
+
     etx_module_state_t* mod_st = nullptr;
     const etx_serial_driver_t* uart_drv = nullptr;
     void* uart_ctx = nullptr;
@@ -137,7 +164,7 @@ class FrskyDeviceFirmwareUpdate {
     const uint8_t * readFrame(uint32_t timeout);
     bool waitState(State state, uint32_t timeout);
     void processFrame(const uint8_t * frame);
-    void sendDataTransfer(uint32_t* buffer);
+    void sendDataTransfer(const FirmwareBlock & buffer);
 
     const char * doFlashFirmware(const char * filename, ProgressHandler progressHandler);
     const char * sendPowerOn();

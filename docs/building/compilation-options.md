@@ -147,7 +147,7 @@ Runtime sanitizers are for native host tests and simulator/fuzzer binaries only.
 |--------|---------|-------------|
 | `EDGE16_SAFETY_CHECKS` | OFF | Enables stricter warning coverage for firmware and native safety builds. |
 | `EDGE16_GCC_ANALYZER` | OFF | Enables GCC's static analyzer for firmware C/C++ translation units. |
-| `EDGE16_SANITIZERS` | empty | Native test sanitizers, comma-separated: `address`, `undefined`, `thread`. Empty native test builds default to AddressSanitizer. |
+| `EDGE16_SANITIZERS` | empty | Native test sanitizers, comma-separated: `address`, `undefined`, `thread`, `memory`. Empty native test builds default to AddressSanitizer. |
 | `EDGE16_BUILD_FUZZERS` | OFF | Builds Clang/libFuzzer native fuzz targets. Requires Clang and cannot be combined with ThreadSanitizer. |
 | `EDGE16_STACK_USAGE_LIMIT` | 8192 | Static stack usage warning limit used with `EDGE16_SAFETY_CHECKS` for firmware builds. |
 | `EDGE16_FRAME_SIZE_LIMIT` | 4096 | Stack frame size warning limit used with `EDGE16_SAFETY_CHECKS` for firmware builds. |
@@ -164,6 +164,14 @@ ThreadSanitizer is intentionally a separate build:
 ```sh
 cmake --preset san-tsan
 cmake --build --preset san-tsan
+```
+
+MemorySanitizer requires Clang and should be run separately because it cannot
+be combined with AddressSanitizer or ThreadSanitizer:
+
+```sh
+CC=clang CXX=clang++ cmake --preset san-msan
+cmake --build --preset san-msan
 ```
 
 The fuzzer smoke targets are available with Clang:

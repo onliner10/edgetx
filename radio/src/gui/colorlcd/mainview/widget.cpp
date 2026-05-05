@@ -27,6 +27,7 @@
 #include "view_main.h"
 #include "widget_settings.h"
 
+#include <algorithm>
 #include <new>
 
 #if defined(HARDWARE_TOUCH)
@@ -363,43 +364,61 @@ WidgetPersistentData* Widget::getPersistentData() { return g_model.getWidgetData
 
 //-----------------------------------------------------------------------------
 
-std::list<const WidgetFactory*>& WidgetFactory::getRegisteredWidgets()
+WidgetFactory::~WidgetFactory()
 {
-  static std::list<const WidgetFactory*> widgets;
+  unregisterWidget(*this);
+}
+
+WidgetFactory::RegisteredWidgets& WidgetFactory::registeredWidgets()
+{
+  static RegisteredWidgets widgets;
   return widgets;
 }
 
-void WidgetFactory::unregisterWidget(const WidgetFactory* factory)
+const WidgetFactory::RegisteredWidgets& WidgetFactory::getRegisteredWidgets()
 {
-  getRegisteredWidgets().remove(factory);
+  return registeredWidgets();
+}
+
+void WidgetFactory::unregisterWidget(const WidgetFactory& factory)
+{
+  auto& widgets = registeredWidgets();
+  widgets.erase(
+      std::remove_if(widgets.begin(), widgets.end(),
+                     [&](const auto& registered) {
+                       return &registered.get() == &factory;
+                     }),
+      widgets.end());
 }
 
 const WidgetFactory* WidgetFactory::getWidgetFactory(const char* name)
 {
-  auto it = getRegisteredWidgets().cbegin();
-  for (; it != getRegisteredWidgets().cend(); ++it) {
-    if (!strcmp(name, (*it)->getName())) {
-      return (*it);
+  if (!name) return nullptr;
+
+  for (const auto& registered : getRegisteredWidgets()) {
+    const auto& factory = registered.get();
+    if (!strcmp(name, factory.getName())) {
+      return &factory;
     }
   }
   return nullptr;
 }
 
-void WidgetFactory::registerWidget(const WidgetFactory* factory)
+void WidgetFactory::registerWidget(const WidgetFactory& factory)
 {
-  auto name = factory->getName();
+  auto& widgets = registeredWidgets();
+  auto name = factory.getName();
   auto oldWidget = getWidgetFactory(name);
   if (oldWidget) {
-    unregisterWidget(oldWidget);
+    unregisterWidget(*oldWidget);
   }
-  for (auto it = getRegisteredWidgets().cbegin();
-       it != getRegisteredWidgets().cend(); ++it) {
-    if (strcasecmp((*it)->getDisplayName(), factory->getDisplayName()) > 0) {
-      getRegisteredWidgets().insert(it, factory);
+  for (auto it = widgets.cbegin(); it != widgets.cend(); ++it) {
+    if (strcasecmp(it->get().getDisplayName(), factory.getDisplayName()) > 0) {
+      widgets.insert(it, std::cref(factory));
       return;
     }
   }
-  getRegisteredWidgets().push_back(factory);
+  widgets.push_back(std::cref(factory));
 }
 
 Widget* WidgetFactory::newWidget(const char* name, Window* parent,

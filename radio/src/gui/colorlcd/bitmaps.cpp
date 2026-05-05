@@ -22,6 +22,7 @@
 #include "bitmaps.h"
 
 #include "lz4/lz4.h"
+#include "definitions.h"
 #include "edgetx_helpers.h"
 
 LZ4BitmapBuffer::LZ4BitmapBuffer(uint8_t format) :

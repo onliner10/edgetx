@@ -22,10 +22,9 @@
 #pragma once
 
 #include <string.h>
+#include <functional>
 #include <new>
-#if !defined(BACKUP)
 #include <vector>
-#endif
 
 #include "button.h"
 #include "widgets_container.h"
@@ -156,14 +155,17 @@ class Widget : public ButtonBase
 class WidgetFactory
 {
  public:
+  using RegisteredWidgets =
+      std::vector<std::reference_wrapper<const WidgetFactory>>;
+
   explicit WidgetFactory(const char* name, const WidgetOption* options = nullptr,
                          const char* displayName = nullptr) :
       name(name), displayName(displayName), options(options)
   {
-    registerWidget(this);
+    registerWidget(*this);
   }
 
-  virtual ~WidgetFactory() {}
+  virtual ~WidgetFactory();
 
   const char* getName() const { return name; }
 
@@ -184,9 +186,7 @@ class WidgetFactory
 
   virtual bool isLuaWidgetFactory() const { return false; }
 
-  static std::list<const WidgetFactory*>& getRegisteredWidgets();
-  static void registerWidget(const WidgetFactory* factory);
-  static void unregisterWidget(const WidgetFactory* factory);
+  static const RegisteredWidgets& getRegisteredWidgets();
   static const WidgetFactory* getWidgetFactory(const char* name);
   static Widget* newWidget(const char* name, Window* parent, const rect_t& rect,
                            int screenNum, int zoneNum);
@@ -195,6 +195,11 @@ class WidgetFactory
   const char* name = nullptr;
   const char* displayName = nullptr;
   const WidgetOption* options = nullptr;
+
+ private:
+  static RegisteredWidgets& registeredWidgets();
+  static void registerWidget(const WidgetFactory& factory);
+  static void unregisterWidget(const WidgetFactory& factory);
 };
 
 //-----------------------------------------------------------------------------

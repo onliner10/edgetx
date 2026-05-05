@@ -122,7 +122,8 @@ void SetupWidgetsPageSlot::addNewWidget(WidgetsContainer* container,
   menu->setTitle(STR_SELECT_WIDGET);
   int selected = -1;
   int index = 0;
-  for (auto factory : WidgetFactory::getRegisteredWidgets()) {
+  for (const auto& registered : WidgetFactory::getRegisteredWidgets()) {
+    auto factory = &registered.get();
     if (strcmp(factory->getName(), "Radio Info") == 0) continue;
     menu->addLine(factory->getDisplayName(), [=]() {
       container->createWidget(slotIndex, factory);

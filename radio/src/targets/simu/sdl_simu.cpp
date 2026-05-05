@@ -28,9 +28,9 @@
 #include <imgui_impl_sdlrenderer2.h>
 
 #include <algorithm>
-#include <iostream>
+#include <cstring>
 #include <fstream>
-#include <filesystem>
+#include <iostream>
 #include <mutex>
 #include <regex>
 #include <sstream>
@@ -866,6 +866,18 @@ int default_input_mode()
 #endif
 }
 
+std::string program_basename(const char* path)
+{
+  if (!path || !*path) return "simu";
+
+  const char* base = strrchr(path, '/');
+#if defined(_WIN32)
+  const char* winBase = strrchr(path, '\\');
+  if (!base || (winBase && winBase > base)) base = winBase;
+#endif
+  return std::string(base ? base + 1 : path);
+}
+
 int find_input_mode()
 {
   // TODO: add support for path from command line
@@ -887,8 +899,7 @@ int find_input_mode()
 
 int main(int argc, char* argv[])
 {
-  auto progname = std::filesystem::path(argv[0]).filename();
-  ArgumentParser args(progname.string());
+  ArgumentParser args(program_basename(argv[0]));
 
   if (!args.parse(argc, argv)) {
     return 1;

@@ -20,7 +20,14 @@
 
 #include "gtests.h"
 
-#if defined(COLORLCD) && !GTEST_OS_WINDOWS
+#ifndef __has_feature
+#define __has_feature(x) 0
+#endif
+
+// MSan provides its own global nothrow new/delete interceptors. This
+// allocation-failure injection test relies on replacing them, so keep it out of
+// MemorySanitizer builds and let MSan own allocation tracking.
+#if defined(COLORLCD) && !GTEST_OS_WINDOWS && !__has_feature(memory_sanitizer)
 
 #include <atomic>
 #include <chrono>

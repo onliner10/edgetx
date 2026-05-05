@@ -1825,10 +1825,6 @@ uint32_t pwrPressedDuration()
   return get_tmr10ms() - pwr_press_time;
 }
 
-#if defined(COLORLCD)
-inline tmr10ms_t getTicks() { return get_tmr10ms(); }
-#endif
-
 bool pwrOffDueToInactivity()
 {
   uint8_t inactivityLimit = g_eeGeneral.pwrOffIfInactive;
@@ -1950,13 +1946,7 @@ uint32_t pwrCheck()
           }
           else if (!modelConnectedConfirmed) {
             message = STR_MODEL_STILL_POWERED;
-            closeCondition = []() {
-              tmr10ms_t startTime = getTicks();
-              while (!TELEMETRY_STREAMING()) {
-                if (getTicks() - startTime > TELEMETRY_CHECK_DELAY10ms) break;
-              }
-              return !TELEMETRY_STREAMING() || g_eeGeneral.disableRssiPoweroffAlarm;
-            };
+            closeCondition = TelemetryLostCloseCondition();
           }
           else if (!trainerConfirmed && !g_eeGeneral.disableTrainerPoweroffAlarm) {
             message = STR_TRAINER_STILL_CONNECTED;
