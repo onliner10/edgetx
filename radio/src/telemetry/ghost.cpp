@@ -133,6 +133,20 @@ static bool checkGhostTelemetryFrameCRC(const uint8_t* frame, uint32_t len)
   return (crc == frame[len - 1]);
 }
 
+static bool ghostTelemetryFrameHasBytes(uint8_t frame_len, uint8_t offset,
+                                        uint8_t count)
+{
+  if (count == 0) {
+    return true;
+  }
+
+  if (frame_len < 2) {
+    return false;
+  }
+
+  return uint16_t(offset) + count <= frame_len - 1;
+}
+
 // hifirst
 static uint16_t _get_u16(const uint8_t* frame, uint8_t offset)
 {
@@ -165,7 +179,15 @@ static uint32_t _get_s32le(const uint8_t* frame, uint8_t offset)
 
 void processGhostTelemetryFrame(uint8_t module, uint8_t* buffer, uint32_t length)
 {
+  if (length < 4) {
+    return;
+  }
+
   uint8_t frame_len = buffer[1];
+  if (frame_len < 2 || length < uint32_t(frame_len) + 2) {
+    return;
+  }
+
   auto frame = buffer + 2;
   if (!checkGhostTelemetryFrameCRC(frame, frame_len)) {
     TRACE("[GS] CRC error");
@@ -176,6 +198,10 @@ void processGhostTelemetryFrame(uint8_t module, uint8_t* buffer, uint32_t length
   switch(id) {
     case GHST_DL_OPENTX_SYNC:
     {
+      if (!ghostTelemetryFrameHasBytes(frame_len, 5, 4)) {
+        break;
+      }
+
       uint32_t update_interval = _get_s32(frame, 1);
       int32_t  offset = _get_s32(frame, 5);
 

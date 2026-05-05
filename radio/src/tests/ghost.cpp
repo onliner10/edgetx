@@ -130,4 +130,23 @@ TEST(Ghost, channelsFrameHonorsChannelCount)
   GhostDriver.deinit(ctx);
 }
 
+TEST(Ghost, shortSyncFrameDoesNotUpdateModuleSync)
+{
+  ModuleSyncStatus &status = getModuleSyncStatus(EXTERNAL_MODULE);
+  status.refreshRate = 4000;
+  status.inputLag = 25;
+  status.currentLag = 25;
+
+  uint8_t frame[] = {GHST_ADDR_RADIO, 2, GHST_DL_OPENTX_SYNC, 0,
+                     0x00,            0x00, 0x27,              0x10,
+                     0x00,            0x00, 0x00,              0x64};
+  frame[3] = crc8(&frame[2], 1);
+
+  processGhostTelemetryFrame(EXTERNAL_MODULE, frame, sizeof(frame));
+
+  EXPECT_EQ(status.refreshRate, 4000);
+  EXPECT_EQ(status.inputLag, 25);
+  EXPECT_EQ(status.currentLag, 25);
+}
+
 #endif
