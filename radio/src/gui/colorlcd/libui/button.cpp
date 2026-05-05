@@ -80,30 +80,39 @@ ButtonBase::ButtonBase(Window* parent, const rect_t& rect,
 
 void ButtonBase::check(bool checked)
 {
-  if (!_deleted && isAvailable() && lvobj) {
+  withAvailableLvObj([&](lv_obj_t* obj) {
     if (checked != this->checked()) {
       if (checked)
-        lv_obj_add_state(lvobj, LV_STATE_CHECKED);
+        lv_obj_add_state(obj, LV_STATE_CHECKED);
       else
-        lv_obj_clear_state(lvobj, LV_STATE_CHECKED);
+        lv_obj_clear_state(obj, LV_STATE_CHECKED);
     }
-  }
+  });
 }
 
 bool ButtonBase::checked() const
 {
-  if (!isAvailable() || !lvobj) return false;
-  return lv_obj_get_state(lvobj) & LV_STATE_CHECKED;
+  bool result = false;
+  withAvailableLvObj([&](lv_obj_t* obj) {
+    result = lv_obj_get_state(obj) & LV_STATE_CHECKED;
+  });
+  return result;
 }
 
-void ButtonBase::onPress() { check(pressHandler && pressHandler()); }
+void ButtonBase::onPress()
+{
+  if (!isAvailable() || deleted()) return;
+  check(pressHandler && pressHandler());
+}
 
 bool ButtonBase::onLongPress()
 {
+  if (!isAvailable() || deleted()) return false;
   if (longPressHandler) {
     check(longPressHandler());
-    if (!deleted() && lvobj)
-      lv_obj_clear_state(lvobj, LV_STATE_PRESSED);
+    withLvObj([](lv_obj_t* obj) {
+      lv_obj_clear_state(obj, LV_STATE_PRESSED);
+    });
     lv_indev_wait_release(lv_indev_get_act());
     return false;
   }
@@ -125,13 +134,10 @@ TextButton::TextButton(Window* parent, const rect_t& rect, std::string text,
     ButtonBase(parent, rect, pressHandler, button_create),
     text(std::move(text))
 {
-  if (!hasLvObj()) return;
-
-  label = text_button_label_create(lvobj);
-  if (!requireLvObj(label)) return;
-
-  lv_label_set_text(label, this->text.c_str());
-  lv_obj_center(label);
+  initRequiredLvObj(label, text_button_label_create, [&](lv_obj_t* obj) {
+    lv_label_set_text(obj, this->text.c_str());
+    lv_obj_center(obj);
+  });
 }
 
 void TextButton::setText(std::string value)
@@ -152,10 +158,15 @@ std::string TextButton::automationText() const
 
 bool textButtonLabelCreateFailureFailsClosedForTest()
 {
+  bool pressed = false;
+  bool longPressed = false;
   forceTextButtonLabelCreateFailureForTest = true;
   auto button = new (std::nothrow) TextButton(
       MainWindow::instance(), {0, 0, 100, EdgeTxStyles::UI_ELEMENT_HEIGHT},
-      "Start");
+      "Start", [&]() {
+        pressed = true;
+        return 0;
+      });
   forceTextButtonLabelCreateFailureForTest = false;
 
   if (!button || !button->getLvObj() || button->isAvailable() ||
@@ -167,10 +178,51 @@ bool textButtonLabelCreateFailureFailsClosedForTest()
   button->setText("Next");
   button->setFont(FONT_STD_INDEX);
   button->setWrap();
+  button->setLongPressHandler([&]() {
+    longPressed = true;
+    return 0;
+  });
+  lv_event_send(button->getLvObj(), LV_EVENT_CLICKED, nullptr);
+  lv_event_send(button->getLvObj(), LV_EVENT_LONG_PRESSED, nullptr);
 
   const bool ok = button->automationText() == "Next" &&
-                  !button->isAvailable() && !button->isVisible();
+                  !button->isAvailable() && !button->isVisible() && !pressed &&
+                  !longPressed && !button->automationLongClickable();
   delete button;
+  return ok;
+}
+
+bool touchLongPressStateIsPerWindowForTest()
+{
+  bool firstPressed = false;
+  bool secondPressed = false;
+
+  auto first = new (std::nothrow) TextButton(
+      MainWindow::instance(), {0, 0, 100, EdgeTxStyles::UI_ELEMENT_HEIGHT},
+      "First", [&]() {
+        firstPressed = true;
+        return 0;
+      });
+  auto second = new (std::nothrow) TextButton(
+      MainWindow::instance(), {0, 24, 100, EdgeTxStyles::UI_ELEMENT_HEIGHT},
+      "Second", [&]() {
+        secondPressed = true;
+        return 0;
+      });
+
+  if (!first || !first->acceptsEvents() || !second ||
+      !second->acceptsEvents()) {
+    delete second;
+    delete first;
+    return false;
+  }
+
+  lv_event_send(first->getLvObj(), LV_EVENT_LONG_PRESSED, nullptr);
+  lv_event_send(second->getLvObj(), LV_EVENT_CLICKED, nullptr);
+
+  bool ok = !firstPressed && secondPressed;
+  delete second;
+  delete first;
   return ok;
 }
 #endif
@@ -207,11 +259,12 @@ MomentaryButton::MomentaryButton(Window* parent, const rect_t& rect, std::string
 {
   if (!hasLvObj()) return;
 
-  label = etx_label_create(lvobj);
-  if (!requireLvObj(label)) return;
-
-  lv_label_set_text(label, this->text.c_str());
-  lv_obj_center(label);
+  initRequiredLvObj(
+      label, [](lv_obj_t* parent) { return etx_label_create(parent); },
+      [&](lv_obj_t* obj) {
+        lv_label_set_text(obj, this->text.c_str());
+        lv_obj_center(obj);
+      });
 }
 
 bool MomentaryButton::customEventHandler(lv_event_code_t code)

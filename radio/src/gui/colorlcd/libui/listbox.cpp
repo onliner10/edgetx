@@ -22,6 +22,9 @@
 #include "listbox.h"
 
 #include "debug.h"
+#include "mainwindow.h"
+
+#include <new>
 
 ListBox::ListBox(Window* parent, const rect_t& rect,
                  const std::vector<std::string>& names, uint8_t lineHeight) :
@@ -35,7 +38,9 @@ ListBox::ListBox(Window* parent, const rect_t& rect,
 
 void ListBox::setName(uint16_t idx, const std::string& name)
 {
-  lv_table_set_cell_value(lvobj, idx, 0, name.c_str());
+  withAvailableLvObj([&](lv_obj_t* obj) {
+    lv_table_set_cell_value(obj, idx, 0, name.c_str());
+  });
 }
 
 void ListBox::setNames(const std::vector<std::string>& names)
@@ -51,7 +56,9 @@ void ListBox::setNames(const std::vector<std::string>& names)
 
 void ListBox::setLineHeight(uint8_t height)
 {
-  lv_obj_set_style_max_height(lvobj, height, LV_PART_ITEMS);
+  withAvailableLvObj([&](lv_obj_t* obj) {
+    lv_obj_set_style_max_height(obj, height, LV_PART_ITEMS);
+  });
 }
 
 void ListBox::setSelected(int selected, bool force)
@@ -63,27 +70,35 @@ void ListBox::setSelected(std::set<uint32_t> selected)
 {
   if (!multiSelect) return;
 
-  for (int i = 0; i < getRowCount(); i++) {
-    if (selected.find(i) != selected.end())
-      lv_table_add_cell_ctrl(lvobj, i, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
-    else
-      lv_table_clear_cell_ctrl(lvobj, i, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
-  }
+  withAvailableLvObj([&](lv_obj_t* obj) {
+    for (int i = 0; i < getRowCount(); i++) {
+      if (selected.find(i) != selected.end())
+        lv_table_add_cell_ctrl(obj, i, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
+      else
+        lv_table_clear_cell_ctrl(obj, i, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
+    }
+  });
 }
 
 bool ListBox::isRowSelected(uint16_t row)
 {
-  return lv_table_has_cell_ctrl(lvobj, row, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
+  bool selected = false;
+  withAvailableLvObj([&](lv_obj_t* obj) {
+    selected = lv_table_has_cell_ctrl(obj, row, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
+  });
+  return selected;
 }
 
 std::set<uint32_t> ListBox::getSelection()
 {
   std::set<uint32_t> selectedIndexes;
   if (multiSelect) {
-    for (int i = 0; i < getRowCount(); i++) {
-      if (lv_table_has_cell_ctrl(lvobj, i, 0, LV_TABLE_CELL_CTRL_CUSTOM_1))
-        selectedIndexes.insert(i);
-    }
+    withAvailableLvObj([&](lv_obj_t* obj) {
+      for (int i = 0; i < getRowCount(); i++) {
+        if (lv_table_has_cell_ctrl(obj, i, 0, LV_TABLE_CELL_CTRL_CUSTOM_1))
+          selectedIndexes.insert(i);
+      }
+    });
   }
   return selectedIndexes;
 }
@@ -99,6 +114,7 @@ int ListBox::getActiveItem() const { return activeItem; }
 
 void ListBox::onPress(uint16_t row, uint16_t col)
 {
+  if (!acceptsEvents()) return;
   if (row == LV_TABLE_CELL_NONE) return;
 
   TRACE("SHORT_PRESS");
@@ -106,12 +122,14 @@ void ListBox::onPress(uint16_t row, uint16_t col)
   if (multiSelect && row < getRowCount()) {
     std::set<uint32_t> lastSelection = getSelection();
 
-    bool chk =
-        lv_table_has_cell_ctrl(lvobj, row, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
-    if (chk)
-      lv_table_clear_cell_ctrl(lvobj, row, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
-    else
-      lv_table_add_cell_ctrl(lvobj, row, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
+    withAvailableLvObj([&](lv_obj_t* obj) {
+      bool chk =
+          lv_table_has_cell_ctrl(obj, row, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
+      if (chk)
+        lv_table_clear_cell_ctrl(obj, row, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
+      else
+        lv_table_add_cell_ctrl(obj, row, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
+    });
 
     if (_multiSelectHandler) {
       _multiSelectHandler(getSelection(), lastSelection);
@@ -125,20 +143,27 @@ void ListBox::onPress(uint16_t row, uint16_t col)
 
 void ListBox::onClicked()
 {
-  lv_group_set_editing((lv_group_t*)lv_obj_get_group(lvobj), true);
+  withAvailableLvObj([](lv_obj_t* obj) {
+    lv_group_set_editing((lv_group_t*)lv_obj_get_group(obj), true);
+  });
 }
 
 void ListBox::onCancel()
 {
-  if (!isAutoEdit() && lv_group_get_editing((lv_group_t*)lv_obj_get_group(lvobj))) {
-    lv_group_set_editing((lv_group_t*)lv_obj_get_group(lvobj), false);
-  } else {
-    TableField::onCancel();
-  }
+  bool handled = false;
+  withAvailableLvObj([&](lv_obj_t* obj) {
+    auto group = (lv_group_t*)lv_obj_get_group(obj);
+    if (!isAutoEdit() && group && lv_group_get_editing(group)) {
+      lv_group_set_editing(group, false);
+      handled = true;
+    }
+  });
+  if (!handled) TableField::onCancel();
 }
 
 void ListBox::onDrawEnd(uint16_t row, uint16_t col, lv_obj_draw_part_dsc_t* dsc)
 {
+  if (!acceptsEvents()) return;
   if ((multiSelect == false && row != activeItem) ||
       (multiSelect == true &&
        !lv_table_has_cell_ctrl(lvobj, dsc->id, 0, LV_TABLE_CELL_CTRL_CUSTOM_1)))
@@ -179,3 +204,48 @@ void ListBox::onDrawEnd(uint16_t row, uint16_t col, lv_obj_draw_part_dsc_t* dsc)
 
   lv_draw_label(dsc->draw_ctx, &label_dsc, &coords, sym, nullptr);
 }
+
+#if defined(SIMU)
+void etxCreateForceObjectAllocationFailureForTest(bool force);
+
+bool listBoxObjectAllocationFailureFailsClosedForTest()
+{
+  class TestListBox : public ListBox
+  {
+   public:
+    explicit TestListBox(Window* parent) :
+        ListBox(parent, {0, 0, 120, 80}, {"A", "B"})
+    {
+    }
+
+    void exerciseProtectedHandlers()
+    {
+      onPress(0, 0);
+      onClicked();
+      onCancel();
+    }
+  };
+
+  etxCreateForceObjectAllocationFailureForTest(true);
+  auto list = new (std::nothrow) TestListBox(MainWindow::instance());
+  etxCreateForceObjectAllocationFailureForTest(false);
+
+  if (!list) return false;
+
+  list->setName(0, "C");
+  list->setNames({"C", "D"});
+  list->setLineHeight(ListBox::MENUS_LINE_HEIGHT);
+  list->setSelected(0);
+  list->setMultiSelect(true);
+  list->setSelected({0});
+  (void)list->isRowSelected(0);
+  (void)list->getSelection();
+  list->setActiveItem(0);
+  list->exerciseProtectedHandlers();
+
+  bool ok = !list->isAvailable() && !list->isVisible() &&
+            !list->automationClickable();
+  delete list;
+  return ok;
+}
+#endif

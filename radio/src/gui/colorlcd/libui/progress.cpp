@@ -19,6 +19,18 @@
 #include "progress.h"
 
 #include "etx_lv_theme.h"
+#include "mainwindow.h"
+
+#include <new>
+
+#if defined(SIMU)
+static bool forceProgressBarCreateFailure = false;
+
+static void progressForceBarCreateFailureForTest(bool force)
+{
+  forceProgressBarCreateFailure = force;
+}
+#endif
 
 static void etx_bar_constructor(const lv_obj_class_t* class_p, lv_obj_t* obj)
 {
@@ -44,13 +56,18 @@ static const lv_obj_class_t bar_class = {
 
 static lv_obj_t* bar_create(lv_obj_t* parent)
 {
+#if defined(SIMU)
+  if (forceProgressBarCreateFailure) return nullptr;
+#endif
   return etx_create(&bar_class, parent);
 }
 
 Progress::Progress(Window* parent, const rect_t& rect) : Window(parent, rect)
 {
-  bar = bar_create(lvobj);
-  lv_bar_set_range(bar, 0, 100);
+  if (!initRequiredLvObj(bar, bar_create, [&](lv_obj_t* obj) {
+        lv_bar_set_range(obj, 0, 100);
+      }))
+    return;
   setValue(0);
 }
 
@@ -58,6 +75,23 @@ void Progress::setValue(int newValue)
 {
   if (newValue != value) {
     value = newValue;
-    lv_bar_set_value(bar, value, LV_ANIM_OFF);
+    if (isAvailable() && bar) lv_bar_set_value(bar, value, LV_ANIM_OFF);
   }
 }
+
+#if defined(SIMU)
+bool progressBarAllocationFailureFailsClosedForTest()
+{
+  progressForceBarCreateFailureForTest(true);
+  auto progress =
+      new (std::nothrow) Progress(MainWindow::instance(), {0, 0, 120, 20});
+  progressForceBarCreateFailureForTest(false);
+
+  if (!progress) return false;
+  progress->setValue(42);
+
+  bool ok = !progress->isAvailable() && !progress->isVisible();
+  delete progress;
+  return ok;
+}
+#endif

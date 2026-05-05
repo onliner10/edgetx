@@ -33,8 +33,15 @@ class ToggleSwitch : public FormField
 
   void onClicked() override;
 
-  uint8_t getValue() const { return _getValue(); }
-  void setValue(uint8_t value) { _setValue(value); }
+  uint8_t getValue() const
+  {
+    return isAvailable() && _getValue ? _getValue() : 0;
+  }
+
+  void setValue(uint8_t value)
+  {
+    if (isAvailable() && _setValue) _setValue(value);
+  }
 
   void setSetValueHandler(std::function<void(uint8_t)> handler)
   {

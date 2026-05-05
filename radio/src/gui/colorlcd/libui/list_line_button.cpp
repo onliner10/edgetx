@@ -29,12 +29,26 @@
 
 #if defined(SIMU)
 static bool forceFmBufferMallocFailure = false;
+static bool forceListLineLabelCreateFailure = false;
 
 void listLineButtonForceFmBufferMallocFailureForTest(bool force)
 {
   forceFmBufferMallocFailure = force;
 }
+
+static void listLineButtonForceLabelCreateFailureForTest(bool force)
+{
+  forceListLineLabelCreateFailure = force;
+}
 #endif
+
+static lv_obj_t* list_line_label_create(lv_obj_t* parent)
+{
+#if defined(SIMU)
+  if (forceListLineLabelCreateFailure) return nullptr;
+#endif
+  return etx_label_create(parent);
+}
 
 static void input_mix_line_constructor(const lv_obj_class_t* class_p,
                                        lv_obj_t* obj)
@@ -84,14 +98,22 @@ InputMixButtonBase::~InputMixButtonBase()
   if (fm_buffer) free(fm_buffer);
 }
 
+bool InputMixButtonBase::ensureLineLabel(lv_obj_t*& label, coord_t x, coord_t y,
+                                         coord_t w, coord_t h)
+{
+  if (!acceptsEvents()) return false;
+  if (label) return true;
+
+  return initRequiredLvObj(label, list_line_label_create, [&](lv_obj_t* obj) {
+    lv_obj_set_pos(obj, x, y);
+    lv_obj_set_size(obj, w, h);
+    etx_font(obj, FONT_XS_INDEX, LV_STATE_USER_1);
+  });
+}
+
 void InputMixButtonBase::setWeight(gvar_t value, gvar_t min, gvar_t max)
 {
-  if (!weight) {
-    weight = etx_label_create(lvobj);
-    lv_obj_set_pos(weight, WGT_X, WGT_Y);
-    lv_obj_set_size(weight, WGT_W, WGT_H);
-    etx_font(weight, FONT_XS_INDEX, LV_STATE_USER_1);
-  }
+  if (!ensureLineLabel(weight, WGT_X, WGT_Y, WGT_W, WGT_H)) return;
 
   char s[32];
   getValueOrSrcVarString(s, sizeof(s), value, 0, "%");
@@ -105,12 +127,7 @@ void InputMixButtonBase::setWeight(gvar_t value, gvar_t min, gvar_t max)
 
 void InputMixButtonBase::setSource(mixsrc_t idx)
 {
-  if (!source) {
-    source = etx_label_create(lvobj);
-    lv_obj_set_pos(source, SRC_X, SRC_Y);
-    lv_obj_set_size(source, SRC_W, SRC_H);
-    etx_font(source, FONT_XS_INDEX, LV_STATE_USER_1);
-  }
+  if (!ensureLineLabel(source, SRC_X, SRC_Y, SRC_W, SRC_H)) return;
 
   char* s = getSourceString(idx);
   if (getTextWidth(s, 0, FONT(STD)) > SRC_W)
@@ -123,12 +140,7 @@ void InputMixButtonBase::setSource(mixsrc_t idx)
 
 void InputMixButtonBase::setOpts(const char* s)
 {
-  if (!opts) {
-    opts = etx_label_create(lvobj);
-    lv_obj_set_pos(opts, OPT_X, OPT_Y);
-    lv_obj_set_size(opts, OPT_W, OPT_H);
-    etx_font(opts, FONT_XS_INDEX, LV_STATE_USER_1);
-  }
+  if (!ensureLineLabel(opts, OPT_X, OPT_Y, OPT_W, OPT_H)) return;
 
   if (getTextWidth(s, 0, FONT(STD)) > OPT_W)
     lv_obj_add_state(opts, LV_STATE_USER_1);
@@ -140,6 +152,11 @@ void InputMixButtonBase::setOpts(const char* s)
 
 void InputMixButtonBase::setFlightModes(uint16_t modes)
 {
+  if (!acceptsEvents()) {
+    fm_modes = 0;
+    return;
+  }
+
   if (!modelFMEnabled()) return;
   if (modes == fm_modes) return;
   fm_modes = modes;
@@ -253,12 +270,72 @@ bool listLineButtonMissingFmBufferLeavesNoCanvasForTest()
 
   return !button->hasFlightModeCanvas() && !button->hasFlightModeBuffer();
 }
+
+bool listLineButtonLabelAllocationFailureFailsClosedForTest()
+{
+  class TestInputMixButton : public InputMixButtonBase
+  {
+   public:
+    TestInputMixButton(Window* parent) : InputMixButtonBase(parent, 0) {}
+
+    void refresh() override {}
+    void updatePos(coord_t, coord_t) override {}
+    void swapLvglGroup(InputMixButtonBase*) override {}
+
+   protected:
+    bool isActive() const override { return false; }
+  };
+
+  auto button = new (std::nothrow) TestInputMixButton(MainWindow::instance());
+  if (!button || !button->isAvailable()) {
+    delete button;
+    return false;
+  }
+
+  listLineButtonForceLabelCreateFailureForTest(true);
+  button->setWeight(100, -100, 100);
+  listLineButtonForceLabelCreateFailureForTest(false);
+
+  button->setSource(MIXSRC_FIRST_INPUT);
+  button->setOpts("Opt");
+  button->setFlightModes(1);
+  button->checkEvents();
+
+  bool ok = !button->isAvailable() && !button->isVisible() &&
+            !button->automationClickable();
+  delete button;
+  return ok;
+}
+
+bool listLineGroupLabelAllocationFailureFailsClosedForTest()
+{
+  class TestInputMixGroup : public InputMixGroupBase
+  {
+   public:
+    explicit TestInputMixGroup(Window* parent) :
+        InputMixGroupBase(parent, MIXSRC_FIRST_INPUT)
+    {
+    }
+  };
+
+  listLineButtonForceLabelCreateFailureForTest(true);
+  auto group = new (std::nothrow) TestInputMixGroup(MainWindow::instance());
+  listLineButtonForceLabelCreateFailureForTest(false);
+
+  if (!group) return false;
+  group->refresh();
+  group->adjustHeight();
+
+  bool ok = !group->isAvailable() && !group->isVisible();
+  delete group;
+  return ok;
+}
 #endif
 
 void InputMixButtonBase::checkEvents()
 {
   ListLineButton::checkEvents();
-  if (!_deleted) {
+  if (acceptsEvents()) {
     if (fm_canvas) {
       bool chkd = lv_obj_get_state(fm_canvas) & LV_STATE_CHECKED;
       if (chkd != this->checked()) {
@@ -308,13 +385,15 @@ InputMixGroupBase::InputMixGroupBase(Window* parent, mixsrc_t idx) :
     Window(parent, rect_t{}, group_create), idx(idx)
 {
   setWindowFlag(NO_FOCUS | NO_CLICK);
-
-  label = etx_label_create(lvobj);
-  etx_font(label, FONT_XS_INDEX, LV_STATE_USER_1);
+  initRequiredLvObj(label, list_line_label_create, [&](lv_obj_t* obj) {
+    etx_font(obj, FONT_XS_INDEX, LV_STATE_USER_1);
+  });
 }
 
 void InputMixGroupBase::_adjustHeight(coord_t y)
 {
+  if (!acceptsEvents()) return;
+
   if (getLineCount() == 0) setHeight(ListLineButton::BTN_H + PAD_SMALL * 2);
 
   for (auto it = lines.cbegin(); it != lines.cend(); ++it) {
@@ -333,6 +412,8 @@ void InputMixGroupBase::adjustHeight()
 
 void InputMixGroupBase::addLine(InputMixButtonBase* line)
 {
+  if (!line || !line->acceptsEvents()) return;
+
   auto l = std::find_if(lines.begin(), lines.end(),
                         [=](const InputMixButtonBase* l) -> bool {
                           return line->getIndex() <= l->getIndex();
@@ -363,6 +444,8 @@ bool InputMixGroupBase::removeLine(InputMixButtonBase* line)
 
 void InputMixGroupBase::refresh()
 {
+  if (!acceptsEvents() || !label) return;
+
   char* s = getSourceString(idx);
   if (getTextWidth(s, 0, FONT(STD)) > InputMixButtonBase::LN_X - PAD_TINY)
     lv_obj_add_state(label, LV_STATE_USER_1);

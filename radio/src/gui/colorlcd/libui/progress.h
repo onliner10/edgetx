@@ -33,5 +33,5 @@ class Progress : public Window
 
  protected:
   int value = -1;
-  lv_obj_t* bar;
+  lv_obj_t* bar = nullptr;
 };

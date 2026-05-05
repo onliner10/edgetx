@@ -20,7 +20,9 @@
 
 #include <functional>
 #include <list>
+#include <new>
 #include <string>
+#include <utility>
 
 #include "definitions.h"
 #include "edgetx_helpers.h"
@@ -49,11 +51,36 @@ constexpr WindowFlags NO_FORCED_SCROLL = 1u << 4u;
 
 class Window
 {
+ private:
+  enum class Availability {
+    Available,
+    Unavailable,
+  };
+
  public:
   Window(const rect_t &rect);
   Window(Window *parent, const rect_t &rect, LvglCreate objConstruct = nullptr);
 
   virtual ~Window();
+
+  static Window* fromLvObj(lv_obj_t* obj);
+  static Window* fromAvailableLvObj(lv_obj_t* obj);
+
+  template <typename T>
+  static T* adoptLive(T* window)
+  {
+    if (window && !window->acceptsEvents()) {
+      delete window;
+      return nullptr;
+    }
+    return window;
+  }
+
+  template <typename T, typename... Args>
+  static T* makeLive(Args&&... args)
+  {
+    return adoptLive(new (std::nothrow) T(std::forward<Args>(args)...));
+  }
 
 #if defined(DEBUG_WINDOWS)
   virtual std::string getName() const;
@@ -153,6 +180,8 @@ class Window
   virtual void onClicked();
   virtual void onCancel();
   virtual bool onLongPress();
+  void dispatchKeyboardEvent(event_t event);
+  bool sendLvEvent(lv_event_code_t code, void* param = nullptr);
   virtual void checkEvents();
 
 #if defined(SIMU)
@@ -181,7 +210,9 @@ class Window
   void detach();
 
   bool deleted() const { return _deleted; }
-  bool isAvailable() const { return available; }
+  bool isAvailable() const { return availability == Availability::Available; }
+  bool hasLiveLvObj() const { return !_deleted && lvobj; }
+  bool acceptsEvents() const { return isAvailable() && hasLiveLvObj(); }
 
 #if defined(HARDWARE_TOUCH)
   void addBackButton();
@@ -190,7 +221,7 @@ class Window
                        const char* automationText = nullptr);
 #endif
 
-  inline lv_obj_t *getLvObj() { return lvobj; }
+  inline lv_obj_t *getLvObj() const { return lvobj; }
 
   virtual bool isTopBar() { return false; }
   virtual bool isNavWindow() { return false; }
@@ -232,7 +263,12 @@ class Window
   LcdFlags textFlags = 0;
 
   bool _deleted = false;
-  bool available = true;
+
+ private:
+  Availability availability = Availability::Available;
+  bool longPressHandled = false;
+
+ protected:
 
   bool loaded = false;
   bool layerCreated = false;
@@ -255,6 +291,42 @@ class Window
   bool hasLvObj() const { return lvobj != nullptr; }
   bool requireLvObj(lv_obj_t* obj);
   void failClosed();
+  bool syncOverlay(Window* overlay);
+
+  template <typename Fn>
+  bool withLvObj(Fn&& fn) const
+  {
+    if (!hasLiveLvObj()) return false;
+    fn(lvobj);
+    return true;
+  }
+
+  template <typename Fn>
+  bool withAvailableLvObj(Fn&& fn) const
+  {
+    if (!acceptsEvents()) return false;
+    fn(lvobj);
+    return true;
+  }
+
+  template <typename Create, typename Init>
+  bool initRequiredLvObj(lv_obj_t*& target, Create&& create, Init&& init)
+  {
+    if (!acceptsEvents()) return false;
+    target = create(lvobj);
+    if (!requireLvObj(target)) return false;
+    init(target);
+    return true;
+  }
+
+  template <typename T, typename... Args>
+  bool initRequiredWindow(T*& target, Args&&... args)
+  {
+    target = Window::makeLive<T>(std::forward<Args>(args)...);
+    if (target) return true;
+    failClosed();
+    return false;
+  }
 
   void eventHandler(lv_event_t *e);
   static void window_event_cb(lv_event_t *e);

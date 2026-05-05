@@ -92,12 +92,11 @@ ChoiceBase::ChoiceBase(Window* parent, const rect_t& rect,
   }
 
   // Add label
-  label = choice_label_create(lvobj);
-  if (!requireLvObj(label)) return;
-
-  lv_obj_set_pos(label, type == CHOICE_TYPE_DROPOWN ? ICON_W - 2 : ICON_W,
-                 PAD_TINY);
-  etx_font(label, FONT_XS_INDEX, LV_STATE_USER_1);
+  initRequiredLvObj(label, choice_label_create, [&](lv_obj_t* obj) {
+    lv_obj_set_pos(obj, type == CHOICE_TYPE_DROPOWN ? ICON_W - 2 : ICON_W,
+                   PAD_TINY);
+    etx_font(obj, FONT_XS_INDEX, LV_STATE_USER_1);
+  });
 }
 
 void ChoiceBase::checkEvents()

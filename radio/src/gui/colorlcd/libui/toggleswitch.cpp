@@ -19,6 +19,7 @@
 #include "toggleswitch.h"
 
 #include "etx_lv_theme.h"
+#include "mainwindow.h"
 
 // Animation
 LV_STYLE_CONST_SINGLE_INIT(anim_fast, LV_STYLE_ANIM_TIME, 120);
@@ -71,7 +72,8 @@ void ToggleSwitch::toggleswitch_event_handler(lv_event_t* e)
   lv_obj_t* target = lv_event_get_target(e);
   ToggleSwitch* cb = (ToggleSwitch*)lv_obj_get_user_data(target);
 
-  if (cb) cb->setValue(lv_obj_get_state(target) & LV_STATE_CHECKED);
+  if (cb && cb->isAvailable())
+    cb->setValue(lv_obj_get_state(target) & LV_STATE_CHECKED);
 }
 
 ToggleSwitch::ToggleSwitch(Window* parent, const rect_t& rect,
@@ -81,6 +83,8 @@ ToggleSwitch::ToggleSwitch(Window* parent, const rect_t& rect,
     _getValue(std::move(getValue)),
     _setValue(std::move(setValue))
 {
+  if (!hasLvObj()) return;
+
   update();
 
   lv_obj_add_event_cb(lvobj, ToggleSwitch::toggleswitch_event_handler, LV_EVENT_VALUE_CHANGED,
@@ -90,10 +94,12 @@ ToggleSwitch::ToggleSwitch(Window* parent, const rect_t& rect,
 void ToggleSwitch::update() const
 {
   if (!_getValue) return;
-  if (_getValue())
-    lv_obj_add_state(lvobj, LV_STATE_CHECKED);
-  else
-    lv_obj_clear_state(lvobj, LV_STATE_CHECKED);
+  withAvailableLvObj([&](lv_obj_t* obj) {
+    if (_getValue())
+      lv_obj_add_state(obj, LV_STATE_CHECKED);
+    else
+      lv_obj_clear_state(obj, LV_STATE_CHECKED);
+  });
 }
 
 void ToggleSwitch::onClicked()
@@ -104,10 +110,53 @@ void ToggleSwitch::onClicked()
 void ToggleSwitch::checkEvents()
 {
   Window::checkEvents();
-  if (_getValue != nullptr) {
+  withAvailableLvObj([&](lv_obj_t* obj) {
+    if (!_getValue) return;
     bool v = _getValue() != 0;
-    bool s = (lv_obj_get_state(lvobj) & LV_STATE_CHECKED) == LV_STATE_CHECKED;
+    bool s = (lv_obj_get_state(obj) & LV_STATE_CHECKED) == LV_STATE_CHECKED;
     if (v != s)
       update();
-  }
+  });
 }
+
+#if defined(SIMU)
+void etxCreateForceObjectAllocationFailureForTest(bool force);
+
+bool toggleSwitchObjectAllocationFailureFailsClosedForTest()
+{
+  class TestToggleSwitch : public ToggleSwitch
+  {
+   public:
+    TestToggleSwitch(Window* parent, std::function<uint8_t()> getValue,
+                     std::function<void(uint8_t)> setValue) :
+        ToggleSwitch(parent,
+                     {0, 0, ToggleSwitch::TOGGLE_W, EdgeTxStyles::UI_ELEMENT_HEIGHT},
+                     std::move(getValue), std::move(setValue))
+    {
+    }
+
+    void exerciseCheckEvents() { checkEvents(); }
+  };
+
+  bool changed = false;
+  etxCreateForceObjectAllocationFailureForTest(true);
+  auto toggle = new (std::nothrow) TestToggleSwitch(
+      MainWindow::instance(),
+      []() { return 1; },
+      [&](uint8_t) { changed = true; });
+  etxCreateForceObjectAllocationFailureForTest(false);
+
+  if (!toggle) return false;
+
+  toggle->update();
+  toggle->setValue(0);
+  toggle->setGetValueHandler(nullptr);
+  toggle->setSetValueHandler(nullptr);
+  (void)toggle->getValue();
+  toggle->exerciseCheckEvents();
+
+  bool ok = !toggle->isAvailable() && !toggle->isVisible() && !changed;
+  delete toggle;
+  return ok;
+}
+#endif

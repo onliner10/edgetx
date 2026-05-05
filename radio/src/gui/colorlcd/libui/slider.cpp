@@ -47,7 +47,7 @@ void SliderBase::slider_changed_cb(lv_event_t* e)
 {
   if (lv_event_get_code(e) == LV_EVENT_VALUE_CHANGED) {
     SliderBase* sl = (SliderBase*)lv_event_get_user_data(e);
-    if (sl != nullptr) {
+    if (sl != nullptr && sl->isAvailable()) {
       lv_obj_t* target = lv_event_get_target(e);
       sl->setValue(lv_slider_get_value(target));
     }
@@ -67,7 +67,7 @@ SliderBase::SliderBase(Window* parent, coord_t width, coord_t height, int32_t vm
 
 void SliderBase::update()
 {
-  if (slider && _getValue != nullptr) {
+  if (isAvailable() && slider && _getValue != nullptr) {
     // Fix for lv_slider_set_value not working when using the rotary encoder to
     // update value
     auto bar = (lv_bar_t*)slider;
@@ -88,14 +88,14 @@ void SliderBase::deleteLater()
 
 void SliderBase::setValue(int value)
 {
-  if (_setValue != nullptr)
+  if (isAvailable() && _setValue != nullptr)
     _setValue(limit(vmin, value, vmax));
 }
 
 void SliderBase::checkEvents()
 {
   Window::checkEvents();
-  if (slider && _getValue != nullptr) {
+  if (isAvailable() && slider && _getValue != nullptr) {
     int v = _getValue();
     if (v != lv_slider_get_value(slider))
       update();
@@ -104,6 +104,7 @@ void SliderBase::checkEvents()
 
 void SliderBase::enable(bool enabled)
 {
+  if (!isAvailable()) enabled = false;
   if (!_deleted && slider) {
     if (lv_obj_has_state(slider, LV_STATE_DISABLED) == enabled) {
       if (enabled)

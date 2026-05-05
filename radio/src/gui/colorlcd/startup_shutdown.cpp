@@ -52,11 +52,27 @@ alignas(LZ4Bitmap) const uint8_t __bmp_splash_logo[] __FLASH = {
 
 static Window* splashScreen = nullptr;
 
+static Window* createFullscreenWindow()
+{
+  return Window::makeLive<Window>(MainWindow::instance(),
+                                  rect_t{0, 0, LCD_W, LCD_H});
+}
+
+static Window* createOpaqueFullscreenWindow(LcdColorIndex bgColor)
+{
+  auto window = createFullscreenWindow();
+  if (!window) return nullptr;
+
+  window->setWindowFlag(OPAQUE);
+  etx_solid_bg(window->getLvObj(), bgColor);
+  return window;
+}
+
 void drawSplash()
 {
   if (!sdMounted()) sdInit();
 
-  splashScreen = new (std::nothrow) Window(MainWindow::instance(), {0, 0, LCD_W, LCD_H});
+  splashScreen = createFullscreenWindow();
   if (!splashScreen) return;
   lv_obj_set_parent(splashScreen->getLvObj(), lv_layer_top());
 
@@ -147,6 +163,7 @@ static lv_obj_t* shutdownCanvas = nullptr;
 
 #if defined(SIMU)
 static bool forceShutdownCanvasCreateFailure = false;
+void etxCreateForceObjectAllocationFailureForTest(bool force);
 
 void startupShutdownForceCanvasCreateFailureForTest(bool force)
 {
@@ -167,11 +184,8 @@ void drawSleepBitmap()
   if (shutdownWindow) {
     shutdownWindow->clear();
   } else {
-    shutdownWindow =
-        new (std::nothrow) Window(MainWindow::instance(), {0, 0, LCD_W, LCD_H});
+    shutdownWindow = createOpaqueFullscreenWindow(COLOR_THEME_PRIMARY1_INDEX);
     if (!shutdownWindow) return;
-    shutdownWindow->setWindowFlag(OPAQUE);
-    etx_solid_bg(shutdownWindow->getLvObj(), COLOR_THEME_PRIMARY1_INDEX);
   }
 
   if (auto icon = new (std::nothrow) StaticIcon(shutdownWindow, 0, 0, ICON_SHUTDOWN, COLOR_THEME_PRIMARY2_INDEX))
@@ -197,11 +211,8 @@ void drawShutdownAnimation(uint32_t duration, uint32_t totalDuration,
   if (totalDuration == 0) return;
 
   if (shutdownWindow == nullptr) {
-    shutdownWindow =
-        new (std::nothrow) Window(MainWindow::instance(), {0, 0, LCD_W, LCD_H});
+    shutdownWindow = createOpaqueFullscreenWindow(COLOR_THEME_PRIMARY1_INDEX);
     if (!shutdownWindow) return;
-    shutdownWindow->setWindowFlag(OPAQUE);
-    etx_solid_bg(shutdownWindow->getLvObj(), COLOR_THEME_PRIMARY1_INDEX);
 
     if (sdMounted() && !shutdownSplashImg)
       shutdownSplashImg = BitmapBuffer::loadBitmap(
@@ -257,14 +268,26 @@ bool startupShutdownCanvasCreateFailureLeavesNoCanvasForTest()
 
   return result;
 }
+
+bool startupShutdownWindowAllocationFailureDoesNotCacheDeadWindowForTest()
+{
+  MainWindow::instance();
+  cancelShutdownAnimation();
+
+  etxCreateForceObjectAllocationFailureForTest(true);
+  drawShutdownAnimation(0, 1, nullptr);
+  etxCreateForceObjectAllocationFailureForTest(false);
+
+  bool result = shutdownWindow == nullptr && shutdownCanvas == nullptr;
+  cancelShutdownAnimation();
+  return result;
+}
 #endif
 
 Window* drawFatalErrorScreen(const char* message)
 {
-  auto w = new (std::nothrow) Window(MainWindow::instance(), {0, 0, LCD_W, LCD_H});
+  auto w = createOpaqueFullscreenWindow(COLOR_BLACK_INDEX);
   if (!w) return nullptr;
-  w->setWindowFlag(OPAQUE);
-  etx_solid_bg(w->getLvObj(), COLOR_BLACK_INDEX);
 
   new (std::nothrow) StaticText(w, rect_t{0, LCD_H / 2 - EdgeTxStyles::STD_FONT_HEIGHT, LCD_W, EdgeTxStyles::STD_FONT_HEIGHT * 2},
                  message, COLOR_WHITE_INDEX, FONT(XL) | CENTERED);

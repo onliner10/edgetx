@@ -199,7 +199,7 @@ void QuickMenuGroup::setFocus()
     curBtn = btns[0];
 
   if (curBtn) {
-    lv_event_send(curBtn->getLvObj(), LV_EVENT_FOCUSED, nullptr);
+    curBtn->sendLvEvent(LV_EVENT_FOCUSED);
     lv_group_focus_obj(curBtn->getLvObj());
   }
 }
@@ -208,7 +208,7 @@ void QuickMenuGroup::clearFocus()
 {
   if (curBtn) {
     ((QuickMenuButton*)curBtn)->setEnabled();
-    lv_event_send(curBtn->getLvObj(), LV_EVENT_DEFOCUSED, nullptr);
+    curBtn->sendLvEvent(LV_EVENT_DEFOCUSED);
   }
 }
 
@@ -217,7 +217,7 @@ void QuickMenuGroup::setDisabled(bool all)
   for (size_t i = 0; i < btns.size(); i += 1) {
     if (btns[i] != curBtn || all) {
       ((QuickMenuButton*)btns[i])->setDisabled();
-      lv_event_send(btns[i]->getLvObj(), LV_EVENT_DEFOCUSED, nullptr);
+      btns[i]->sendLvEvent(LV_EVENT_DEFOCUSED);
     }
   }
 }

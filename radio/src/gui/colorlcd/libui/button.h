@@ -43,7 +43,10 @@ class ButtonBase : public FormField
 
 #if defined(SIMU)
   std::string automationRole() const override { return "button"; }
-  bool automationLongClickable() const override { return static_cast<bool>(longPressHandler); }
+  bool automationLongClickable() const override
+  {
+    return isAvailable() && getLvObj() && static_cast<bool>(longPressHandler);
+  }
 #endif
 
   void check(bool checked = true);

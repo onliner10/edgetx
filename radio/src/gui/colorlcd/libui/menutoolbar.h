@@ -57,7 +57,7 @@ class MenuToolbar : public Window
   MenuToolbarButton* allBtn = nullptr;
   Messaging changeFilterMsg;
 
-  lv_group_t* group;
+  lv_group_t* group = nullptr;
 
   void addButton(const char* picto, int16_t filtermin, int16_t filtermax,
                  const Choice::FilterFct& filterFunc = nullptr,

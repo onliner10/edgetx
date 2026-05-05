@@ -35,6 +35,7 @@ static uint16_t read_u16_le(const uint8_t* data)
 
 #if defined(SIMU)
 static bool forceStaticLZ4ImageBufferAllocationFailure = false;
+static bool forceStaticTextCreateFailure = false;
 
 void staticLZ4ImageForceBufferAllocationFailureForTest(bool force)
 {
@@ -48,6 +49,14 @@ static uint8_t* allocStaticLZ4ImageBuffer(size_t size)
   if (forceStaticLZ4ImageBufferAllocationFailure) return nullptr;
 #endif
   return static_cast<uint8_t*>(lv_mem_alloc(size));
+}
+
+static lv_obj_t* createStaticTextObject(lv_obj_t* parent)
+{
+#if defined(SIMU)
+  if (forceStaticTextCreateFailure) return nullptr;
+#endif
+  return lv_label_create(parent);
 }
 
 #if defined(SIMU)
@@ -71,10 +80,11 @@ static lv_obj_t* createStaticImageObject(lv_obj_t* parent)
 
 StaticText::StaticText(Window* parent, const rect_t& rect, std::string txt,
                        LcdColorIndex color, LcdFlags textFlags) :
-    Window(parent, rect, lv_label_create), text(std::move(txt))
+    Window(parent, rect, createStaticTextObject), text(std::move(txt))
 {
   setTextFlag(textFlags);
   setWindowFlag(NO_FOCUS);
+  if (!hasLvObj()) return;
 
   etx_font(lvobj, FONT_INDEX(textFlags));
   etx_txt_color(lvobj, color);
@@ -101,7 +111,9 @@ void StaticText::setText(std::string value)
 {
   if (text != value) {
     text = std::move(value);
-    if (lvobj) lv_label_set_text(lvobj, text.c_str());
+    withLvObj([&](lv_obj_t* obj) {
+      lv_label_set_text(obj, text.c_str());
+    });
   }
 }
 
@@ -201,6 +213,7 @@ StaticIcon::StaticIcon(Window* parent, coord_t x, coord_t y, EdgeTxIcon icon,
     currentColor(color)
 {
   setWindowFlag(NO_FOCUS | NO_CLICK);
+  if (!hasLvObj()) return;
 
   setIcon(icon);
 
@@ -213,6 +226,7 @@ StaticIcon::StaticIcon(Window* parent, coord_t x, coord_t y, const char* filenam
     currentColor(color)
 {
   setWindowFlag(NO_FOCUS | NO_CLICK);
+  if (!hasLvObj()) return;
 
   auto bm = BitmapBuffer::loadBitmap(filename, BMP_RGB565);
   if (bm) {
@@ -240,17 +254,21 @@ void StaticIcon::deleteLater()
 void StaticIcon::setColor(LcdColorIndex color)
 {
   if (currentColor != color) {
-    etx_img_color(lvobj, color, LV_PART_MAIN);
+    withLvObj([&](lv_obj_t* obj) {
+      etx_img_color(obj, color, LV_PART_MAIN);
+    });
     currentColor = color;
   }
 }
 
 void StaticIcon::setIcon(EdgeTxIcon icon)
 {
-  auto newMask = getBuiltinIcon(icon);
-  setSize(newMask->width, newMask->height);
-  lv_canvas_set_buffer(lvobj, (void*)newMask->data, newMask->width, newMask->height,
-                       LV_IMG_CF_ALPHA_8BIT);
+  withLvObj([&](lv_obj_t* obj) {
+    auto newMask = getBuiltinIcon(icon);
+    setSize(newMask->width, newMask->height);
+    lv_canvas_set_buffer(obj, (void*)newMask->data, newMask->width,
+                         newMask->height, LV_IMG_CF_ALPHA_8BIT);
+  });
 }
 
 void StaticIcon::center(coord_t w, coord_t h)
@@ -274,6 +292,8 @@ StaticImage::StaticImage(Window* parent, const rect_t& rect,
 
 void StaticImage::setSource(std::string filename)
 {
+  if (!acceptsEvents()) return;
+
   if (!filename.empty()) {
     std::string fullpath = std::string("A");
     if (filename[0] != PATH_SEPARATOR[0]) fullpath += PATH_SEPARATOR;
@@ -336,6 +356,8 @@ StaticBitmap::StaticBitmap(Window* parent, const rect_t& rect,
 
 void StaticBitmap::setSource(const char *filename)
 {
+  if (!acceptsEvents()) return;
+
   if (filename) {
     if (filename[0] == '\0') {
       clearSource();
@@ -397,6 +419,7 @@ StaticLZ4Image::StaticLZ4Image(Window* parent, coord_t x, coord_t y,
            lv_canvas_create)
 {
   setWindowFlag(NO_FOCUS | NO_CLICK);
+  if (!hasLvObj()) return;
 
   // Convert ARGB4444 to LV_IMG_CF_TRUE_COLOR_ALPHA
   uint16_t w = lz4Bitmap->width;
@@ -427,6 +450,21 @@ StaticLZ4Image::StaticLZ4Image(Window* parent, coord_t x, coord_t y,
 }
 
 #if defined(SIMU)
+bool staticTextObjectCreateFailureFailsClosedForTest()
+{
+  forceStaticTextCreateFailure = true;
+  auto text = new (std::nothrow) StaticText(MainWindow::instance(),
+                                           {0, 0, 100, 20}, "Title");
+  forceStaticTextCreateFailure = false;
+
+  if (!text) return false;
+  text->setText("Next");
+  bool ok = !text->isAvailable() && !text->isVisible() &&
+            text->automationText() == "Next";
+  delete text;
+  return ok;
+}
+
 bool staticLZ4ImageBufferAllocationFailureLeavesNoImageDataForTest()
 {
   class TestStaticLZ4Image : public StaticLZ4Image
@@ -489,8 +527,10 @@ QRCode::QRCode(Window *parent, coord_t x, coord_t y, coord_t sz, std::string dat
     Window(parent, {x, y, sz, sz})
 {
   setWindowFlag(NO_CLICK);
+  if (!hasLvObj()) return;
 
   qr = lv_qrcode_create(lvobj, sz, makeLvColor(color), makeLvColor(bgColor));
+  if (!requireLvObj(qr)) return;
   setData(data);
 }
 

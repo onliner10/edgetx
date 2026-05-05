@@ -22,6 +22,7 @@
 #include <string.h>
 
 #include "etx_lv_theme.h"
+#include "mainwindow.h"
 
 static void btnmatrix_constructor(const lv_obj_class_t* class_p, lv_obj_t* obj)
 {
@@ -73,7 +74,7 @@ static void btn_matrix_event(lv_event_t* e)
     lv_obj_t* obj = lv_event_get_target(e);
     auto btn_id = *((uint8_t*)lv_event_get_param(e));
     auto btnm = (ButtonMatrix*)lv_event_get_user_data(e);
-    if (!btnm) return;
+    if (!btnm || !btnm->isAvailable()) return;
 
     bool edited = lv_obj_has_state(obj, LV_STATE_EDITED);
     bool is_pointer =
@@ -87,6 +88,8 @@ static void btn_matrix_event(lv_event_t* e)
 ButtonMatrix::ButtonMatrix(Window* parent, const rect_t& r) :
     FormField(parent, r, btnmatrix_create)
 {
+  if (!hasLvObj()) return;
+
   lv_obj_add_flag(lvobj, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
   setWindowFlag(NO_FOCUS);
 
@@ -114,6 +117,8 @@ void ButtonMatrix::deallocate()
 void ButtonMatrix::initBtnMap(uint8_t cols, uint8_t btns)
 {
   deallocate();
+  if (!acceptsEvents()) return;
+
   if (cols == 0 || btns == 0) {
     lv_btnmatrix_set_map(lvobj, _empty_map);
     return;
@@ -163,7 +168,7 @@ void ButtonMatrix::initBtnMap(uint8_t cols, uint8_t btns)
 
 void ButtonMatrix::setText(uint8_t btn_id, const char* txt)
 {
-  if (btn_id < btn_cnt && lv_btnm_map && txt_index) {
+  if (isAvailable() && btn_id < btn_cnt && lv_btnm_map && txt_index) {
     char* copy = strdup(txt);
     if (copy) lv_btnm_map[txt_index[btn_id]] = copy;
   }
@@ -171,6 +176,8 @@ void ButtonMatrix::setText(uint8_t btn_id, const char* txt)
 
 void ButtonMatrix::update()
 {
+  if (!acceptsEvents()) return;
+
   if (!lv_btnm_map) {
     lv_btnmatrix_set_map(lvobj, _empty_map);
     return;
@@ -190,14 +197,52 @@ void ButtonMatrix::update()
 
 void ButtonMatrix::onClicked()
 {
-  lv_group_focus_obj(lvobj);
-  setEditMode(true);
+  withAvailableLvObj([&](lv_obj_t* obj) {
+    lv_group_focus_obj(obj);
+    setEditMode(true);
+  });
 }
 
 void ButtonMatrix::setChecked(uint8_t btn_id)
 {
+  if (!acceptsEvents()) return;
+
   if (isActive(btn_id))
     lv_btnmatrix_set_btn_ctrl(lvobj, btn_id, LV_BTNMATRIX_CTRL_CHECKED);
   else
     lv_btnmatrix_clear_btn_ctrl(lvobj, btn_id, LV_BTNMATRIX_CTRL_CHECKED);
 }
+
+#if defined(SIMU)
+void etxCreateForceObjectAllocationFailureForTest(bool force);
+
+bool buttonMatrixObjectAllocationFailureFailsClosedForTest()
+{
+  class TestButtonMatrix : public ButtonMatrix
+  {
+   public:
+    explicit TestButtonMatrix(Window* parent) : ButtonMatrix(parent, {0, 0, 100, 40}) {}
+
+    void exercise()
+    {
+      initBtnMap(2, 3);
+      setText(0, "A");
+      update();
+      onClicked();
+      setChecked(0);
+    }
+  };
+
+  etxCreateForceObjectAllocationFailureForTest(true);
+  auto matrix = new (std::nothrow) TestButtonMatrix(MainWindow::instance());
+  etxCreateForceObjectAllocationFailureForTest(false);
+
+  if (!matrix) return false;
+  matrix->exercise();
+
+  bool ok = !matrix->isAvailable() && !matrix->isVisible() &&
+            !matrix->automationClickable();
+  delete matrix;
+  return ok;
+}
+#endif

@@ -22,7 +22,7 @@
 
 class MaskBitmap;
 class Menu;
-class MenuWindowContent;
+class MenuContent;
 class MenuToolbar;
 
 class Menu : public ModalWindow
@@ -71,7 +71,7 @@ class Menu : public ModalWindow
 
  protected:
   bool multiple;
-  MenuWindowContent *content;
+  MenuContent *content = nullptr;
   MenuToolbar *toolbar = nullptr;
   std::function<void()> waitHandler;
   std::function<void()> cancelHandler;

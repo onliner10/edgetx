@@ -19,6 +19,7 @@
 #include "keyboard_number.h"
 
 #include "etx_lv_theme.h"
+#include "mainwindow.h"
 #include "numberedit.h"
 #include "keys.h"
 
@@ -263,23 +264,39 @@ void NumberKeyboard::onPressPGDN() { if (hasTwoPageKeys) incSmall(); else decLar
 
 NumberKeyboard::NumberKeyboard() : Keyboard(KEYBOARD_HEIGHT, true)
 {
-  etx_solid_bg(lvobj, COLOR_THEME_SECONDARY3_INDEX);
+  if (!acceptsKeyboardInput()) return;
 
-  titleLabel = lv_label_create(lvobj);
-  lv_obj_set_pos(titleLabel, 0, TITLE_Y);
-  lv_obj_set_size(titleLabel, LCD_W, TITLE_H);
-  lv_obj_set_style_text_align(titleLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-  lv_label_set_long_mode(titleLabel, LV_LABEL_LONG_DOT);
-  etx_font(titleLabel, FONT_XS_INDEX);
-  etx_txt_color(titleLabel, COLOR_THEME_PRIMARY3_INDEX);
+  withAvailableLvObj([](lv_obj_t* obj) {
+    etx_solid_bg(obj, COLOR_THEME_SECONDARY3_INDEX);
+  });
 
-  valueLabel = lv_label_create(lvobj);
-  lv_obj_set_pos(valueLabel, 0, VALUE_Y);
-  lv_obj_set_size(valueLabel, LCD_W, VALUE_H);
-  lv_obj_set_style_text_align(valueLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-  lv_label_set_long_mode(valueLabel, LV_LABEL_LONG_DOT);
-  etx_font(valueLabel, FONT_L_INDEX);
-  etx_txt_color(valueLabel, COLOR_THEME_PRIMARY1_INDEX);
+  if (!initRequiredLvObj(titleLabel,
+                         [](lv_obj_t* parent) {
+                           return etx_label_create(parent);
+                         },
+                         [&](lv_obj_t* obj) {
+        lv_obj_set_pos(obj, 0, TITLE_Y);
+        lv_obj_set_size(obj, LCD_W, TITLE_H);
+        lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+        lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
+        etx_font(obj, FONT_XS_INDEX);
+        etx_txt_color(obj, COLOR_THEME_PRIMARY3_INDEX);
+      }))
+    return;
+
+  if (!initRequiredLvObj(valueLabel,
+                         [](lv_obj_t* parent) {
+                           return etx_label_create(parent);
+                         },
+                         [&](lv_obj_t* obj) {
+        lv_obj_set_pos(obj, 0, VALUE_Y);
+        lv_obj_set_size(obj, LCD_W, VALUE_H);
+        lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+        lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
+        etx_font(obj, FONT_L_INDEX);
+        etx_txt_color(obj, COLOR_THEME_PRIMARY1_INDEX);
+      }))
+    return;
 
   lv_obj_set_size(keyboard, LCD_W, LCD_H - HEADER_HEIGHT);
   lv_obj_align(keyboard, LV_ALIGN_TOP_LEFT, 0, HEADER_HEIGHT);
@@ -290,8 +307,19 @@ NumberKeyboard::~NumberKeyboard() { _instance = nullptr; }
 
 void NumberKeyboard::open(FormField* field, NumberEdit* edit)
 {
-  if (!_instance) _instance = new (std::nothrow) NumberKeyboard();
-  if (!_instance) return;
+  if (!field || !field->acceptsEvents()) return;
+
+  if (!_instance) {
+    _instance = Window::makeLive<NumberKeyboard>();
+    if (!_instance || !_instance->acceptsKeyboardInput()) {
+      _instance = nullptr;
+      return;
+    }
+  } else if (!_instance->acceptsKeyboardInput()) {
+    delete _instance;
+    _instance = nullptr;
+    return;
+  }
 
   _instance->numberEdit = edit;
   set_keyboard_map(_instance->keyboard, edit);
@@ -315,3 +343,55 @@ void NumberKeyboard::setValueText(const char* value)
 {
   if (valueLabel) lv_label_set_text(valueLabel, value ? value : "");
 }
+
+#if defined(SIMU)
+void etxCreateForceObjectAllocationFailureForTest(bool force);
+void keyboardForceObjectCreateFailureForTest(bool force);
+
+namespace {
+class TestNumberKeyboardField : public FormField
+{
+ public:
+  explicit TestNumberKeyboardField(Window* parent) :
+      FormField(parent, {0, 0, 120, EdgeTxStyles::UI_ELEMENT_HEIGHT})
+  {
+  }
+};
+}  // namespace
+
+bool numberKeyboardWindowAllocationFailureDoesNotCacheDeadKeyboardForTest()
+{
+  auto field = new (std::nothrow) TestNumberKeyboardField(MainWindow::instance());
+  if (!field || !field->isAvailable()) {
+    delete field;
+    return false;
+  }
+
+  etxCreateForceObjectAllocationFailureForTest(true);
+  NumberKeyboard::open(field, nullptr);
+  etxCreateForceObjectAllocationFailureForTest(false);
+
+  bool ok = Keyboard::keyboardWindow() == nullptr &&
+            NumberKeyboard::instance() == nullptr;
+  delete field;
+  return ok;
+}
+
+bool numberKeyboardKeypadAllocationFailureDoesNotCacheDeadKeyboardForTest()
+{
+  auto field = new (std::nothrow) TestNumberKeyboardField(MainWindow::instance());
+  if (!field || !field->isAvailable()) {
+    delete field;
+    return false;
+  }
+
+  keyboardForceObjectCreateFailureForTest(true);
+  NumberKeyboard::open(field, nullptr);
+  keyboardForceObjectCreateFailureForTest(false);
+
+  bool ok = Keyboard::keyboardWindow() == nullptr &&
+            NumberKeyboard::instance() == nullptr;
+  delete field;
+  return ok;
+}
+#endif

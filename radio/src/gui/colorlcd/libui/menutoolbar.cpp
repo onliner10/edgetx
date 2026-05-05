@@ -19,11 +19,29 @@
 #include "menutoolbar.h"
 
 #include "keys.h"
+#include "mainwindow.h"
 #include "menu.h"
 #include "etx_lv_theme.h"
 #include "translations/translations.h"
 
 #include <new>
+
+#if defined(SIMU)
+static bool forceMenuToolbarLabelCreateFailure = false;
+
+static void menuToolbarForceLabelCreateFailureForTest(bool force)
+{
+  forceMenuToolbarLabelCreateFailure = force;
+}
+#endif
+
+static lv_obj_t* menu_toolbar_label_create(lv_obj_t* parent)
+{
+#if defined(SIMU)
+  if (forceMenuToolbarLabelCreateFailure) return nullptr;
+#endif
+  return etx_label_create(parent);
+}
 
 static const lv_obj_class_t menu_button_class = {
     .base_class = &button_class,
@@ -47,20 +65,24 @@ static void toolbar_btn_defocus(lv_event_t* event)
 {
   auto obj = lv_event_get_target(event);
   auto btn = (MenuToolbarButton*)lv_obj_get_user_data(obj);
-  if (btn) btn->check(false);
+  if (btn && btn->isAvailable()) btn->check(false);
 }
 
 MenuToolbarButton::MenuToolbarButton(Window* parent, const rect_t& rect,
                                      const char* picto) :
     ButtonBase(parent, rect, nullptr, menu_button_create)
 {
+  if (!hasLvObj()) return;
+
   lv_obj_add_flag(lvobj, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
 
   lv_obj_add_event_cb(lvobj, toolbar_btn_defocus, LV_EVENT_DEFOCUSED, nullptr);
 
-  auto label = etx_label_create(lvobj);
-  lv_label_set_text(label, picto);
-  lv_obj_center(label);
+  lv_obj_t* label = nullptr;
+  initRequiredLvObj(label, menu_toolbar_label_create, [&](lv_obj_t* obj) {
+    lv_label_set_text(obj, picto);
+    lv_obj_center(obj);
+  });
 }
 
 MenuToolbar::MenuToolbar(Choice* choice, Menu* menu, const int columns) :
@@ -71,6 +93,10 @@ MenuToolbar::MenuToolbar(Choice* choice, Menu* menu, const int columns) :
     group(lv_group_create())
 {
   setWindowFlag(OPAQUE);
+  if (!hasLvObj() || !choice || !menu || filterColumns <= 0 || !group) {
+    failClosed();
+    return;
+  }
 
   padAll(PAD_SMALL);
 
@@ -91,10 +117,15 @@ MenuToolbar::MenuToolbar(Choice* choice, Menu* menu, const int columns) :
   });
 }
 
-MenuToolbar::~MenuToolbar() { lv_group_del(group); }
+MenuToolbar::~MenuToolbar()
+{
+  if (group) lv_group_del(group);
+}
 
 void MenuToolbar::resetFilter()
 {
+  if (!acceptsEvents() || !group || !choice || !menu) return;
+
   if (lv_group_get_focused(group) != lvobj) {
     lv_group_focus_obj(lvobj);
     choice->fillMenu(menu);
@@ -104,16 +135,20 @@ void MenuToolbar::resetFilter()
 
 void MenuToolbar::nextFilter()
 {
+  if (!acceptsEvents() || !group) return;
+
   lv_group_focus_next(group);
-  auto obj = lv_group_get_focused(group);
-  lv_event_send(obj, LV_EVENT_CLICKED, nullptr);
+  if (auto window = Window::fromAvailableLvObj(lv_group_get_focused(group)))
+    window->sendLvEvent(LV_EVENT_CLICKED);
 }
 
 void MenuToolbar::prevFilter()
 {
+  if (!acceptsEvents() || !group) return;
+
   lv_group_focus_prev(group);
-  auto obj = lv_group_get_focused(group);
-  lv_event_send(obj, LV_EVENT_CLICKED, nullptr);
+  if (auto window = Window::fromAvailableLvObj(lv_group_get_focused(group)))
+    window->sendLvEvent(LV_EVENT_CLICKED);
 }
 
 rect_t MenuToolbar::getButtonRect(bool wideButton)
@@ -137,6 +172,9 @@ bool MenuToolbar::filterMenu(MenuToolbarButton* btn, int16_t filtermin,
                              const Choice::FilterFct& filterFunc,
                              const char* title)
 {
+  if (!acceptsEvents() || !btn || !btn->acceptsEvents() || !choice || !menu)
+    return false;
+
   btn->check(!btn->checked());
 
   filter = nullptr;
@@ -152,7 +190,8 @@ bool MenuToolbar::filterMenu(MenuToolbarButton* btn, int16_t filtermin,
     lv_group_focus_obj(btn->getLvObj());
     choice->fillMenu(menu, filter);
   } else {
-    lv_event_send(allBtn->getLvObj(), LV_EVENT_CLICKED, nullptr);
+    if (allBtn && allBtn->acceptsEvents())
+      allBtn->sendLvEvent(LV_EVENT_CLICKED);
   }
 
   return btn->checked();
@@ -163,6 +202,8 @@ void MenuToolbar::addButton(const char* picto, int16_t filtermin,
                             const Choice::FilterFct& filterFunc,
                             const char* title, bool wideButton)
 {
+  if (!acceptsEvents() || !group || !choice || !menu) return;
+
   int vmin = choice->getMin();
   int vmax = choice->getMax();
 
@@ -182,7 +223,7 @@ void MenuToolbar::addButton(const char* picto, int16_t filtermin,
   }
 
   rect_t r = getButtonRect(wideButton);
-  auto button = new (std::nothrow) MenuToolbarButton(this, r, picto);
+  auto button = Window::makeLive<MenuToolbarButton>(this, r, picto);
   if (!button) return;
 
   button->setPressHandler(std::bind(&MenuToolbar::filterMenu, this, button,
@@ -192,6 +233,25 @@ void MenuToolbar::addButton(const char* picto, int16_t filtermin,
 
   if (children.size() == 1) {
     allBtn = button;
-    lv_event_send(allBtn->getLvObj(), LV_EVENT_CLICKED, nullptr);
+    allBtn->sendLvEvent(LV_EVENT_CLICKED);
   }
 }
+
+#if defined(SIMU)
+bool menuToolbarButtonLabelAllocationFailureFailsClosedForTest()
+{
+  menuToolbarForceLabelCreateFailureForTest(true);
+  auto button = new (std::nothrow) MenuToolbarButton(
+      MainWindow::instance(), {0, 0, 36, EdgeTxStyles::UI_ELEMENT_HEIGHT},
+      "A");
+  menuToolbarForceLabelCreateFailureForTest(false);
+
+  if (!button) return false;
+  button->onClicked();
+
+  bool ok = !button->isAvailable() && !button->isVisible() &&
+            !button->automationClickable();
+  delete button;
+  return ok;
+}
+#endif

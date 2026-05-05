@@ -26,6 +26,9 @@
 #include <unistd.h>
 
 bool menuIconCanvasCreateFailureStillAddsLineForTest();
+bool menuToolbarButtonLabelAllocationFailureFailsClosedForTest();
+bool menuBodyObjectAllocationFailureFailsClosedForTest();
+bool menuWindowContentObjectAllocationFailureFailsClosedForTest();
 
 TEST(ColorMenu, IconCanvasCreateFailureStillAddsLine)
 {
@@ -35,6 +38,54 @@ TEST(ColorMenu, IconCanvasCreateFailureStillAddsLine)
   if (pid == 0) {
     alarm(2);
     _exit(menuIconCanvasCreateFailureStillAddsLineForTest() ? 0 : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorMenu, ToolbarButtonLabelAllocationFailureFailsClosed)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(menuToolbarButtonLabelAllocationFailureFailsClosedForTest() ? 0 : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorMenu, BodyObjectAllocationFailureFailsClosed)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(menuBodyObjectAllocationFailureFailsClosedForTest() ? 0 : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorMenu, WindowContentObjectAllocationFailureFailsClosed)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(menuWindowContentObjectAllocationFailureFailsClosedForTest() ? 0 : 1);
   }
 
   int status = 0;

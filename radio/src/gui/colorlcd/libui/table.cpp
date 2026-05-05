@@ -21,6 +21,7 @@
 #include "debug.h"
 #include "etx_lv_theme.h"
 #include "keys.h"
+#include "mainwindow.h"
 
 // Table
 const lv_style_const_prop_t table_cell_props[] = {
@@ -76,6 +77,11 @@ void TableField::table_event(const lv_obj_class_t* class_p, lv_event_t* e)
     TableField* tf = (TableField*)lv_obj_get_user_data(obj);
     if (tf) {
       lv_event_code_t code = lv_event_get_code(e);
+      if (!tf->acceptsEvents()) {
+        lv_obj_event_base(&table_class, e);
+        return;
+      }
+
       switch (code) {
         case LV_EVENT_VALUE_CHANGED: {
           uint16_t row;
@@ -180,69 +186,95 @@ TableField::TableField(Window* parent, const rect_t& rect) :
     Window(parent, rect, table_create)
 {
   setWindowFlag(OPAQUE);
+  if (!hasLvObj()) return;
 
   lv_table_set_col_cnt(lvobj, 1);
 }
 
 void TableField::setRowCount(uint16_t rows)
 {
-  lv_table_set_row_cnt(lvobj, rows);
+  withAvailableLvObj([&](lv_obj_t* obj) {
+    lv_table_set_row_cnt(obj, rows);
+  });
 }
 
-uint16_t TableField::getRowCount() const { return lv_table_get_row_cnt(lvobj); }
+uint16_t TableField::getRowCount() const
+{
+  uint16_t rows = 0;
+  withAvailableLvObj([&](lv_obj_t* obj) {
+    rows = lv_table_get_row_cnt(obj);
+  });
+  return rows;
+}
 
 void TableField::setColumnWidth(uint16_t col, coord_t w)
 {
-  lv_table_set_col_width(lvobj, col, w);
+  withAvailableLvObj([&](lv_obj_t* obj) {
+    lv_table_set_col_width(obj, col, w);
+  });
 }
 
 void TableField::select(uint16_t row, uint16_t col, bool force)
 {
-  lv_table_t* table = (lv_table_t*)lvobj;
-  if (!force && table->row_act == row && table->col_act == row) return;
+  withAvailableLvObj([&](lv_obj_t* obj) {
+    lv_table_t* table = (lv_table_t*)obj;
+    if (!force && table->row_act == row && table->col_act == col) return;
 
-  if (row >= table->row_cnt || col >= table->col_cnt) {
-    table->col_act = LV_TABLE_CELL_NONE;
-    table->row_act = LV_TABLE_CELL_NONE;
-  } else {
-    table->row_act = row;
-    table->col_act = col;
-  }
+    if (row >= table->row_cnt || col >= table->col_cnt) {
+      table->col_act = LV_TABLE_CELL_NONE;
+      table->row_act = LV_TABLE_CELL_NONE;
+    } else {
+      table->row_act = row;
+      table->col_act = col;
+    }
 
-  lv_obj_invalidate(lvobj);
-  adjustScroll();
+    lv_obj_invalidate(obj);
+    if (table->row_act != LV_TABLE_CELL_NONE &&
+        table->col_act != LV_TABLE_CELL_NONE) {
+      adjustScroll();
+    }
+  });
 }
 
 void TableField::adjustScroll()
 {
-  lv_table_t* table = (lv_table_t*)lvobj;
+  withAvailableLvObj([&](lv_obj_t* obj) {
+    lv_table_t* table = (lv_table_t*)obj;
+    if (table->row_act == LV_TABLE_CELL_NONE ||
+        table->row_act >= table->row_cnt) {
+      return;
+    }
 
-  // only vertical scroll for now
-  lv_coord_t h_before = 0;
-  for (uint16_t i = 0; i < table->row_act; i++) h_before += table->row_h[i];
+    // only vertical scroll for now
+    lv_coord_t h_before = 0;
+    for (uint16_t i = 0; i < table->row_act; i++) h_before += table->row_h[i];
 
-  lv_coord_t row_h = table->row_h[table->row_act];
-  lv_coord_t scroll_y = lv_obj_get_scroll_y(lvobj);
+    lv_coord_t row_h = table->row_h[table->row_act];
+    lv_coord_t scroll_y = lv_obj_get_scroll_y(obj);
 
-  lv_obj_update_layout(lvobj);
-  lv_coord_t h = lv_obj_get_height(lvobj);
+    lv_obj_update_layout(obj);
+    lv_coord_t h = lv_obj_get_height(obj);
 
-  lv_coord_t diff_y = 0;
-  if (h_before < scroll_y) {
-    diff_y = scroll_y - h_before;
-  } else if (scroll_y + h < h_before + row_h) {
-    diff_y = scroll_y + h - h_before - row_h;
-  } else {
-    return;
-  }
+    lv_coord_t diff_y = 0;
+    if (h_before < scroll_y) {
+      diff_y = scroll_y - h_before;
+    } else if (scroll_y + h < h_before + row_h) {
+      diff_y = scroll_y + h - h_before - row_h;
+    } else {
+      return;
+    }
 
-  lv_obj_scroll_by_bounded(lvobj, 0, diff_y, LV_ANIM_OFF);
+    lv_obj_scroll_by_bounded(obj, 0, diff_y, LV_ANIM_OFF);
+  });
 }
 
 int TableField::getSelected() const
 {
-  uint16_t row, col;
-  lv_table_get_selected_cell(lvobj, &row, &col);
+  uint16_t row = LV_TABLE_CELL_NONE;
+  uint16_t col = LV_TABLE_CELL_NONE;
+  withAvailableLvObj([&](lv_obj_t* obj) {
+    lv_table_get_selected_cell(obj, &row, &col);
+  });
   if (row != LV_TABLE_CELL_NONE) {
     return row;
   }
@@ -251,6 +283,8 @@ int TableField::getSelected() const
 
 bool TableField::onLongPress()
 {
+  if (!acceptsEvents()) return false;
+
   TRACE("LONG_PRESS");
   if (longPressHandler) {
     longPressHandler();
@@ -262,7 +296,7 @@ bool TableField::onLongPress()
 
 void TableField::setAutoEdit()
 {
-  if (autoedit) return;
+  if (autoedit || !acceptsEvents()) return;
 
   autoedit = true;
 
@@ -286,7 +320,7 @@ void TableField::deleteLater()
 {
   if (!deleted()) {
     if (autoedit) {
-      lv_group_del(group);
+      if (group) lv_group_del(group);
       if (oldGroup)
         assignLvGroup(oldGroup, true);
       else
@@ -295,3 +329,80 @@ void TableField::deleteLater()
     Window::deleteLater();
   }
 }
+
+#if defined(SIMU)
+void etxCreateForceObjectAllocationFailureForTest(bool force);
+
+bool tableFieldObjectAllocationFailureFailsClosedForTest()
+{
+  class TestTableField : public TableField
+  {
+   public:
+    explicit TestTableField(Window* parent) : TableField(parent, {0, 0, 100, 40}) {}
+
+    void exercise()
+    {
+      setRowCount(1);
+      (void)getRowCount();
+      setColumnWidth(0, 100);
+      select(0, 0);
+      adjustScroll();
+      setAutoEdit();
+      setLongPressHandler([]() {});
+      (void)onLongPress();
+    }
+  };
+
+  etxCreateForceObjectAllocationFailureForTest(true);
+  auto table = new (std::nothrow) TestTableField(MainWindow::instance());
+  etxCreateForceObjectAllocationFailureForTest(false);
+
+  if (!table) return false;
+  table->exercise();
+
+  bool ok = !table->isAvailable() && !table->isVisible() &&
+            !table->automationClickable();
+  delete table;
+  return ok;
+}
+
+bool tableFieldInvalidSelectionClearsWithoutScrollForTest()
+{
+  auto table = new (std::nothrow) TableField(MainWindow::instance(),
+                                             {0, 0, 100, 40});
+  if (!table || !table->isAvailable()) {
+    delete table;
+    return false;
+  }
+
+  table->setRowCount(1);
+  table->select(0, 0);
+  table->select(99, 0);
+  bool ok = table->getSelected() == -1;
+  delete table;
+  return ok;
+}
+
+bool tableFieldSelectMovesAcrossColumnsForTest()
+{
+  auto table = new (std::nothrow) TableField(MainWindow::instance(),
+                                             {0, 0, 100, 40});
+  if (!table || !table->isAvailable()) {
+    delete table;
+    return false;
+  }
+
+  table->setRowCount(1);
+  lv_table_set_col_cnt(table->getLvObj(), 2);
+  table->select(0, 0);
+  table->select(0, 1);
+
+  uint16_t row = LV_TABLE_CELL_NONE;
+  uint16_t col = LV_TABLE_CELL_NONE;
+  lv_table_get_selected_cell(table->getLvObj(), &row, &col);
+
+  bool ok = row == 0 && col == 1;
+  delete table;
+  return ok;
+}
+#endif

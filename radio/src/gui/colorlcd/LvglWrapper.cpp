@@ -154,18 +154,7 @@ static bool evt_to_indev_data(event_t evt, lv_indev_data_t *data)
 
 static void dispatch_kb_event(Window* w, event_t evt)
 {
-  if (!w) return;
-
-  event_t key = EVT_KEY_MASK(evt);
-  if (evt == EVT_KEY_BREAK(KEY_ENTER)) {
-    w->onClicked();
-  } else if (evt == EVT_KEY_BREAK(KEY_EXIT)) {
-    w->onCancel();
-  } else if (key != KEY_ENTER) {
-    w->onEvent(evt);
-  } else if (evt == EVT_KEY_LONG(KEY_ENTER)) {
-    lv_event_send(w->getLvObj(), LV_EVENT_LONG_PRESSED, nullptr);
-  }
+  if (w) w->dispatchKeyboardEvent(evt);
 }
 
 static void keyboardDriverRead(lv_indev_drv_t *drv, lv_indev_data_t *data)
@@ -206,7 +195,7 @@ static void keyboardDriverRead(lv_indev_drv_t *drv, lv_indev_data_t *data)
     // not an LVGL key ?
     bool is_lvgl_evt = evt_to_indev_data(evt, data);
     if (!is_lvgl_evt) {
-      auto w = (Window*)lv_obj_get_user_data(obj);
+      auto w = Window::fromLvObj(obj);
       // If no window, check for keyboard window
       if (!w) w = Keyboard::keyboardWindow();
       dispatch_kb_event(w, evt);

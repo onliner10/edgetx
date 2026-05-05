@@ -46,6 +46,11 @@ class Keyboard : public NavWindow
   lv_coord_t scroll_pos = 0;
   bool fullScreen = false;
 
+  bool acceptsKeyboardInput() const
+  {
+    return acceptsEvents() && keyboard != nullptr;
+  }
+
   void setField(FormField* newField);
   bool attachKeyboard();
   void deleteLater() override;

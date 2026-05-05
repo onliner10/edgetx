@@ -18,6 +18,7 @@
 
 #include "keyboard_text.h"
 
+#include "mainwindow.h"
 #include "textedit.h"
 
 #include <new>
@@ -111,8 +112,19 @@ void TextKeyboard::onLongPressPGDN() { cursorEnd(); }
 
 void TextKeyboard::open(FormField* field)
 {
-  if (!_instance) _instance = new (std::nothrow) TextKeyboard();
-  if (!_instance) return;
+  if (!field || !field->acceptsEvents()) return;
+
+  if (!_instance) {
+    _instance = Window::makeLive<TextKeyboard>();
+    if (!_instance || !_instance->acceptsKeyboardInput()) {
+      _instance = nullptr;
+      return;
+    }
+  } else if (!_instance->acceptsKeyboardInput()) {
+    delete _instance;
+    _instance = nullptr;
+    return;
+  }
 
   lv_obj_clear_flag(_instance->lvobj, LV_OBJ_FLAG_HIDDEN);
   lv_obj_clear_flag(_instance->keyboard, LV_OBJ_FLAG_HIDDEN);
@@ -120,3 +132,61 @@ void TextKeyboard::open(FormField* field)
 
   _instance->setField(field);
 }
+
+#if defined(SIMU)
+void etxCreateForceObjectAllocationFailureForTest(bool force);
+void keyboardForceObjectCreateFailureForTest(bool force);
+
+namespace {
+class TestKeyboardField : public FormField
+{
+ public:
+  explicit TestKeyboardField(Window* parent) :
+      FormField(parent, {0, 0, 120, EdgeTxStyles::UI_ELEMENT_HEIGHT})
+  {
+  }
+};
+
+class TextKeyboardProbe : public TextKeyboard
+{
+ public:
+  static TextKeyboard* cachedInstance() { return _instance; }
+};
+}  // namespace
+
+bool textKeyboardWindowAllocationFailureDoesNotCacheDeadKeyboardForTest()
+{
+  auto field = new (std::nothrow) TestKeyboardField(MainWindow::instance());
+  if (!field || !field->isAvailable()) {
+    delete field;
+    return false;
+  }
+
+  etxCreateForceObjectAllocationFailureForTest(true);
+  TextKeyboard::open(field);
+  etxCreateForceObjectAllocationFailureForTest(false);
+
+  bool ok = Keyboard::keyboardWindow() == nullptr &&
+            TextKeyboardProbe::cachedInstance() == nullptr;
+  delete field;
+  return ok;
+}
+
+bool textKeyboardKeypadAllocationFailureDoesNotCacheDeadKeyboardForTest()
+{
+  auto field = new (std::nothrow) TestKeyboardField(MainWindow::instance());
+  if (!field || !field->isAvailable()) {
+    delete field;
+    return false;
+  }
+
+  keyboardForceObjectCreateFailureForTest(true);
+  TextKeyboard::open(field);
+  keyboardForceObjectCreateFailureForTest(false);
+
+  bool ok = Keyboard::keyboardWindow() == nullptr &&
+            TextKeyboardProbe::cachedInstance() == nullptr;
+  delete field;
+  return ok;
+}
+#endif

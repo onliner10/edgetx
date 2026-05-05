@@ -34,6 +34,7 @@
 
 #if defined(SIMU)
 bool mainWindowBackgroundCanvasCreateFailureLeavesNoCanvasForTest();
+bool mainWindowObjectAllocationFailureFailsClosedForTest();
 #endif
 
 namespace {
@@ -67,6 +68,19 @@ TEST(ColorImageLifetime, MainWindowCanvasCreateFailureLeavesNoCanvas)
     alarm(2);
     _exit(mainWindowBackgroundCanvasCreateFailureLeavesNoCanvasForTest() ? 0
                                                                         : 1);
+  }
+
+  expectChildSuccess(pid);
+}
+
+TEST(ColorImageLifetime, MainWindowObjectAllocationFailureFailsClosed)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(mainWindowObjectAllocationFailureFailsClosedForTest() ? 0 : 1);
   }
 
   expectChildSuccess(pid);

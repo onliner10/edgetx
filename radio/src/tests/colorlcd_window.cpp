@@ -33,6 +33,20 @@ bool etxLabelAllocationFailureReturnsNullForTest();
 bool etxStyleHelpersIgnoreNullObjectForTest();
 bool windowObjectAllocationFailureLeavesNoLvObjForTest();
 bool formFieldObjectAllocationFailureFailsClosedForTest();
+bool childOfUnavailableParentFailsClosedForTest();
+bool buttonMatrixObjectAllocationFailureFailsClosedForTest();
+bool tableFieldObjectAllocationFailureFailsClosedForTest();
+bool tableFieldInvalidSelectionClearsWithoutScrollForTest();
+bool tableFieldSelectMovesAcrossColumnsForTest();
+bool toggleSwitchObjectAllocationFailureFailsClosedForTest();
+bool textEditTextAreaAllocationFailureDoesNotCacheDeadEditorForTest();
+bool numberEditNumberAreaAllocationFailureDoesNotCacheDeadEditorForTest();
+bool textKeyboardWindowAllocationFailureDoesNotCacheDeadKeyboardForTest();
+bool textKeyboardKeypadAllocationFailureDoesNotCacheDeadKeyboardForTest();
+bool numberKeyboardWindowAllocationFailureDoesNotCacheDeadKeyboardForTest();
+bool numberKeyboardKeypadAllocationFailureDoesNotCacheDeadKeyboardForTest();
+bool progressBarAllocationFailureFailsClosedForTest();
+bool listBoxObjectAllocationFailureFailsClosedForTest();
 
 TEST(ColorEtxTheme, ObjectAllocationFailureReturnsNull)
 {
@@ -106,6 +120,240 @@ TEST(ColorWindow, FormFieldObjectAllocationFailureFailsClosed)
   if (pid == 0) {
     alarm(2);
     _exit(formFieldObjectAllocationFailureFailsClosedForTest() ? 0 : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorWindow, ChildOfUnavailableParentFailsClosed)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(childOfUnavailableParentFailsClosedForTest() ? 0 : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorWindow, ButtonMatrixObjectAllocationFailureFailsClosed)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(buttonMatrixObjectAllocationFailureFailsClosedForTest() ? 0 : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorWindow, TableFieldObjectAllocationFailureFailsClosed)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(tableFieldObjectAllocationFailureFailsClosedForTest() ? 0 : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorWindow, TableFieldInvalidSelectionClearsWithoutScroll)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(tableFieldInvalidSelectionClearsWithoutScrollForTest() ? 0 : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorWindow, TableFieldSelectMovesAcrossColumns)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(tableFieldSelectMovesAcrossColumnsForTest() ? 0 : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorWindow, ToggleSwitchObjectAllocationFailureFailsClosed)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(toggleSwitchObjectAllocationFailureFailsClosedForTest() ? 0 : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorWindow, TextEditTextAreaAllocationFailureDoesNotCacheDeadEditor)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(textEditTextAreaAllocationFailureDoesNotCacheDeadEditorForTest() ? 0 : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorWindow, NumberEditNumberAreaAllocationFailureDoesNotCacheDeadEditor)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(numberEditNumberAreaAllocationFailureDoesNotCacheDeadEditorForTest()
+              ? 0
+              : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorWindow, TextKeyboardWindowAllocationFailureDoesNotCacheDeadKeyboard)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(textKeyboardWindowAllocationFailureDoesNotCacheDeadKeyboardForTest()
+              ? 0
+              : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorWindow, TextKeyboardKeypadAllocationFailureDoesNotCacheDeadKeyboard)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(textKeyboardKeypadAllocationFailureDoesNotCacheDeadKeyboardForTest()
+              ? 0
+              : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorWindow, NumberKeyboardWindowAllocationFailureDoesNotCacheDeadKeyboard)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(numberKeyboardWindowAllocationFailureDoesNotCacheDeadKeyboardForTest()
+              ? 0
+              : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorWindow, NumberKeyboardKeypadAllocationFailureDoesNotCacheDeadKeyboard)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(numberKeyboardKeypadAllocationFailureDoesNotCacheDeadKeyboardForTest()
+              ? 0
+              : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorWindow, ProgressBarAllocationFailureFailsClosed)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(progressBarAllocationFailureFailsClosedForTest() ? 0 : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorWindow, ListBoxObjectAllocationFailureFailsClosed)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(listBoxObjectAllocationFailureFailsClosedForTest() ? 0 : 1);
   }
 
   int status = 0;

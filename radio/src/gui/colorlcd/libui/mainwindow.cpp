@@ -39,6 +39,7 @@ MainWindow* MainWindow::_instance = nullptr;
 
 #if defined(SIMU)
 static bool forceBackgroundCanvasCreateFailure = false;
+void etxCreateForceObjectAllocationFailureForTest(bool force);
 
 void mainWindowForceBackgroundCanvasCreateFailureForTest(bool force)
 {
@@ -63,6 +64,7 @@ MainWindow* MainWindow::instance()
 MainWindow::MainWindow() : Window(nullptr, {0, 0, LCD_W, LCD_H})
 {
   setWindowFlag(OPAQUE);
+  if (!hasLvObj()) return;
 
   etx_solid_bg(lvobj);
 
@@ -170,6 +172,10 @@ void MainWindow::shutdown()
   emptyTrash();
 
   // Re-add background canvas
+  if (!hasLvObj()) {
+    background = nullptr;
+    return;
+  }
   background = createBackgroundCanvas(lvobj);
   if (background) lv_obj_center(background);
 }
@@ -213,6 +219,25 @@ bool mainWindowBackgroundCanvasCreateFailureLeavesNoCanvasForTest()
   mainWindowForceBackgroundCanvasCreateFailureForTest(false);
 
   return window && !window->hasBackgroundCanvas();
+}
+
+bool mainWindowObjectAllocationFailureFailsClosedForTest()
+{
+  class TestMainWindow : public MainWindow
+  {
+   public:
+    TestMainWindow() : MainWindow() {}
+    bool hasBackgroundCanvas() const { return background != nullptr; }
+  };
+
+  etxCreateForceObjectAllocationFailureForTest(true);
+  auto window = new TestMainWindow();
+  etxCreateForceObjectAllocationFailureForTest(false);
+
+  bool ok = window && window->getLvObj() == nullptr && !window->isAvailable() &&
+            !window->isVisible() && !window->hasBackgroundCanvas();
+  delete window;
+  return ok;
 }
 #endif
 

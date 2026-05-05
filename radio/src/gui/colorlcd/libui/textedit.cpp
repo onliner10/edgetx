@@ -19,6 +19,7 @@
 #include "textedit.h"
 
 #include "keyboard_text.h"
+#include "mainwindow.h"
 #include "myeeprom.h"
 #include "storage/storage.h"
 #include "etx_lv_theme.h"
@@ -36,6 +37,7 @@ class TextArea : public FormField
       FormField(parent, rect, etx_textarea_create), value(value), length(length)
   {
     setWindowFlag(NO_FOCUS);
+    if (!hasLvObj()) return;
 
     lv_textarea_set_max_length(lvobj, length);
     lv_textarea_set_placeholder_text(lvobj, "---");
@@ -44,8 +46,10 @@ class TextArea : public FormField
       if (!focus && editMode) {
         setEditMode(false);
         hide();
-        lv_group_focus_obj(parent->getLvObj());
-        lv_obj_clear_state(parent->getLvObj(), LV_STATE_FOCUSED);
+        if (auto parentObj = parent ? parent->getLvObj() : nullptr) {
+          lv_group_focus_obj(parentObj);
+          lv_obj_clear_state(parentObj, LV_STATE_FOCUSED);
+        }
       }
     });
 
@@ -60,14 +64,18 @@ class TextArea : public FormField
   {
     // value may not be null-terminated
     std::string txt(value, length);
-    lv_textarea_set_text(lvobj, txt.c_str());
+    withAvailableLvObj([&](lv_obj_t* obj) {
+      lv_textarea_set_text(obj, txt.c_str());
+    });
   }
 
   void onClicked() override {
+    if (!acceptsEvents()) return;
     setEditMode(true);
   }
 
   void openKeyboard() {
+    if (!acceptsEvents()) return;
     TextKeyboard::open(this);
   }
 
@@ -93,10 +101,15 @@ class TextArea : public FormField
 
   void changeEnd(bool forceChanged = false) override
   {
-    if (lvobj == nullptr) return;
-
     bool changed = false;
-    auto text = lv_textarea_get_text(lvobj);
+    const char* text = nullptr;
+    if (!withAvailableLvObj([&](lv_obj_t* obj) {
+          text = lv_textarea_get_text(obj);
+        }) ||
+        !text) {
+      return;
+    }
+
     if (strncmp(value, text, length) != 0) {
       changed = true;
     }
@@ -119,28 +132,6 @@ class TextArea : public FormField
   }
 };
 
-static void sync_edit_overlay(Window* field, Window* overlay)
-{
-  lv_obj_t* fieldObj = field->getLvObj();
-  lv_obj_t* overlayObj = overlay->getLvObj();
-  lv_obj_t* fieldParent = lv_obj_get_parent(fieldObj);
-
-  if (!fieldParent) return;
-
-  lv_obj_update_layout(fieldParent);
-  lv_obj_add_flag(overlayObj, LV_OBJ_FLAG_IGNORE_LAYOUT);
-  if (lv_obj_get_parent(overlayObj) != fieldParent) {
-    lv_obj_set_parent(overlayObj, fieldParent);
-  }
-  overlay->setRect({
-      lv_obj_get_x(fieldObj),
-      lv_obj_get_y(fieldObj),
-      lv_obj_get_width(fieldObj),
-      lv_obj_get_height(fieldObj),
-  });
-  lv_obj_move_foreground(overlayObj);
-}
-
 /*
   The lv_textarea object is slow. To avoid too much overhead on views with multiple
   edit fields, the text area is initially displayed as a button. When the button
@@ -158,6 +149,7 @@ TextEdit::TextEdit(Window* parent, const rect_t& rect, char* text,
 {
   if (rect.w == 0) setWidth(EdgeTxStyles::EDIT_FLD_WIDTH);
 
+  if (!isAvailable() || !label) return;
   update();
   lv_obj_align(label, LV_ALIGN_OUT_LEFT_MID, 0, PAD_TINY);
 }
@@ -174,26 +166,34 @@ void TextEdit::update()
 
 void TextEdit::openEdit()
 {
+  if (!acceptsEvents()) return;
+
   if (edit == nullptr) {
-    edit = new (std::nothrow) TextArea(this,
-                                       {0, 0, width(), height()},
-                                       text, length);
-    if (!edit) return;
+    auto newEdit = Window::makeLive<TextArea>(
+        this, rect_t{0, 0, width(), height()}, text, length);
+    if (!newEdit) return;
+    edit = newEdit;
     edit->setChangeHandler([=]() {
       update();
       if (updateHandler) updateHandler();
-      lv_group_focus_obj(lvobj);
+      withAvailableLvObj([](lv_obj_t* obj) {
+        lv_group_focus_obj(obj);
+      });
       edit->hide();
     });
     edit->setCancelHandler([=]() {
-      lv_group_focus_obj(lvobj);
+      withAvailableLvObj([](lv_obj_t* obj) {
+        lv_group_focus_obj(obj);
+      });
       edit->hide();
     });
   }
-  sync_edit_overlay(this, edit);
+  if (!syncOverlay(edit)) return;
   edit->show();
-  lv_group_focus_obj(edit->getLvObj());
-  lv_obj_add_state(edit->getLvObj(), LV_STATE_FOCUSED | LV_STATE_EDITED);
+  if (auto editObj = edit->getLvObj()) {
+    lv_group_focus_obj(editObj);
+    lv_obj_add_state(editObj, LV_STATE_FOCUSED | LV_STATE_EDITED);
+  }
   edit->openKeyboard();
 }
 
@@ -201,14 +201,15 @@ void TextEdit::preview(bool edited, char* text, uint8_t length)
 {
   setWindowFlag(NO_FOCUS | NO_CLICK);
 
-  edit = new (std::nothrow) TextArea(this,
-                                     {0, 0, width(), height()},
-                                     text, length);
+  edit = Window::makeLive<TextArea>(
+      this, rect_t{0, 0, width(), height()}, text, length);
   if (!edit) return;
   edit->setWindowFlag(NO_CLICK);
-  lv_group_focus_obj(edit->getLvObj());
-  lv_obj_add_state(edit->getLvObj(), LV_STATE_FOCUSED);
-  if (edited) lv_obj_add_state(edit->getLvObj(), LV_STATE_EDITED);
+  if (auto editObj = edit->getLvObj()) {
+    lv_group_focus_obj(editObj);
+    lv_obj_add_state(editObj, LV_STATE_FOCUSED);
+    if (edited) lv_obj_add_state(editObj, LV_STATE_EDITED);
+  }
 }
 
 ModelTextEdit::ModelTextEdit(Window* parent, const rect_t& rect, char* value,
@@ -239,3 +240,41 @@ RadioTextEdit::RadioTextEdit(Window* parent, const rect_t& rect, char* value,
              []() { storageDirty(EE_GENERAL); })
 {
 }
+
+#if defined(SIMU)
+void etxCreateForceObjectAllocationFailureForTest(bool force);
+
+bool textEditTextAreaAllocationFailureDoesNotCacheDeadEditorForTest()
+{
+  class TestTextEdit : public TextEdit
+  {
+   public:
+    TestTextEdit(Window* parent, char* value, uint8_t length) :
+        TextEdit(parent, {0, 0, 120, EdgeTxStyles::UI_ELEMENT_HEIGHT}, value,
+                 length)
+    {
+    }
+
+    void exerciseOpenEdit() { openEdit(); }
+
+    bool hasCachedEditor() const { return edit != nullptr; }
+  };
+
+  char value[8] = "Model";
+  auto textEdit =
+      new (std::nothrow) TestTextEdit(MainWindow::instance(), value, sizeof(value));
+  if (!textEdit || !textEdit->isAvailable()) {
+    delete textEdit;
+    return false;
+  }
+
+  etxCreateForceObjectAllocationFailureForTest(true);
+  textEdit->exerciseOpenEdit();
+  etxCreateForceObjectAllocationFailureForTest(false);
+
+  bool ok = textEdit->isAvailable() && textEdit->automationClickable() &&
+            !textEdit->hasCachedEditor();
+  delete textEdit;
+  return ok;
+}
+#endif

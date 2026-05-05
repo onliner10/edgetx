@@ -46,8 +46,20 @@ static const lv_obj_class_t keyboard_class = {
     .instance_size = sizeof(lv_keyboard_t),
 };
 
+#if defined(SIMU)
+static bool forceKeyboardObjectCreateFailureForTest = false;
+
+void keyboardForceObjectCreateFailureForTest(bool force)
+{
+  forceKeyboardObjectCreateFailureForTest = force;
+}
+#endif
+
 static lv_obj_t* keyboard_create(lv_obj_t* parent)
 {
+#if defined(SIMU)
+  if (forceKeyboardObjectCreateFailureForTest) return nullptr;
+#endif
   return etx_create(&keyboard_class, parent);
 }
 
@@ -81,10 +93,16 @@ Keyboard::Keyboard(coord_t height, bool fullScreen) :
   hasTwoPageKeys = keyIsSupported(KEY_PAGEUP);
 #endif
 
+  if (!hasLvObj()) return;
+
   lv_obj_set_parent(lvobj, lv_layer_top());  // the keyboard is always on top
 
   // use a separate group for the keyboard
   group = lv_group_create();
+  if (!group) {
+    failClosed();
+    return;
+  }
   lv_group_set_editing(group, true);
 
   auto old_g = lv_group_get_default();
@@ -92,6 +110,7 @@ Keyboard::Keyboard(coord_t height, bool fullScreen) :
 
   keyboard = keyboard_create(lvobj);
   lv_group_set_default(old_g);
+  if (!requireLvObj(keyboard)) return;
 
   lv_obj_add_event_cb(keyboard, keyboard_event_cb, LV_EVENT_ALL, this);
 
@@ -122,9 +141,11 @@ void Keyboard::clearField(bool wasCancelled)
   }
 
   detach();
-  lv_obj_set_parent(lvobj, lv_layer_top());
+  withLvObj([](lv_obj_t* obj) {
+    lv_obj_set_parent(obj, lv_layer_top());
+  });
 
-  if (fieldContainer) {
+  if (fieldContainer && fieldContainer->acceptsEvents()) {
     lv_obj_scroll_to_y(fieldContainer->getLvObj(), scroll_pos, LV_ANIM_OFF);
     fieldContainer = nullptr;
   }
@@ -153,13 +174,17 @@ void Keyboard::hide(bool wasCancelled)
 {
   if (activeKeyboard  && !activeKeyboard->_deleted) {
     activeKeyboard->clearField(wasCancelled);
-    lv_obj_add_flag(activeKeyboard->lvobj, LV_OBJ_FLAG_HIDDEN);
+    activeKeyboard->withLvObj([](lv_obj_t* obj) {
+      lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+    });
     activeKeyboard = nullptr;
   }
 }
 
 bool Keyboard::attachKeyboard()
 {
+  if (!acceptsKeyboardInput()) return false;
+
   if (activeKeyboard) {
     if (activeKeyboard == this) return false;
     hide(false);
@@ -171,38 +196,45 @@ bool Keyboard::attachKeyboard()
 
 void Keyboard::setField(FormField* newField)
 {
-  if (!attachKeyboard()) return;
+  if (!newField || !newField->acceptsEvents() || !acceptsKeyboardInput())
+    return;
 
   lv_obj_t* obj = newField->getLvObj();
-  if (obj) {
-    if (fullScreen) {
-      setTop(0);
-      lv_obj_set_parent(lvobj, lv_layer_top());
-      fieldContainer = nullptr;
-    } else {
-      fieldContainer = newField->getFullScreenWindow();
-      if (!fieldContainer) return;
+  if (!obj) return;
 
-      attach(fieldContainer);
-
-      lv_area_t coords;
-      lv_obj_get_coords(obj, &coords);
-
-      // place keyboard bellow the field with some margin
-      setTop(max(coords.y2 + 21, LCD_H - height()));
-
-      // save scroll position
-      scroll_pos = lv_obj_get_scroll_y(fieldContainer->getLvObj());
-      lv_obj_scroll_to_view(lvobj, LV_ANIM_OFF);
-    }
-
-    newField->setEditMode(true);
-
-    lv_keyboard_set_textarea(keyboard, obj);
-    lv_obj_add_event_cb(obj, field_focus_leave, LV_EVENT_DEFOCUSED, nullptr);
-    assignLvGroup(group, false);
-
-    field = newField;
-    fieldGroup = (lv_group_t*)lv_obj_get_group(obj);
+  Window* newFieldContainer = nullptr;
+  if (!fullScreen) {
+    newFieldContainer = newField->getFullScreenWindow();
+    if (!newFieldContainer || !newFieldContainer->acceptsEvents()) return;
   }
+
+  if (!attachKeyboard()) return;
+
+  if (fullScreen) {
+    setTop(0);
+    lv_obj_set_parent(lvobj, lv_layer_top());
+    fieldContainer = nullptr;
+  } else {
+    fieldContainer = newFieldContainer;
+    attach(fieldContainer);
+
+    lv_area_t coords;
+    lv_obj_get_coords(obj, &coords);
+
+    // place keyboard bellow the field with some margin
+    setTop(max(coords.y2 + 21, LCD_H - height()));
+
+    // save scroll position
+    scroll_pos = lv_obj_get_scroll_y(fieldContainer->getLvObj());
+    lv_obj_scroll_to_view(lvobj, LV_ANIM_OFF);
+  }
+
+  newField->setEditMode(true);
+
+  lv_keyboard_set_textarea(keyboard, obj);
+  lv_obj_add_event_cb(obj, field_focus_leave, LV_EVENT_DEFOCUSED, nullptr);
+  assignLvGroup(group, false);
+
+  field = newField;
+  fieldGroup = (lv_group_t*)lv_obj_get_group(obj);
 }

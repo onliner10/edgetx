@@ -22,6 +22,7 @@
 #include "edgetx.h"
 #include "etx_lv_theme.h"
 #include "keyboard_base.h"
+#include "mainwindow.h"
 #include "menutoolbar.h"
 #include "static.h"
 #include "table.h"
@@ -84,6 +85,8 @@ class MenuBody : public TableField
   MenuBody(Window* parent, const rect_t& rect) :
       TableField(parent, rect)
   {
+    if (!hasLvObj()) return;
+
     // Allow encoder acceleration
     lv_obj_add_flag(lvobj, LV_OBJ_FLAG_ENCODER_ACCEL);
 
@@ -107,42 +110,41 @@ class MenuBody : public TableField
 
   void setIndex(int index)
   {
-    if (index < (int)lines.size()) {
-      if (index == selectedIndex) return;
-      selectedIndex = index;
+    if (index >= (int)lines.size()) return;
+    if (index == selectedIndex) return;
+    selectedIndex = index;
 
-      lv_obj_invalidate(lvobj);
-      lv_table_t* table = (lv_table_t*)lvobj;
+    lv_obj_invalidate(lvobj);
+    lv_table_t* table = (lv_table_t*)lvobj;
 
-      if (index < 0) {
-        table->row_act = LV_TABLE_CELL_NONE;
-        table->col_act = LV_TABLE_CELL_NONE;
-        return;
-      }
-
-      table->row_act = index;
-      table->col_act = 0;
-
-      lv_coord_t h_before = 0;
-      for (uint16_t i = 0; i < table->row_act; i++) h_before += table->row_h[i];
-
-      lv_coord_t row_h = table->row_h[table->row_act];
-      lv_coord_t scroll_y = lv_obj_get_scroll_y(lvobj);
-
-      lv_obj_update_layout(lvobj);
-      lv_coord_t h = lv_obj_get_height(lvobj);
-
-      lv_coord_t diff_y = 0;
-      if (h_before < scroll_y) {
-        diff_y = scroll_y - h_before;
-      } else if (scroll_y + h < h_before + row_h) {
-        diff_y = scroll_y + h - h_before - row_h;
-      } else {
-        return;
-      }
-
-      lv_obj_scroll_by_bounded(lvobj, 0, diff_y, LV_ANIM_OFF);
+    if (index < 0) {
+      table->row_act = LV_TABLE_CELL_NONE;
+      table->col_act = LV_TABLE_CELL_NONE;
+      return;
     }
+
+    table->row_act = index;
+    table->col_act = 0;
+
+    lv_coord_t h_before = 0;
+    for (uint16_t i = 0; i < table->row_act; i++) h_before += table->row_h[i];
+
+    lv_coord_t row_h = table->row_h[table->row_act];
+    lv_coord_t scroll_y = lv_obj_get_scroll_y(lvobj);
+
+    lv_obj_update_layout(lvobj);
+    lv_coord_t h = lv_obj_get_height(lvobj);
+
+    lv_coord_t diff_y = 0;
+    if (h_before < scroll_y) {
+      diff_y = scroll_y - h_before;
+    } else if (scroll_y + h < h_before + row_h) {
+      diff_y = scroll_y + h - h_before - row_h;
+    } else {
+      return;
+    }
+
+    lv_obj_scroll_by_bounded(lvobj, 0, diff_y, LV_ANIM_OFF);
   }
 
   int selection() const { return selectedIndex; }
@@ -225,7 +227,7 @@ class MenuBody : public TableField
   void onDrawBegin(uint16_t row, uint16_t col,
                    lv_obj_draw_part_dsc_t* dsc) override
   {
-    if (lines.size() == 0) return;
+    if (row >= lines.size()) return;
 
     lv_canvas_t* icon = (lv_canvas_t*)lines[row]->getIcon();
     if (!icon) return;
@@ -282,6 +284,30 @@ class MenuBody : public TableField
   Menu* getParentMenu() { return static_cast<Menu*>(getParent()->getParent()); }
 };
 
+#if defined(SIMU)
+void etxCreateForceObjectAllocationFailureForTest(bool force);
+
+bool menuBodyObjectAllocationFailureFailsClosedForTest()
+{
+  class TestMenuBody : public MenuBody
+  {
+   public:
+    explicit TestMenuBody(Window* parent) : MenuBody(parent, {0, 0, 120, 80}) {}
+  };
+
+  etxCreateForceObjectAllocationFailureForTest(true);
+  auto body = new (std::nothrow) TestMenuBody(MainWindow::instance());
+  etxCreateForceObjectAllocationFailureForTest(false);
+
+  if (!body) return false;
+
+  bool ok = !body->isAvailable() && !body->isVisible() &&
+            !body->automationClickable();
+  delete body;
+  return ok;
+}
+#endif
+
 //-----------------------------------------------------------------------------
 
 static void menu_content_constructor(const lv_obj_class_t* class_p,
@@ -309,30 +335,58 @@ static lv_obj_t* menu_content_create(lv_obj_t* parent)
   return etx_create(&menu_content_class, parent);
 }
 
-class MenuWindowContent : public NavWindow
+class MenuContent
+{
+ public:
+  virtual ~MenuContent() = default;
+
+  virtual void setTitle(std::string text) {}
+  virtual void addLine(const MaskBitmap* icon_mask, const std::string& text,
+                       std::function<void()> onPress,
+                       std::function<bool()> isChecked, bool update)
+  {
+  }
+  virtual void updateLines() {}
+  virtual void removeLines() {}
+  virtual unsigned count() const { return 0; }
+  virtual int selection() const { return -1; }
+  virtual void setIndex(int index) {}
+  virtual void updatePosition(MenuToolbar* toolbar) {}
+};
+
+class MissingMenuContent final : public MenuContent
+{
+};
+
+static MissingMenuContent missingMenuContent;
+
+class MenuWindowContent : public NavWindow, public MenuContent
 {
  public:
   explicit MenuWindowContent(Menu* parent, coord_t popupWidth) :
       NavWindow(parent, rect_t{}, menu_content_create)
   {
     setWindowFlag(OPAQUE);
+    if (!hasLvObj()) return;
 
     coord_t w = (popupWidth > 0) ? popupWidth : MENUS_WIDTH;
 
     lv_obj_center(lvobj);
     setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_ZERO, w, LV_SIZE_CONTENT);
 
-    header = new StaticText(this, {0, 0, LV_PCT(100), 0}, "",
-                            COLOR_THEME_PRIMARY2_INDEX);
+    if (!initRequiredWindow(header, this, rect_t{0, 0, LV_PCT(100), 0}, "",
+                            COLOR_THEME_PRIMARY2_INDEX))
+      return;
     etx_solid_bg(header->getLvObj(), COLOR_THEME_SECONDARY1_INDEX);
     header->padAll(PAD_SMALL);
     header->hide();
 
-    body = new MenuBody(this, rect_t{0, 0, w, LV_SIZE_CONTENT});
+    if (!initRequiredWindow(body, this, rect_t{0, 0, w, LV_SIZE_CONTENT}))
+      return;
     lv_obj_set_style_max_height(body->getLvObj(), LCD_H * 0.8, LV_PART_MAIN);
   }
 
-  virtual void setTitle(const std::string& text)
+  void setTitle(std::string text) override
   {
     header->setText(text);
     header->show();
@@ -344,17 +398,34 @@ class MenuWindowContent : public NavWindow
   std::string getName() const override { return "MenuWindowContent"; }
 #endif
 
-  void updateLines() { body->updateLines(); }
-  void removeLines() { body->removeLines(); }
-  int count() { return body->count(); }
-  int selection() { return body->selection(); }
-  void setIndex(int index) { body->setIndex(index); }
+  void updateLines() override { body->updateLines(); }
+  void removeLines() override { body->removeLines(); }
+  unsigned count() const override { return body->count(); }
+  int selection() const override { return body->selection(); }
+  void setIndex(int index) override { body->setIndex(index); }
 
   void addLine(const MaskBitmap* icon_mask, const std::string& text,
                std::function<void()> onPress, std::function<bool()> isChecked,
-               bool update = true)
+               bool update) override
   {
-    body->addLine(icon_mask, text, onPress, isChecked, update);
+    body->addLine(icon_mask, text, std::move(onPress), std::move(isChecked),
+                  update);
+  }
+
+  void updatePosition(MenuToolbar* toolbar) override
+  {
+    if (!toolbar || !toolbar->acceptsEvents()) return;
+
+    coord_t cw = lv_obj_get_width(getLvObj());
+    coord_t ch = lv_obj_get_height(getLvObj());
+    coord_t tw = lv_obj_get_width(toolbar->getLvObj());
+    coord_t th = lv_obj_get_height(toolbar->getLvObj());
+
+    lv_obj_align(toolbar->getLvObj(), LV_ALIGN_CENTER, -cw / 2, 0);
+    lv_obj_align(getLvObj(), LV_ALIGN_CENTER, tw / 2, 0);
+
+    toolbar->setHeight(max(ch, th));
+    setHeight(max(ch, th));
   }
 
 #if defined(HARDWARE_KEYS)
@@ -376,13 +447,38 @@ class MenuWindowContent : public NavWindow
   MenuBody* body = nullptr;
 };
 
+#if defined(SIMU)
+bool menuWindowContentObjectAllocationFailureFailsClosedForTest()
+{
+  etxCreateForceObjectAllocationFailureForTest(true);
+  auto menu = new (std::nothrow) Menu();
+  etxCreateForceObjectAllocationFailureForTest(false);
+
+  if (!menu) return false;
+  menu->setTitle("Title");
+  menu->addLine(nullptr, "A", []() {}, nullptr);
+  menu->updateLines();
+  menu->removeLines();
+  menu->select(0);
+
+  bool ok = !menu->isAvailable() && !menu->isVisible() &&
+            menu->count() == 0 && menu->selection() == -1;
+  delete menu;
+  return ok;
+}
+#endif
+
 //-----------------------------------------------------------------------------
 
 Menu::Menu(bool multiple, coord_t popupWidth) :
     ModalWindow(true),
-    multiple(multiple),
-    content(new MenuWindowContent(this, popupWidth))
+    multiple(multiple)
 {
+  content = Window::makeLive<MenuWindowContent>(this, popupWidth);
+  if (!content) {
+    content = &missingMenuContent;
+    failClosed();
+  }
 }
 
 void Menu::setToolbar(MenuToolbar* window)
@@ -393,18 +489,7 @@ void Menu::setToolbar(MenuToolbar* window)
 
 void Menu::updatePosition()
 {
-  if (toolbar) {
-    coord_t cw = lv_obj_get_width(content->getLvObj());
-    coord_t ch = lv_obj_get_height(content->getLvObj());
-    coord_t tw = lv_obj_get_width(toolbar->getLvObj());
-    coord_t th = lv_obj_get_height(toolbar->getLvObj());
-
-    lv_obj_align(toolbar->getLvObj(), LV_ALIGN_CENTER, -cw / 2, 0);
-    lv_obj_align(content->getLvObj(), LV_ALIGN_CENTER, tw / 2, 0);
-
-    toolbar->setHeight(max(ch, th));
-    content->setHeight(max(ch, th));
-  }
+  content->updatePosition(toolbar);
 }
 
 void Menu::setTitle(std::string text)
@@ -417,7 +502,8 @@ void Menu::addLine(const MaskBitmap* icon_mask, const std::string& text,
                    std::function<void()> onPress,
                    std::function<bool()> isChecked)
 {
-  content->addLine(icon_mask, text, std::move(onPress), std::move(isChecked));
+  content->addLine(icon_mask, text, std::move(onPress), std::move(isChecked),
+                   true);
   updatePosition();
 }
 
@@ -430,7 +516,8 @@ void Menu::addLine(const std::string &text, std::function<void()> onPress,
 void Menu::addLineBuffered(const std::string &text, std::function<void()> onPress,
                            std::function<bool()> isChecked)
 {
-  content->addLine(nullptr, text, std::move(onPress), std::move(isChecked), false);
+  content->addLine(nullptr, text, std::move(onPress), std::move(isChecked),
+                   false);
 }
 
 void Menu::updateLines()
@@ -472,16 +559,25 @@ void Menu::handleLongPress()
     longPressHandler();
 }
 
-unsigned Menu::count() const { return content->count(); }
+unsigned Menu::count() const
+{
+  return content->count();
+}
 
-int Menu::selection() const { return content->selection(); }
+int Menu::selection() const
+{
+  return content->selection();
+}
 
-void Menu::select(int index) { content->setIndex(index); }
+void Menu::select(int index)
+{
+  content->setIndex(index);
+}
 
 void Menu::checkEvents()
 {
   ModalWindow::checkEvents();
-  if (waitHandler)
+  if (acceptsEvents() && waitHandler)
     waitHandler();
 }
 

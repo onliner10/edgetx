@@ -37,12 +37,19 @@ lua_State *lsStandalone = nullptr;
 
 #if defined(SIMU)
 static bool forceStandaloneLuaCanvasCreateFailure = false;
+static bool forceStandaloneLuaLoadingLabelCreateFailure = false;
 
 void bitmapBufferForceDataMallocFailureForTest(bool force);
+void etxCreateForceObjectAllocationFailureForTest(bool force);
 
 void standaloneLuaForceCanvasCreateFailureForTest(bool force)
 {
   forceStandaloneLuaCanvasCreateFailure = force;
+}
+
+void standaloneLuaForceLoadingLabelCreateFailureForTest(bool force)
+{
+  forceStandaloneLuaLoadingLabelCreateFailure = force;
 }
 #endif
 
@@ -52,6 +59,22 @@ static lv_obj_t* createStandaloneLuaCanvas(lv_obj_t* parent)
   if (forceStandaloneLuaCanvasCreateFailure) return nullptr;
 #endif
   return lv_canvas_create(parent);
+}
+
+static lv_obj_t* createStandaloneLuaLoadingLabel(lv_obj_t* parent)
+{
+#if defined(SIMU)
+  if (forceStandaloneLuaLoadingLabelCreateFailure) return nullptr;
+#endif
+  return etx_label_create(parent, FONT_XL_INDEX);
+}
+
+static void releaseStandaloneLuaSetupRefs(int initFn, int runFn)
+{
+  if (!lsStandalone) return;
+  luaL_unref(lsStandalone, LUA_REGISTRYINDEX, initFn);
+  luaL_unref(lsStandalone, LUA_REGISTRYINDEX, runFn);
+  luaClose(&lsStandalone);
 }
 
 #if defined(LUA_ALLOCATOR_TRACER)
@@ -150,14 +173,9 @@ StandaloneLuaWindow::StandaloneLuaWindow(bool useLvgl, int initFn, int runFn) :
     useLvgl(useLvgl), initFunction(initFn), runFunction(runFn)
 {
   setWindowFlag(OPAQUE);
+  if (!acceptsEvents()) return;
 
   etx_solid_bg(lvobj);
-
-  luaScriptManager = this;
-
-  pushLayer(true);
-
-  MainWindow::instance()->enableWidgetRefresh(false);
 
   auto setSetupError = [this]() {
     if (lsStandalone) {
@@ -171,18 +189,28 @@ StandaloneLuaWindow::StandaloneLuaWindow(bool useLvgl, int initFn, int runFn) :
     hasError = true;
   };
 
+  bool focusStandaloneCanvas = false;
+
   if (useLvglLayout()) {
     padAll(PAD_ZERO);
     etx_scrollbar(lvobj);
 
-    lv_obj_t* lbl = etx_label_create(lvobj, FONT_XL_INDEX);
-    lv_obj_set_pos(lbl, 0, 0);
-    lv_obj_set_size(lbl, LCD_W, LCD_H);
-    etx_solid_bg(lbl, COLOR_THEME_PRIMARY1_INDEX);
-    etx_txt_color(lbl, COLOR_THEME_PRIMARY2_INDEX);
-    lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_obj_set_style_pad_top(lbl, (LCD_H - EdgeTxStyles::STD_FONT_HEIGHT) / 2, LV_PART_MAIN);
-    lv_label_set_text(lbl, STR_LOADING);
+    lv_obj_t* lbl = createStandaloneLuaLoadingLabel(lvobj);
+    if (!initRequiredLvObj(lbl, createStandaloneLuaLoadingLabel,
+                           [&](lv_obj_t* obj) {
+                             lv_obj_set_pos(obj, 0, 0);
+                             lv_obj_set_size(obj, LCD_W, LCD_H);
+                             etx_solid_bg(obj, COLOR_THEME_PRIMARY1_INDEX);
+                             etx_txt_color(obj, COLOR_THEME_PRIMARY2_INDEX);
+                             lv_obj_set_style_text_align(
+                                 obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+                             lv_obj_set_style_pad_top(
+                                 obj,
+                                 (LCD_H - EdgeTxStyles::STD_FONT_HEIGHT) / 2,
+                                 LV_PART_MAIN);
+                             lv_label_set_text(obj, STR_LOADING);
+                           }))
+      return;
   } else {
     lcdBuffer = new (std::nothrow) BitmapBuffer(BMP_RGB565, LCD_W, LCD_H);
     if (!lcdBuffer || !lcdBuffer->getData()) {
@@ -201,9 +229,22 @@ StandaloneLuaWindow::StandaloneLuaWindow(bool useLvgl, int initFn, int runFn) :
         lv_canvas_set_buffer(canvas, lcdBuffer->getData(),
                              lcdBuffer->width(), lcdBuffer->height(), LV_IMG_CF_TRUE_COLOR);
 
-        lv_group_add_obj(lv_group_get_default(), lvobj);
-        lv_group_set_editing(lv_group_get_default(), true);
+        focusStandaloneCanvas = true;
       }
+    }
+  }
+
+  luaScriptManager = this;
+
+  pushLayer(true);
+
+  MainWindow::instance()->enableWidgetRefresh(false);
+
+  if (focusStandaloneCanvas) {
+    auto group = lv_group_get_default();
+    if (group) {
+      lv_group_add_obj(group, lvobj);
+      lv_group_set_editing(group, true);
     }
   }
 
@@ -224,11 +265,10 @@ StandaloneLuaWindow::StandaloneLuaWindow(bool useLvgl, int initFn, int runFn) :
 void StandaloneLuaWindow::setup(bool useLvgl, int initFn, int runFn)
 {
   if (_instance == nullptr) {
-    _instance = new (std::nothrow) StandaloneLuaWindow(useLvgl, initFn, runFn);
-    if (!_instance && lsStandalone) {
-      luaL_unref(lsStandalone, LUA_REGISTRYINDEX, initFn);
-      luaL_unref(lsStandalone, LUA_REGISTRYINDEX, runFn);
-      luaClose(&lsStandalone);
+    _instance = Window::adoptLive(
+        new (std::nothrow) StandaloneLuaWindow(useLvgl, initFn, runFn));
+    if (!_instance) {
+      releaseStandaloneLuaSetupRefs(initFn, runFn);
     }
   }
 }
@@ -300,6 +340,44 @@ bool standaloneLuaBitmapBufferDataFailureSetsErrorForTest()
   auto window = StandaloneLuaWindow::instance();
   bool result = window && window->hasErrorForTest() &&
                 !window->hasLcdBufferForTest();
+
+  if (window)
+    window->deleteLater();
+
+  return result;
+}
+
+bool standaloneLuaWindowAllocationFailureDoesNotCacheDeadWindowForTest()
+{
+  if (!lsStandalone)
+    luaStandaloneInit();
+
+  MainWindow::instance();
+  etxCreateForceObjectAllocationFailureForTest(true);
+  StandaloneLuaWindow::setup(false, LUA_REFNIL, LUA_REFNIL);
+  etxCreateForceObjectAllocationFailureForTest(false);
+
+  auto window = StandaloneLuaWindow::instance();
+  bool result = window == nullptr;
+
+  if (window)
+    window->deleteLater();
+
+  return result;
+}
+
+bool standaloneLuaLoadingLabelFailureDoesNotCacheDeadWindowForTest()
+{
+  if (!lsStandalone)
+    luaStandaloneInit();
+
+  MainWindow::instance();
+  standaloneLuaForceLoadingLabelCreateFailureForTest(true);
+  StandaloneLuaWindow::setup(true, LUA_REFNIL, LUA_REFNIL);
+  standaloneLuaForceLoadingLabelCreateFailureForTest(false);
+
+  auto window = StandaloneLuaWindow::instance();
+  bool result = window == nullptr;
 
   if (window)
     window->deleteLater();

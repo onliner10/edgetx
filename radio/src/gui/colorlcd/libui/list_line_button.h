@@ -102,6 +102,9 @@ class InputMixButtonBase : public ListLineButton
   lv_obj_t* weight = nullptr;
   lv_obj_t* source = nullptr;
   lv_obj_t* opts = nullptr;
+
+  bool ensureLineLabel(lv_obj_t*& label, coord_t x, coord_t y, coord_t w,
+                       coord_t h);
 };
 
 class InputMixGroupBase : public Window
@@ -121,7 +124,7 @@ class InputMixGroupBase : public Window
 
  protected:
   mixsrc_t idx;
-  lv_obj_t* label;
+  lv_obj_t* label = nullptr;
   std::list<InputMixButtonBase*> lines;
 
   void _adjustHeight(coord_t y);

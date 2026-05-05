@@ -23,6 +23,7 @@
 #include "hal/rotary_encoder.h"
 #include "keyboard_number.h"
 #include "keys.h"
+#include "mainwindow.h"
 #include "strhelpers.h"
 #include "etx_lv_theme.h"
 
@@ -36,6 +37,7 @@ class NumberArea : public FormField
       numEdit(parent)
   {
     setWindowFlag(NO_FOCUS);
+    if (!hasLvObj()) return;
 
     if (parent->getTextFlags() & CENTERED)
       etx_obj_add_style(lvobj, styles->text_align_center, LV_PART_MAIN);
@@ -51,7 +53,8 @@ class NumberArea : public FormField
       if (!focus && editMode) {
         setEditMode(false);
         hide();
-        lv_obj_clear_state(parent->getLvObj(), LV_STATE_FOCUSED);
+        if (auto parentObj = parent ? parent->getLvObj() : nullptr)
+          lv_obj_clear_state(parentObj, LV_STATE_FOCUSED);
       }
     });
 
@@ -70,6 +73,8 @@ class NumberArea : public FormField
 
   void onEvent(event_t event) override
   {
+    if (!acceptsEvents() || !numEdit) return;
+
     TRACE_WINDOWS("%s received event 0x%X", getWindowDebugString().c_str(),
                   event);
 
@@ -157,6 +162,8 @@ class NumberArea : public FormField
 
   void onClicked() override
   {
+    if (!acceptsEvents()) return;
+
     lv_indev_type_t indev_type = lv_indev_get_type(lv_indev_get_act());
     if (indev_type == LV_INDEV_TYPE_POINTER) {
       setEditMode(true);
@@ -168,22 +175,30 @@ class NumberArea : public FormField
 
   void openKeyboard()
   {
+    if (!acceptsEvents()) return;
+
     editTextIsRaw = numEdit->useDirectKeyboard();
-    lv_textarea_set_text(lvobj, editTextIsRaw ? numEdit->getEditVal().c_str()
+    withAvailableLvObj([&](lv_obj_t* obj) {
+      lv_textarea_set_text(obj, editTextIsRaw ? numEdit->getEditVal().c_str()
                                               : numEdit->getDisplayVal().c_str());
+    });
     NumberKeyboard::open(this, numEdit);
   }
 
   void directEdit()
   {
+    if (!acceptsEvents()) return;
+
     editTextIsRaw = false;
     FormField::onClicked();
   }
 
   void update()
   {
-    if (lvobj != nullptr)
-      lv_textarea_set_text(lvobj, numEdit->getDisplayVal().c_str());
+    if (!numEdit) return;
+    withAvailableLvObj([&](lv_obj_t* obj) {
+      lv_textarea_set_text(obj, numEdit->getDisplayVal().c_str());
+    });
   }
 
  protected:
@@ -192,10 +207,15 @@ class NumberArea : public FormField
 
   void changeEnd(bool forceChanged = false) override
   {
-    if (lvobj == nullptr) return;
-
     if (editTextIsRaw) {
-      numEdit->setValueFromEditVal(lv_textarea_get_text(lvobj));
+      const char* text = nullptr;
+      if (!withAvailableLvObj([&](lv_obj_t* obj) {
+            text = lv_textarea_get_text(obj);
+          }) ||
+          !text) {
+        return;
+      }
+      numEdit->setValueFromEditVal(text);
       editTextIsRaw = false;
     }
     FormField::changeEnd(forceChanged);
@@ -209,7 +229,7 @@ class NumberArea : public FormField
   static void numberedit_cb(lv_event_t* e)
   {
     NumberArea* numEdit = (NumberArea*)lv_event_get_user_data(e);
-    if (!numEdit || numEdit->deleted()) return;
+    if (!numEdit || !numEdit->acceptsEvents()) return;
 
     uint32_t key = lv_event_get_key(e);
     switch (key) {
@@ -222,28 +242,6 @@ class NumberArea : public FormField
     }
   }
 };
-
-static void sync_edit_overlay(Window* field, Window* overlay)
-{
-  lv_obj_t* fieldObj = field->getLvObj();
-  lv_obj_t* overlayObj = overlay->getLvObj();
-  lv_obj_t* fieldParent = lv_obj_get_parent(fieldObj);
-
-  if (!fieldParent) return;
-
-  lv_obj_update_layout(fieldParent);
-  lv_obj_add_flag(overlayObj, LV_OBJ_FLAG_IGNORE_LAYOUT);
-  if (lv_obj_get_parent(overlayObj) != fieldParent) {
-    lv_obj_set_parent(overlayObj, fieldParent);
-  }
-  overlay->setRect({
-      lv_obj_get_x(fieldObj),
-      lv_obj_get_y(fieldObj),
-      lv_obj_get_width(fieldObj),
-      lv_obj_get_height(fieldObj),
-  });
-  lv_obj_move_foreground(overlayObj);
-}
 
 /*
   The lv_textarea object is slow. To avoid too much overhead on views with multiple
@@ -264,6 +262,8 @@ NumberEdit::NumberEdit(Window* parent, const rect_t& rect, int vmin, int vmax,
     vmin(vmin),
     vmax(vmax)
 {
+  if (!isAvailable() || !label) return;
+
   if (parent) {
     const char* title = parent->getFormFieldTitle();
     if (title) editTitle = title;
@@ -288,23 +288,30 @@ NumberEdit::NumberEdit(Window* parent, const rect_t& rect, int vmin, int vmax,
 
 void NumberEdit::openEdit()
 {
+  if (!acceptsEvents()) return;
+
   if (edit == nullptr) {
-    edit = new (std::nothrow) NumberArea(
-        this, {0, 0, width(), height()});
-    if (!edit) return;
+    auto newEdit = Window::makeLive<NumberArea>(
+        this, rect_t{0, 0, width(), height()});
+    if (!newEdit) return;
+    edit = newEdit;
     edit->setChangeHandler([=]() {
       update();
       if (onEdited) onEdited(currentValue);
       if (edit->hasFocus())
-        lv_group_focus_obj(lvobj);
+        withAvailableLvObj([](lv_obj_t* obj) {
+          lv_group_focus_obj(obj);
+        });
       edit->hide();
     });
   }
-  sync_edit_overlay(this, edit);
+  if (!syncOverlay(edit)) return;
   edit->update();
   edit->show();
-  lv_group_focus_obj(edit->getLvObj());
-  lv_obj_add_state(edit->getLvObj(), LV_STATE_FOCUSED | LV_STATE_EDITED);
+  if (auto editObj = edit->getLvObj()) {
+    lv_group_focus_obj(editObj);
+    lv_obj_add_state(editObj, LV_STATE_FOCUSED | LV_STATE_EDITED);
+  }
   lv_indev_type_t indev_type =
       lv_indev_get_type(lv_indev_get_act());
   if (indev_type == LV_INDEV_TYPE_POINTER) {
@@ -438,3 +445,43 @@ void NumberEdit::setValue(int value)
   updateDisplay();
   if (edit) edit->update();
 }
+
+#if defined(SIMU)
+void etxCreateForceObjectAllocationFailureForTest(bool force);
+
+bool numberEditNumberAreaAllocationFailureDoesNotCacheDeadEditorForTest()
+{
+  class TestNumberEdit : public NumberEdit
+  {
+   public:
+    TestNumberEdit(Window* parent, std::function<int()> getValue,
+                   std::function<void(int)> setValue) :
+        NumberEdit(parent, {0, 0, 120, EdgeTxStyles::UI_ELEMENT_HEIGHT}, 0,
+                   100, std::move(getValue), std::move(setValue))
+    {
+    }
+
+    void exerciseOpenEdit() { openEdit(); }
+
+    bool hasCachedEditor() const { return edit != nullptr; }
+  };
+
+  int value = 7;
+  auto numberEdit = new (std::nothrow) TestNumberEdit(
+      MainWindow::instance(), [&]() { return value; },
+      [&](int newValue) { value = newValue; });
+  if (!numberEdit || !numberEdit->isAvailable()) {
+    delete numberEdit;
+    return false;
+  }
+
+  etxCreateForceObjectAllocationFailureForTest(true);
+  numberEdit->exerciseOpenEdit();
+  etxCreateForceObjectAllocationFailureForTest(false);
+
+  bool ok = numberEdit->isAvailable() && numberEdit->automationClickable() &&
+            !numberEdit->hasCachedEditor();
+  delete numberEdit;
+  return ok;
+}
+#endif
