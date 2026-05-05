@@ -195,7 +195,7 @@ static void setupPulsesLemonDSMP(uint8_t module, uint8_t*& p_buf,
   /* const*/ auto& md = g_model.moduleData[module];
 
     //uint8_t start_channel = md.channelsStart;
-    auto channelCount = md.getChannelsCount();
+    auto channelCount = sentModuleChannels(module);
     auto flags = md.dsmp.flags;
     auto module_mode = getModuleMode(module);
     auto version     = dsmpStatus.version[0];

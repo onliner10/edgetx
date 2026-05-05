@@ -225,6 +225,33 @@ TEST_F(PulsesTest, dsmpSendPulsesHonorsChannelCount)
 
   DSMPDriver.deinit(ctx);
 }
+
+TEST_F(PulsesTest, dsmpSetupRejectsInvalidChannelCount)
+{
+  modulePortInit();
+  g_model.moduleData[EXTERNAL_MODULE].type = MODULE_TYPE_LEMON_DSMP;
+  g_model.moduleData[EXTERNAL_MODULE].channelsCount = 127;
+  g_model.moduleData[EXTERNAL_MODULE].dsmp.flags = 0;
+
+  auto ctx = DSMPDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  uint8_t buffer[MODULE_BUFFER_SIZE] = {};
+  bool setupSent = false;
+  for (int i = 0; i < 3; i++) {
+    memset(buffer, 0, sizeof(buffer));
+    DSMPDriver.sendPulses(ctx, buffer, nullptr, 0);
+    if (buffer[0] == 0xAA && buffer[1] == 0) {
+      setupSent = true;
+      break;
+    }
+  }
+
+  ASSERT_TRUE(setupSent);
+  EXPECT_EQ(buffer[4], 12);
+
+  DSMPDriver.deinit(ctx);
+}
 #endif
 
 #if defined(PXX1) && defined(HARDWARE_EXTERNAL_MODULE)
