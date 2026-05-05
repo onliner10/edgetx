@@ -327,6 +327,20 @@ TEST_F(PulsesTest, pxx2SendPulsesRejectsInvalidChannelCount)
 
   Pxx2Driver.deinit(ctx);
 }
+
+TEST_F(PulsesTest, pxx2IsrmRejectsInvalidSubtype)
+{
+  g_model.moduleData[INTERNAL_MODULE].type = MODULE_TYPE_ISRM_PXX2;
+  g_model.moduleData[INTERNAL_MODULE].subType = 15;
+  g_model.moduleData[INTERNAL_MODULE].channelsCount = 0;
+  g_model.moduleData[INTERNAL_MODULE].failsafeMode = FAILSAFE_NOT_SET;
+
+  uint8_t buffer[MODULE_BUFFER_SIZE] = {};
+  Pxx2Pulses frame(buffer);
+  ASSERT_TRUE(frame.setupFrame(INTERNAL_MODULE, nullptr, 0));
+
+  EXPECT_EQ(buffer[5], MODULE_SUBTYPE_ISRM_PXX2_ACCESS << 4);
+}
 #endif
 
 #if defined(PXX2) && defined(HARDWARE_EXTERNAL_MODULE)

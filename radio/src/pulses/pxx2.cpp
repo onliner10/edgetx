@@ -256,7 +256,7 @@ void Pxx2Pulses::addFlag1(uint8_t module)
     subType = PXX2_XJT_MODULE_SUBTYPES[getModuleXJTSubType(module)];
   }
   else if (isModuleISRM(module)) {
-    subType = g_model.moduleData[module].subType;
+    subType = getModuleISRMSubType(module);
   }
 
   uint8_t flag1 = subType << 4u;
