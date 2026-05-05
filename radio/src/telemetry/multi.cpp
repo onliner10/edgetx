@@ -339,6 +339,11 @@ static void processMultiProtoDef(uint8_t module, const uint8_t * packet, uint8_t
  
 static void processMultiDSMBindPacket(uint8_t module, const uint8_t *packet)
 {
+  if (getModuleMode(module) != MODULE_MODE_BIND) {
+    TRACE("[MP] DSM bind packet ignored outside bind mode");
+    return;
+  }
+
   if (//g_model.moduleData[module].type == MODULE_TYPE_MULTIMODULE &&
       //g_model.moduleData[module].multi.rfProtocol ==
       //    MODULE_SUBTYPE_MULTI_DSM2 &&
@@ -381,9 +386,7 @@ static void processMultiDSMBindPacket(uint8_t module, const uint8_t *packet)
   }
 
   /* Finally stop binding as the rx just told us that it is bound */
-  if (getModuleMode(module) == MODULE_MODE_BIND) {
-      setMultiBindStatus(module, MULTI_BIND_FINISHED);
-  }
+  setMultiBindStatus(module, MULTI_BIND_FINISHED);
 
   // Continue with the common Spektrum Processing
   processDSMBindPacket(packet);

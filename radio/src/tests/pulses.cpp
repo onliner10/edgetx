@@ -26,6 +26,7 @@
 
 #if defined(MULTIMODULE)
 #include "pulses/multi.h"
+#include "telemetry/multi.h"
 #endif
 
 #if defined(SBUS)
@@ -312,6 +313,29 @@ TEST_F(PulsesTest, multiSendPulsesRejectsInvalidSubtype)
   EXPECT_EQ(buffer[2] & 0x70, 0);
 
   MultiDriver.deinit(ctx);
+}
+
+TEST_F(PulsesTest, multiDsmBindPacketIgnoredOutsideBindMode)
+{
+  modulePortInit();
+  g_model.moduleData[EXTERNAL_MODULE].type = MODULE_TYPE_MULTIMODULE;
+  g_model.moduleData[EXTERNAL_MODULE].multi.rfProtocol =
+      MODULE_SUBTYPE_MULTI_DSM2;
+  g_model.moduleData[EXTERNAL_MODULE].subType = MM_RF_DSM2_SUBTYPE_AUTO;
+  g_model.moduleData[EXTERNAL_MODULE].channelsCount = 0;
+  moduleState[EXTERNAL_MODULE].mode = MODULE_MODE_NORMAL;
+
+  const uint8_t bindFrame[] = {
+      'M', 'P', 0x05, 10, 0x00, 0x00, 0x00,
+      0x00, 0x00, 12,   0xb2, 0x00, 0x00, 0x00};
+  for (uint8_t byte : bindFrame) {
+    processMultiTelemetryData(byte, EXTERNAL_MODULE);
+  }
+
+  EXPECT_EQ(g_model.moduleData[EXTERNAL_MODULE].subType,
+            MM_RF_DSM2_SUBTYPE_AUTO);
+  EXPECT_EQ(g_model.moduleData[EXTERNAL_MODULE].channelsCount, 0);
+  EXPECT_EQ(moduleState[EXTERNAL_MODULE].mode, MODULE_MODE_NORMAL);
 }
 #endif
 
