@@ -24,6 +24,7 @@
 #include "layout.h"
 
 class HeaderIcon;
+class SetupWidgetsPageSlot;
 
 //-----------------------------------------------------------------------------
 
@@ -39,6 +40,7 @@ class SetupTopBarWidgetsPage : public NavWindow
   void onClicked() override;
   void onCancel() override;
   void deleteLater() override;
+  void refreshSlots();
 
 #if defined(HARDWARE_KEYS)
   void onPressSYS() override {}
@@ -51,6 +53,9 @@ class SetupTopBarWidgetsPage : public NavWindow
   void onLongPressPGDN() override {}
   void onPressTELE() override { onCancel(); }
 #endif
+
+ protected:
+  SetupWidgetsPageSlot* slots[MAX_TOPBAR_ZONES] = {};
 };
 
 //-----------------------------------------------------------------------------
@@ -79,6 +84,7 @@ class TopBar: public WidgetsContainer
   bool isTopBar() override { return true; }
 
   void removeWidget(unsigned int index) override;
+  bool moveWidget(unsigned int index, int8_t direction);
 
   Widget* createWidget(unsigned int index, const WidgetFactory* factory) override;
 

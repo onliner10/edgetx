@@ -76,4 +76,6 @@ class SetupWidgetsPageSlot : public ButtonBase
   void setFocusState();
 
   void addNewWidget(WidgetsContainer* container, uint8_t slotIndex);
+  void moveTopBarWidget(WidgetsContainer* container, uint8_t slotIndex,
+                        int8_t direction);
 };

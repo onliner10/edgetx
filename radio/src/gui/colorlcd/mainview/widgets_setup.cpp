@@ -29,6 +29,7 @@
 #include "widget_settings.h"
 #include "pagegroup.h"
 #include "screen_setup.h"
+#include "topbar.h"
 
 #include <new>
 
@@ -48,6 +49,18 @@ SetupWidgetsPageSlot::SetupWidgetsPageSlot(Window* parent, const rect_t& rect,
       if (widget->hasOptions())
         menu->addLine(STR_WIDGET_SETTINGS,
                       [=]() { new (std::nothrow) WidgetSettings(widget); });
+      if (container->isTopBar()) {
+        auto topbarData = g_eeGeneral.getTopbarData();
+        if (slotIndex > 0 && topbarData->hasWidget(slotIndex - 1)) {
+          menu->addLine("Move left",
+                        [=]() { moveTopBarWidget(container, slotIndex, -1); });
+        }
+        if (slotIndex + 1 < MAX_TOPBAR_ZONES &&
+            topbarData->hasWidget(slotIndex + 1)) {
+          menu->addLine("Move right",
+                        [=]() { moveTopBarWidget(container, slotIndex, 1); });
+        }
+      }
       menu->addLine(STR_REMOVE_WIDGET,
                     [=]() { container->removeWidget(slotIndex); });
     } else {
@@ -124,6 +137,21 @@ void SetupWidgetsPageSlot::addNewWidget(WidgetsContainer* container,
 
   if (selected >= 0)
     menu->select(selected);
+}
+
+void SetupWidgetsPageSlot::moveTopBarWidget(WidgetsContainer* container,
+                                            uint8_t slotIndex,
+                                            int8_t direction)
+{
+  if (!container || !container->isTopBar()) return;
+
+  int targetIndex = (int)slotIndex + direction;
+  if (targetIndex < 0 || targetIndex >= MAX_TOPBAR_ZONES) return;
+
+  auto topbar = static_cast<TopBar*>(container);
+  if (topbar->moveWidget(slotIndex, direction) && parent) {
+    static_cast<SetupTopBarWidgetsPage*>(parent)->refreshSlots();
+  }
 }
 
 SetupWidgetsPage::SetupWidgetsPage(uint8_t customScreenIdx) :

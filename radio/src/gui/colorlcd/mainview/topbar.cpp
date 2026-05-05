@@ -32,6 +32,7 @@
 #include "widget.h"
 
 #include <new>
+#include <utility>
 
 //-----------------------------------------------------------------------------
 
@@ -89,15 +90,36 @@ SetupTopBarWidgetsPage::SetupTopBarWidgetsPage() :
 
   auto topbar = viewMain->getTopbar();
   topbar->setSetupMode(true);
-  topbar->updateZones();
-  for (unsigned i = 0; i < topbar->getZonesCount(); i++) {
-    auto rect = topbar->getZone(i);
-    new (std::nothrow) SetupWidgetsPageSlot(this, rect, topbar, i);
-  }
+  refreshSlots();
 
 #if defined(HARDWARE_TOUCH)
   addBackButton();
 #endif
+}
+
+void SetupTopBarWidgetsPage::refreshSlots()
+{
+  auto viewMain = ViewMain::instance();
+  if (!viewMain) return;
+
+  auto topbar = viewMain->getTopbar();
+  if (!topbar) return;
+
+  topbar->updateZones();
+  const unsigned int count = topbar->getZonesCount();
+  for (unsigned int i = 0; i < MAX_TOPBAR_ZONES; i += 1) {
+    if (i < count) {
+      auto rect = topbar->getZone(i);
+      if (slots[i]) {
+        slots[i]->setRect(rect);
+      } else {
+        slots[i] = new (std::nothrow) SetupWidgetsPageSlot(this, rect, topbar, i);
+      }
+    } else if (slots[i]) {
+      slots[i]->deleteLater();
+      slots[i] = nullptr;
+    }
+  }
 }
 
 void SetupTopBarWidgetsPage::onClicked()
@@ -319,6 +341,39 @@ void TopBar::removeWidget(unsigned int index)
   g_eeGeneral.getTopbarData()->clearZone(index);
 
   WidgetsContainer::removeWidget(index);
+}
+
+bool TopBar::moveWidget(unsigned int index, int8_t direction)
+{
+  if (!widgets || index >= zoneCount) return false;
+
+  int targetIndex = (int)index + direction;
+  if (targetIndex < 0 || targetIndex >= zoneCount) return false;
+
+  auto topbarData = g_eeGeneral.getTopbarData();
+  if (!topbarData->hasWidget(index) || !topbarData->hasWidget(targetIndex))
+    return false;
+
+  std::swap(topbarData->zones[index], topbarData->zones[targetIndex]);
+
+  const unsigned int target = (unsigned int)targetIndex;
+  for (auto i : {index, target}) {
+    if (widgets[i]) {
+      widgets[i]->deleteLater();
+      widgets[i] = nullptr;
+    }
+  }
+
+  for (auto i : {index, target}) {
+    if (topbarData->hasWidget(i)) {
+      widgets[i] = WidgetFactory::newWidget(topbarData->getWidgetName(i),
+                                            this, getZone(i), -1, i);
+    }
+  }
+
+  updateZones();
+  storageDirty(EE_GENERAL);
+  return true;
 }
 
 void TopBar::load()
