@@ -91,3 +91,13 @@ TEST(FlySky, shortAaPacketDoesNotReadPastFrame)
 
   processFlySkyPacket(frame.data(), 28);
 }
+
+TEST(FlySky, shortAcSensorDoesNotReadPastFrame)
+{
+  GuardedFlySkyFrame frame(28);
+  ASSERT_TRUE(frame.isValid());
+
+  frame.data()[3] = 19;
+
+  processFlySkyPacketAC(frame.data(), 28);
+}

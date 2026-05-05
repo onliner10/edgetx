@@ -431,16 +431,20 @@ void processFlySkyPacket(const uint8_t * packet, uint8_t len)
   }
 }
 
-void processFlySkyPacketAC(const uint8_t * packet)
+void processFlySkyPacketAC(const uint8_t * packet, uint8_t len)
 {
+  if (len < 1)
+    return;
+
   // Set TX RSSI Value, reverse MULTIs scaling
   setFlyskyTelemetryValue(AFHDS2A_ID_TX_RSSI, 0, packet[0], UNIT_RAW, 0);
   const uint8_t * buffer = packet + 1;
-  while (buffer - packet < 26) //28 + 1(multi TX rssi) - 3(ac header)
+  const uint8_t * end = packet + len;
+  while (end - buffer >= 3)
   {
     if (*buffer == SENSOR_TYPE_END) break;
     uint8_t size = buffer[2];
-    if (size > 26 - (buffer - packet) - 3) break;
+    if (size < 4 || size > end - buffer - 3) break;
     processFlySkySensor(buffer, 0xAC);
     buffer += size + 3;
   }
@@ -479,7 +483,7 @@ void processFlySkyTelemetryData(uint8_t data, uint8_t * rxBuffer, uint8_t &rxBuf
     debugPrintf(CRLF);
 #endif
     if (data == 0xAA) processFlySkyPacket(rxBuffer + 1, rxBufferCount - 1);
-    else if (data == 0xAC) processFlySkyPacketAC(rxBuffer + 1);
+    else if (data == 0xAC) processFlySkyPacketAC(rxBuffer + 1, rxBufferCount - 1);
     rxBufferCount = 0;
   }
 }

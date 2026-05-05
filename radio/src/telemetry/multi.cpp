@@ -430,7 +430,7 @@ static void processMultiTelemetryPaket(const uint8_t * packet, uint8_t module)
 
     case FlyskyIBusTelemetryAC:
       if (len >= 28)
-        processFlySkyPacketAC(data);
+        processFlySkyPacketAC(data, len);
       else
         TRACE("[MP] Received IBUS telemetry AC len %d < 28", len);
       break;
