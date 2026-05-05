@@ -311,7 +311,7 @@ int intpol(int x, uint8_t idx) // -100, -75, -50, -25, 0 ,25 ,50, 75, 100
     erg = (int16_t)points[count - 1] * (RESX / 4);
   } else {
     uint16_t a = 0, b = 0;
-    uint8_t i;
+    int i;
     if (custom) {
       for (i = 0; i < count - 1; i++) {
         a = b;
