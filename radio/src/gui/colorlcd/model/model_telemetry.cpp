@@ -26,6 +26,7 @@
 #include "fullscreen_dialog.h"
 #include "getset_helpers.h"
 #include "list_line_button.h"
+#include "mainwindow.h"
 #include "menu.h"
 #include "numberedit.h"
 #include "page.h"
@@ -39,6 +40,23 @@
 #define ETX_STATE_VALUE_STALE_WARN LV_STATE_USER_1
 
 std::string getSensorCustomValue(uint8_t sensor, int32_t value, LcdFlags flags);
+
+#if defined(SIMU)
+static bool forceFreshCanvasCreateFailure = false;
+
+void modelTelemetryForceFreshCanvasCreateFailureForTest(bool force)
+{
+  forceFreshCanvasCreateFailure = force;
+}
+#endif
+
+static lv_obj_t* createFreshCanvas(lv_obj_t* parent)
+{
+#if defined(SIMU)
+  if (forceFreshCanvasCreateFailure) return nullptr;
+#endif
+  return lv_canvas_create(parent);
+}
 
 #if PORTRAIT || defined(TRANSLATIONS_CZ)
 #define TWOCOLBUTTONS 1
@@ -276,10 +294,14 @@ class SensorButton : public ListLineButton
     lv_obj_set_pos(nm, TSStyle::NUM_W + PAD_SMALL, PAD_MEDIUM/2);
 
     auto mask = getBuiltinIcon(ICON_DOT);
-    fresh = lv_canvas_create(lvobj);
-    lv_obj_set_pos(fresh, TSStyle::NUM_W + TSStyle::NAME_W + PAD_MEDIUM, PAD_LARGE);
-    lv_canvas_set_buffer(fresh, (void*)mask->data, mask->width, mask->height, LV_IMG_CF_ALPHA_8BIT);
-    lv_obj_add_flag(fresh, LV_OBJ_FLAG_HIDDEN);
+    fresh = createFreshCanvas(lvobj);
+    if (fresh) {
+      lv_obj_set_pos(fresh, TSStyle::NUM_W + TSStyle::NAME_W + PAD_MEDIUM,
+                     PAD_LARGE);
+      lv_canvas_set_buffer(fresh, (void*)mask->data, mask->width, mask->height,
+                           LV_IMG_CF_ALPHA_8BIT);
+      lv_obj_add_flag(fresh, LV_OBJ_FLAG_HIDDEN);
+    }
 
     valLabel = tsStyle.newValue(lvobj);
     lv_obj_set_pos(valLabel, TSStyle::NUM_W + TSStyle::NAME_W + PAD_LARGE * 3, PAD_MEDIUM/2);
@@ -297,10 +319,12 @@ class SensorButton : public ListLineButton
     if (showId != g_model.showInstanceIds) setNumIdState();
 
     // Draw a 'fresh' marker
-    if (telemetryItems[index].isFresh())
-      lv_obj_clear_flag(fresh, LV_OBJ_FLAG_HIDDEN);
-    else
-      lv_obj_add_flag(fresh, LV_OBJ_FLAG_HIDDEN);
+    if (fresh) {
+      if (telemetryItems[index].isFresh())
+        lv_obj_clear_flag(fresh, LV_OBJ_FLAG_HIDDEN);
+      else
+        lv_obj_add_flag(fresh, LV_OBJ_FLAG_HIDDEN);
+    }
 
     uint32_t now = lv_tick_get();
     TelemetryItem& telemetryItem = telemetryItems[index];
@@ -333,6 +357,34 @@ class SensorButton : public ListLineButton
     }
   }
 };
+
+#if defined(SIMU)
+bool modelTelemetryFreshCanvasCreateFailureLeavesNoMarkerForTest()
+{
+  class TestSensorButton : public SensorButton
+  {
+   public:
+    TestSensorButton(Window* parent) :
+        SensorButton(parent,
+                     rect_t{0, 0, LCD_W, EdgeTxStyles::UI_ELEMENT_HEIGHT}, 0)
+    {
+    }
+
+    void initForTest() { delayedInit(); }
+    bool hasFreshMarker() const { return fresh != nullptr; }
+  };
+
+  memclear(g_model.telemetrySensors, sizeof(g_model.telemetrySensors));
+  strAppend(g_model.telemetrySensors[0].label, "RSSI", TELEM_LABEL_LEN);
+
+  modelTelemetryForceFreshCanvasCreateFailureForTest(true);
+  auto button = new TestSensorButton(MainWindow::instance());
+  button->initForTest();
+  modelTelemetryForceFreshCanvasCreateFailureForTest(false);
+
+  return button && !button->hasFreshMarker();
+}
+#endif
 
 class SensorSourceChoice : public SourceChoice
 {
