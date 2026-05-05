@@ -732,6 +732,19 @@ TEST_F(PulsesTest, pxx2RejectsEmptyFrame)
   SUCCEED();
 }
 
+TEST_F(PulsesTest, pxx2RejectsModuleFrameWithoutId)
+{
+  GuardedPxx2Frame guardedFrame(1);
+  ASSERT_TRUE(guardedFrame.isValid());
+
+  uint8_t * frame = guardedFrame.data();
+  frame[1] = PXX2_TYPE_C_MODULE;
+
+  processPXX2Frame(INTERNAL_MODULE, frame, nullptr, nullptr);
+
+  SUCCEED();
+}
+
 TEST_F(PulsesTest, pxx2RejectsShortModuleSettingsFrame)
 {
   ModuleSettings moduleSettings = {};

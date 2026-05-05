@@ -532,6 +532,10 @@ static void processOtaUpdateFrame(uint8_t module, const uint8_t * frame)
 static void processModuleFrame(uint8_t module, const uint8_t *frame,
                                const etx_serial_driver_t* drv, void* ctx)
 {
+  if (!pxx2FrameHasIndex(frame, 2)) {
+    return;
+  }
+
   switch (frame[2]) {
     case PXX2_TYPE_ID_HW_INFO:
       processGetHardwareInfoFrame(module, frame);
