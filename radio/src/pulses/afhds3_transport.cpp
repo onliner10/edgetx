@@ -41,6 +41,9 @@
 namespace afhds3
 {
 
+static constexpr uint8_t AFHDS3_MIN_FRAME_SIZE =
+    offsetof(AfhdsFrame, value) + 2;
+
 enum AfhdsSpecialChars {
   END = 0xC0,  // Frame end
   START = END,
@@ -150,6 +153,12 @@ bool FrameTransport::processTelemetryData(uint8_t byte, uint8_t* rxBuffer,
 
     if (!_checkCRC(rxBuffer, rxBufferCount - 2)) {
       TRACE("AFHDS3 [INVALID CRC]");
+      rxBufferCount = 0;
+      return false;
+    }
+
+    if (rxBufferCount < AFHDS3_MIN_FRAME_SIZE) {
+      TRACE("AFHDS3 [SHORT FRAME]");
       rxBufferCount = 0;
       return false;
     }
@@ -319,7 +328,9 @@ bool Transport::handleRetransmissions(bool& error)
 
 bool Transport::handleReply(uint8_t* buffer, uint8_t len)
 {
-  // TODO: check len...
+  if (len < AFHDS3_MIN_FRAME_SIZE) {
+    return false;
+  }
 
   AfhdsFrame* responseFrame = reinterpret_cast<AfhdsFrame*>(buffer);
   if (responseFrame->frameType == FRAME_TYPE::REQUEST_SET_EXPECT_ACK) {

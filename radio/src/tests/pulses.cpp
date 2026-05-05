@@ -24,6 +24,11 @@
 #include "hal/module_port.h"
 #include "pulses/pulses.h"
 
+#if defined(PXX2) || defined(AFHDS3)
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
+
 #if defined(MULTIMODULE)
 #include "pulses/multi.h"
 #include "telemetry/multi.h"
@@ -50,8 +55,6 @@
 #if defined(PXX2)
 #include "pulses/pxx2.h"
 #include "pulses/pxx2_transport.h"
-#include <sys/mman.h>
-#include <unistd.h>
 #endif
 
 #if defined(AFHDS3)
@@ -159,6 +162,60 @@ class GuardedPxx2Frame
 #endif
 
 #if defined(AFHDS3)
+class GuardedAfhds3RxBuffer
+{
+ public:
+  explicit GuardedAfhds3RxBuffer(size_t size):
+      mappingSize(0),
+      mapping(nullptr),
+      frame(nullptr)
+  {
+    long pageSize = sysconf(_SC_PAGESIZE);
+    if (pageSize <= 0 || size > static_cast<size_t>(pageSize)) {
+      return;
+    }
+
+    mappingSize = static_cast<size_t>(pageSize * 2);
+    mapping = mmap(nullptr, mappingSize, PROT_READ | PROT_WRITE,
+                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (mapping == MAP_FAILED) {
+      mapping = nullptr;
+      mappingSize = 0;
+      return;
+    }
+
+    if (mprotect(static_cast<uint8_t *>(mapping) + pageSize, pageSize,
+                 PROT_NONE) != 0) {
+      munmap(mapping, mappingSize);
+      mapping = nullptr;
+      mappingSize = 0;
+      return;
+    }
+
+    frame = static_cast<uint8_t *>(mapping) + pageSize - size;
+    memset(frame, 0, size);
+  }
+
+  ~GuardedAfhds3RxBuffer()
+  {
+    if (mapping != nullptr) {
+      munmap(mapping, mappingSize);
+    }
+  }
+
+  bool isValid() const { return frame != nullptr; }
+
+  uint8_t * data()
+  {
+    return frame;
+  }
+
+ private:
+  size_t mappingSize;
+  void * mapping;
+  uint8_t * frame;
+};
+
 void feedShortAfhds3Response(void* ctx, afhds3::COMMAND command,
                              uint8_t value)
 {
@@ -715,6 +772,27 @@ TEST_F(PulsesTest, afhds3RejectsShortModuleVersionResponse)
   feedShortAfhds3Response(ctx, afhds3::COMMAND::MODULE_VERSION, 0);
 
   afhds3::ProtoDriver.deinit(ctx);
+}
+
+TEST_F(PulsesTest, afhds3RejectsTooShortResponseFrame)
+{
+  modulePortInit();
+  g_model.moduleData[EXTERNAL_MODULE].type = MODULE_TYPE_FLYSKY_AFHDS3;
+
+  auto ctx = afhds3::ProtoDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  GuardedAfhds3RxBuffer rxBuffer(3);
+  ASSERT_TRUE(rxBuffer.isValid());
+
+  uint8_t len = 0;
+  const uint8_t frame[] = {0xC0, 0xFF, 0xC0};
+  for (uint8_t byte : frame) {
+    afhds3::ProtoDriver.processData(ctx, byte, rxBuffer.data(), &len);
+  }
+
+  afhds3::ProtoDriver.deinit(ctx);
+  SUCCEED();
 }
 
 TEST_F(PulsesTest, afhds3RejectsInvalidRfPower)

@@ -631,10 +631,13 @@ bool containsData(enum FRAME_TYPE frameType)
       frameType == FRAME_TYPE::REQUEST_SET_NO_RESP);
 }
 
+constexpr size_t AFHDS3_MIN_FRAME_SIZE = offsetof(AfhdsFrame, value) + 2;
+
 size_t getPayloadLength(uint8_t rxBufferCount)
 {
-  constexpr size_t frameOverhead = offsetof(AfhdsFrame, value) + 2;
-  return rxBufferCount >= frameOverhead ? rxBufferCount - frameOverhead : 0;
+  return rxBufferCount >= AFHDS3_MIN_FRAME_SIZE
+             ? rxBufferCount - AFHDS3_MIN_FRAME_SIZE
+             : 0;
 }
 
 void ProtoState::setState(ModuleState state)
@@ -679,6 +682,10 @@ void ProtoState::requestInfoAndRun(bool send)
 
 void ProtoState::parseData(uint8_t* rxBuffer, uint8_t rxBufferCount)
 {
+  if (rxBufferCount < AFHDS3_MIN_FRAME_SIZE) {
+    return;
+  }
+
   AfhdsFrame* responseFrame = reinterpret_cast<AfhdsFrame*>(rxBuffer);
   uint8_t* payload = responseFrame->GetValue();
   size_t payloadLength = getPayloadLength(rxBufferCount);
