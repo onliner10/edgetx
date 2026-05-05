@@ -817,6 +817,25 @@ TEST_F(PulsesTest, pxx2RejectsShortSpectrumAnalyserFrame)
   EXPECT_EQ(reusableBuffer.spectrumAnalyser.bars[0], 21);
 }
 
+TEST_F(PulsesTest, pxx2RejectsZeroSpectrumAnalyserStep)
+{
+  moduleState[INTERNAL_MODULE].mode = MODULE_MODE_SPECTRUM_ANALYSER;
+  reusableBuffer.spectrumAnalyser.step = 0;
+  reusableBuffer.spectrumAnalyser.bars[0] = 21;
+
+  GuardedPxx2Frame guardedFrame(8);
+  ASSERT_TRUE(guardedFrame.isValid());
+
+  uint8_t * frame = guardedFrame.data();
+  frame[1] = PXX2_TYPE_C_POWER_METER;
+  frame[2] = PXX2_TYPE_ID_SPECTRUM;
+  frame[8] = 0;
+
+  processPXX2Frame(INTERNAL_MODULE, frame, nullptr, nullptr);
+
+  EXPECT_EQ(reusableBuffer.spectrumAnalyser.bars[0], 21);
+}
+
 TEST_F(PulsesTest, pxx2RejectsShortTelemetryFrame)
 {
   GuardedPxx2Frame guardedFrame(3);

@@ -453,7 +453,11 @@ static void processSpectrumAnalyserFrame(uint8_t module, const uint8_t * frame)
   int32_t offset = frequency - (reusableBuffer.spectrumAnalyser.freq - reusableBuffer.spectrumAnalyser.span / 2);
   TRACE("Fq=%u => %d, Pw=%d", frequency, offset, int32_t(power));
 
-  uint32_t x = offset / reusableBuffer.spectrumAnalyser.step;
+  uint32_t x;
+  if (!divInto(offset, reusableBuffer.spectrumAnalyser.step, x)) {
+    return;
+  }
+
   if (x < LCD_W) {
     reusableBuffer.spectrumAnalyser.bars[x] = max<int>(0, -SPECTRUM_ANALYSER_POWER_FLOOR + power); // we remove everything below -120dB
 #if defined(COLORLCD)
