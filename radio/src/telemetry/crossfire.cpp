@@ -299,12 +299,23 @@ void processCrossfireTelemetryFrame(uint8_t module, uint8_t* rxBuffer,
 
     case CHANNELS_ID:
       if (g_model.trainerData.mode == TRAINER_MODE_CRSF) {
+        constexpr uint8_t trainerChannels =
+            CROSSFIRE_CHANNELS_COUNT < MAX_TRAINER_CHANNELS
+                ? CROSSFIRE_CHANNELS_COUNT
+                : MAX_TRAINER_CHANNELS;
+        constexpr uint8_t channelBytes =
+            (trainerChannels * CROSSFIRE_CH_BITS + 7) / 8;
+        if (crsfPayloadLen < 2 + channelBytes ||
+            rxBufferCount < 3 + channelBytes) {
+          break;
+        }
+
         uint8_t inputbitsavailable = 0;
         uint32_t inputbits = 0;
         uint8_t  byteIdx = 3;
         int16_t *pulses = trainerInput;
 
-        for (int i = 0; i < min(CROSSFIRE_CHANNELS_COUNT, MAX_TRAINER_CHANNELS); i++) {
+        for (int i = 0; i < trainerChannels; i++) {
           while (inputbitsavailable < CROSSFIRE_CH_BITS) {
             inputbits |= (uint32_t)(rxBuffer[byteIdx++]) << inputbitsavailable;
             inputbitsavailable += 8;

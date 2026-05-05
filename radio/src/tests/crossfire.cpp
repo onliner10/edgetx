@@ -252,6 +252,17 @@ TEST(Crossfire, frameParser_badFrames)
   EXPECT_EQ(lua_buffer[offset + 0x1F - 1], 0xFE);
 }
 
+TEST(Crossfire, shortChannelsFrameDoesNotUpdateTrainerInputs)
+{
+  g_model.trainerData.mode = TRAINER_MODE_CRSF;
+  trainerInput[0] = 123;
+
+  uint8_t frame[] = {RADIO_ADDRESS, 2, CHANNELS_ID, 0};
+  processCrossfireTelemetryFrame(EXTERNAL_MODULE, frame, sizeof(frame));
+
+  EXPECT_EQ(trainerInput[0], 123);
+}
+
 static uint8_t jumboFrame1[]={
   0xEA, 0x3E, 0xFE, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
