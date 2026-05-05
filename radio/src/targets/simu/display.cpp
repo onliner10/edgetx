@@ -22,6 +22,8 @@
 #include "display.h"
 #include "simu.h"
 
+#include <mutex>
+
 static void _set_pixel(uint8_t* pixel, const SDL_Color& color)
 {
   pixel[0] = color.a;
@@ -100,7 +102,9 @@ static void _blit_simu_screen_4bit(void* screen_buffer, Uint32 format, int w, in
 
 void refreshDisplay(SDL_Texture* screen)
 {
-  if (simuLcdRefresh) {
+  {
+    std::lock_guard<std::mutex> lock(simuLcdMutex);
+    if (!simuLcdRefresh) return;
 
     // fetch texture format
     Uint32 format = 0;
@@ -132,8 +136,5 @@ void refreshDisplay(SDL_Texture* screen)
 
     SDL_UnlockTexture(screen);
     simuLcdRefresh = false;
-    lcdFlushed();
   }
 }
-
-

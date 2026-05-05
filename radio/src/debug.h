@@ -30,7 +30,7 @@
 
 #include "serial.h"
 
-EXTERN_C(extern volatile uint32_t g_tmr10ms);
+EXTERN_C(uint32_t timersGet10msTick(void));
 
 #if defined(SIMU)
   typedef void (*traceCallbackFunc)(const char * text);
@@ -46,7 +46,7 @@ EXTERN_C(extern volatile uint32_t g_tmr10ms);
 #endif
 
 #define TRACE_TIME_FORMAT     "%dms: "
-#define TRACE_TIME_VALUE      (g_tmr10ms * 10)
+#define TRACE_TIME_VALUE      (timersGet10msTick() * 10)
 
 #define TRACE_NOCRLF(...)     debugPrintf(__VA_ARGS__)
 #define TRACE(f_, ...)        debugPrintf((TRACE_TIME_FORMAT f_ CRLF), TRACE_TIME_VALUE, ##__VA_ARGS__)

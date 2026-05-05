@@ -25,45 +25,52 @@
 #include <FreeRTOS/include/FreeRTOS.h>
 #include <FreeRTOS/include/timers.h>
 
-bool async_call(async_func_t func, volatile bool* excl_flag, void* param1,
+static inline bool async_try_claim(AsyncExclusiveFlag* excl_flag)
+{
+  return !excl_flag || excl_flag->tryClaim();
+}
+
+static inline void async_clear_claim(AsyncExclusiveFlag* excl_flag)
+{
+  if (excl_flag) excl_flag->clear();
+}
+
+bool async_call(async_func_t func, AsyncExclusiveFlag* excl_flag, void* param1,
                 uint32_t param2)
 {
+  if (!async_try_claim(excl_flag)) return false;
+
   if (scheduler_is_running()) {
-
-    // check exclusive flag first
-    if (excl_flag && *excl_flag) return false;
-
     BaseType_t xReturn = xTimerPendFunctionCall(func, param1, param2, 0);
 
-    // update exclusive flag if provided
-    if (excl_flag && (xReturn == pdPASS)) *excl_flag = true;
+    if (xReturn != pdPASS) async_clear_claim(excl_flag);
 
     return xReturn == pdPASS;
   }
 
   func(param1, param2);
+  async_clear_claim(excl_flag);
   return true;
 }
 
-bool async_call_isr(async_func_t func, volatile bool* excl_flag, void* param1,
+bool async_call_isr(async_func_t func, AsyncExclusiveFlag* excl_flag, void* param1,
                     uint32_t param2)
 {
   BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+  if (!async_try_claim(excl_flag)) return false;
+
   if (scheduler_is_running()) {
-
-    // check exclusive flag first
-    if (excl_flag && *excl_flag) return false;
-
     BaseType_t xReturn = xTimerPendFunctionCallFromISR(
         func, param1, param2, &xHigherPriorityTaskWoken);
 
-    // update exclusive flag if provided
-    if (excl_flag && (xReturn == pdPASS)) *excl_flag = true;
+    if (xReturn != pdPASS) async_clear_claim(excl_flag);
 
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
     return xReturn == pdPASS;
   }
 
   func(param1, param2);
+  async_clear_claim(excl_flag);
   return true;
 }

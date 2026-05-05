@@ -605,7 +605,7 @@ static void toggleBtnBit(uint8_t bitix)
   _buttonState[(bitix / 8)] ^= 1 << (bitix % 8);
 }
 
-#define g_usbTmr10ms (*(uint8_t*)&g_tmr10ms)
+#define g_usbTmr10ms get_tmr10ms_low8()
 #define BTNPUSH_TIME 20 /* x10ms */
 
 static int16_t circularCutoutValue(uint8_t chix)

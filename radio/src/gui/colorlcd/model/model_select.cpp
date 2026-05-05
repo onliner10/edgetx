@@ -32,7 +32,7 @@
 #include "view_channels.h"
 #include "view_main.h"
 
-inline tmr10ms_t getTicks() { return g_tmr10ms; }
+inline tmr10ms_t getTicks() { return get_tmr10ms(); }
 
 struct ModelButtonLayout {
   uint16_t width;

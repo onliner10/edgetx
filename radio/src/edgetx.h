@@ -376,7 +376,7 @@ inline int calcRESXto100(int x)
   return divRoundClosest(x*100, RESX);
 }
 
-#define g_blinkTmr10ms    (*(uint8_t*)&g_tmr10ms)
+#define g_blinkTmr10ms    get_tmr10ms_low8()
 
 #include "trainer.h"
 

@@ -32,7 +32,14 @@
 #include "tasks.h"
 #include "tasks/mixer_task.h"
 
+#if defined(SIMU)
+#include "targets/simu/simulib.h"
+#endif
+
 #if defined(COLORLCD)
+#if defined(SIMU)
+#include "lvgl/lvgl.h"
+#endif
 #if defined(FREE_RTOS)
 #include "LvglWrapper.h"
 #endif
@@ -102,11 +109,21 @@ static void pumpAdaptiveLvglUntilMenuDeadline(uint32_t cycleStart)
 bool perMainEnabled = true;
 #endif
 
+static void timer10msStart();
+
 static void menusTask()
 {
   edgeTxInit();
 
+#if defined(SIMU)
+  timer10msStart();
+#endif
+
   mixerTaskInit();
+
+#if defined(SIMU)
+  simuStartupComplete();
+#endif
 
 #if defined(COLORLCD) && defined(RTC_BACKUP_RAM)
   if (UNEXPECTED_SHUTDOWN())
@@ -208,7 +225,7 @@ static void timer10msStart()
   timer_start(&_timer10ms);
 }
 
-#if defined(COLORLCD) && defined(SIMU)
+#if defined(COLORLCD) && defined(SIMU) && !LV_TICK_CUSTOM
 static timer_handle_t _timer1ms = TIMER_INITIALIZER;
 
 static void _timer_1ms_cb(timer_handle_t* h)
@@ -235,11 +252,13 @@ void tasksStart()
   cliStart();
 #endif
 
-#if defined(COLORLCD) && defined(SIMU)
+#if defined(COLORLCD) && defined(SIMU) && !LV_TICK_CUSTOM
   timer1msStart();
 #endif
 
+#if !defined(SIMU)
   timer10msStart();
+#endif
 
   task_create(&menusTaskId, menusTask, "menus", menusStack, MENUS_STACK_SIZE,
               MENUS_TASK_PRIO);

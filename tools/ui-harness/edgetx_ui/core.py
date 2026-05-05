@@ -79,6 +79,10 @@ def simulator_environment() -> dict[str, str]:
     has_display = env.get("DISPLAY") or env.get("WAYLAND_DISPLAY")
     if sys.platform.startswith("linux") and not has_display:
         env.setdefault("SDL_VIDEODRIVER", "dummy")
+    if env.get("TSAN_OPTIONS"):
+        # Avoid libdbus lock-order reports from SDL desktop integration while
+        # keeping TSan focused on simulator/firmware code.
+        env["DBUS_SESSION_BUS_ADDRESS"] = "/dev/null"
     return env
 
 

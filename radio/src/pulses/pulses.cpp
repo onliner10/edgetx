@@ -31,6 +31,7 @@
 
 #include "pulses/pxx2.h"
 #include "pulses/flysky.h"
+#include "telemetry/telemetry.h"
 
 #if defined(DSM2)
 #include "pulses/dsm2.h"
@@ -133,12 +134,12 @@ void pulsesRestartModuleUnsafe(uint8_t module)
   mod_drv->ctx = drv->init(module);
 }
 
-static volatile bool _module_restart_queued[NUM_MODULES] = {false};
+static AsyncExclusiveFlag _module_restart_queued[NUM_MODULES];
 
 static void _setup_async_module_restart(void* p1, uint32_t p2)
 {
   uint8_t module = (uint8_t)(uintptr_t)p1;
-  _module_restart_queued[module] = false;
+  _module_restart_queued[module].clear();
 
   if (!mixerTaskTryLock()) {
     // In case the mixer cannot be locked, try again later
@@ -497,14 +498,11 @@ static void pulsesEnableModule(uint8_t module, uint8_t protocol)
   }
 }
 
-// TODO: declare a function in telemetry
-extern volatile uint8_t _telemetryIsPolling;
-
 void pulsesStopModule(uint8_t module)
 {
   if (module >= MAX_MODULES) return;
 
-  while(_telemetryIsPolling) {
+  while(telemetryIsPolling()) {
     // In case the telemetry timer is currently polling the port,
     // we give the timer task a chance to run and finish the polling.
     sleep_ms(1);
@@ -552,7 +550,7 @@ void pulsesSendNextFrame(uint8_t module)
   auto& state = moduleState[module];
   if (state.protocol != protocol || state.forced_off) {
 
-    if (_telemetryIsPolling) {
+    if (telemetryIsPolling()) {
       // In case the telemetry timer is currently polling the port,
       // we just yield in the hope it will be different next time.
       return;

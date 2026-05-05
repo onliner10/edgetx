@@ -123,7 +123,7 @@ void flySkyNv14SetDefault(int index, uint8_t id, uint8_t subId,
   storageDirty(EE_MODEL);
 }
 
-inline tmr10ms_t getTicks() { return g_tmr10ms; }
+inline tmr10ms_t getTicks() { return get_tmr10ms(); }
 
 int32_t GetSensorValueFlySkyNv14(const FlyskyNv14Sensor* sensor,
                                  const uint8_t* data)

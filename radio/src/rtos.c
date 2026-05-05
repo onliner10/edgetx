@@ -107,11 +107,20 @@ void vApplicationGetTimerTaskMemory( StaticTask_t **ppxTimerTaskTCBBuffer,
 
 #endif // configSUPPORT_STATIC_ALLOCATION
 
-#if configUSE_TICK_HOOK > 0
-#include <lvgl/lvgl.h>
+#if defined(COLORLCD)
+#include "lv_conf.h"
+#endif
 
+#if configUSE_TICK_HOOK > 0 && defined(COLORLCD) && \
+    (!defined(LV_TICK_CUSTOM) || !LV_TICK_CUSTOM)
+#include <lvgl/lvgl.h>
+#endif
+
+#if configUSE_TICK_HOOK > 0
 void vApplicationTickHook( void )
 {
+#if defined(COLORLCD) && (!defined(LV_TICK_CUSTOM) || !LV_TICK_CUSTOM)
   lv_tick_inc(1);
+#endif
 }
 #endif

@@ -24,8 +24,11 @@
 #include "edgetx_types.h"
 #include "lcd.h"
 
+#include <mutex>
+
 extern int g_snapshot_idx;
 extern bool simuLcdRefresh;
+extern std::mutex simuLcdMutex;
 
 #if defined(COLORLCD)
 extern pixel_t* simuLcdBuf;

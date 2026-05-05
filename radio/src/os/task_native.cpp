@@ -24,6 +24,7 @@
 #include "timer_native_impl.h"
 
 #include <chrono>
+#include <atomic>
 #include <memory>
 #include <vector>
 #include <mutex>
@@ -34,7 +35,7 @@ static std::mutex _stop_m;
 
 static std::mutex _tasks_m;
 static std::vector<task_handle_t*> _tasks;
-static bool _stop_tasks = false;
+static std::atomic_bool _stop_tasks{false};
 
 void task_sleep_ms(uint32_t ms)
 {
@@ -53,7 +54,7 @@ void task_sleep_until(time_point_t* tp, uint32_t inc)
 static void stop_tasks()
 {
   std::lock_guard lock(_tasks_m);
-  _stop_tasks = true;
+  _stop_tasks.store(true, std::memory_order_release);
 }
 
 static bool next_task_to_stop(task_handle_t*& task)
@@ -107,7 +108,7 @@ void task_create(task_handle_t* h, task_func_t func, const char* name,
   (void)stack;
   (void)priority;
   std::lock_guard lock(_tasks_m);
-  if (_stop_tasks) return;
+  if (_stop_tasks.load(std::memory_order_acquire)) return;
 
   h->_stack_size = stack_size;
   run_context* ctx = new run_context{func, name};
@@ -117,7 +118,7 @@ void task_create(task_handle_t* h, task_func_t func, const char* name,
 
 bool task_running()
 {
-  return !_stop_tasks;
+  return !_stop_tasks.load(std::memory_order_acquire);
 }
 
 unsigned task_get_stack_usage(task_handle_t* h)
@@ -160,4 +161,3 @@ bool mutex_trylock(mutex_handle_t* h) ETX_NO_THREAD_SAFETY_ANALYSIS
   if (!h) return false;
   return h->try_lock();
 }
-

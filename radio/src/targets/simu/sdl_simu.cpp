@@ -31,6 +31,7 @@
 #include <iostream>
 #include <fstream>
 #include <filesystem>
+#include <mutex>
 #include <regex>
 #include <sstream>
 #include <string>
@@ -92,6 +93,7 @@ static SDL_Renderer* renderer;
 static SDL_Texture* screen_frame_buffer;
 static bool automation_stdio = false;
 
+static std::mutex inputStateMutex;
 static GimbalState stick_left = {{0.5f, 0.5f}, false};
 static GimbalState stick_right = {{0.5f, 0.5f}, false};
 
@@ -102,7 +104,6 @@ static const unsigned char _icon_png[] = {
 #endif
 
 #if defined(ROTARY_ENCODER_NAVIGATION)
-extern volatile rotenc_t rotencValue;
 #endif
 
 int pots[MAX_POTS] = {0};
@@ -332,7 +333,7 @@ static bool handleKeyEvents(SDL_Event& event)
     case SDLK_UP:
 #if defined(ROTARY_ENCODER_NAVIGATION)
       if (event.type == SDL_KEYDOWN) {
-        rotencValue -= ROTARY_ENCODER_GRANULARITY;
+        simuRotaryEncoderEvent(-1);
       }
 #else
       if (keysGetSupported() & (1 << KEY_UP)) {
@@ -345,7 +346,7 @@ static bool handleKeyEvents(SDL_Event& event)
     case SDLK_DOWN:
 #if defined(ROTARY_ENCODER_NAVIGATION)
       if (event.type == SDL_KEYDOWN) {
-        rotencValue += ROTARY_ENCODER_GRANULARITY;
+        simuRotaryEncoderEvent(1);
       }
 #else
       if (keysGetSupported() & (1 << KEY_DOWN)) {
@@ -650,6 +651,7 @@ static float gimbals_width()
 
 static void draw_gimbals()
 {
+  std::lock_guard<std::mutex> lock(inputStateMutex);
   stick_left.lock_y = (g_eeGeneral.stickMode == 1);
   stick_right.lock_y = (g_eeGeneral.stickMode == 0);
 
@@ -671,6 +673,7 @@ static void draw_pots()
   ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(spacing, spacing));
   ImGui::PushID("pots");
   {
+    std::lock_guard<std::mutex> lock(inputStateMutex);
     ImGui::BeginGroup();
     int pot_idx = 0;
     for (int i = 0; i < adcGetMaxInputs(ADC_INPUT_FLEX); i++) {
@@ -816,7 +819,9 @@ static void redraw()
   bool show_win = true;
 
   if (ImGui::Begin("Main window", &show_win, flags)) {
-    draw_controls();
+    if (simuStartupCompleted()) {
+      draw_controls();
+    }
     draw_screen();
   }
   ImGui::End();
@@ -975,11 +980,17 @@ int main(int argc, char* argv[])
   switch (input_mode) {
     case 0:
     case 2:
-      stick_right.pos.y = 1.0f;
+      {
+        std::lock_guard<std::mutex> lock(inputStateMutex);
+        stick_right.pos.y = 1.0f;
+      }
       break;
     case 1:
     case 3:
-      stick_left.pos.y = 1.0f;
+      {
+        std::lock_guard<std::mutex> lock(inputStateMutex);
+        stick_left.pos.y = 1.0f;
+      }
       break;
     default:
       SDL_Log("Invalid input mode %d", input_mode);
@@ -1041,6 +1052,8 @@ int main(int argc, char* argv[])
 
 uint16_t simuGetAnalog(uint8_t idx)
 {
+  std::lock_guard<std::mutex> lock(inputStateMutex);
+
   auto max_sticks = adcGetMaxInputs(ADC_INPUT_MAIN);
   if (idx < max_sticks) {
     switch(idx) {

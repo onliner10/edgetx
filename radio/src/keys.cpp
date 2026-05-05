@@ -539,7 +539,8 @@ bool rotaryEncoderPollingCycle()
     rePreviousValue = reNewValue;
 
     bool new_cw = (scrollRE < 0) ? false : true;
-    if ((g_tmr10ms - lastEvent >= 10) || (cw == new_cw)) {  // 100ms
+    uint32_t now = get_tmr10ms();
+    if ((now - lastEvent >= 10) || (cw == new_cw)) {  // 100ms
 
       pushEvent(new_cw ? EVT_ROTARY_RIGHT : EVT_ROTARY_LEFT);
 
@@ -548,7 +549,7 @@ bool rotaryEncoderPollingCycle()
 
       if (new_cw == cw) {
         // Modified moving average filter used for smoother change of speed
-        delay = (((g_tmr10ms - lastEvent) << 3) + delay) >> 1;
+        delay = (((now - lastEvent) << 3) + delay) >> 1;
       } else {
         delay = 2 * ROTENC_DELAY_MIDSPEED;
       }
@@ -560,7 +561,7 @@ bool rotaryEncoderPollingCycle()
       else
         rotencSpeed = ROTENC_LOWSPEED;
       cw = new_cw;
-      lastEvent = g_tmr10ms;
+      lastEvent = now;
     }
 
     return true;

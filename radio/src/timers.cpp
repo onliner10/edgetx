@@ -23,7 +23,12 @@
 #include "timers.h"
 #include "switches.h"
 
-volatile tmr10ms_t g_tmr10ms;
+Tmr10msCounter g_tmr10ms;
+
+extern "C" tmr10ms_t timersGet10msTick()
+{
+  return get_tmr10ms();
+}
 
 #define MAX_ALERT_TIME   60
 

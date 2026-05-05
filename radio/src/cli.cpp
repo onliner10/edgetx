@@ -1417,7 +1417,8 @@ void printAudioVars()
   }
 
   cliSerialPrint("FragmentFifo:  ridx: %d, widx: %d",
-              audioQueue.fragmentsFifo.ridx, audioQueue.fragmentsFifo.widx);
+              audioQueue.fragmentsFifo.ridx.load(std::memory_order_relaxed),
+              audioQueue.fragmentsFifo.widx.load(std::memory_order_relaxed));
   cliSerialPrint("audioQueue:  readIdx: %d, writeIdx: %d, full: %d",
               audioQueue.buffersFifo.readIdx, audioQueue.buffersFifo.writeIdx,
               audioQueue.buffersFifo.bufferFull);

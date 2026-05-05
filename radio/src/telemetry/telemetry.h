@@ -74,6 +74,7 @@ void telemetryMirrorSend(uint8_t data);
 
 void telemetryWakeup();
 void telemetryReset();
+bool telemetryIsPolling();
 
 void telemetryInterrupt10ms();
 
