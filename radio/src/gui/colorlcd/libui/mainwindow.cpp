@@ -161,15 +161,15 @@ bool MainWindow::setBackgroundImage(std::string& fileName)
 {
   if (fileName.empty()) return false;
 
-  // ensure you delete old bitmap
-  if (backgroundBitmap != nullptr) delete backgroundBitmap;
-
   // Try to load bitmap.
-  backgroundBitmap = BitmapBuffer::loadBitmap(fileName.c_str(), BMP_RGB565);
+  auto newBitmap = BitmapBuffer::loadBitmap(fileName.c_str(), BMP_RGB565);
 
-  if (backgroundBitmap) {
+  if (newBitmap) {
+    auto oldBitmap = backgroundBitmap;
+    backgroundBitmap = newBitmap;
     lv_canvas_set_buffer(background, backgroundBitmap->getData(), backgroundBitmap->width(),
                          backgroundBitmap->height(), LV_IMG_CF_TRUE_COLOR);
+    if (oldBitmap != nullptr) delete oldBitmap;
     return true;
   }
 

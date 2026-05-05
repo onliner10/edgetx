@@ -300,25 +300,41 @@ StaticBitmap::StaticBitmap(Window* parent, const rect_t& rect,
 void StaticBitmap::setSource(const char *filename)
 {
   if (filename) {
-    if (img) delete img;
-    img = BitmapBuffer::loadBitmap(filename, BMP_ARGB4444);
-    if (img) {
-      img->resizeToLVGL(width(), height());
-      if (canvas) lv_obj_del(canvas);
-      canvas = lv_canvas_create(lvobj);
-      lv_obj_center(canvas);
-      lv_canvas_set_buffer(canvas, img->getData(), img->width(), img->height(),
+    if (filename[0] == '\0') {
+      clearSource();
+      return;
+    }
+
+    BitmapBuffer* newImg = BitmapBuffer::loadBitmap(filename, BMP_ARGB4444);
+    if (newImg) {
+      newImg->resizeToLVGL(width(), height());
+      lv_obj_t* newCanvas = lv_canvas_create(lvobj);
+      if (!newCanvas) {
+        delete newImg;
+        return;
+      }
+
+      lv_obj_center(newCanvas);
+      lv_canvas_set_buffer(newCanvas, newImg->getData(), newImg->width(), newImg->height(),
                           LV_IMG_CF_TRUE_COLOR_ALPHA);
+
+      auto oldCanvas = canvas;
+      auto oldImg = img;
+      canvas = newCanvas;
+      img = newImg;
+
+      if (oldCanvas) lv_obj_del(oldCanvas);
+      if (oldImg) delete oldImg;
     }
   }
 }
 
 void StaticBitmap::clearSource()
 {
-  if (img) delete img;
-  img = nullptr;
   if (canvas) lv_obj_del(canvas);
   canvas = nullptr;
+  if (img) delete img;
+  img = nullptr;
 }
 
 StaticBitmap::~StaticBitmap()
