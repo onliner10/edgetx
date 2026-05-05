@@ -28,6 +28,51 @@
 #include "pulses/pulses.h"
 #include "telemetry/ghost.h"
 #include "telemetry/telemetry.h"
+#include <sys/mman.h>
+#include <unistd.h>
+
+class GuardedGhostFrame
+{
+ public:
+  explicit GuardedGhostFrame(size_t size):
+      pageSize(sysconf(_SC_PAGESIZE)),
+      mappingSize(pageSize * 2),
+      frameSize(size)
+  {
+    mapping = static_cast<uint8_t*>(
+        mmap(nullptr, mappingSize, PROT_READ | PROT_WRITE,
+             MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+    if (mapping == MAP_FAILED) {
+      mapping = nullptr;
+      return;
+    }
+    if (mprotect(mapping + pageSize, pageSize, PROT_NONE) != 0) {
+      munmap(mapping, mappingSize);
+      mapping = nullptr;
+      return;
+    }
+    frame = mapping + pageSize - frameSize;
+    memset(frame, 0, frameSize);
+  }
+
+  ~GuardedGhostFrame()
+  {
+    if (mapping != nullptr) {
+      munmap(mapping, mappingSize);
+    }
+  }
+
+  bool isValid() const { return frame != nullptr; }
+  uint8_t* data() { return frame; }
+  uint8_t& operator[](size_t index) { return frame[index]; }
+
+ private:
+  long pageSize = 0;
+  size_t mappingSize = 0;
+  size_t frameSize = 0;
+  uint8_t* mapping = nullptr;
+  uint8_t* frame = nullptr;
+};
 
 TEST(Ghost, telemetryOutputIsBoundedByModuleBuffer)
 {
@@ -147,6 +192,20 @@ TEST(Ghost, shortSyncFrameDoesNotUpdateModuleSync)
   EXPECT_EQ(status.refreshRate, 4000);
   EXPECT_EQ(status.inputLag, 25);
   EXPECT_EQ(status.currentLag, 25);
+}
+
+TEST(Ghost, shortLinkStatFrameDoesNotReadPastFrame)
+{
+  GuardedGhostFrame frame(4);
+  ASSERT_TRUE(frame.isValid());
+  frame[0] = GHST_ADDR_RADIO;
+  frame[1] = 2;
+  frame[2] = GHST_DL_LINK_STAT;
+  frame[3] = crc8(&frame[2], 1);
+
+  processGhostTelemetryFrame(EXTERNAL_MODULE, frame.data(), 4);
+
+  SUCCEED();
 }
 
 #endif
