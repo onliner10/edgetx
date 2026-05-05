@@ -373,11 +373,18 @@ void BitmapBuffer::drawLine(coord_t x1, coord_t y1, coord_t x2, coord_t y2,
   SCB_CleanInvalidateDCache();
 #endif
 
+  auto drawLinePixel = [this, color](coord_t x, coord_t y) {
+    if (!data || x < xmin || x > xmax || y < ymin || y > ymax) return;
+    if (x >= 0 && x < _width && y >= 0 && y < _height) {
+      drawPixel(getPixelPtrAbs(x, y), color);
+    }
+  };
+
   if (dxabs >= dyabs) {
     /* the line is more horizontal than vertical */
     if (pat == SOLID) {
       for (int i = 0; i <= dxabs; i++) {
-        drawPixelAbs(px, py, color);
+        drawLinePixel(px, py);
         y += dyabs;
         if (y >= dxabs) {
           y -= dxabs;
@@ -388,7 +395,7 @@ void BitmapBuffer::drawLine(coord_t x1, coord_t y1, coord_t x2, coord_t y2,
     } else {
       for (int i = 0; i <= dxabs; i++) {
         if ((1u << ((uint8_t)px & 7u)) & pat) {
-          drawPixelAbs(px, py, color);
+          drawLinePixel(px, py);
         }
         y += dyabs;
         if (y >= dxabs) {
@@ -402,7 +409,7 @@ void BitmapBuffer::drawLine(coord_t x1, coord_t y1, coord_t x2, coord_t y2,
     /* the line is more vertical than horizontal */
     if (pat == SOLID) {
       for (int i = 0; i <= dyabs; i++) {
-        drawPixelAbs(px, py, color);
+        drawLinePixel(px, py);
         x += dxabs;
         if (x >= dyabs) {
           x -= dyabs;
@@ -413,7 +420,7 @@ void BitmapBuffer::drawLine(coord_t x1, coord_t y1, coord_t x2, coord_t y2,
     } else {
       for (int i = 0; i <= dyabs; i++) {
         if ((1u << ((uint8_t)py & 7u)) & pat) {
-          drawPixelAbs(px, py, color);
+          drawLinePixel(px, py);
         }
         x += dxabs;
         if (x >= dyabs) {
