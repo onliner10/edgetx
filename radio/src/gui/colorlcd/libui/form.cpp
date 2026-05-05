@@ -22,6 +22,8 @@
 
 void FlexGridLayout::apply(Window* w)
 {
+  if (!w || !w->getLvObj()) return;
+
   w->padAll(padding);
 
   // layout
@@ -33,6 +35,8 @@ void FlexGridLayout::apply(Window* w)
 
 void FlexGridLayout::add(Window* w)
 {
+  if (!w || !w->getLvObj()) return;
+
   if (col_dsc && row_dsc) {
     lv_obj_set_grid_cell(w->getLvObj(), LV_GRID_ALIGN_START, col_pos, col_span,
                          LV_GRID_ALIGN_CENTER, row_pos, row_span);
@@ -43,11 +47,17 @@ FormField::FormField(Window* parent, const rect_t& rect, LvglCreate objConstruct
     Window(parent, rect, objConstruct)
 {
   setTextFlag(textFlags);
+  if (!lvobj) return;
   lv_obj_add_flag(lvobj, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
 }
 
 void FormField::setEditMode(bool newEditMode)
 {
+  if (!isAvailable()) {
+    editMode = false;
+    return;
+  }
+
   editMode = newEditMode;
 
   if (lvobj != nullptr) {
@@ -58,6 +68,8 @@ void FormField::setEditMode(bool newEditMode)
 
 void FormField::onClicked()
 {
+  if (!isAvailable()) return;
+
   lv_indev_type_t indev_type = lv_indev_get_type(lv_indev_get_act());
   if (indev_type != LV_INDEV_TYPE_POINTER) {
     setEditMode(!editMode);
@@ -85,6 +97,7 @@ FormLine::FormLine(Window* parent, FlexGridLayout& layout) :
     Window(parent, rect_t{}), layout(layout)
 {
   setWindowFlag(NO_FOCUS);
+  if (!lvobj) return;
 
   layout.resetPos();
   layout.apply(this);
@@ -95,6 +108,8 @@ FormLine::FormLine(Window* parent, FlexGridLayout& layout) :
 
 void FormLine::addChild(Window* window)
 {
+  if (!window || !window->isAvailable() || !window->getLvObj()) return;
+
   Window::addChild(window);
   layout.add(window);
   layout.nextCell();

@@ -78,6 +78,8 @@ ChoiceBase::ChoiceBase(Window* parent, const rect_t& rect,
     _getValue(std::move(_getValue)),
     _setValue(std::move(_setValue))
 {
+  if (!hasLvObj()) return;
+
   padLeft(PAD_TINY);
   padRight(PAD_SMALL);
 
@@ -91,11 +93,11 @@ ChoiceBase::ChoiceBase(Window* parent, const rect_t& rect,
 
   // Add label
   label = choice_label_create(lvobj);
-  if (label) {
-    lv_obj_set_pos(label, type == CHOICE_TYPE_DROPOWN ? ICON_W - 2 : ICON_W,
-                   PAD_TINY);
-    etx_font(label, FONT_XS_INDEX, LV_STATE_USER_1);
-  }
+  if (!requireLvObj(label)) return;
+
+  lv_obj_set_pos(label, type == CHOICE_TYPE_DROPOWN ? ICON_W - 2 : ICON_W,
+                 PAD_TINY);
+  etx_font(label, FONT_XS_INDEX, LV_STATE_USER_1);
 }
 
 void ChoiceBase::checkEvents()
@@ -127,7 +129,7 @@ std::string Choice::getLabelText()
 
 void ChoiceBase::update()
 {
-  if (!deleted() && _getValue) {
+  if (!deleted() && isAvailable() && _getValue) {
     int v = _getValue();
     if (v != currentValue) {
       currentValue = v;
@@ -207,7 +209,7 @@ void Choice::setValue(int val)
 
 void Choice::onClicked()
 {
-  if (!deleted())
+  if (!deleted() && isAvailable())
     openMenu();
 }
 
@@ -279,7 +281,7 @@ bool choiceImageCreateFailureLeavesChoiceUsableForTest()
   return ok;
 }
 
-bool choiceLabelCreateFailureLeavesChoiceUsableForTest()
+bool choiceLabelCreateFailureFailsClosedForTest()
 {
   forceChoiceLabelCreateFailureForTest = true;
   auto choice = new (std::nothrow) Choice(
@@ -287,7 +289,8 @@ bool choiceLabelCreateFailureLeavesChoiceUsableForTest()
       0, 1, [] { return 0; });
   forceChoiceLabelCreateFailureForTest = false;
 
-  bool ok = choice && choice->getLvObj() != nullptr && choice->isVisible();
+  bool ok = choice && choice->getLvObj() != nullptr && !choice->isAvailable() &&
+            !choice->isVisible() && !choice->automationClickable();
   delete choice;
   return ok;
 }

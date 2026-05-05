@@ -181,6 +181,7 @@ class Window
   void detach();
 
   bool deleted() const { return _deleted; }
+  bool isAvailable() const { return available; }
 
 #if defined(HARDWARE_TOUCH)
   void addBackButton();
@@ -231,6 +232,7 @@ class Window
   LcdFlags textFlags = 0;
 
   bool _deleted = false;
+  bool available = true;
 
   bool loaded = false;
   bool layerCreated = false;
@@ -249,6 +251,10 @@ class Window
   void deleteChildren();
 
   virtual void addChild(Window *window);
+
+  bool hasLvObj() const { return lvobj != nullptr; }
+  bool requireLvObj(lv_obj_t* obj);
+  void failClosed();
 
   void eventHandler(lv_event_t *e);
   static void window_event_cb(lv_event_t *e);

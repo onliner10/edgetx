@@ -32,6 +32,7 @@ bool etxCreateObjectAllocationFailureReturnsNullForTest();
 bool etxLabelAllocationFailureReturnsNullForTest();
 bool etxStyleHelpersIgnoreNullObjectForTest();
 bool windowObjectAllocationFailureLeavesNoLvObjForTest();
+bool formFieldObjectAllocationFailureFailsClosedForTest();
 
 TEST(ColorEtxTheme, ObjectAllocationFailureReturnsNull)
 {
@@ -89,6 +90,22 @@ TEST(ColorWindow, ObjectAllocationFailureLeavesNoLvObj)
   if (pid == 0) {
     alarm(2);
     _exit(windowObjectAllocationFailureLeavesNoLvObjForTest() ? 0 : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorWindow, FormFieldObjectAllocationFailureFailsClosed)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(formFieldObjectAllocationFailureFailsClosedForTest() ? 0 : 1);
   }
 
   int status = 0;

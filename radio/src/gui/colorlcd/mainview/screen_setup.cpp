@@ -74,10 +74,13 @@ class LayoutChoice : public Button
   {
     padAll(PAD_ZERO);
     canvas = createLayoutChoiceCanvas(lvobj);
-    if (canvas) {
-      lv_obj_center(canvas);
-      update();
+    if (!canvas) {
+      failClosed();
+      return;
     }
+
+    lv_obj_center(canvas);
+    update();
   }
 
   void onPress() override
@@ -123,7 +126,7 @@ class LayoutChoice : public Button
 };
 
 #if defined(SIMU)
-bool screenSetupLayoutChoiceCanvasCreateFailureLeavesNoCanvasForTest()
+bool screenSetupLayoutChoiceCanvasCreateFailureFailsClosedForTest()
 {
   class TestLayoutChoice : public LayoutChoice
   {
@@ -141,7 +144,8 @@ bool screenSetupLayoutChoiceCanvasCreateFailureLeavesNoCanvasForTest()
   auto choice = new TestLayoutChoice(MainWindow::instance());
   screenSetupForceLayoutChoiceCanvasCreateFailureForTest(false);
 
-  return choice && !choice->hasCanvas();
+  return choice && !choice->hasCanvas() && !choice->isAvailable() &&
+         !choice->isVisible() && !choice->automationClickable();
 }
 #endif
 

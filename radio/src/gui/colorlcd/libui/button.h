@@ -108,11 +108,12 @@ class TextButton : public ButtonBase
 
   void setFont(FontIndex font)
   {
-    etx_font(label, font);
+    if (label) etx_font(label, font);
   }
 
   void setWrap()
   {
+    if (!label) return;
     lv_obj_set_width(label, lv_pct(100));
     etx_obj_add_style(label, styles->text_align_center, LV_PART_MAIN);
     lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
@@ -153,13 +154,13 @@ class MomentaryButton : public FormField
   {
     if (value != text) {
       text = std::move(value);
-      lv_label_set_text(label, text.c_str());
+      if (label) lv_label_set_text(label, text.c_str());
     }
   }
 
   void setFont(FontIndex font)
   {
-    etx_font(label, font);
+    if (label) etx_font(label, font);
   }
 
  protected:

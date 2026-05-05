@@ -26,7 +26,7 @@
 #include <unistd.h>
 
 bool choiceImageCreateFailureLeavesChoiceUsableForTest();
-bool choiceLabelCreateFailureLeavesChoiceUsableForTest();
+bool choiceLabelCreateFailureFailsClosedForTest();
 
 TEST(ColorChoice, ImageCreateFailureLeavesChoiceUsable)
 {
@@ -44,14 +44,14 @@ TEST(ColorChoice, ImageCreateFailureLeavesChoiceUsable)
   EXPECT_EQ(WEXITSTATUS(status), 0);
 }
 
-TEST(ColorChoice, LabelCreateFailureLeavesChoiceUsable)
+TEST(ColorChoice, LabelCreateFailureFailsClosed)
 {
   const pid_t pid = fork();
   ASSERT_GE(pid, 0);
 
   if (pid == 0) {
     alarm(2);
-    _exit(choiceLabelCreateFailureLeavesChoiceUsableForTest() ? 0 : 1);
+    _exit(choiceLabelCreateFailureFailsClosedForTest() ? 0 : 1);
   }
 
   int status = 0;

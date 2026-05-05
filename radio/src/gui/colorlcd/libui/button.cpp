@@ -20,6 +20,7 @@
 
 #include "static.h"
 #include "etx_lv_theme.h"
+#include "mainwindow.h"
 
 #include <new>
 
@@ -49,6 +50,18 @@ static lv_obj_t* button_create(lv_obj_t* parent)
   return etx_create(&button_class, parent);
 }
 
+#if defined(SIMU)
+static bool forceTextButtonLabelCreateFailureForTest = false;
+#endif
+
+static lv_obj_t* text_button_label_create(lv_obj_t* parent)
+{
+#if defined(SIMU)
+  if (forceTextButtonLabelCreateFailureForTest) return nullptr;
+#endif
+  return etx_label_create(parent);
+}
+
 Button::Button(Window* parent, const rect_t& rect,
                std::function<uint8_t(void)> pressHandler) :
     ButtonBase(parent, rect, pressHandler, button_create)
@@ -67,7 +80,7 @@ ButtonBase::ButtonBase(Window* parent, const rect_t& rect,
 
 void ButtonBase::check(bool checked)
 {
-  if (!_deleted) {
+  if (!_deleted && isAvailable() && lvobj) {
     if (checked != this->checked()) {
       if (checked)
         lv_obj_add_state(lvobj, LV_STATE_CHECKED);
@@ -79,6 +92,7 @@ void ButtonBase::check(bool checked)
 
 bool ButtonBase::checked() const
 {
+  if (!isAvailable() || !lvobj) return false;
   return lv_obj_get_state(lvobj) & LV_STATE_CHECKED;
 }
 
@@ -88,7 +102,7 @@ bool ButtonBase::onLongPress()
 {
   if (longPressHandler) {
     check(longPressHandler());
-    if (!deleted())
+    if (!deleted() && lvobj)
       lv_obj_clear_state(lvobj, LV_STATE_PRESSED);
     lv_indev_wait_release(lv_indev_get_act());
     return false;
@@ -101,7 +115,7 @@ void ButtonBase::onClicked() { onPress(); }
 void ButtonBase::checkEvents()
 {
   Window::checkEvents();
-  if (checkHandler) checkHandler();
+  if (isAvailable() && checkHandler) checkHandler();
 }
 
 //-----------------------------------------------------------------------------
@@ -111,7 +125,11 @@ TextButton::TextButton(Window* parent, const rect_t& rect, std::string text,
     ButtonBase(parent, rect, pressHandler, button_create),
     text(std::move(text))
 {
-  label = etx_label_create(lvobj);
+  if (!hasLvObj()) return;
+
+  label = text_button_label_create(lvobj);
+  if (!requireLvObj(label)) return;
+
   lv_label_set_text(label, this->text.c_str());
   lv_obj_center(label);
 }
@@ -120,7 +138,7 @@ void TextButton::setText(std::string value)
 {
   if (value != text) {
     text = std::move(value);
-    lv_label_set_text(label, text.c_str());
+    if (label) lv_label_set_text(label, text.c_str());
   }
 }
 
@@ -131,6 +149,30 @@ std::string TextButton::automationText() const
   if (!label.empty()) return label;
   return text;
 }
+
+bool textButtonLabelCreateFailureFailsClosedForTest()
+{
+  forceTextButtonLabelCreateFailureForTest = true;
+  auto button = new (std::nothrow) TextButton(
+      MainWindow::instance(), {0, 0, 100, EdgeTxStyles::UI_ELEMENT_HEIGHT},
+      "Start");
+  forceTextButtonLabelCreateFailureForTest = false;
+
+  if (!button || !button->getLvObj() || button->isAvailable() ||
+      button->isVisible() || button->automationClickable()) {
+    delete button;
+    return false;
+  }
+
+  button->setText("Next");
+  button->setFont(FONT_STD_INDEX);
+  button->setWrap();
+
+  const bool ok = button->automationText() == "Next" &&
+                  !button->isAvailable() && !button->isVisible();
+  delete button;
+  return ok;
+}
 #endif
 
 //-----------------------------------------------------------------------------
@@ -139,6 +181,8 @@ IconButton::IconButton(Window* parent, EdgeTxIcon icon, coord_t x, coord_t y,
                        std::function<uint8_t(void)> pressHandler) :
     ButtonBase(parent, {x, y, EdgeTxStyles::UI_ELEMENT_HEIGHT, EdgeTxStyles::UI_ELEMENT_HEIGHT}, pressHandler, button_create)
 {
+  if (!hasLvObj()) return;
+
   padAll(PAD_ZERO);
   iconImage = new (std::nothrow) StaticIcon(this, 0, 0, icon, COLOR_THEME_SECONDARY1_INDEX);
   if (iconImage) {
@@ -161,13 +205,19 @@ MomentaryButton::MomentaryButton(Window* parent, const rect_t& rect, std::string
     releaseHandler(std::move(releaseHandler)),
     text(std::move(text))
 {
+  if (!hasLvObj()) return;
+
   label = etx_label_create(lvobj);
+  if (!requireLvObj(label)) return;
+
   lv_label_set_text(label, this->text.c_str());
   lv_obj_center(label);
 }
 
 bool MomentaryButton::customEventHandler(lv_event_code_t code)
 {
+  if (!isAvailable() || !lvobj) return false;
+
   switch (code) {
     case LV_EVENT_PRESSED:
       if (pressHandler)

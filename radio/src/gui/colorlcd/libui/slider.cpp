@@ -195,8 +195,16 @@ Slider::Slider(Window* parent, coord_t width, int32_t vmin, int32_t vmax,
   padRight(PAD_LARGE);
 
   auto sliderField = createSliderFormField(this, slider_create);
-  if (!sliderField) return;
+  if (!sliderField) {
+    failClosed();
+    return;
+  }
   slider = sliderField->getLvObj();
+  if (!slider) {
+    delete sliderField;
+    failClosed();
+    return;
+  }
   lv_obj_set_width(slider, lv_pct(100));
 
   lv_obj_add_event_cb(slider, SliderBase::slider_changed_cb, LV_EVENT_VALUE_CHANGED, this);
@@ -307,8 +315,16 @@ VerticalSlider::VerticalSlider(Window* parent, coord_t height, int32_t vmin, int
   padBottom(PAD_LARGE);
 
   auto sliderField = createSliderFormField(this, vslider_create);
-  if (!sliderField) return;
+  if (!sliderField) {
+    failClosed();
+    return;
+  }
   slider = sliderField->getLvObj();
+  if (!slider) {
+    delete sliderField;
+    failClosed();
+    return;
+  }
   lv_obj_set_height(slider, lv_pct(100));
 
   lv_obj_add_event_cb(slider, SliderBase::slider_changed_cb, LV_EVENT_VALUE_CHANGED, this);
@@ -335,7 +351,7 @@ VerticalSlider::VerticalSlider(Window* parent, coord_t height, int32_t vmin, int
 }
 
 #if defined(SIMU)
-bool sliderFormFieldCreateFailureLeavesNoSliderForTest()
+bool sliderFormFieldCreateFailureFailsClosedForTest()
 {
   class TestSlider : public Slider
   {
@@ -354,7 +370,8 @@ bool sliderFormFieldCreateFailureLeavesNoSliderForTest()
 
   if (!slider) return false;
   slider->update();
-  return !slider->hasSlider();
+  return !slider->hasSlider() && !slider->isAvailable() &&
+         !slider->isVisible();
 }
 #endif
 

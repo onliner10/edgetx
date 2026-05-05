@@ -250,6 +250,7 @@ Window::Window(Window *parent, const rect_t &rect, LvglCreate objConstruct) :
 {
   if (parent && !parent->lvobj) {
     this->parent = nullptr;
+    available = false;
     return;
   }
 
@@ -259,6 +260,7 @@ Window::Window(Window *parent, const rect_t &rect, LvglCreate objConstruct) :
   lvobj = objConstruct(lv_parent);
   if (!lvobj) {
     this->parent = nullptr;
+    available = false;
     return;
   }
 
@@ -298,8 +300,22 @@ bool windowObjectAllocationFailureLeavesNoLvObjForTest()
   auto window = new (std::nothrow) Window(nullptr, {0, 0, 10, 10});
   etxCreateForceObjectAllocationFailureForTest(false);
 
-  bool ok = window && window->getLvObj() == nullptr && !window->isVisible();
+  bool ok = window && window->getLvObj() == nullptr && !window->isAvailable() &&
+            !window->isVisible();
   delete window;
+  return ok;
+}
+
+bool formFieldObjectAllocationFailureFailsClosedForTest()
+{
+  etxCreateForceObjectAllocationFailureForTest(true);
+  auto button = new (std::nothrow) Button(nullptr, {0, 0, 10, 10});
+  etxCreateForceObjectAllocationFailureForTest(false);
+
+  bool ok = button && button->getLvObj() == nullptr &&
+            !button->isAvailable() && !button->isVisible() &&
+            !button->automationClickable();
+  delete button;
   return ok;
 }
 #endif
@@ -470,7 +486,7 @@ void Window::deleteChildren()
 
 bool Window::hasFocus() const
 {
-  return lvobj && lv_obj_has_state(lvobj, LV_STATE_FOCUSED);
+  return available && lvobj && lv_obj_has_state(lvobj, LV_STATE_FOCUSED);
 }
 
 void Window::padLeft(coord_t pad)
@@ -502,7 +518,7 @@ void Window::checkEvents()
 {
   auto copy = children;
   for (auto child : copy) {
-    if (child && !child->deleted()) {
+    if (child && !child->deleted() && child->isAvailable()) {
       child->checkEvents();
     }
   }
@@ -561,7 +577,7 @@ std::string Window::automationText() const
 
 bool Window::automationClickable() const
 {
-  if (!lvobj || hasWindowFlag(NO_CLICK) ||
+  if (!available || !lvobj || hasWindowFlag(NO_CLICK) ||
       !lv_obj_has_flag(lvobj, LV_OBJ_FLAG_CLICKABLE)) {
     return false;
   }
@@ -573,7 +589,10 @@ bool Window::automationClickable() const
 
 void Window::addChild(Window *window)
 {
-  if (!lvobj || !window || !window->lvobj) return;
+  if (!available || !lvobj || !window || !window->available ||
+      !window->lvobj) {
+    return;
+  }
 
   auto lv_parent = lv_obj_get_parent(window->lvobj);
   if (lv_parent && (lv_parent != lvobj)) {
@@ -611,6 +630,7 @@ FormLine *Window::newLine(FlexGridLayout &layout)
 
 void Window::show(bool visible)
 {
+  if (!available) visible = false;
   if (!_deleted && lvobj) {
     if (lv_obj_has_flag(lvobj, LV_OBJ_FLAG_HIDDEN) == visible) {
       if (visible)
@@ -623,7 +643,8 @@ void Window::show(bool visible)
 
 bool Window::isVisible()
 {
-  return !_deleted && lvobj && !lv_obj_has_flag(lvobj, LV_OBJ_FLAG_HIDDEN);
+  return available && !_deleted && lvobj &&
+         !lv_obj_has_flag(lvobj, LV_OBJ_FLAG_HIDDEN);
 }
 
 bool Window::isOnScreen()
@@ -637,6 +658,7 @@ bool Window::isOnScreen()
 
 void Window::enable(bool enabled)
 {
+  if (!available) enabled = false;
   if (!_deleted && lvobj) {
     if (lv_obj_has_state(lvobj, LV_STATE_DISABLED) == enabled) {
       if (enabled)
@@ -645,6 +667,24 @@ void Window::enable(bool enabled)
         lv_obj_add_state(lvobj, LV_STATE_DISABLED);
     }
   }
+}
+
+bool Window::requireLvObj(lv_obj_t* obj)
+{
+  if (obj) return true;
+  failClosed();
+  return false;
+}
+
+void Window::failClosed()
+{
+  available = false;
+  windowFlags |= NO_FOCUS | NO_CLICK;
+  if (!lvobj) return;
+  lv_obj_clear_flag(lvobj, LV_OBJ_FLAG_CLICK_FOCUSABLE);
+  lv_obj_clear_flag(lvobj, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_state(lvobj, LV_STATE_DISABLED);
+  lv_obj_add_flag(lvobj, LV_OBJ_FLAG_HIDDEN);
 }
 
 #if defined(HARDWARE_TOUCH)
