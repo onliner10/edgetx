@@ -27,6 +27,539 @@
 #include "theme_manager.h"
 
 #include <new>
+#include <stdio.h>
+
+namespace {
+
+constexpr uint8_t LINK_BARS = 5;
+const uint8_t linkBarThresholds[LINK_BARS] = {30, 40, 50, 60, 80};
+
+coord_t minCoord(coord_t a, coord_t b) { return a < b ? a : b; }
+coord_t maxCoord(coord_t a, coord_t b) { return a > b ? a : b; }
+
+coord_t clampCoord(coord_t value, coord_t low, coord_t high)
+{
+  if (value < low) return low;
+  if (value > high) return high;
+  return value;
+}
+
+lv_obj_t* makeStatusPart(lv_obj_t* parent)
+{
+  auto obj = lv_obj_create(parent);
+  if (!obj) return nullptr;
+
+  lv_obj_remove_style_all(obj);
+  lv_obj_clear_flag(obj, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_PART_MAIN);
+  lv_obj_set_style_border_opa(obj, LV_OPA_COVER, LV_PART_MAIN);
+  return obj;
+}
+
+LcdColorIndex statusPrimaryColor(bool topbar)
+{
+  return topbar ? COLOR_THEME_PRIMARY2_INDEX : COLOR_THEME_SECONDARY1_INDEX;
+}
+
+LcdColorIndex statusMutedColor(bool topbar)
+{
+  return topbar ? COLOR_THEME_SECONDARY2_INDEX : COLOR_THEME_SECONDARY2_INDEX;
+}
+
+void setStatusPartColor(lv_obj_t* obj, LcdColorIndex color)
+{
+  if (!obj) return;
+  etx_solid_bg(obj, color);
+}
+
+void setStatusPartBorder(lv_obj_t* obj, LcdColorIndex color, coord_t width)
+{
+  if (!obj) return;
+  etx_border_color(obj, color);
+  lv_obj_set_style_border_width(obj, width, LV_PART_MAIN);
+}
+
+void setStatusLabel(lv_obj_t* label, const char* text, LcdColorIndex color,
+                    FontIndex font, coord_t x, coord_t y, coord_t w, coord_t h)
+{
+  if (!label) return;
+
+  etx_font(label, font);
+  etx_txt_color(label, color);
+  lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
+  lv_label_set_text(label, text);
+  lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+  lv_obj_set_pos(label, x, y);
+  lv_obj_set_size(label, w, h);
+}
+
+void setLvVisible(lv_obj_t* obj, bool visible)
+{
+  if (!obj) return;
+  if (visible)
+    lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
+  else
+    lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+}
+
+uint8_t activeLinkBars(uint8_t rssi)
+{
+  uint8_t bars = 0;
+  for (uint8_t i = 0; i < LINK_BARS; i += 1) {
+    if (rssi >= linkBarThresholds[i]) bars = i + 1;
+  }
+  return bars;
+}
+
+bool linkWarning(uint8_t rssi)
+{
+  return rssi > 0 && rssi < (uint8_t)g_model.rfAlarms.warning;
+}
+
+uint8_t speakerVolumeLevel()
+{
+#if defined(AUDIO)
+  if (requiredSpeakerVolume == 0 || g_eeGeneral.beepMode == e_mode_quiet)
+    return 0;
+  if (requiredSpeakerVolume < 7)
+    return 1;
+  if (requiredSpeakerVolume < 13)
+    return 2;
+  if (requiredSpeakerVolume < 19)
+    return 3;
+  return 4;
+#else
+  return 0;
+#endif
+}
+
+uint8_t speakerVolumePercent()
+{
+#if defined(AUDIO)
+  if (g_eeGeneral.beepMode == e_mode_quiet) return 0;
+  return divRoundClosest((uint16_t)requiredSpeakerVolume * 100, VOLUME_LEVEL_MAX);
+#else
+  return 0;
+#endif
+}
+
+}  // namespace
+
+class LinkStatusWidget : public Widget
+{
+ public:
+  LinkStatusWidget(const WidgetFactory* factory, Window* parent,
+                   const rect_t& rect, int screenNum, int zoneNum) :
+      Widget(factory, parent, rect, screenNum, zoneNum)
+  {
+    for (uint8_t i = 0; i < LINK_BARS; i += 1) {
+      bars[i] = makeStatusPart(lvobj);
+      if (bars[i]) lv_obj_set_style_radius(bars[i], 1, LV_PART_MAIN);
+    }
+
+    title = etx_label_create(lvobj, FONT_XXS_INDEX);
+    value = etx_label_create(lvobj, FONT_BOLD_INDEX);
+
+    update();
+    foreground();
+  }
+
+  void update() override
+  {
+    if (_deleted) return;
+
+    const bool topbar = isCompactTopBarWidget();
+    const coord_t pad = topbar ? PAD_TINY : PAD_SMALL;
+    const coord_t labelW = width() > 2 * pad ? width() - 2 * pad : width();
+
+    setLvVisible(title, !topbar && height() >= 54);
+    setLvVisible(value, !topbar);
+
+    coord_t graphX = pad;
+    coord_t graphY = pad;
+    coord_t graphW = width() > 2 * pad ? width() - 2 * pad : width();
+    coord_t graphH = height() > 2 * pad ? height() - 2 * pad : height();
+
+    if (topbar) {
+      graphH = minCoord(graphH, (coord_t)29);
+      graphY = (height() - graphH) / 2;
+    } else {
+      coord_t textW = maxCoord(labelW / 3, (coord_t)34);
+      if (width() > 110) {
+        graphW = minCoord((coord_t)(width() - textW - 3 * pad), (coord_t)58);
+      } else {
+        graphW = minCoord(graphW, (coord_t)58);
+      }
+      graphH = minCoord(graphH, height() >= 72 ? (coord_t)42 : (coord_t)32);
+      graphY = (height() - graphH) / 2;
+
+      coord_t textX = graphX + graphW + pad;
+      coord_t textRight = width() > pad ? width() - pad : width();
+      if (textX + 22 < textRight) {
+        coord_t textAreaW = textRight - textX;
+        coord_t titleH = height() >= 54 ? EdgeTxStyles::STD_FONT_HEIGHT / 2 : 0;
+        FontIndex valueFont = responsiveTextFont(height() - 2 * pad - titleH);
+        coord_t valueH = getFontHeight(LcdFlags(valueFont) << 8u);
+        coord_t textBlockH = titleH + valueH;
+        coord_t textY = (height() - textBlockH) / 2;
+
+        setStatusLabel(title, "LINK", COLOR_THEME_PRIMARY1_INDEX,
+                       FONT_XXS_INDEX, textX, textY, textAreaW, titleH);
+        setStatusLabel(value, "--", statusPrimaryColor(false), valueFont,
+                       textX, textY + titleH, textAreaW, valueH);
+      } else {
+        setLvVisible(title, false);
+        setLvVisible(value, false);
+      }
+    }
+
+    coord_t gap = topbar ? PAD_TINY : PAD_THREE;
+    coord_t barW = (graphW - (LINK_BARS - 1) * gap) / LINK_BARS;
+    barW = clampCoord(barW, topbar ? (coord_t)5 : (coord_t)6,
+                      topbar ? (coord_t)12 : (coord_t)14);
+
+    for (uint8_t i = 0; i < LINK_BARS; i += 1) {
+      if (!bars[i]) continue;
+      coord_t barH = ((i + 1) * graphH + LINK_BARS - 1) / LINK_BARS;
+      if (i == 0) barH = maxCoord(barH, topbar ? (coord_t)8 : (coord_t)9);
+      lv_obj_set_pos(bars[i], graphX + i * (barW + gap),
+                     graphY + graphH - barH);
+      lv_obj_set_size(bars[i], barW, barH);
+    }
+
+    lastRSSI = 255;
+  }
+
+  void foreground() override
+  {
+    if (_deleted) return;
+
+    uint8_t rssi = TELEMETRY_RSSI();
+    if (rssi == lastRSSI) return;
+    lastRSSI = rssi;
+
+    bool topbar = isCompactTopBarWidget();
+    bool warning = linkWarning(rssi);
+    uint8_t active = activeLinkBars(rssi);
+    LcdColorIndex activeColor = warning ? COLOR_THEME_WARNING_INDEX
+                                        : statusPrimaryColor(topbar);
+    LcdColorIndex mutedColor = statusMutedColor(topbar);
+
+    for (uint8_t i = 0; i < LINK_BARS; i += 1) {
+      setStatusPartColor(bars[i], i < active ? activeColor : mutedColor);
+    }
+
+    if (value && !topbar) {
+      char text[8];
+      if (rssi == 0)
+        snprintf(text, sizeof(text), "--");
+      else
+        snprintf(text, sizeof(text), "%u", rssi);
+
+      FontIndex font = responsiveTextFont(height() - 2 * PAD_SMALL -
+                                          EdgeTxStyles::STD_FONT_HEIGHT / 2);
+      setStatusLabel(value, text,
+                     warning ? COLOR_THEME_WARNING_INDEX
+                             : statusPrimaryColor(false),
+                     font, lv_obj_get_x(value), lv_obj_get_y(value),
+                     lv_obj_get_width(value), lv_obj_get_height(value));
+    }
+  }
+
+ protected:
+  lv_obj_t* bars[LINK_BARS] = {};
+  lv_obj_t* title = nullptr;
+  lv_obj_t* value = nullptr;
+  uint8_t lastRSSI = 255;
+};
+
+BaseWidgetFactory<LinkStatusWidget> linkStatusWidget("Link", nullptr, "Link");
+
+class TxBatteryStatusWidget : public Widget
+{
+ public:
+  TxBatteryStatusWidget(const WidgetFactory* factory, Window* parent,
+                        const rect_t& rect, int screenNum, int zoneNum) :
+      Widget(factory, parent, rect, screenNum, zoneNum)
+  {
+    shell = makeStatusPart(lvobj);
+    fill = makeStatusPart(lvobj);
+    cap = makeStatusPart(lvobj);
+    title = etx_label_create(lvobj, FONT_XXS_INDEX);
+    value = etx_label_create(lvobj, FONT_BOLD_INDEX);
+
+    if (shell) {
+      lv_obj_set_style_bg_opa(shell, LV_OPA_TRANSP, LV_PART_MAIN);
+      lv_obj_set_style_radius(shell, 3, LV_PART_MAIN);
+    }
+    if (fill) lv_obj_set_style_radius(fill, 2, LV_PART_MAIN);
+    if (cap) lv_obj_set_style_radius(cap, 1, LV_PART_MAIN);
+
+    update();
+    foreground();
+  }
+
+  void update() override
+  {
+    if (_deleted) return;
+
+    const bool topbar = isCompactTopBarWidget();
+    const coord_t pad = topbar ? PAD_TINY : PAD_SMALL;
+
+    setLvVisible(title, !topbar && height() >= 54);
+    setLvVisible(value, !topbar);
+
+    coord_t battH = topbar ? minCoord((coord_t)20, height() - 2 * pad)
+                           : minCoord((coord_t)30, height() - 2 * pad);
+    battH = maxCoord(battH, topbar ? (coord_t)14 : (coord_t)18);
+    coord_t battW = topbar ? minCoord((coord_t)42, width() - 3 * pad)
+                           : minCoord((coord_t)58, width() - 3 * pad);
+    battW = maxCoord(battW, topbar ? (coord_t)28 : (coord_t)36);
+
+    coord_t battX = pad;
+    coord_t battY = (height() - battH) / 2;
+
+    if (!topbar && width() < 110) {
+      battW = minCoord(battW, (coord_t)(width() - 3 * pad));
+    }
+
+    if (shell) {
+      lv_obj_set_pos(shell, battX, battY);
+      lv_obj_set_size(shell, battW, battH);
+      setStatusPartBorder(shell, statusPrimaryColor(topbar), 2);
+    }
+    if (cap) {
+      lv_obj_set_pos(cap, battX + battW, battY + battH / 4);
+      lv_obj_set_size(cap, 3, battH / 2);
+    }
+
+    coord_t fillX = battX + 3;
+    coord_t fillY = battY + 3;
+    fillMaxW = battW > 6 ? battW - 6 : battW;
+    fillH = battH > 6 ? battH - 6 : battH;
+
+    if (fill) {
+      lv_obj_set_pos(fill, fillX, fillY);
+      lv_obj_set_size(fill, fillMaxW, fillH);
+    }
+
+    if (!topbar) {
+      coord_t textX = battX + battW + PAD_SMALL + 3;
+      coord_t textRight = width() > pad ? width() - pad : width();
+      if (textX + 24 < textRight) {
+        coord_t titleH = height() >= 54 ? EdgeTxStyles::STD_FONT_HEIGHT / 2 : 0;
+        FontIndex valueFont = responsiveTextFont(height() - 2 * pad - titleH);
+        coord_t valueH = getFontHeight(LcdFlags(valueFont) << 8u);
+        coord_t textBlockH = titleH + valueH;
+        coord_t textY = (height() - textBlockH) / 2;
+        coord_t textW = textRight - textX;
+
+        setStatusLabel(title, "TX BAT", COLOR_THEME_PRIMARY1_INDEX,
+                       FONT_XXS_INDEX, textX, textY, textW, titleH);
+        setStatusLabel(value, "", statusPrimaryColor(false), valueFont,
+                       textX, textY + titleH, textW, valueH);
+      } else {
+        setLvVisible(title, false);
+        setLvVisible(value, false);
+      }
+    }
+
+    lastBattBars = 255;
+    lastVoltage = 255;
+  }
+
+  void foreground() override
+  {
+    if (_deleted) return;
+
+    bool topbar = isCompactTopBarWidget();
+    bool warning = IS_TXBATT_WARNING();
+    uint8_t bars = GET_TXBATT_BARS(fillMaxW);
+    LcdColorIndex color = warning ? COLOR_THEME_WARNING_INDEX
+                                  : statusPrimaryColor(topbar);
+
+    setStatusPartBorder(shell, color, 2);
+    setStatusPartColor(cap, color);
+
+    if (bars != lastBattBars) {
+      lastBattBars = bars;
+      if (fill) {
+        lv_obj_set_size(fill, bars, fillH);
+      }
+    }
+    setStatusPartColor(fill, color);
+
+    if (value && !topbar && g_vbat100mV != lastVoltage) {
+      lastVoltage = g_vbat100mV;
+
+      char text[10];
+      snprintf(text, sizeof(text), "%u.%uV", g_vbat100mV / 10,
+               g_vbat100mV % 10);
+
+      setStatusLabel(value, text,
+                     warning ? COLOR_THEME_WARNING_INDEX
+                             : statusPrimaryColor(false),
+                     responsiveTextFont(height() - 2 * PAD_SMALL -
+                                        EdgeTxStyles::STD_FONT_HEIGHT / 2),
+                     lv_obj_get_x(value), lv_obj_get_y(value),
+                     lv_obj_get_width(value), lv_obj_get_height(value));
+    }
+  }
+
+ protected:
+  lv_obj_t* shell = nullptr;
+  lv_obj_t* fill = nullptr;
+  lv_obj_t* cap = nullptr;
+  lv_obj_t* title = nullptr;
+  lv_obj_t* value = nullptr;
+  coord_t fillMaxW = 1;
+  coord_t fillH = 1;
+  uint8_t lastBattBars = 255;
+  uint8_t lastVoltage = 255;
+};
+
+BaseWidgetFactory<TxBatteryStatusWidget> txBatteryStatusWidget("TX Battery",
+                                                               nullptr,
+                                                               "TX Battery");
+
+#if defined(AUDIO)
+
+class VolumeStatusWidget : public Widget
+{
+ public:
+  VolumeStatusWidget(const WidgetFactory* factory, Window* parent,
+                     const rect_t& rect, int screenNum, int zoneNum) :
+      Widget(factory, parent, rect, screenNum, zoneNum)
+  {
+    icon = new (std::nothrow) StaticIcon(this, 0, 0, ICON_TOPMENU_VOLUME_0,
+                                         COLOR_THEME_PRIMARY2_INDEX);
+
+    for (uint8_t i = 0; i < VOLUME_SEGMENTS; i += 1) {
+      segments[i] = makeStatusPart(lvobj);
+      if (segments[i]) lv_obj_set_style_radius(segments[i], 1, LV_PART_MAIN);
+    }
+
+    title = etx_label_create(lvobj, FONT_XXS_INDEX);
+    value = etx_label_create(lvobj, FONT_BOLD_INDEX);
+
+    update();
+    foreground();
+  }
+
+  void update() override
+  {
+    if (_deleted) return;
+
+    const bool topbar = isCompactTopBarWidget();
+    const coord_t pad = topbar ? PAD_TINY : PAD_SMALL;
+
+    setLvVisible(title, !topbar && height() >= 54);
+    setLvVisible(value, !topbar);
+
+    if (icon) {
+      icon->setColor(statusPrimaryColor(topbar));
+      icon->setPos(pad, (height() - icon->height()) / 2);
+    }
+
+    coord_t segX = icon ? icon->left() + icon->width() + PAD_TINY : pad;
+    coord_t segAreaRight = width() > pad ? width() - pad : width();
+    coord_t segAreaW = segAreaRight > segX ? segAreaRight - segX : 0;
+    coord_t gap = PAD_TINY;
+    coord_t segW = (segAreaW - (VOLUME_SEGMENTS - 1) * gap) / VOLUME_SEGMENTS;
+    segW = clampCoord(segW, (coord_t)4, topbar ? (coord_t)8 : (coord_t)10);
+    coord_t segH = topbar ? minCoord((coord_t)16, height() - 2 * pad)
+                          : minCoord((coord_t)22, height() - 2 * pad);
+    segH = maxCoord(segH, (coord_t)8);
+    coord_t segY = (height() - segH) / 2;
+
+    for (uint8_t i = 0; i < VOLUME_SEGMENTS; i += 1) {
+      if (!segments[i]) continue;
+      lv_obj_set_pos(segments[i], segX + i * (segW + gap), segY);
+      lv_obj_set_size(segments[i], segW, segH);
+    }
+
+    if (!topbar) {
+      coord_t textX = segX + VOLUME_SEGMENTS * segW +
+                      (VOLUME_SEGMENTS - 1) * gap + PAD_SMALL;
+      coord_t textRight = width() > pad ? width() - pad : width();
+      if (textX + 24 < textRight) {
+        coord_t titleH = height() >= 54 ? EdgeTxStyles::STD_FONT_HEIGHT / 2 : 0;
+        FontIndex valueFont = responsiveTextFont(height() - 2 * pad - titleH);
+        coord_t valueH = getFontHeight(LcdFlags(valueFont) << 8u);
+        coord_t textBlockH = titleH + valueH;
+        coord_t textY = (height() - textBlockH) / 2;
+        coord_t textW = textRight - textX;
+
+        setStatusLabel(title, "VOL", COLOR_THEME_PRIMARY1_INDEX,
+                       FONT_XXS_INDEX, textX, textY, textW, titleH);
+        setStatusLabel(value, "", statusPrimaryColor(false), valueFont,
+                       textX, textY + titleH, textW, valueH);
+      } else {
+        setLvVisible(title, false);
+        setLvVisible(value, false);
+      }
+    }
+
+    lastLevel = 255;
+    lastPercent = 255;
+  }
+
+  void foreground() override
+  {
+    if (_deleted) return;
+
+    bool topbar = isCompactTopBarWidget();
+    uint8_t level = speakerVolumeLevel();
+    uint8_t percent = speakerVolumePercent();
+    if (level == lastLevel && percent == lastPercent) return;
+
+    lastLevel = level;
+    lastPercent = percent;
+
+    if (icon) {
+      icon->setIcon((EdgeTxIcon)(ICON_TOPMENU_VOLUME_0 + level));
+      icon->setColor(level == 0 ? statusMutedColor(topbar)
+                                : statusPrimaryColor(topbar));
+    }
+
+    for (uint8_t i = 0; i < VOLUME_SEGMENTS; i += 1) {
+      setStatusPartColor(segments[i],
+                         i < level ? statusPrimaryColor(topbar)
+                                   : statusMutedColor(topbar));
+    }
+
+    if (value && !topbar) {
+      char text[10];
+      if (level == 0)
+        snprintf(text, sizeof(text), "MUTE");
+      else
+        snprintf(text, sizeof(text), "%u%%", percent);
+
+      setStatusLabel(value, text,
+                     level == 0 ? COLOR_THEME_DISABLED_INDEX
+                                : statusPrimaryColor(false),
+                     responsiveTextFont(height() - 2 * PAD_SMALL -
+                                        EdgeTxStyles::STD_FONT_HEIGHT / 2),
+                     lv_obj_get_x(value), lv_obj_get_y(value),
+                     lv_obj_get_width(value), lv_obj_get_height(value));
+    }
+  }
+
+ protected:
+  static constexpr uint8_t VOLUME_SEGMENTS = 4;
+  StaticIcon* icon = nullptr;
+  lv_obj_t* segments[VOLUME_SEGMENTS] = {};
+  lv_obj_t* title = nullptr;
+  lv_obj_t* value = nullptr;
+  uint8_t lastLevel = 255;
+  uint8_t lastPercent = 255;
+};
+
+BaseWidgetFactory<VolumeStatusWidget> volumeStatusWidget("Volume", nullptr,
+                                                         STR_VOLUME);
+
+#endif
 
 class RadioInfoWidget : public Widget
 {
@@ -416,6 +949,7 @@ class DateTimeWidget : public Widget
     coord_t displayWidth = compact ? width() : HeaderDateTime::HDR_DATE_WIDTH;
     coord_t x = compact ? 0 : width() - displayWidth - DT_XO;
     dateTime->setDisplayWidth(displayWidth);
+    dateTime->setTextAlign(LV_TEXT_ALIGN_LEFT);
     dateTime->setPos(x, PAD_THREE);
   }
 

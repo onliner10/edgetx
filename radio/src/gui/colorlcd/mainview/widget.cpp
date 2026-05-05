@@ -194,8 +194,8 @@ FontIndex Widget::responsiveTextFont(coord_t height)
   return FONT_XXS_INDEX;
 }
 
-void Widget::centerLabel(lv_obj_t* label, const rect_t& rect, FontIndex font,
-                         coord_t xOffset, coord_t yOffset)
+void Widget::layoutTextLabel(lv_obj_t* label, const rect_t& rect,
+                             FontIndex font, coord_t xOffset, coord_t yOffset)
 {
   coord_t pad = responsive_text_padding(rect.h);
   LcdFlags flags = LcdFlags(font) << 8u;
@@ -203,11 +203,12 @@ void Widget::centerLabel(lv_obj_t* label, const rect_t& rect, FontIndex font,
   coord_t x = rect.x + pad + xOffset;
   coord_t y = rect.y + (rect.h - fontHeight) / 2 + yOffset;
   coord_t w = rect.w > 2 * pad ? rect.w - 2 * pad : rect.w;
+  if (xOffset > 0 && w > xOffset) w -= xOffset;
 
   etx_font(label, font);
   lv_obj_set_pos(label, x, y);
   lv_obj_set_size(label, w, fontHeight);
-  lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+  lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
 }
 
 void Widget::openMenu()

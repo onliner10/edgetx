@@ -89,7 +89,7 @@ class ModelBitmapWidget : public Widget
     coord_t labelHeight = isLarge && hasBitmap ? LARGE_IMG_H : height();
     rect_t labelRect = {0, 0, width(), labelHeight};
     FontIndex font = responsiveTextFont(labelRect.h);
-    centerLabel(label->getLvObj(), labelRect, font);
+    layoutTextLabel(label->getLvObj(), labelRect, font);
 
     // get fill color from options[3]
     etx_bg_color_from_flags(lvobj, widgetData->options[3].value.unsignedValue);

@@ -2319,18 +2319,15 @@ void ModelData::initTopBar()
   topBarData.clear();
   int zones = RadioLayout::topBarZones();
 
-  if (zones - 1 >= 0) {
-    ZonePersistentData & zone = topBarData.zones[zones - 1];
-    zone.widgetName = "Date Time";
+  if (zones > 0) {
+    topBarData.zones[0].widgetName = "ModelBmp";
   }
 
-  if (zones - 2 >= 0) {
-    ZonePersistentData & zone = topBarData.zones[zones - 2];
-    zone.widgetName = "Radio Info";
+  if (zones > 1) {
+    topBarData.zones[1].widgetName = "Link";
   }
 
-  if (zones - 3 >= 0 && Boards::getCapability(getCurrentBoard(), Board::HasInternalGPS)) {
-    ZonePersistentData & zone = topBarData.zones[zones - 3];
-    zone.widgetName = "Internal GPS";
+  if (zones > 2) {
+    topBarData.zones[2].widgetName = "TX Battery";
   }
 }

@@ -74,6 +74,7 @@ class TopBar: public WidgetsContainer
   void setVisible(float visible);
   void setEdgeTxButtonVisible(float visible);
   coord_t getVisibleHeight(float visible) const; // 0.0 -> 1.0
+  void setSetupMode(bool enable) { setupMode = enable; }
 
   bool isTopBar() override { return true; }
 
@@ -88,10 +89,24 @@ class TopBar: public WidgetsContainer
   static LAYOUT_VAL_SCALED(HDR_DATE_XO, 48)
 
   static constexpr coord_t TOPBAR_ZONE_HEIGHT = EdgeTxStyles::MENU_HEADER_HEIGHT - 2 * PAD_THREE;
+  static LAYOUT_VAL_SCALED(TOPBAR_FLEX_MIN_WIDTH, 96)
+  static LAYOUT_VAL_SCALED(TOPBAR_STATUS_WIDTH, 50)
+  static LAYOUT_VAL_SCALED(TOPBAR_LINK_WIDTH, 48)
+  static LAYOUT_VAL_SCALED(TOPBAR_BATTERY_WIDTH, 50)
+  static LAYOUT_VAL_SCALED(TOPBAR_VOLUME_WIDTH, 42)
+  static LAYOUT_VAL_SCALED(TOPBAR_DATETIME_WIDTH, 50)
+  static LAYOUT_VAL_SCALED(TOPBAR_GPS_WIDTH, 38)
+  static LAYOUT_VAL_SCALED(TOPBAR_LEGACY_STATUS_WIDTH, 74)
 
  protected:
   uint32_t lastRefresh = 0;
   HeaderIcon* headerIcon = nullptr;
+  bool setupMode = false;
+
+  bool hasLayoutWidget(unsigned int index) const;
+  int firstLayoutWidget() const;
+  coord_t intrinsicZoneWidth(unsigned int index) const;
+  void compactLayoutWidgets();
 };
 
 //-----------------------------------------------------------------------------

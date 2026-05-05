@@ -77,8 +77,8 @@ class TextWidget : public Widget
     }
 
     FontIndex font = responsiveTextFont(height());
-    centerLabel(shadow, {0, 0, width(), height()}, font, 1, 1);
-    centerLabel(label, {0, 0, width(), height()}, font);
+    layoutTextLabel(shadow, {0, 0, width(), height()}, font, 1, 1);
+    layoutTextLabel(label, {0, 0, width(), height()}, font);
 
     // Show or hide shadow
     if (isMainViewWidget() && widgetData->options[3].value.boolValue)
@@ -94,7 +94,7 @@ const WidgetOption TextWidget::options[] = {
     {STR_COLOR, WidgetOption::Color, COLOR2FLAGS(COLOR_THEME_SECONDARY1_INDEX)},
     {"", WidgetOption::TextSize, 0},
     {STR_SHADOW, WidgetOption::Bool, false},
-    {"", WidgetOption::Align, ALIGN_CENTER},
+    {"", WidgetOption::Align, ALIGN_LEFT},
     {nullptr, WidgetOption::Bool}};
 
 BaseWidgetFactory<TextWidget> textWidget("Text", TextWidget::options,

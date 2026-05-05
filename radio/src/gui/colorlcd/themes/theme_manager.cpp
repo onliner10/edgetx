@@ -585,6 +585,12 @@ void HeaderDateTime::setDisplayWidth(coord_t width)
   lv_obj_set_width(time, width);
 }
 
+void HeaderDateTime::setTextAlign(lv_text_align_t align)
+{
+  lv_obj_set_style_text_align(date, align, LV_PART_MAIN);
+  lv_obj_set_style_text_align(time, align, LV_PART_MAIN);
+}
+
 HeaderIcon::HeaderIcon(Window* parent, EdgeTxIcon icon, std::function<void()> action) :
   StaticIcon(parent, 0, 0, ICON_TOPLEFT_BG, COLOR_THEME_FOCUS_INDEX),
   action(std::move(action))

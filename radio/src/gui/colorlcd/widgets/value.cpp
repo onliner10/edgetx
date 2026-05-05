@@ -223,11 +223,11 @@ class ValueWidget : public Widget
 
     // Get positions, alignment and value font size.
     if (compact) {
-      lblAlign = ALIGN_CENTER;
-      valAlign = ALIGN_CENTER;
-      labelX = 0;
+      lblAlign = ALIGN_LEFT;
+      valAlign = ALIGN_LEFT;
+      labelX = PAD_TINY;
       labelY = 0;
-      valueX = 0;
+      valueX = PAD_TINY;
       valueY = COMPACT_VAL_Y;
       etx_font(label, FONT_XXS_INDEX);
       etx_font(labelShadow, FONT_XXS_INDEX);

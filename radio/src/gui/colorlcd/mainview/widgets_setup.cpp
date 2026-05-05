@@ -110,6 +110,7 @@ void SetupWidgetsPageSlot::addNewWidget(WidgetsContainer* container,
   int selected = -1;
   int index = 0;
   for (auto factory : WidgetFactory::getRegisteredWidgets()) {
+    if (strcmp(factory->getName(), "Radio Info") == 0) continue;
     menu->addLine(factory->getDisplayName(), [=]() {
       container->createWidget(slotIndex, factory);
       auto widget = container->getWidget(slotIndex);
