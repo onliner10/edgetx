@@ -26,7 +26,13 @@
 #include "edgetx_helpers.h"
 
 #if defined(SIMU)
+static bool forceLZ4BitmapBufferMallocFailure = false;
 static bool forceMaskMallocFailure = false;
+
+void bitmapsForceLZ4BitmapBufferMallocFailureForTest(bool force)
+{
+  forceLZ4BitmapBufferMallocFailure = force;
+}
 
 void bitmapsForceMaskMallocFailureForTest(bool force)
 {
@@ -43,14 +49,44 @@ LZ4BitmapBuffer::~LZ4BitmapBuffer() { free(data); }
 
 void LZ4BitmapBuffer::load(const LZ4Bitmap* lz4Data)
 {
+  free(data);
+  data = nullptr;
+  data_end = nullptr;
+
   _width = lz4Data->width;
   _height = lz4Data->height;
+  xmax = _width;
+  ymax = _height;
 
   uint32_t pixels = _width * _height;
-  data = (uint16_t*)malloc(align32(pixels * sizeof(uint16_t)));
+#if defined(SIMU)
+  auto newData = forceLZ4BitmapBufferMallocFailure
+                     ? nullptr
+                     : (uint16_t*)malloc(align32(pixels * sizeof(uint16_t)));
+#else
+  auto newData = (uint16_t*)malloc(align32(pixels * sizeof(uint16_t)));
+#endif
+  if (!newData) {
+    _width = 0;
+    _height = 0;
+    xmax = 0;
+    ymax = 0;
+    return;
+  }
 
-  LZ4_decompress_safe((const char*)lz4Data->data, (char*)data,
-                      lz4Data->compressedSize, pixels * sizeof(uint16_t));
+  auto decoded = LZ4_decompress_safe((const char*)lz4Data->data,
+                                     (char*)newData, lz4Data->compressedSize,
+                                     pixels * sizeof(uint16_t));
+  if (decoded < 0) {
+    free(newData);
+    _width = 0;
+    _height = 0;
+    xmax = 0;
+    ymax = 0;
+    return;
+  }
+
+  data = newData;
   data_end = data + pixels;
 }
 
@@ -585,6 +621,28 @@ bool builtinIconAllocationFailureLeavesDrawableMaskForTest()
   _builtinIconsDecompressed[id] = previous;
 
   return width > 0 && height > 0 && firstPixel == 0;
+}
+
+bool lz4BitmapBufferAllocationFailureInvalidatesBufferForTest()
+{
+  uint16_t pixel = 0;
+  alignas(LZ4Bitmap) uint8_t fixtureStorage[sizeof(LZ4Bitmap) + 16] = {};
+  auto fixture = reinterpret_cast<LZ4Bitmap*>(fixtureStorage);
+  fixture->width = 1;
+  fixture->height = 1;
+  auto compressedSize =
+      LZ4_compress_default((const char*)&pixel, (char*)fixture->data,
+                           sizeof(pixel),
+                           sizeof(fixtureStorage) - sizeof(LZ4Bitmap));
+  fixture->compressedSize = compressedSize;
+
+  LZ4BitmapBuffer bitmap(BMP_RGB565);
+  bitmapsForceLZ4BitmapBufferMallocFailureForTest(true);
+  bitmap.load(fixture);
+  bitmapsForceLZ4BitmapBufferMallocFailureForTest(false);
+
+  return bitmap.getData() == nullptr && bitmap.width() == 0 &&
+         bitmap.height() == 0;
 }
 #endif
 
