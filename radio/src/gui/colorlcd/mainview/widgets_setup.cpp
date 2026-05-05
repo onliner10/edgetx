@@ -40,31 +40,31 @@ SetupWidgetsPageSlot::SetupWidgetsPageSlot(Window* parent, const rect_t& rect,
     ButtonBase(parent, rect),
     container(container),
     topBarSetupPage(topBarSetupPage),
-    slotIndex(slotIndex)
+    slot(WidgetSlotIndex{slotIndex})
 {
-  setPressHandler([=]() -> uint8_t {
-    if (!container) return 0;
-    if (container->getWidget(slotIndex)) {
+  setPressHandler([this]() -> uint8_t {
+    if (!this->container) return 0;
+    if (this->container->getWidget(this->slot.asUnsigned())) {
       Menu* menu = new (std::nothrow) Menu();
       if (!menu) return 0;
       menu->addLine(STR_SELECT_WIDGET,
-                    [=]() { addNewWidget(container, slotIndex); });
-      auto widget = container->getWidget(slotIndex);
+                    [this]() { addNewWidget(); });
+      auto widget = this->container->getWidget(this->slot.asUnsigned());
       if (widget->hasOptions())
         menu->addLine(STR_WIDGET_SETTINGS,
                       [=]() { new (std::nothrow) WidgetSettings(widget); });
-      if (container->canMoveWidget(slotIndex, WidgetMoveDirection::Left))
+      if (this->container->canMoveWidget(this->slot, WidgetMoveDirection::Left))
         menu->addLine(STR_MOVE_LEFT,
-                      [=]() { moveWidget(container, slotIndex,
-                                         WidgetMoveDirection::Left); });
-      if (container->canMoveWidget(slotIndex, WidgetMoveDirection::Right))
+                      [this]() { moveWidget(WidgetMoveDirection::Left); });
+      if (this->container->canMoveWidget(this->slot, WidgetMoveDirection::Right))
         menu->addLine(STR_MOVE_RIGHT,
-                      [=]() { moveWidget(container, slotIndex,
-                                         WidgetMoveDirection::Right); });
+                      [this]() { moveWidget(WidgetMoveDirection::Right); });
       menu->addLine(STR_REMOVE_WIDGET,
-                    [=]() { container->removeWidget(slotIndex); });
+                    [this]() {
+                      this->container->removeWidget(this->slot.asUnsigned());
+                    });
     } else {
-      addNewWidget(container, slotIndex);
+      addNewWidget();
     }
 
     return 0;
@@ -82,21 +82,32 @@ SetupWidgetsPageSlot::SetupWidgetsPageSlot(Window* parent, const rect_t& rect,
   lv_style_set_line_dash_gap(&borderStyle, PAD_BORDER);
   lv_style_set_line_color(&borderStyle, makeLvColor(COLOR_THEME_SECONDARY2));
 
+  border = lv_line_create(lvobj);
+  if (border) {
+    lv_obj_add_style(border, &borderStyle, LV_PART_MAIN);
+  }
+
+  updateBorder();
+  setFocusState();
+
+  setFocusHandler([=](bool) { setFocusState(); });
+}
+
+void SetupWidgetsPageSlot::setSlotRect(const rect_t& rect)
+{
+  setRect(rect);
+  updateBorder();
+}
+
+void SetupWidgetsPageSlot::updateBorder()
+{
   borderPts[0] = {1, 1};
   borderPts[1] = {(lv_coord_t)(width() - 1), 1};
   borderPts[2] = {(lv_coord_t)(width() - 1), (lv_coord_t)(height() - 1)};
   borderPts[3] = {1, (lv_coord_t)(height() - 1)};
   borderPts[4] = {1, 1};
 
-  border = lv_line_create(lvobj);
-  if (border) {
-    lv_obj_add_style(border, &borderStyle, LV_PART_MAIN);
-    lv_line_set_points(border, borderPts, 5);
-  }
-
-  setFocusState();
-
-  setFocusHandler([=](bool) { setFocusState(); });
+  if (border) lv_line_set_points(border, borderPts, 5);
 }
 
 void SetupWidgetsPageSlot::setFocusState()
@@ -109,12 +120,11 @@ void SetupWidgetsPageSlot::setFocusState()
   }
 }
 
-void SetupWidgetsPageSlot::addNewWidget(WidgetsContainer* container,
-                                        uint8_t slotIndex)
+void SetupWidgetsPageSlot::addNewWidget()
 {
   if (!container) return;
   const char* cur = nullptr;
-  auto w = container->getWidget((slotIndex));
+  auto w = container->getWidget(slot.asUnsigned());
   if (w) cur = w->getFactory()->getDisplayName();
 
   Menu* menu = new (std::nothrow) Menu();
@@ -125,9 +135,11 @@ void SetupWidgetsPageSlot::addNewWidget(WidgetsContainer* container,
   for (const auto& registered : WidgetFactory::getRegisteredWidgets()) {
     auto factory = &registered.get();
     if (strcmp(factory->getName(), "Radio Info") == 0) continue;
+    auto selectedSlot = slot;
+    auto selectedContainer = container;
     menu->addLine(factory->getDisplayName(), [=]() {
-      container->createWidget(slotIndex, factory);
-      auto widget = container->getWidget(slotIndex);
+      selectedContainer->createWidget(selectedSlot.asUnsigned(), factory);
+      auto widget = selectedContainer->getWidget(selectedSlot.asUnsigned());
       if (widget && widget->hasOptions())
         new (std::nothrow) WidgetSettings(widget);
     });
@@ -140,12 +152,13 @@ void SetupWidgetsPageSlot::addNewWidget(WidgetsContainer* container,
     menu->select(selected);
 }
 
-void SetupWidgetsPageSlot::moveWidget(WidgetsContainer* container,
-                                      uint8_t slotIndex,
-                                      WidgetMoveDirection direction)
+void SetupWidgetsPageSlot::moveWidget(WidgetMoveDirection direction)
 {
-  if (container && container->moveWidget(slotIndex, direction) && topBarSetupPage)
-    topBarSetupPage->refreshSlots();
+  if (!container) return;
+
+  WidgetMoveResult moveResult = container->moveWidget(slot, direction);
+  if (topBarSetupPage)
+    topBarSetupPage->refreshSlots(moveResult);
 }
 
 SetupWidgetsPage::SetupWidgetsPage(uint8_t customScreenIdx) :

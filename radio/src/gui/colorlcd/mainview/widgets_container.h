@@ -31,6 +31,36 @@ enum class WidgetMoveDirection : int8_t {
   Right = 1,
 };
 
+class WidgetSlotIndex
+{
+ public:
+  explicit constexpr WidgetSlotIndex(uint8_t value) : value_(value) {}
+
+  constexpr uint8_t value() const { return value_; }
+  constexpr unsigned int asUnsigned() const { return value_; }
+
+ private:
+  uint8_t value_;
+};
+
+constexpr bool operator==(WidgetSlotIndex lhs, WidgetSlotIndex rhs)
+{
+  return lhs.value() == rhs.value();
+}
+
+constexpr bool operator!=(WidgetSlotIndex lhs, WidgetSlotIndex rhs)
+{
+  return !(lhs == rhs);
+}
+
+struct WidgetMoveResult
+{
+  WidgetSlotIndex from;
+  WidgetSlotIndex to;
+
+  constexpr bool moved() const { return from != to; }
+};
+
 class WidgetsContainer: public Window
 {
  public:
@@ -42,10 +72,13 @@ class WidgetsContainer: public Window
 
   Widget* getWidget(unsigned int index);
   virtual void removeWidget(unsigned int index);
-  virtual bool canMoveWidget(unsigned int,
+  virtual bool canMoveWidget(WidgetSlotIndex,
                              WidgetMoveDirection) const { return false; }
-  virtual bool moveWidget(unsigned int,
-                          WidgetMoveDirection) { return false; }
+  [[nodiscard]] virtual WidgetMoveResult moveWidget(WidgetSlotIndex index,
+                                                    WidgetMoveDirection)
+  {
+    return {index, index};
+  }
   void removeAllWidgets();
   void updateZones();
   void showWidgets(bool visible = true);

@@ -66,19 +66,20 @@ class SetupWidgetsPageSlot : public ButtonBase
   SetupWidgetsPageSlot(Window* parent, const rect_t& rect,
                        WidgetsContainer* container, uint8_t slotIndex,
                        SetupTopBarWidgetsPage* topBarSetupPage = nullptr);
+  void setSlotRect(const rect_t& rect);
 
  protected:
   WidgetsContainer* container = nullptr;
   SetupTopBarWidgetsPage* topBarSetupPage = nullptr;
-  uint8_t slotIndex = 0;
+  WidgetSlotIndex slot;
   bool openSettings = false;
   lv_style_t borderStyle;
   lv_point_t borderPts[5];
-  lv_obj_t* border;
+  lv_obj_t* border = nullptr;
 
   void setFocusState();
+  void updateBorder();
 
-  void addNewWidget(WidgetsContainer* container, uint8_t slotIndex);
-  void moveWidget(WidgetsContainer* container, uint8_t slotIndex,
-                  WidgetMoveDirection direction);
+  void addNewWidget();
+  void moveWidget(WidgetMoveDirection direction);
 };
