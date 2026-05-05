@@ -266,8 +266,7 @@ extern uint32_t touchI2Chiccups;
 extern uint16_t touchICfwver;
 void TouchInit();
 
-struct TouchState touchPanelRead();
-bool touchPanelEventOccured();
+TouchReadResult touchPanelRead();
 
 PACK(typedef struct {
   uint8_t track;

@@ -36,12 +36,15 @@
 
 #pragma once
 
+#include <stdint.h>
+
+#ifdef __cplusplus
+#include <touch.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <stdint.h>
-#include <touch.h>
 
 /* Set Multi-touch as non supported */
 #ifndef TS_MULTI_TOUCH_SUPPORTED

@@ -85,12 +85,11 @@ static void pumpAdaptiveLvglUntilMenuDeadline(uint32_t cycleStart)
 {
   while (time_get_ms() - cycleStart < MENU_TASK_PERIOD) {
     LvglWrapper* lvgl = LvglWrapper::instance();
-    uint32_t nextRun = lvgl->getNextRunDelay();
+    uint32_t nextRun = LVGL_ADAPTIVE_PUMP_MAX_SLEEP_MS;
+    bool nextRunKnown = lvgl->getNextRunDelay(nextRun);
 
-    if (lvgl->hasAdaptiveWork()) {
+    if ((nextRunKnown && nextRun == 0) || lvgl->hasAdaptiveWork()) {
       nextRun = MainWindow::instance()->runActiveLoopTick();
-    } else if (nextRun == 0) {
-      nextRun = LVGL_ADAPTIVE_PUMP_MAX_SLEEP_MS;
     }
 
     uint32_t elapsed = time_get_ms() - cycleStart;

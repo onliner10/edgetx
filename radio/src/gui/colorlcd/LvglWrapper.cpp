@@ -233,12 +233,21 @@ extern "C" void touchDriverRead(lv_indev_drv_t *drv, lv_indev_data_t *data)
 #if defined(HARDWARE_TOUCH)
   static lv_indev_data_t touch_data_backup;
 
-  if(!touchPanelEventOccured()) {
+  TouchReadResult touch = touchPanelRead();
+  if (touch.isCancel()) {
+    data->state = LV_INDEV_STATE_RELEASED;
+    touchPressed = false;
+    lv_indev_reset(touchDevice, nullptr);
+    memcpy(&touch_data_backup, data, sizeof(lv_indev_data_t));
+    return;
+  }
+  const TouchState* touchState = touch.event();
+  if (!touchState) {
     memcpy(data, &touch_data_backup, sizeof(lv_indev_data_t));
     return;
   }
 
-  TouchState st = touchPanelRead();
+  TouchState st = *touchState;
 
   // no touch input if backlight is disabled
   if (!isBacklightEnabled()) {
@@ -247,13 +256,17 @@ extern "C" void touchDriverRead(lv_indev_drv_t *drv, lv_indev_data_t *data)
     data->state = LV_INDEV_STATE_PRESSED;
     touchPressed = false;
     lv_indev_wait_release(touchDevice);
+    data->state = LV_INDEV_STATE_RELEASED;
+    memcpy(&touch_data_backup, data, sizeof(lv_indev_data_t));
     return;
   }
 
   // no touch input if special function is used
   if (isFunctionActive(FUNCTION_DISABLE_TOUCH)) {
+    data->state = LV_INDEV_STATE_RELEASED;
     touchPressed = false;
     lv_indev_reset(touchDevice, nullptr);
+    memcpy(&touch_data_backup, data, sizeof(lv_indev_data_t));
     return;
   }
   
@@ -472,14 +485,18 @@ uint32_t LvglWrapper::run()
   }
 }
 
-uint32_t LvglWrapper::getNextRunDelay() const
+bool LvglWrapper::getNextRunDelay(uint32_t& delay) const
 {
-  if (!nextRunKnown) return 0;
+  if (!nextRunKnown) return false;
 
   uint32_t now = time_get_ms();
-  if (time_reached(now, nextRunAt)) return 0;
+  if (time_reached(now, nextRunAt)) {
+    delay = 0;
+    return true;
+  }
 
-  return nextRunAt - now;
+  delay = nextRunAt - now;
+  return true;
 }
 
 bool LvglWrapper::hasAdaptiveWork() const
@@ -490,10 +507,6 @@ bool LvglWrapper::hasAdaptiveWork() const
 
 #if defined(HARDWARE_TOUCH)
   if (touchPressed || active_until_pending(now, touchActiveUntil)) return true;
-  if (isBacklightEnabled() && !isFunctionActive(FUNCTION_DISABLE_TOUCH) &&
-      touchPanelEventOccured()) {
-    return true;
-  }
 #endif
 
 #if defined(ROTARY_ENCODER_NAVIGATION)

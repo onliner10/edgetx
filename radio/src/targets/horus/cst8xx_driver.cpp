@@ -243,11 +243,9 @@ void handleTouch()
   }
 }
 
-bool touchPanelEventOccured() { return touchEventOccured; }
-
-TouchState touchPanelRead()
+TouchReadResult touchPanelRead()
 {
-  if (!touchEventOccured) return internalTouchState;
+  if (!touchEventOccured) return TouchReadResult::none();
 
   touchEventOccured = false;
 
@@ -286,7 +284,7 @@ TouchState touchPanelRead()
   if (internalTouchState.event == TE_UP ||
       internalTouchState.event == TE_SLIDE_END)
     internalTouchState.event = TE_NONE;
-  return ret;
+  return TouchReadResult::event(ret);
 }
 
 TouchState getInternalTouchState() { return internalTouchState; }

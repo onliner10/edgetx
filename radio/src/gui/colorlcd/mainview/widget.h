@@ -247,7 +247,14 @@ class Widget : public ButtonBase
 class TrackedWidget : public Widget
 {
  public:
-  using Widget::Widget;
+  enum class LoadMode {
+    Immediate,
+    Delayed
+  };
+
+  TrackedWidget(const WidgetFactory* factory, Window* parent,
+                const rect_t& rect, WidgetLocation location,
+                LoadMode loadMode);
 
   void foreground() final;
 

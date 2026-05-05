@@ -26,6 +26,5 @@
 extern void touchPanelDeInit();
 extern bool touchPanelInit();
 
-struct TouchState touchPanelRead();
-bool touchPanelEventOccured();
+TouchReadResult touchPanelRead();
 struct TouchState getInternalTouchState();

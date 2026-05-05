@@ -460,14 +460,10 @@ bool touchPanelInit()
   return touchController != TC_NONE;
 }
 
-bool touchPanelEventOccured()
+TouchReadResult touchPanelRead()
 {
-  return tcd->hasTouchEvent();
-}
-
-struct TouchState touchPanelRead()
-{
-  if (!touchEventOccured) return internalTouchState;
+  if (touchController != TC_NONE) tcd->hasTouchEvent();
+  if (!touchEventOccured) return TouchReadResult::none();
 
   touchEventOccured = false;
 
@@ -557,7 +553,7 @@ struct TouchState touchPanelRead()
   TRACE("%s: event=%d,X=%d,Y=%d", TOUCH_CONTROLLER_STR[touchController], ret.event, ret.x, ret.y);
 #endif
 
-  return ret;
+  return TouchReadResult::event(ret);
 }
 
 struct TouchState getInternalTouchState()

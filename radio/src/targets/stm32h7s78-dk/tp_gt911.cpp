@@ -209,11 +209,11 @@ static const char *event2str(uint8_t ev)
 }
 #endif
 
-struct TouchState touchPanelRead()
+TouchReadResult touchPanelRead()
 {
   uint8_t state = 0;
 
-  if (!touchEventOccured) return internalTouchState;
+  if (!touchEventOccured) return TouchReadResult::none();
 
   touchEventOccured = false;
 
@@ -224,7 +224,7 @@ struct TouchState touchPanelRead()
       touchGT911hiccups++;
       TRACE("GT911 I2C read XY error");
       // if (!I2C_ReInit()) { TRACE("I2C B1 ReInit failed"); }
-      return internalTouchState;
+      return TouchReadResult::cancel();
     }
 
     if (state & 0x80u) {
@@ -249,7 +249,7 @@ struct TouchState touchPanelRead()
         touchGT911hiccups++;
         TRACE("GT911 I2C data read error");
         // if (!I2C_ReInit()) { TRACE("I2C B1 ReInit failed"); }
-        return internalTouchState;
+        return TouchReadResult::cancel();
       }
         
       if (internalTouchState.event == TE_NONE ||
@@ -299,16 +299,10 @@ struct TouchState touchPanelRead()
   }
 
   TRACE("touch event = %s", event2str(internalTouchState.event));
-  return internalTouchState;
-}
-
-bool touchPanelEventOccured()
-{
-  return touchEventOccured;
+  return TouchReadResult::event(internalTouchState);
 }
 
 TouchState getInternalTouchState()
 {
   return internalTouchState;
 }
-

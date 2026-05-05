@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 enum TouchEvent
 {
     TE_NONE,
@@ -44,6 +46,40 @@ struct TouchState
   short tapCount;
 };
 
+class TouchReadResult
+{
+ public:
+  enum class Kind : uint8_t {
+    None,
+    Event,
+    Cancel,
+  };
+
+  static TouchReadResult none() { return TouchReadResult(Kind::None, {}); }
+
+  static TouchReadResult event(const TouchState& state)
+  {
+    return TouchReadResult(Kind::Event, state);
+  }
+
+  static TouchReadResult cancel() { return TouchReadResult(Kind::Cancel, {}); }
+
+  bool isCancel() const { return kind_ == Kind::Cancel; }
+  const TouchState* event() const
+  {
+    return kind_ == Kind::Event ? &state_ : nullptr;
+  }
+
+ private:
+  TouchReadResult(Kind kind, const TouchState& state) :
+      kind_(kind),
+      state_(state)
+  {
+  }
+
+  Kind kind_;
+  TouchState state_;
+};
 
 #define SLIDE_RANGE 6
 

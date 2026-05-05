@@ -523,17 +523,6 @@ bool touchPanelInit()
   return true;
 }
 
-bool touchPanelEventOccured()
-{
-  std::lock_guard<std::mutex> lock(simTouchMutex);
-  if(simTouchOccured)
-  {
-    simTouchOccured = false;
-    return true;
-  }
-  return false;
-}
-
 void touchPanelDown(short x, short y)
 {
   std::lock_guard<std::mutex> lock(simTouchMutex);
@@ -550,13 +539,15 @@ void touchPanelUp()
   simTouchOccured = true;
 }
 
-struct TouchState touchPanelRead()
+TouchReadResult touchPanelRead()
 {
   std::lock_guard<std::mutex> lock(simTouchMutex);
+  if (!simTouchOccured) return TouchReadResult::none();
+  simTouchOccured = false;
   struct TouchState st = simTouchState;
   simTouchState.deltaX = 0;
   simTouchState.deltaY = 0;
-  return st;
+  return TouchReadResult::event(st);
 }
 
 struct TouchState getInternalTouchState()

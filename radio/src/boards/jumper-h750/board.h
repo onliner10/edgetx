@@ -30,6 +30,11 @@
 #include "hal/serial_port.h"
 #include "hal/watchdog_driver.h"
 
+#ifdef __cplusplus
+class TouchReadResult;
+struct TouchState;
+#endif
+
 #define FLASHSIZE                       0x1000000
 #define BOOTLOADER_SIZE                 0x10000
 #define BOOTLOADER_ADDRESS              0x08000000
@@ -248,9 +253,10 @@ extern uint8_t currentTrainerMode;
 void checkTrainerSettings();
 
 // Touch panel driver
-bool touchPanelEventOccured();
-struct TouchState touchPanelRead();
+#ifdef __cplusplus
+TouchReadResult touchPanelRead();
 struct TouchState getInternalTouchState();
+#endif
 
 // USB Charger
 #if defined(USB_CHARGER)

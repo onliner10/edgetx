@@ -30,6 +30,11 @@
 #include "hal/serial_port.h"
 #include "hal/watchdog_driver.h"
 
+#ifdef __cplusplus
+class TouchReadResult;
+struct TouchState;
+#endif
+
 #define FLASHSIZE                       0x200000
 #define FLASH_PAGESIZE                  256
 #define BOOTLOADER_ADDRESS              0x08000000
@@ -203,9 +208,10 @@ extern uint8_t currentTrainerMode;
 void checkTrainerSettings();
 
 // Touch panel driver
-bool touchPanelEventOccured();
-struct TouchState touchPanelRead();
+#ifdef __cplusplus
+TouchReadResult touchPanelRead();
 struct TouchState getInternalTouchState();
+#endif
 
 #define IS_FIRMWARE_COMPATIBLE_WITH_BOARD() true
 

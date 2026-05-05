@@ -34,7 +34,7 @@ class LvglWrapper
   // Called from UI task: true while input/scroll/animation work can benefit
   // from servicing LVGL before the next 50 ms menu tick.
   bool hasAdaptiveWork() const;
-  uint32_t getNextRunDelay() const;
+  bool getNextRunDelay(uint32_t& delay) const;
 
  protected:
   static LvglWrapper *_instance;

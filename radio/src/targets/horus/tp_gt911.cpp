@@ -648,11 +648,11 @@ static const char *event2str(uint8_t ev)
   extern bool IICReadStatusFlag;
 #endif
 
-struct TouchState touchPanelRead()
+TouchReadResult touchPanelRead()
 {
   uint8_t state = 0;
 
-  if (!touchEventOccured) return internalTouchState;
+  if (!touchEventOccured) return TouchReadResult::none();
 #if defined(CSD203_SENSOR)
   for(int a=0;a<6;a++)
   {//IIC bus preemption
@@ -661,7 +661,7 @@ struct TouchState touchPanelRead()
       break;
     } 
     else if(a>6){
-      return internalTouchState;
+      return TouchReadResult::none();
     }
     delay_us(10);
   }
@@ -679,7 +679,7 @@ struct TouchState touchPanelRead()
     #if defined(CSD203_SENSOR)
       IICReadStatusFlag=false;
     #endif  
-      return internalTouchState;
+      return TouchReadResult::cancel();
     }
 
     if (state & 0x80u) {
@@ -707,7 +707,7 @@ struct TouchState touchPanelRead()
       #if defined(CSD203_SENSOR)
         IICReadStatusFlag=false;
       #endif  
-        return internalTouchState;
+        return TouchReadResult::cancel();
       }
         
       if (internalTouchState.event == TE_NONE ||
@@ -760,16 +760,10 @@ struct TouchState touchPanelRead()
 #if defined(CSD203_SENSOR)
   IICReadStatusFlag=false;
 #endif
-  return internalTouchState;
-}
-
-bool touchPanelEventOccured()
-{
-  return touchEventOccured;
+  return TouchReadResult::event(internalTouchState);
 }
 
 TouchState getInternalTouchState()
 {
   return internalTouchState;
 }
-

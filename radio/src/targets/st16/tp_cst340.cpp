@@ -486,8 +486,7 @@ void handleTouch()
   }
 }
 
-static bool lastHasTouch = false;
-bool touchPanelEventOccured()
+static bool hasTouchEvent()
 {
   bool result = touchEventOccured;
   uint8_t hasTouch = false;
@@ -506,9 +505,10 @@ bool touchPanelEventOccured()
   return result;      
 }
 
-TouchState touchPanelRead()
+TouchReadResult touchPanelRead()
 {
-  if (!touchEventOccured) return internalTouchState;
+  hasTouchEvent();
+  if (!touchEventOccured) return TouchReadResult::none();
 
   touchEventOccured = false;
 
@@ -551,7 +551,7 @@ TouchState touchPanelRead()
   TRACE("%s: Event = %d", touchController == TC_CST340 ? "CST340" : "FT6236", ret.event);
 #endif
 
-  return ret;
+  return TouchReadResult::event(ret);
 }
 
 TouchState getInternalTouchState()

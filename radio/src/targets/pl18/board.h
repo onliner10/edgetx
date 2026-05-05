@@ -29,6 +29,11 @@
 #include "hal/serial_port.h"
 #include "hal/watchdog_driver.h"
 
+#ifdef __cplusplus
+class TouchReadResult;
+struct TouchState;
+#endif
+
 #if defined(RADIO_NB4P)
   #define SURFACE_RADIO  true
 #endif
@@ -271,6 +276,7 @@ void hapticOn(uint32_t pwmPercent);
 #define LUA_DEFAULT_BAUDRATE            115200
 
 // Touch panel driver
-bool touchPanelEventOccured();
-struct TouchState touchPanelRead();
+#ifdef __cplusplus
+TouchReadResult touchPanelRead();
 struct TouchState getInternalTouchState();
+#endif

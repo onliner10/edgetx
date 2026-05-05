@@ -36,9 +36,8 @@ class TimerWidget : public TrackedWidget
  public:
   TimerWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
               WidgetLocation location) :
-      TrackedWidget(factory, parent, rect, location)
+      TrackedWidget(factory, parent, rect, location, LoadMode::Delayed)
   {
-    delayLoad();
   }
 
   void delayedInit() override

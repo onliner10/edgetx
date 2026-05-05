@@ -407,6 +407,21 @@ uint32_t Widget::getPersistentDataRevision()
   return widgetData ? widgetData->getRevision() : 0;
 }
 
+TrackedWidget::TrackedWidget(const WidgetFactory* factory, Window* parent,
+                             const rect_t& rect, WidgetLocation location,
+                             LoadMode loadMode) :
+    Widget(factory, parent, rect, location)
+{
+  switch (loadMode) {
+    case LoadMode::Immediate:
+      loaded = true;
+      break;
+    case LoadMode::Delayed:
+      delayLoad();
+      break;
+  }
+}
+
 void TrackedWidget::foreground()
 {
   if (!loaded || _deleted) return;

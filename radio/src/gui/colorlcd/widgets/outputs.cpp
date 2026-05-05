@@ -174,7 +174,7 @@ class OutputsWidget : public TrackedWidget
  public:
   OutputsWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
                 WidgetLocation location) :
-      TrackedWidget(factory, parent, rect, location)
+      TrackedWidget(factory, parent, rect, location, LoadMode::Immediate)
   {
     padAll(PAD_ZERO);
 

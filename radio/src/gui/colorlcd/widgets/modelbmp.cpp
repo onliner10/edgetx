@@ -33,13 +33,11 @@ class ModelBitmapWidget : public TrackedWidget
  public:
   ModelBitmapWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
                     WidgetLocation location) :
-      TrackedWidget(factory, parent, rect, location)
+      TrackedWidget(factory, parent, rect, location, LoadMode::Delayed)
   {
     etx_obj_add_style(lvobj, styles->bg_opacity_transparent, LV_PART_MAIN);
     etx_obj_add_style(lvobj, styles->bg_opacity_cover,
                       LV_PART_MAIN | ETX_STATE_BG_FILL);
-
-    delayLoad();
   }
 
   void delayedInit() override

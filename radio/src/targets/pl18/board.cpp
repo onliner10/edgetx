@@ -256,8 +256,7 @@ void boardInit()
         boardOff();
       } else {
         uint32_t press_end_touch = press_end;
-        if (touchPanelEventOccured()) {
-          touchPanelRead();
+        if (touchPanelRead().event()) {
           press_end_touch = timersGetMsTick();
         }
         press_start = 0;
