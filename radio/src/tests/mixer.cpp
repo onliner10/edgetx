@@ -1181,6 +1181,31 @@ TEST(Trainer, UnpluggedTest)
   CHECK_DELAY(0, 5000);
 }
 
+TEST_F(MixerTest, TrainerChannelsDoesNotReadPastTrainerInputs)
+{
+  for (uint8_t i = 0; i < MAX_TRAINER_CHANNELS; i++) {
+    trainerInput[i] = i + 1;
+  }
+
+  g_model.customFn[0].swtch = SWSRC_ON;
+  g_model.customFn[0].func = FUNC_TRAINER;
+  g_model.customFn[0].all.param = MAX_STICKS + 1;
+  g_model.customFn[0].active = true;
+  g_model.mixData[0].destCh = MAX_TRAINER_CHANNELS;
+  g_model.mixData[0].mltpx = MLTPX_REPL;
+  g_model.mixData[0].srcRaw = MIXSRC_MAX;
+  g_model.mixData[0].weight = makeSourceNumVal(100);
+  trainerSetTimer(1);
+
+  evalMixes(1);
+
+  EXPECT_EQ(channelOutputs[0], trainerInput[0] * 2);
+  EXPECT_EQ(channelOutputs[MAX_TRAINER_CHANNELS - 1],
+            trainerInput[MAX_TRAINER_CHANNELS - 1] * 2);
+  EXPECT_EQ(channelOutputs[MAX_TRAINER_CHANNELS], CHANNEL_MAX / 256);
+  EXPECT_EQ(channelOutputs[MAX_OUTPUT_CHANNELS - 1], 0);
+}
+
 TEST_F(MixerTest, flightModeTransition)
 {
   int sw;

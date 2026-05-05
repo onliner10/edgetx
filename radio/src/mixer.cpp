@@ -274,7 +274,9 @@ int16_t applyLimits(uint8_t channel, int32_t value)
 #endif
 
   if (isFunctionActive(FUNCTION_TRAINER_CHANNELS) && isTrainerValid()) {
-    return trainerInput[channel] * 2;
+    if (channel < MAX_TRAINER_CHANNELS) {
+      return trainerInput[channel] * 2;
+    }
   }
 
   LimitData * lim = limitAddress(channel);
