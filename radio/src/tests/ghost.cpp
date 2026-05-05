@@ -264,4 +264,18 @@ TEST(Ghost, shortGpsSecondaryFrameDoesNotReadPastFrame)
   SUCCEED();
 }
 
+TEST(Ghost, shortMenuDescFrameDoesNotReadPastFrame)
+{
+  GuardedGhostFrame frame(4);
+  ASSERT_TRUE(frame.isValid());
+  frame[0] = GHST_ADDR_RADIO;
+  frame[1] = 2;
+  frame[2] = GHST_DL_MENU_DESC;
+  frame[3] = crc8(&frame[2], 1);
+
+  processGhostTelemetryFrame(EXTERNAL_MODULE, frame.data(), 4);
+
+  SUCCEED();
+}
+
 #endif

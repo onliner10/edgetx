@@ -282,6 +282,10 @@ void processGhostTelemetryFrame(uint8_t module, uint8_t* buffer, uint32_t length
 
     case GHST_DL_MENU_DESC:
     {
+      if (uint32_t(frame_len) + 2 < sizeof(GhostMenuFrame)) {
+        break;
+      }
+
       GhostMenuFrame * packet;
       GhostMenuData * lineData;
       packet = (GhostMenuFrame * )buffer;
