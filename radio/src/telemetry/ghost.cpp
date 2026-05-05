@@ -337,6 +337,10 @@ void processGhostTelemetryFrame(uint8_t module, uint8_t* buffer, uint32_t length
     }
 
     case GHST_DL_GPS_SECONDARY: {
+      if (!ghostTelemetryFrameHasBytes(frame_len, 5, 1)) {
+        break;
+      }
+
 #if defined(BLUETOOTH)
       if (g_eeGeneral.bluetoothMode == BLUETOOTH_TELEMETRY &&
           bluetooth.state == BLUETOOTH_STATE_CONNECTED) {
