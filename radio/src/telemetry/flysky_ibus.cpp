@@ -238,6 +238,9 @@ void processFlySkyAFHDS3Sensor(const uint8_t * packet, uint8_t len )
     }
     else if( SENSOR_TYPE_RF_MODULE == type )
     {
+      if (len < 7) {
+        return;
+      }
       uint8_t data1[] = { (uint8_t)(SENSOR_TYPE_RF_MODULE_TEMP>>8), (uint8_t)SENSOR_TYPE_RF_MODULE_TEMP, id, packet[3] };
       uint8_t data2[] = { (uint8_t)(SENSOR_TYPE_RF_MODULE_VOL>>8), (uint8_t)SENSOR_TYPE_RF_MODULE_VOL, id, packet[4], packet[5] };
       uint8_t data3[] = { (uint8_t)(SENSOR_TYPE_RF_MODULE_POWER>>8), (uint8_t)SENSOR_TYPE_RF_MODULE_POWER, id, packet[8], packet[9] };

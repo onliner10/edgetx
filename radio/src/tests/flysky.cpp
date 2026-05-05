@@ -101,3 +101,14 @@ TEST(FlySky, shortAcSensorDoesNotReadPastFrame)
 
   processFlySkyPacketAC(frame.data(), 28);
 }
+
+TEST(FlySky, shortAfhds3RfModuleSensorDoesNotReadPastFrame)
+{
+  GuardedFlySkyFrame frame(8);
+  ASSERT_TRUE(frame.isValid());
+
+  constexpr uint8_t sensorTypeRfModule = 0x56;
+  frame.data()[1] = sensorTypeRfModule;
+
+  processFlySkyAFHDS3Sensor(frame.data(), 5);
+}

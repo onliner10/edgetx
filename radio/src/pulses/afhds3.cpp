@@ -32,6 +32,7 @@
 #include "mixer_scheduler.h"
 #include "hal/module_driver.h"
 #include "hal/module_port.h"
+#include "telemetry/flysky_ibus.h"
 
 #define SET_DIRTY() storageDirty(EE_MODEL)
 
@@ -50,8 +51,6 @@ extern uint16_t  sns_RFCurrentPower;
 
 //get channel value outside of afhds3 namespace
 int32_t getChannelValue(uint8_t channel);
-void processFlySkyAFHDS3Sensor(const uint8_t * packet, uint8_t type);
-void processFlySkySensor(const uint8_t * packet, uint8_t type);
 
 namespace afhds3
 {
