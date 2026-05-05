@@ -145,6 +145,23 @@ static StaticIcon* shutdownAnim[4] = {nullptr};
 static BitmapBuffer* shutdownSplashImg = nullptr;
 static lv_obj_t* shutdownCanvas = nullptr;
 
+#if defined(SIMU)
+static bool forceShutdownCanvasCreateFailure = false;
+
+void startupShutdownForceCanvasCreateFailureForTest(bool force)
+{
+  forceShutdownCanvasCreateFailure = force;
+}
+#endif
+
+static lv_obj_t* createShutdownCanvas(lv_obj_t* parent)
+{
+#if defined(SIMU)
+  if (forceShutdownCanvasCreateFailure) return nullptr;
+#endif
+  return lv_canvas_create(parent);
+}
+
 void drawSleepBitmap()
 {
   if (shutdownWindow) {
@@ -191,11 +208,13 @@ void drawShutdownAnimation(uint32_t duration, uint32_t totalDuration,
           BITMAPS_PATH "/" SHUTDOWN_SPLASH_FILE, BMP_RGB565);
 
     if (shutdownSplashImg) {
-      shutdownCanvas = lv_canvas_create(shutdownWindow->getLvObj());
-      lv_obj_center(shutdownCanvas);
-      lv_canvas_set_buffer(shutdownCanvas, shutdownSplashImg->getData(),
-                           shutdownSplashImg->width(),
-                           shutdownSplashImg->height(), LV_IMG_CF_TRUE_COLOR);
+      shutdownCanvas = createShutdownCanvas(shutdownWindow->getLvObj());
+      if (shutdownCanvas) {
+        lv_obj_center(shutdownCanvas);
+        lv_canvas_set_buffer(shutdownCanvas, shutdownSplashImg->getData(),
+                             shutdownSplashImg->width(),
+                             shutdownSplashImg->height(), LV_IMG_CF_TRUE_COLOR);
+      }
     }
     if (auto icon = new (std::nothrow) StaticIcon(
             shutdownWindow, 0, 0, ICON_SHUTDOWN, COLOR_THEME_PRIMARY2_INDEX))
@@ -217,6 +236,28 @@ void drawShutdownAnimation(uint32_t duration, uint32_t totalDuration,
 
   MainWindow::instance()->runMainLoopTick();
 }
+
+#if defined(SIMU)
+bool startupShutdownCanvasCreateFailureLeavesNoCanvasForTest()
+{
+  static pixel_t pixel = 0;
+
+  cancelShutdownAnimation();
+  delete shutdownSplashImg;
+  shutdownSplashImg = new BitmapBuffer(BMP_RGB565, 1, 1, &pixel);
+
+  startupShutdownForceCanvasCreateFailureForTest(true);
+  drawShutdownAnimation(0, 1, nullptr);
+  startupShutdownForceCanvasCreateFailureForTest(false);
+
+  bool result = shutdownWindow && shutdownCanvas == nullptr;
+  cancelShutdownAnimation();
+  delete shutdownSplashImg;
+  shutdownSplashImg = nullptr;
+
+  return result;
+}
+#endif
 
 Window* drawFatalErrorScreen(const char* message)
 {
