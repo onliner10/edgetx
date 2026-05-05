@@ -426,17 +426,38 @@ void useMainStyle()
 
 // Object constructor helpers
 
+#if defined(SIMU)
+static bool forceEtxLabelAllocationFailureForTest = false;
+#endif
+
 lv_obj_t* etx_label_create(lv_obj_t* parent, FontIndex fontIdx)
 {
-  lv_obj_t* lvobj = lv_label_create(parent);
+  lv_obj_t* lvobj =
+#if defined(SIMU)
+      forceEtxLabelAllocationFailureForTest ? nullptr :
+#endif
+      lv_label_create(parent);
+  if (!lvobj) return nullptr;
+
   etx_font(lvobj, fontIdx);
   return lvobj;
 }
 
 lv_obj_t* etx_label_create(Window* parent, FontIndex fontIdx)
 {
+  if (!parent) return nullptr;
   return etx_label_create(parent->getLvObj(), fontIdx);
 }
+
+#if defined(SIMU)
+bool etxLabelAllocationFailureReturnsNullForTest()
+{
+  forceEtxLabelAllocationFailureForTest = true;
+  lv_obj_t* obj = etx_label_create((lv_obj_t*)nullptr);
+  forceEtxLabelAllocationFailureForTest = false;
+  return obj == nullptr;
+}
+#endif
 
 void etx_solid_bg(lv_obj_t* obj, LcdColorIndex bg_color,
                   lv_style_selector_t selector)
