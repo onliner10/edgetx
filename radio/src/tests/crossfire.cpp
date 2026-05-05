@@ -274,6 +274,23 @@ TEST(Crossfire, shortDeviceInfoFrameDoesNotUpdateModuleStatus)
   EXPECT_FALSE(crossfireModuleStatus[EXTERNAL_MODULE].queryCompleted);
 }
 
+TEST(Crossfire, shortRadioTimingFrameDoesNotUpdateModuleSync)
+{
+  ModuleSyncStatus &status = getModuleSyncStatus(EXTERNAL_MODULE);
+  status.refreshRate = 4000;
+  status.inputLag = 25;
+  status.currentLag = 25;
+
+  uint8_t frame[] = {RADIO_ADDRESS, 4, RADIO_ID, 0xEA, 0, 0x10, 0x00,
+                     0x00,          0x27, 0x10,     0x00, 0x00, 0x00,
+                     0x64};
+  processCrossfireTelemetryFrame(EXTERNAL_MODULE, frame, sizeof(frame));
+
+  EXPECT_EQ(status.refreshRate, 4000);
+  EXPECT_EQ(status.inputLag, 25);
+  EXPECT_EQ(status.currentLag, 25);
+}
+
 static uint8_t jumboFrame1[]={
   0xEA, 0x3E, 0xFE, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 

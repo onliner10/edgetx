@@ -376,7 +376,9 @@ void processCrossfireTelemetryFrame(uint8_t module, uint8_t* rxBuffer,
     }
 
     case RADIO_ID:
-      if (rxBuffer[3] == 0xEA     // radio address
+      if (crsfPayloadLen >= 13 &&
+          rxBufferCount >= 14 &&
+          rxBuffer[3] == 0xEA     // radio address
           && rxBuffer[5] == 0x10  // timing correction frame
       ) {
         uint32_t update_interval;
