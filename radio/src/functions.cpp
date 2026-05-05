@@ -284,47 +284,56 @@ void evalFunctions(CustomFunctionData * functions, CustomFunctionsContext & func
 #endif
 
 #if defined(GVARS)
-          case FUNC_ADJUST_GVAR:
-            if (CFN_GVAR_MODE(cfn) == FUNC_ADJUST_GVAR_CONSTANT) {
-              SET_GVAR(CFN_GVAR_INDEX(cfn), CFN_PARAM(cfn),
+          case FUNC_ADJUST_GVAR: {
+            uint8_t gvar = CFN_GVAR_INDEX(cfn);
+            uint8_t mode = CFN_GVAR_MODE(cfn);
+            int16_t param = CFN_PARAM(cfn);
+            if (gvar >= MAX_GVARS || mode > FUNC_ADJUST_GVAR_INCDEC ||
+                (mode == FUNC_ADJUST_GVAR_GVAR &&
+                 (param < 0 || param >= MAX_GVARS))) {
+              TRACE("Invalid GVar function! Disabling...");
+              cfn->active = false;
+              break;
+            }
+
+            if (mode == FUNC_ADJUST_GVAR_CONSTANT) {
+              SET_GVAR(gvar, param, mixerCurrentFlightMode);
+            } else if (mode == FUNC_ADJUST_GVAR_GVAR) {
+              SET_GVAR(gvar,
+                       GVAR_VALUE(param, getGVarFlightMode(mixerCurrentFlightMode,
+                                                           param)),
                        mixerCurrentFlightMode);
-            } else if (CFN_GVAR_MODE(cfn) == FUNC_ADJUST_GVAR_GVAR) {
-              SET_GVAR(CFN_GVAR_INDEX(cfn),
-                       GVAR_VALUE(CFN_PARAM(cfn),
-                                  getGVarFlightMode(mixerCurrentFlightMode,
-                                                    CFN_PARAM(cfn))),
-                       mixerCurrentFlightMode);
-            } else if (CFN_GVAR_MODE(cfn) == FUNC_ADJUST_GVAR_INCDEC) {
+            } else if (mode == FUNC_ADJUST_GVAR_INCDEC) {
               if (!(functionsContext.activeSwitches & switch_mask)) {
-                SET_GVAR(CFN_GVAR_INDEX(cfn),
-                         limit<int16_t>(MODEL_GVAR_MIN(CFN_GVAR_INDEX(cfn)),
-                                        GVAR_VALUE(CFN_GVAR_INDEX(cfn),
+                SET_GVAR(gvar,
+                         limit<int16_t>(MODEL_GVAR_MIN(gvar),
+                                        GVAR_VALUE(gvar,
                                                    getGVarFlightMode(
                                                        mixerCurrentFlightMode,
-                                                       CFN_GVAR_INDEX(cfn))) +
-                                            CFN_PARAM(cfn),
-                                        MODEL_GVAR_MAX(CFN_GVAR_INDEX(cfn))),
+                                                       gvar)) +
+                                            param,
+                                        MODEL_GVAR_MAX(gvar)),
                          mixerCurrentFlightMode);
               }
-            } else if (CFN_PARAM(cfn) >= MIXSRC_FIRST_TRIM &&
-                       CFN_PARAM(cfn) <= MIXSRC_LAST_TRIM) {
-              trimGvar[CFN_PARAM(cfn) - MIXSRC_FIRST_TRIM] =
-                  CFN_GVAR_INDEX(cfn);
+            } else if (param >= MIXSRC_FIRST_TRIM &&
+                       param <= MIXSRC_LAST_TRIM) {
+              trimGvar[param - MIXSRC_FIRST_TRIM] = gvar;
             } else {
-              if (CFN_GVAR_MODE(cfn) == FUNC_ADJUST_GVAR_SOURCE)
-                SET_GVAR(CFN_GVAR_INDEX(cfn),
-                        limit<int16_t>(MODEL_GVAR_MIN(CFN_GVAR_INDEX(cfn)),
-                                        calcRESXto100(getValue(CFN_PARAM(cfn))),
-                                        MODEL_GVAR_MAX(CFN_GVAR_INDEX(cfn))),
+              if (mode == FUNC_ADJUST_GVAR_SOURCE)
+                SET_GVAR(gvar,
+                        limit<int16_t>(MODEL_GVAR_MIN(gvar),
+                                        calcRESXto100(getValue(param)),
+                                        MODEL_GVAR_MAX(gvar)),
                         mixerCurrentFlightMode);
               else
-                SET_GVAR(CFN_GVAR_INDEX(cfn),
-                        limit<int16_t>(MODEL_GVAR_MIN(CFN_GVAR_INDEX(cfn)),
-                                        getValue(CFN_PARAM(cfn)),
-                                        MODEL_GVAR_MAX(CFN_GVAR_INDEX(cfn))),
+                SET_GVAR(gvar,
+                        limit<int16_t>(MODEL_GVAR_MIN(gvar),
+                                        getValue(param),
+                                        MODEL_GVAR_MAX(gvar)),
                         mixerCurrentFlightMode);
             }
             break;
+          }
 #endif
 
 #if defined(AUDIO)

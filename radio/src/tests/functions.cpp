@@ -97,6 +97,20 @@ TEST_F(SpecialFunctionsTest, InvalidSetTimerDoesNotCrash)
 }
 
 #if defined(GVARS)
+TEST_F(SpecialFunctionsTest, InvalidAdjustGvarDoesNotCrash)
+{
+  g_model.customFn[0].swtch = SWSRC_ON;
+  g_model.customFn[0].func = FUNC_ADJUST_GVAR;
+  g_model.customFn[0].all.mode = FUNC_ADJUST_GVAR_INCDEC;
+  g_model.customFn[0].all.param = 255;
+  g_model.customFn[0].all.val = 1;
+  g_model.customFn[0].active = true;
+
+  evalFunctions(g_model.customFn, modelFunctionsContext);
+
+  EXPECT_FALSE(g_model.customFn[0].active);
+}
+
 TEST_F(SpecialFunctionsTest, GvarsInc)
 {
   int sw;
