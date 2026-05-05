@@ -35,6 +35,23 @@
 
 lua_State *lsStandalone = nullptr;
 
+#if defined(SIMU)
+static bool forceStandaloneLuaCanvasCreateFailure = false;
+
+void standaloneLuaForceCanvasCreateFailureForTest(bool force)
+{
+  forceStandaloneLuaCanvasCreateFailure = force;
+}
+#endif
+
+static lv_obj_t* createStandaloneLuaCanvas(lv_obj_t* parent)
+{
+#if defined(SIMU)
+  if (forceStandaloneLuaCanvasCreateFailure) return nullptr;
+#endif
+  return lv_canvas_create(parent);
+}
+
 #if defined(LUA_ALLOCATOR_TRACER)
 LuaMemTracer lsStandaloneTrace;
 
@@ -168,13 +185,25 @@ StandaloneLuaWindow::StandaloneLuaWindow(bool useLvgl, int initFn, int runFn) :
                         FONT(L) | COLOR_THEME_PRIMARY2 | CENTERED);
       setWindowFlag(NO_FOCUS | NO_SCROLL);
 
-      auto canvas = lv_canvas_create(lvobj);
-      lv_obj_center(canvas);
-      lv_canvas_set_buffer(canvas, lcdBuffer->getData(),
-                           lcdBuffer->width(), lcdBuffer->height(), LV_IMG_CF_TRUE_COLOR);
+      auto canvas = createStandaloneLuaCanvas(lvobj);
+      if (!canvas) {
+        if (lsStandalone) {
+          luaL_unref(lsStandalone, LUA_REGISTRYINDEX, initFunction);
+          luaL_unref(lsStandalone, LUA_REGISTRYINDEX, runFunction);
+        }
+        initFunction = LUA_REFNIL;
+        runFunction = LUA_REFNIL;
+        delete lcdBuffer;
+        lcdBuffer = nullptr;
+        hasError = true;
+      } else {
+        lv_obj_center(canvas);
+        lv_canvas_set_buffer(canvas, lcdBuffer->getData(),
+                             lcdBuffer->width(), lcdBuffer->height(), LV_IMG_CF_TRUE_COLOR);
 
-      lv_group_add_obj(lv_group_get_default(), lvobj);
-      lv_group_set_editing(lv_group_get_default(), true);
+        lv_group_add_obj(lv_group_get_default(), lvobj);
+        lv_group_set_editing(lv_group_get_default(), true);
+      }
     }
   }
 
@@ -238,6 +267,27 @@ void StandaloneLuaWindow::deleteLater()
 
   Window::deleteLater();
 }
+
+#if defined(SIMU)
+bool standaloneLuaCanvasCreateFailureSetsErrorForTest()
+{
+  if (!lsStandalone)
+    luaStandaloneInit();
+
+  standaloneLuaForceCanvasCreateFailureForTest(true);
+  StandaloneLuaWindow::setup(false, LUA_REFNIL, LUA_REFNIL);
+  standaloneLuaForceCanvasCreateFailureForTest(false);
+
+  auto window = StandaloneLuaWindow::instance();
+  bool result = window && window->hasErrorForTest() &&
+                !window->hasLcdBufferForTest();
+
+  if (window)
+    window->deleteLater();
+
+  return result;
+}
+#endif
 
 void StandaloneLuaWindow::checkEvents()
 {

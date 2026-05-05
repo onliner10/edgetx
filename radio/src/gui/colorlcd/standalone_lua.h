@@ -60,6 +60,11 @@ public:
 
   void showError(bool firstCall, const char* title, const char* msg);
 
+#if defined(SIMU)
+  bool hasErrorForTest() const { return hasError; }
+  bool hasLcdBufferForTest() const { return lcdBuffer != nullptr; }
+#endif
+
   static LAYOUT_VAL_SCALED(POPUP_HEADER_HEIGHT, 30)
   static LAYOUT_SIZE_SCALED(POPUP_X, 50, 40)
   static LAYOUT_SIZE_SCALED(POPUP_Y, 70, 110)
