@@ -184,6 +184,26 @@ TEST_F(PulsesTest, multiFailsafeHonorsChannelStart)
 
   MultiDriver.deinit(ctx);
 }
+
+TEST_F(PulsesTest, multiSendPulsesRejectsInvalidRfProtocol)
+{
+  modulePortInit();
+  g_model.moduleData[EXTERNAL_MODULE].type = MODULE_TYPE_MULTIMODULE;
+  g_model.moduleData[EXTERNAL_MODULE].multi.rfProtocol = 200;
+  g_model.moduleData[EXTERNAL_MODULE].multi.autoBindMode = 0;
+  g_model.moduleData[EXTERNAL_MODULE].failsafeMode = FAILSAFE_NOT_SET;
+
+  auto ctx = MultiDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  uint8_t buffer[MODULE_BUFFER_SIZE] = {};
+  MultiDriver.sendPulses(ctx, buffer, nullptr, 0);
+
+  EXPECT_EQ(buffer[1] & 0x1f, MODULE_SUBTYPE_MULTI_FIRST + 1);
+  EXPECT_EQ(buffer[26] & 0xc0, 0);
+
+  MultiDriver.deinit(ctx);
+}
 #endif
 
 #if defined(DSM2) && defined(HARDWARE_EXTERNAL_MODULE)

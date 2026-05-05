@@ -192,7 +192,8 @@ static void setupPulsesMulti(uint8_t*& p_buf, uint8_t module,
     sendMulti(p_buf, invert[module] & 0x08);
   }
   else {
-    sendMulti(p_buf, (uint8_t) (((g_model.moduleData[module].multi.rfProtocol + 1) & 0xC0)
+    uint8_t rfProtocol = getModuleMultiRfProtocol(module);
+    sendMulti(p_buf, (uint8_t) (((rfProtocol + 1) & 0xC0)
                                 | (g_model.header.modelId[module] & 0x30)
                                 | (invert[module] & 0x08)
                                 //| 0x04 // Future use
@@ -346,7 +347,8 @@ void sendFrameProtocolHeader(uint8_t*& p_buf, uint8_t module, bool failsafe)
 {// byte 1+2, protocol information
 
   // Our enumeration starts at 0
-  int type = g_model.moduleData[module].multi.rfProtocol + 1;
+  uint8_t rfProtocol = getModuleMultiRfProtocol(module);
+  int type = rfProtocol + 1;
   int subtype = g_model.moduleData[module].subType;
   int8_t optionValue = g_model.moduleData[module].multi.optionValue;
 
@@ -396,12 +398,12 @@ void sendFrameProtocolHeader(uint8_t*& p_buf, uint8_t module, bool failsafe)
 
   // Set the highest bit of option byte in AFHDS2A protocol to instruct MULTI to passthrough telemetry bytes instead
   // of sending Frsky D telemetry
-  if (g_model.moduleData[module].multi.rfProtocol == MODULE_SUBTYPE_MULTI_FS_AFHDS2A)
+  if (rfProtocol == MODULE_SUBTYPE_MULTI_FS_AFHDS2A)
     optionValue = optionValue | 0x80;
 
   // For custom protocol send unmodified type byte
-  if (g_model.moduleData[module].multi.rfProtocol == MM_RF_CUSTOM_SELECTED)
-    type = g_model.moduleData[module].multi.rfProtocol;
+  if (rfProtocol == MM_RF_CUSTOM_SELECTED)
+    type = rfProtocol;
 
   uint8_t headerByte = 0x55;
   // header, byte 0,  0x55 for proto 0-31, 0x54 for proto 32-63
@@ -415,7 +417,7 @@ void sendFrameProtocolHeader(uint8_t*& p_buf, uint8_t module, bool failsafe)
 
   // protocol byte
   protoByte |= (type & 0x1f);
-  if (g_model.moduleData[module].multi.rfProtocol != MODULE_SUBTYPE_MULTI_DSM2)
+  if (rfProtocol != MODULE_SUBTYPE_MULTI_DSM2)
     protoByte |= (g_model.moduleData[module].multi.autoBindMode << 6);
 
   sendMulti(p_buf, protoByte);

@@ -50,31 +50,40 @@ extern uint32_t NV14internalModuleFwVersion;
    (moduleState[module].protocol == PROTOCOL_CHANNELS_PXX2))
 
 #if defined (MULTIMODULE)
+  inline uint8_t getModuleMultiRfProtocol(uint8_t moduleIdx)
+  {
+    uint8_t protocol = g_model.moduleData[moduleIdx].multi.rfProtocol;
+    return (protocol <= MODULE_SUBTYPE_MULTI_LAST ||
+            protocol == MM_RF_CUSTOM_SELECTED)
+               ? protocol
+               : MODULE_SUBTYPE_MULTI_FIRST;
+  }
+
   #define IS_D16_MULTI(module)                                            \
-    ((g_model.moduleData[module].multi.rfProtocol == MODULE_SUBTYPE_MULTI_FRSKYX) || \
-    (g_model.moduleData[module].multi.rfProtocol == MODULE_SUBTYPE_MULTI_FRSKYX2))
+    ((getModuleMultiRfProtocol(module) == MODULE_SUBTYPE_MULTI_FRSKYX) || \
+    (getModuleMultiRfProtocol(module) == MODULE_SUBTYPE_MULTI_FRSKYX2))
 
   #define IS_R9_MULTI(module)                         \
-    (g_model.moduleData[module].multi.rfProtocol == \
+    (getModuleMultiRfProtocol(module) == \
     MODULE_SUBTYPE_MULTI_FRSKY_R9)
 
   #define IS_HOTT_MULTI(module)                                           \
-    (g_model.moduleData[module].multi.rfProtocol == MODULE_SUBTYPE_MULTI_HOTT)
+    (getModuleMultiRfProtocol(module) == MODULE_SUBTYPE_MULTI_HOTT)
 
   #define IS_CONFIG_MULTI(module)                                         \
-    (g_model.moduleData[module].multi.rfProtocol == MODULE_SUBTYPE_MULTI_CONFIG)
+    (getModuleMultiRfProtocol(module) == MODULE_SUBTYPE_MULTI_CONFIG)
 
   #define IS_DSM_MULTI(module)                                            \
-    (g_model.moduleData[module].multi.rfProtocol == MODULE_SUBTYPE_MULTI_DSM2)
+    (getModuleMultiRfProtocol(module) == MODULE_SUBTYPE_MULTI_DSM2)
 
   #define IS_RX_MULTI(module)                          \
-    ((g_model.moduleData[module].multi.rfProtocol == \
+    ((getModuleMultiRfProtocol(module) == \
       MODULE_SUBTYPE_MULTI_AFHDS2A_RX) ||              \
-    (g_model.moduleData[module].multi.rfProtocol == \
+    (getModuleMultiRfProtocol(module) == \
       MODULE_SUBTYPE_MULTI_FRSKYX_RX) ||               \
-    (g_model.moduleData[module].multi.rfProtocol == \
+    (getModuleMultiRfProtocol(module) == \
       MODULE_SUBTYPE_MULTI_BAYANG_RX) ||               \
-    (g_model.moduleData[module].multi.rfProtocol == \
+    (getModuleMultiRfProtocol(module) == \
       MODULE_SUBTYPE_MULTI_DSM_RX))
 
   // When using packed, the pointer in here end up not being aligned, which clang and gcc complain about
@@ -101,7 +110,7 @@ extern uint32_t NV14internalModuleFwVersion;
     MultiModuleStatus &status = getMultiModuleStatus(moduleIdx);
 
     uint8_t max_pdef = 0;
-    auto proto = g_model.moduleData[moduleIdx].multi.rfProtocol;
+    auto proto = getModuleMultiRfProtocol(moduleIdx);
     const mm_protocol_definition *pdef = getMultiProtocolDefinition(proto);
     if (pdef) {
       max_pdef = pdef->maxSubtype;
@@ -123,7 +132,7 @@ extern uint32_t NV14internalModuleFwVersion;
   inline bool isModuleMultimoduleDSM2(uint8_t idx)
   {
     return isModuleMultimodule(idx) &&
-          g_model.moduleData[idx].multi.rfProtocol ==
+          getModuleMultiRfProtocol(idx) ==
               MODULE_SUBTYPE_MULTI_DSM2;
   }
 
@@ -133,7 +142,7 @@ extern uint32_t NV14internalModuleFwVersion;
       return;
 
     // Sensible default for DSM2 (same as for ppm): 7ch@22ms + Autodetect settings enabled
-    if (g_model.moduleData[moduleIdx].multi.rfProtocol == MODULE_SUBTYPE_MULTI_DSM2) {
+    if (getModuleMultiRfProtocol(moduleIdx) == MODULE_SUBTYPE_MULTI_DSM2) {
       g_model.moduleData[moduleIdx].multi.autoBindMode = 1;
     }
     else {
@@ -621,7 +630,7 @@ inline bool isModuleFailsafeAvailable(uint8_t moduleIdx)
       return status.supportsFailsafe();
     }
     else {
-      auto proto = g_model.moduleData[moduleIdx].multi.rfProtocol;
+      auto proto = getModuleMultiRfProtocol(moduleIdx);
       const mm_protocol_definition * pdef = getMultiProtocolDefinition(proto);
       if (pdef) return pdef->failsafe;
       return false;
@@ -653,7 +662,7 @@ inline bool isMultiProtocolDSMCloneAvailable(uint8_t moduleIdx)
     return false;
   }
 
-  return g_model.moduleData[moduleIdx].multi.rfProtocol == MODULE_SUBTYPE_MULTI_DSM2;
+  return getModuleMultiRfProtocol(moduleIdx) == MODULE_SUBTYPE_MULTI_DSM2;
 }
 #endif
 
