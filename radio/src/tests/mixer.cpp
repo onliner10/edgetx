@@ -650,6 +650,16 @@ TEST_F(MixerTest, InfiniteRecursiveChannels)
   EXPECT_EQ(chans[0], 0);
 }
 
+TEST_F(MixerTest, InvalidThrottleTraceSourceDoesNotCrashPeriodicUpdate)
+{
+  g_model.thrTraceSrc = 255;
+  g_tmr10ms += 1;
+
+  doMixerPeriodicUpdates();
+
+  EXPECT_EQ(g_model.thrTraceSrc, 0);
+}
+
 TEST_F(MixerTest, BlockingChannel)
 {
   g_model.mixData[0].destCh = 0;

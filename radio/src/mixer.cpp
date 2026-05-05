@@ -1317,9 +1317,15 @@ void doMixerPeriodicUpdates()
   if (tick10ms) {
     /* Throttle trace */
     int16_t val;
+    uint8_t thrTraceSrc = g_model.thrTraceSrc;
+    if (thrTraceSrc > MAX_POTS + MAX_OUTPUT_CHANNELS) {
+      TRACE("Invalid throttle trace source! Fixing...");
+      g_model.thrTraceSrc = 0;
+      thrTraceSrc = 0;
+    }
 
-    if (g_model.thrTraceSrc > MAX_POTS) {
-      uint8_t ch = g_model.thrTraceSrc - MAX_POTS - 1;
+    if (thrTraceSrc > MAX_POTS) {
+      uint8_t ch = thrTraceSrc - MAX_POTS - 1;
       val = channelOutputs[ch];
 
       LimitData * lim = limitAddress(ch);
@@ -1347,7 +1353,7 @@ void doMixerPeriodicUpdates()
         val=0;  // prevent val be negative, which would corrupt throttle trace and timers; could occur if safetyswitch is smaller than limits
     }
     else {
-      val = RESX + calibratedAnalogs[g_model.thrTraceSrc == 0 ? inputMappingConvertMode(inputMappingGetThrottle()) : g_model.thrTraceSrc + MAX_STICKS - 1];
+      val = RESX + calibratedAnalogs[thrTraceSrc == 0 ? inputMappingConvertMode(inputMappingGetThrottle()) : thrTraceSrc + MAX_STICKS - 1];
     }
 
     // calibrate it (resolution increased by factor 4)
