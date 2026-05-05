@@ -31,8 +31,14 @@
 #include "strhelpers.h"
 
 #if defined(SIMU)
+static bool forceBitmapBufferCanvasCreateFailure = false;
 static bool forceBitmapBufferDataMallocFailure = false;
 static bool forceBitmapBufferResizeMallocFailure = false;
+
+void bitmapBufferForceCanvasCreateFailureForTest(bool force)
+{
+  forceBitmapBufferCanvasCreateFailure = force;
+}
 
 void bitmapBufferForceDataMallocFailureForTest(bool force)
 {
@@ -42,6 +48,16 @@ void bitmapBufferForceDataMallocFailureForTest(bool force)
 void bitmapBufferForceResizeMallocFailureForTest(bool force)
 {
   forceBitmapBufferResizeMallocFailure = force;
+}
+#endif
+
+#if !defined(BOOT)
+static lv_obj_t* createBitmapBufferCanvas(lv_obj_t* parent)
+{
+#if defined(SIMU)
+  if (forceBitmapBufferCanvasCreateFailure) return nullptr;
+#endif
+  return lv_canvas_create(parent);
 }
 #endif
 
@@ -78,8 +94,9 @@ BitmapBuffer::BitmapBuffer(uint8_t format, uint16_t width, uint16_t height) :
 
 #if !defined(BOOT)
   // Assume we need a canvas here
-  canvas = lv_canvas_create(nullptr);
-  lv_canvas_set_buffer(canvas, data, width, height, LV_IMG_CF_TRUE_COLOR);
+  canvas = createBitmapBufferCanvas(nullptr);
+  if (canvas)
+    lv_canvas_set_buffer(canvas, data, width, height, LV_IMG_CF_TRUE_COLOR);
 #endif
 }
 
@@ -105,7 +122,7 @@ BitmapBuffer::~BitmapBuffer()
   DMAWait();
   if (dataAllocated) {
 #if !defined(BOOT)
-    lv_obj_del(canvas);
+    if (canvas) lv_obj_del(canvas);
 #endif
     free(data);
   }
@@ -645,6 +662,16 @@ void BitmapBuffer::resizeToLVGL(coord_t w, coord_t h)
 }
 
 #if defined(SIMU)
+bool bitmapBufferCanvasCreateFailureKeepsDataForTest()
+{
+  bitmapBufferForceCanvasCreateFailureForTest(true);
+  BitmapBuffer bitmap(BMP_RGB565, 8, 8);
+  bitmapBufferForceCanvasCreateFailureForTest(false);
+
+  return bitmap.getData() != nullptr && bitmap.width() == 8 &&
+         bitmap.height() == 8;
+}
+
 bool bitmapBufferResizeAllocationFailurePreventsLvglOverreadForTest()
 {
   BitmapBuffer bitmap(BMP_ARGB4444, 512, 512);
