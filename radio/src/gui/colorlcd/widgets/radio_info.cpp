@@ -34,6 +34,13 @@ namespace {
 constexpr uint8_t LINK_BARS = 5;
 const uint8_t linkBarThresholds[LINK_BARS] = {30, 40, 50, 60, 80};
 
+struct StatusContentBox {
+  coord_t x;
+  coord_t y;
+  coord_t w;
+  coord_t h;
+};
+
 coord_t minCoord(coord_t a, coord_t b) { return a < b ? a : b; }
 coord_t maxCoord(coord_t a, coord_t b) { return a > b ? a : b; }
 
@@ -45,6 +52,17 @@ coord_t clampCoord(coord_t value, coord_t low, coord_t high)
 }
 
 constexpr coord_t TOPBAR_CONTENT_PAD = PAD_TINY;
+
+StatusContentBox topbarContentBox(coord_t w, coord_t h)
+{
+  coord_t contentW = w > 2 * TOPBAR_CONTENT_PAD
+                         ? w - 2 * TOPBAR_CONTENT_PAD
+                         : maxCoord(w, (coord_t)1);
+  coord_t contentH = h > 2 * TOPBAR_CONTENT_PAD
+                         ? h - 2 * TOPBAR_CONTENT_PAD
+                         : maxCoord(h, (coord_t)1);
+  return {TOPBAR_CONTENT_PAD, TOPBAR_CONTENT_PAD, contentW, contentH};
+}
 
 lv_obj_t* makeStatusPart(lv_obj_t* parent)
 {
@@ -184,8 +202,11 @@ class LinkStatusWidget : public Widget
     coord_t graphH = height() > 2 * pad ? height() - 2 * pad : height();
 
     if (topbar) {
-      graphH = minCoord(graphH, (coord_t)29);
-      graphY = (height() - graphH) / 2;
+      auto box = topbarContentBox(width(), height());
+      graphX = box.x;
+      graphY = box.y;
+      graphW = box.w;
+      graphH = box.h;
     } else {
       coord_t textW = maxCoord(labelW / 3, (coord_t)34);
       if (width() > 110) {
@@ -218,8 +239,10 @@ class LinkStatusWidget : public Widget
 
     coord_t gap = topbar ? TOPBAR_CONTENT_PAD : PAD_THREE;
     coord_t barW = (graphW - (LINK_BARS - 1) * gap) / LINK_BARS;
-    barW = clampCoord(barW, topbar ? (coord_t)5 : (coord_t)6,
-                      topbar ? (coord_t)12 : (coord_t)14);
+    if (topbar)
+      barW = maxCoord(barW, (coord_t)1);
+    else
+      barW = clampCoord(barW, (coord_t)6, (coord_t)14);
 
     for (uint8_t i = 0; i < LINK_BARS; i += 1) {
       if (!bars[i]) continue;
@@ -312,18 +335,29 @@ class TxBatteryStatusWidget : public Widget
     setLvVisible(title, !topbar && height() >= 54);
     setLvVisible(value, !topbar);
 
-    coord_t battH = topbar ? minCoord((coord_t)20, height() - 2 * pad)
-                           : minCoord((coord_t)30, height() - 2 * pad);
-    battH = maxCoord(battH, topbar ? (coord_t)14 : (coord_t)18);
-    coord_t battW = topbar ? minCoord((coord_t)42, width() - 3 * pad)
-                           : minCoord((coord_t)58, width() - 3 * pad);
-    battW = maxCoord(battW, topbar ? (coord_t)28 : (coord_t)36);
-
+    coord_t capW = PAD_THREE;
+    coord_t battW = 0;
+    coord_t battH = 0;
     coord_t battX = pad;
-    coord_t battY = (height() - battH) / 2;
+    coord_t battY = 0;
 
-    if (!topbar && width() < 110) {
-      battW = minCoord(battW, (coord_t)(width() - 3 * pad));
+    if (topbar) {
+      auto box = topbarContentBox(width(), height());
+      capW = minCoord(PAD_THREE, maxCoord((coord_t)(box.w / 8), (coord_t)1));
+      battW = maxCoord((coord_t)(box.w - capW), (coord_t)1);
+      battH = minCoord(box.h, maxCoord((coord_t)(battW / 2), (coord_t)1));
+      battX = box.x;
+      battY = box.y + (box.h - battH) / 2;
+    } else {
+      battH = minCoord((coord_t)30, height() - 2 * pad);
+      battH = maxCoord(battH, (coord_t)18);
+      battW = minCoord((coord_t)58, width() - 3 * pad);
+      battW = maxCoord(battW, (coord_t)36);
+      battY = (height() - battH) / 2;
+
+      if (width() < 110) {
+        battW = minCoord(battW, (coord_t)(width() - 3 * pad));
+      }
     }
 
     if (shell) {
@@ -333,13 +367,14 @@ class TxBatteryStatusWidget : public Widget
     }
     if (cap) {
       lv_obj_set_pos(cap, battX + battW, battY + battH / 4);
-      lv_obj_set_size(cap, 3, battH / 2);
+      lv_obj_set_size(cap, capW, battH / 2);
     }
 
-    coord_t fillX = battX + 3;
-    coord_t fillY = battY + 3;
-    fillMaxW = battW > 6 ? battW - 6 : battW;
-    fillH = battH > 6 ? battH - 6 : battH;
+    coord_t fillInset = PAD_THREE;
+    coord_t fillX = battX + fillInset;
+    coord_t fillY = battY + fillInset;
+    fillMaxW = battW > 2 * fillInset ? battW - 2 * fillInset : battW;
+    fillH = battH > 2 * fillInset ? battH - 2 * fillInset : battH;
 
     if (fill) {
       lv_obj_set_pos(fill, fillX, fillY);
@@ -459,20 +494,34 @@ class VolumeStatusWidget : public Widget
     setLvVisible(title, !topbar && height() >= 54);
     setLvVisible(value, !topbar);
 
+    StatusContentBox box = topbar ? topbarContentBox(width(), height())
+                                  : StatusContentBox{pad, pad,
+                                                     width() > 2 * pad
+                                                         ? width() - 2 * pad
+                                                         : width(),
+                                                     height() > 2 * pad
+                                                         ? height() - 2 * pad
+                                                         : height()};
+
     if (icon) {
       icon->setColor(statusPrimaryColor(topbar));
-      icon->setPos(pad, (height() - icon->height()) / 2);
+      icon->setPos(box.x, (height() - icon->height()) / 2);
     }
 
-    coord_t segX = icon ? icon->left() + icon->width() + PAD_TINY : pad;
-    coord_t segAreaRight = width() > pad ? width() - pad : width();
+    coord_t gap = topbar ? TOPBAR_CONTENT_PAD : PAD_TINY;
+    coord_t segX = icon ? icon->left() + icon->width() + gap : box.x;
+    coord_t segAreaRight = topbar ? box.x + box.w
+                                  : (width() > pad ? width() - pad : width());
     coord_t segAreaW = segAreaRight > segX ? segAreaRight - segX : 0;
-    coord_t gap = PAD_TINY;
     coord_t segW = (segAreaW - (VOLUME_SEGMENTS - 1) * gap) / VOLUME_SEGMENTS;
-    segW = clampCoord(segW, (coord_t)4, topbar ? (coord_t)8 : (coord_t)10);
-    coord_t segH = topbar ? minCoord((coord_t)16, height() - 2 * pad)
+    if (topbar)
+      segW = maxCoord(segW, (coord_t)1);
+    else
+      segW = clampCoord(segW, (coord_t)4, (coord_t)10);
+    coord_t segH = topbar ? maxCoord((coord_t)(box.h - 2 * TOPBAR_CONTENT_PAD),
+                                     (coord_t)1)
                           : minCoord((coord_t)22, height() - 2 * pad);
-    segH = maxCoord(segH, (coord_t)8);
+    if (!topbar) segH = maxCoord(segH, (coord_t)8);
     coord_t segY = (height() - segH) / 2;
 
     for (uint8_t i = 0; i < VOLUME_SEGMENTS; i += 1) {
