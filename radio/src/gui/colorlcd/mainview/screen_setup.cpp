@@ -28,6 +28,7 @@
 #include "edgetx.h"
 #include "getset_helpers.h"
 #include "layout.h"
+#include "mainwindow.h"
 #include "menu.h"
 #include "static.h"
 #include "toggleswitch.h"
@@ -42,6 +43,23 @@
 
 extern PageDef screensMenuItems[];
 
+#if defined(SIMU)
+static bool forceLayoutChoiceCanvasCreateFailure = false;
+
+void screenSetupForceLayoutChoiceCanvasCreateFailureForTest(bool force)
+{
+  forceLayoutChoiceCanvasCreateFailure = force;
+}
+#endif
+
+static lv_obj_t* createLayoutChoiceCanvas(lv_obj_t* parent)
+{
+#if defined(SIMU)
+  if (forceLayoutChoiceCanvasCreateFailure) return nullptr;
+#endif
+  return lv_canvas_create(parent);
+}
+
 class LayoutChoice : public Button
 {
  public:
@@ -55,9 +73,11 @@ class LayoutChoice : public Button
       setValue(std::move(setValue))
   {
     padAll(PAD_ZERO);
-    canvas = lv_canvas_create(lvobj);
-    lv_obj_center(canvas);
-    update();
+    canvas = createLayoutChoiceCanvas(lvobj);
+    if (canvas) {
+      lv_obj_center(canvas);
+      update();
+    }
   }
 
   void onPress() override
@@ -101,6 +121,29 @@ class LayoutChoice : public Button
     lv_canvas_set_buffer(canvas, (void*)&bitmap->data[0], w, h, LV_IMG_CF_ALPHA_8BIT);
   }
 };
+
+#if defined(SIMU)
+bool screenSetupLayoutChoiceCanvasCreateFailureLeavesNoCanvasForTest()
+{
+  class TestLayoutChoice : public LayoutChoice
+  {
+   public:
+    TestLayoutChoice(Window* parent) :
+        LayoutChoice(parent, []() -> const LayoutFactory* { return nullptr; },
+                     [](const LayoutFactory*) {})
+    {
+    }
+
+    bool hasCanvas() const { return canvas != nullptr; }
+  };
+
+  screenSetupForceLayoutChoiceCanvasCreateFailureForTest(true);
+  auto choice = new TestLayoutChoice(MainWindow::instance());
+  screenSetupForceLayoutChoiceCanvasCreateFailureForTest(false);
+
+  return choice && !choice->hasCanvas();
+}
+#endif
 
 #if LANDSCAPE
 static const lv_coord_t line_col_dsc[] = {LV_GRID_FR(2), LV_GRID_FR(1),
