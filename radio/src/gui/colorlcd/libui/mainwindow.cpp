@@ -37,6 +37,23 @@
 
 MainWindow* MainWindow::_instance = nullptr;
 
+#if defined(SIMU)
+static bool forceBackgroundCanvasCreateFailure = false;
+
+void mainWindowForceBackgroundCanvasCreateFailureForTest(bool force)
+{
+  forceBackgroundCanvasCreateFailure = force;
+}
+#endif
+
+static lv_obj_t* createBackgroundCanvas(lv_obj_t* parent)
+{
+#if defined(SIMU)
+  if (forceBackgroundCanvasCreateFailure) return nullptr;
+#endif
+  return lv_canvas_create(parent);
+}
+
 MainWindow* MainWindow::instance()
 {
   if (!_instance) _instance = new MainWindow();
@@ -49,8 +66,8 @@ MainWindow::MainWindow() : Window(nullptr, {0, 0, LCD_W, LCD_H})
 
   etx_solid_bg(lvobj);
 
-  background = lv_canvas_create(lvobj);
-  lv_obj_center(background);
+  background = createBackgroundCanvas(lvobj);
+  if (background) lv_obj_center(background);
 }
 
 void MainWindow::emptyTrash()
@@ -153,8 +170,8 @@ void MainWindow::shutdown()
   emptyTrash();
 
   // Re-add background canvas
-  background = lv_canvas_create(lvobj);
-  lv_obj_center(background);
+  background = createBackgroundCanvas(lvobj);
+  if (background) lv_obj_center(background);
 }
 
 bool MainWindow::setBackgroundImage(std::string& fileName)
@@ -165,6 +182,11 @@ bool MainWindow::setBackgroundImage(std::string& fileName)
   auto newBitmap = BitmapBuffer::loadBitmap(fileName.c_str(), BMP_RGB565);
 
   if (newBitmap) {
+    if (!background) {
+      delete newBitmap;
+      return false;
+    }
+
     auto oldBitmap = backgroundBitmap;
     backgroundBitmap = newBitmap;
     lv_canvas_set_buffer(background, backgroundBitmap->getData(), backgroundBitmap->width(),
@@ -175,6 +197,24 @@ bool MainWindow::setBackgroundImage(std::string& fileName)
 
   return false;
 }
+
+#if defined(SIMU)
+bool mainWindowBackgroundCanvasCreateFailureLeavesNoCanvasForTest()
+{
+  class TestMainWindow : public MainWindow
+  {
+   public:
+    TestMainWindow() : MainWindow() {}
+    bool hasBackgroundCanvas() const { return background != nullptr; }
+  };
+
+  mainWindowForceBackgroundCanvasCreateFailureForTest(true);
+  auto window = new TestMainWindow();
+  mainWindowForceBackgroundCanvasCreateFailureForTest(false);
+
+  return window && !window->hasBackgroundCanvas();
+}
+#endif
 
 void MainWindow::blockUntilClose(bool checkPwr, std::function<bool(void)> closeCondition, bool isError)
 {

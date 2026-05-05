@@ -32,6 +32,10 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#if defined(SIMU)
+bool mainWindowBackgroundCanvasCreateFailureLeavesNoCanvasForTest();
+#endif
+
 namespace {
 
 constexpr const char* VALID_IMAGE = "images/color/edgetx.png";
@@ -52,6 +56,22 @@ void expectChildSuccess(pid_t pid)
 }
 
 }  // namespace
+
+#if defined(SIMU)
+TEST(ColorImageLifetime, MainWindowCanvasCreateFailureLeavesNoCanvas)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(mainWindowBackgroundCanvasCreateFailureLeavesNoCanvasForTest() ? 0
+                                                                        : 1);
+  }
+
+  expectChildSuccess(pid);
+}
+#endif
 
 TEST(ColorImageLifetime, MainWindowKeepsBackgroundOnFailedReplacement)
 {
