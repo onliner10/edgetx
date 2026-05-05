@@ -294,7 +294,8 @@ static void processBindFrame(uint8_t module, const uint8_t * frame)
 
   switch(frame[3]) {
     case 0x00:
-      if (destination->step == BIND_INIT) {
+      if (destination->step == BIND_INIT &&
+          pxx2FrameHasIndex(frame, 4 + PXX2_LEN_RX_NAME - 1)) {
         bool found = false;
         for (uint8_t i=0; i<destination->candidateReceiversCount; i++) {
           if (memcmp(destination->candidateReceiversNames[i], &frame[4], PXX2_LEN_RX_NAME) == 0) {
@@ -312,7 +313,8 @@ static void processBindFrame(uint8_t module, const uint8_t * frame)
       break;
 
     case 0x01:
-      if (destination->step == BIND_START) {
+      if (destination->step == BIND_START &&
+          pxx2FrameHasIndex(frame, 4 + PXX2_LEN_RX_NAME - 1)) {
         if (memcmp(&destination->candidateReceiversNames[destination->selectedReceiverIndex], &frame[4], PXX2_LEN_RX_NAME) == 0) {
           memcpy(g_model.moduleData[module].pxx2.receiverName[destination->rxUid], &frame[4], PXX2_LEN_RX_NAME);
           storageDirty(EE_MODEL);
@@ -323,7 +325,8 @@ static void processBindFrame(uint8_t module, const uint8_t * frame)
       break;
 
     case 0x02:
-      if (destination->step == BIND_INFO_REQUEST) {
+      if (destination->step == BIND_INFO_REQUEST &&
+          pxx2FrameHasIndex(frame, 12 + sizeof(PXX2HardwareInformation) - 1)) {
         if (memcmp(&destination->candidateReceiversNames[destination->selectedReceiverIndex], &frame[4], PXX2_LEN_RX_NAME) == 0) {
           memcpy(&destination->receiverInformation, &frame[12], sizeof(PXX2HardwareInformation));
           if (moduleState[module].callback) {

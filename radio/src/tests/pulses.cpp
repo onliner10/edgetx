@@ -97,6 +97,65 @@ const etx_proto_driver_t ChannelBoundsDriver = {
     .txCompleted = nullptr,
 };
 
+#if defined(PXX2)
+class GuardedPxx2Frame
+{
+ public:
+  explicit GuardedPxx2Frame(uint8_t declaredLength):
+      mappingSize(0),
+      mapping(nullptr),
+      frame(nullptr)
+  {
+    long pageSize = sysconf(_SC_PAGESIZE);
+    if (pageSize <= 0 || declaredLength + 1 > pageSize) {
+      return;
+    }
+
+    mappingSize = static_cast<size_t>(pageSize * 2);
+    mapping = mmap(nullptr, mappingSize, PROT_READ | PROT_WRITE,
+                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (mapping == MAP_FAILED) {
+      mapping = nullptr;
+      mappingSize = 0;
+      return;
+    }
+
+    if (mprotect(static_cast<uint8_t *>(mapping) + pageSize, pageSize,
+                 PROT_NONE) != 0) {
+      munmap(mapping, mappingSize);
+      mapping = nullptr;
+      mappingSize = 0;
+      return;
+    }
+
+    frame = static_cast<uint8_t *>(mapping) + pageSize - (declaredLength + 1);
+    frame[0] = declaredLength;
+  }
+
+  ~GuardedPxx2Frame()
+  {
+    if (mapping != nullptr) {
+      munmap(mapping, mappingSize);
+    }
+  }
+
+  bool isValid() const
+  {
+    return frame != nullptr;
+  }
+
+  uint8_t * data()
+  {
+    return frame;
+  }
+
+ private:
+  size_t mappingSize;
+  void * mapping;
+  uint8_t * frame;
+};
+#endif
+
 #if defined(AFHDS3)
 void feedShortAfhds3Response(void* ctx, afhds3::COMMAND command,
                              uint8_t value)
@@ -475,18 +534,10 @@ TEST_F(PulsesTest, pxx2RejectsShortRegisterFrame)
   moduleState[INTERNAL_MODULE].mode = MODULE_MODE_REGISTER;
   reusableBuffer.moduleSetup.pxx2.registerStep = REGISTER_INIT;
 
-  long pageSize = sysconf(_SC_PAGESIZE);
-  ASSERT_GT(pageSize, 0);
+  GuardedPxx2Frame guardedFrame(4);
+  ASSERT_TRUE(guardedFrame.isValid());
 
-  auto mappingSize = static_cast<size_t>(pageSize * 2);
-  void * mapping = mmap(nullptr, mappingSize, PROT_READ | PROT_WRITE,
-                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  ASSERT_NE(mapping, MAP_FAILED);
-  ASSERT_EQ(mprotect(static_cast<uint8_t *>(mapping) + pageSize, pageSize,
-                     PROT_NONE), 0);
-
-  uint8_t * frame = static_cast<uint8_t *>(mapping) + pageSize - 5;
-  frame[0] = 4;
+  uint8_t * frame = guardedFrame.data();
   frame[1] = PXX2_TYPE_C_MODULE;
   frame[2] = PXX2_TYPE_ID_REGISTER;
   frame[3] = 0;
@@ -495,7 +546,28 @@ TEST_F(PulsesTest, pxx2RejectsShortRegisterFrame)
   processPXX2Frame(INTERNAL_MODULE, frame, nullptr, nullptr);
 
   EXPECT_EQ(reusableBuffer.moduleSetup.pxx2.registerStep, REGISTER_INIT);
-  EXPECT_EQ(munmap(mapping, mappingSize), 0);
+}
+
+TEST_F(PulsesTest, pxx2RejectsShortBindFrame)
+{
+  moduleState[INTERNAL_MODULE].bindInformation =
+      &reusableBuffer.moduleSetup.bindInformation;
+  moduleState[INTERNAL_MODULE].mode = MODULE_MODE_BIND;
+  reusableBuffer.moduleSetup.bindInformation.step = BIND_INIT;
+
+  GuardedPxx2Frame guardedFrame(4);
+  ASSERT_TRUE(guardedFrame.isValid());
+
+  uint8_t * frame = guardedFrame.data();
+  frame[1] = PXX2_TYPE_C_MODULE;
+  frame[2] = PXX2_TYPE_ID_BIND;
+  frame[3] = 0;
+  frame[4] = 0;
+
+  processPXX2Frame(INTERNAL_MODULE, frame, nullptr, nullptr);
+
+  EXPECT_EQ(reusableBuffer.moduleSetup.bindInformation.candidateReceiversCount,
+            0);
 }
 #endif
 
