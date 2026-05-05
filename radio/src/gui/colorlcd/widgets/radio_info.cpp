@@ -51,6 +51,39 @@ coord_t clampCoord(coord_t value, coord_t low, coord_t high)
   return value;
 }
 
+FontIndex textFontForBox(const char* text, coord_t width, coord_t height)
+{
+  static const FontIndex candidates[] = {
+      FONT_XXL_INDEX, FONT_LXL_INDEX, FONT_XL_INDEX, FONT_L_INDEX,
+      FONT_BOLD_INDEX, FONT_STD_INDEX, FONT_XS_INDEX, FONT_XXS_INDEX};
+
+  for (auto font : candidates) {
+    LcdFlags flags = LcdFlags(font) << 8u;
+    if (getFontHeight(flags) <= height &&
+        getTextWidth(text, 0, flags) <= width) {
+      return font;
+    }
+  }
+
+  return FONT_XXS_INDEX;
+}
+
+FontIndex chipTextFontForBox(const char* text, coord_t width, coord_t height)
+{
+  static const FontIndex candidates[] = {
+      FONT_BOLD_INDEX, FONT_STD_INDEX, FONT_XS_INDEX, FONT_XXS_INDEX};
+
+  for (auto font : candidates) {
+    LcdFlags flags = LcdFlags(font) << 8u;
+    if (getFontHeight(flags) <= height &&
+        getTextWidth(text, 0, flags) <= width) {
+      return font;
+    }
+  }
+
+  return FONT_XXS_INDEX;
+}
+
 constexpr coord_t TOPBAR_CONTENT_PAD = PAD_TINY;
 
 StatusContentBox topbarContentBox(coord_t w, coord_t h)
@@ -469,13 +502,13 @@ class VolumeStatusWidget : public Widget
                      const rect_t& rect, int screenNum, int zoneNum) :
       Widget(factory, parent, rect, screenNum, zoneNum)
   {
-    icon = new (std::nothrow) StaticIcon(this, 0, 0, ICON_TOPMENU_VOLUME_0,
-                                         COLOR_THEME_PRIMARY2_INDEX);
+    track = makeStatusPart(lvobj);
+    fill = makeStatusPart(lvobj);
+    if (track) lv_obj_set_style_radius(track, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+    if (fill) lv_obj_set_style_radius(fill, LV_RADIUS_CIRCLE, LV_PART_MAIN);
 
-    for (uint8_t i = 0; i < VOLUME_SEGMENTS; i += 1) {
-      segments[i] = makeStatusPart(lvobj);
-      if (segments[i]) lv_obj_set_style_radius(segments[i], 1, LV_PART_MAIN);
-    }
+    capsuleLabel = etx_label_create(lvobj, FONT_BOLD_INDEX);
+    if (capsuleLabel) lv_label_set_long_mode(capsuleLabel, LV_LABEL_LONG_DOT);
 
     title = etx_label_create(lvobj, FONT_XXS_INDEX);
     value = etx_label_create(lvobj, FONT_BOLD_INDEX);
@@ -493,6 +526,9 @@ class VolumeStatusWidget : public Widget
 
     setLvVisible(title, !topbar && height() >= 54);
     setLvVisible(value, !topbar);
+    setLvVisible(capsuleLabel, topbar);
+    setLvVisible(track, true);
+    setLvVisible(fill, true);
 
     StatusContentBox box = topbar ? topbarContentBox(width(), height())
                                   : StatusContentBox{pad, pad,
@@ -503,36 +539,58 @@ class VolumeStatusWidget : public Widget
                                                          ? height() - 2 * pad
                                                          : height()};
 
-    if (icon) {
-      icon->setColor(statusPrimaryColor(topbar));
-      icon->setPos(box.x, (height() - icon->height()) / 2);
+    coord_t trackX = box.x;
+    coord_t trackRight = box.x + box.w;
+    coord_t textX = 0;
+
+    if (!topbar && width() > 110) {
+      coord_t textW = maxCoord((coord_t)(box.w / 3), (coord_t)38);
+      trackRight = width() > pad + textW + PAD_SMALL
+                       ? width() - pad - textW - PAD_SMALL
+                       : trackRight;
+      textX = trackRight + PAD_SMALL;
     }
 
-    coord_t gap = topbar ? TOPBAR_CONTENT_PAD : PAD_TINY;
-    coord_t segX = icon ? icon->left() + icon->width() + gap : box.x;
-    coord_t segAreaRight = topbar ? box.x + box.w
-                                  : (width() > pad ? width() - pad : width());
-    coord_t segAreaW = segAreaRight > segX ? segAreaRight - segX : 0;
-    coord_t segW = (segAreaW - (VOLUME_SEGMENTS - 1) * gap) / VOLUME_SEGMENTS;
-    if (topbar)
-      segW = maxCoord(segW, (coord_t)1);
-    else
-      segW = clampCoord(segW, (coord_t)4, (coord_t)10);
-    coord_t segH = topbar ? maxCoord((coord_t)(box.h - 2 * TOPBAR_CONTENT_PAD),
-                                     (coord_t)1)
-                          : minCoord((coord_t)22, height() - 2 * pad);
-    if (!topbar) segH = maxCoord(segH, (coord_t)8);
-    coord_t segY = (height() - segH) / 2;
+    trackMaxW = trackRight > trackX ? trackRight - trackX : 1;
+    trackH = topbar ? clampCoord((coord_t)(box.h / 4), PAD_THREE, PAD_LARGE)
+                    : clampCoord((coord_t)(box.h / 5), PAD_LARGE,
+                                 (coord_t)18);
+    coord_t trackY = topbar ? box.y + box.h - trackH
+                            : box.y + (box.h - trackH) / 2;
 
-    for (uint8_t i = 0; i < VOLUME_SEGMENTS; i += 1) {
-      if (!segments[i]) continue;
-      lv_obj_set_pos(segments[i], segX + i * (segW + gap), segY);
-      lv_obj_set_size(segments[i], segW, segH);
+    if (track) {
+      lv_obj_set_pos(track, trackX, trackY);
+      lv_obj_set_size(track, trackMaxW, trackH);
     }
 
-    if (!topbar) {
-      coord_t textX = segX + VOLUME_SEGMENTS * segW +
-                      (VOLUME_SEGMENTS - 1) * gap + PAD_SMALL;
+    coord_t fillX = trackX;
+    coord_t fillY = trackY;
+    fillMaxW = trackMaxW;
+    fillH = trackH;
+
+    if (fill) {
+      lv_obj_set_pos(fill, fillX, fillY);
+      lv_obj_set_size(fill, fillMaxW, fillH);
+    }
+    if (topbar && capsuleLabel) {
+      coord_t textW = trackMaxW > 2 * PAD_TINY
+                          ? trackMaxW - 2 * PAD_TINY
+                          : trackMaxW;
+      coord_t textX = trackX + PAD_TINY;
+      coord_t labelAreaH = trackY > box.y ? trackY - box.y : box.h;
+      FontIndex font = chipTextFontForBox("VOL", textW, labelAreaH);
+      coord_t labelH = getFontHeight(LcdFlags(font) << 8u);
+      coord_t labelY = box.y + (labelAreaH - labelH) / 2;
+
+      etx_font(capsuleLabel, font);
+      etx_txt_color(capsuleLabel, statusPrimaryColor(topbar));
+      lv_obj_set_style_text_align(capsuleLabel, LV_TEXT_ALIGN_CENTER,
+                                  LV_PART_MAIN);
+      lv_obj_set_pos(capsuleLabel, textX, labelY);
+      lv_obj_set_size(capsuleLabel, textW, labelH);
+    }
+
+    if (!topbar && textX > 0) {
       coord_t textRight = width() > pad ? width() - pad : width();
       if (textX + 24 < textRight) {
         coord_t titleH = height() >= 54 ? EdgeTxStyles::STD_FONT_HEIGHT / 2 : 0;
@@ -550,6 +608,9 @@ class VolumeStatusWidget : public Widget
         setLvVisible(title, false);
         setLvVisible(value, false);
       }
+    } else if (!topbar) {
+      setLvVisible(title, false);
+      setLvVisible(value, false);
     }
 
     lastLevel = 255;
@@ -568,17 +629,22 @@ class VolumeStatusWidget : public Widget
     lastLevel = level;
     lastPercent = percent;
 
-    if (icon) {
-      icon->setIcon((EdgeTxIcon)(ICON_TOPMENU_VOLUME_0 + level));
-      icon->setColor(level == 0 ? statusMutedColor(topbar)
-                                : statusPrimaryColor(topbar));
+    setStatusPartColor(track, statusMutedColor(topbar));
+
+    coord_t fillW = percent > 0
+                        ? maxCoord((coord_t)1,
+                                   (coord_t)divRoundClosest(
+                                       (uint16_t)fillMaxW * percent, 100))
+                        : 0;
+    if (fillW > fillMaxW) fillW = fillMaxW;
+
+    setLvVisible(fill, level > 0 && fillW > 0);
+    if (fill) {
+      lv_obj_set_size(fill, fillW, fillH);
+      setStatusPartColor(fill, statusPrimaryColor(topbar));
     }
 
-    for (uint8_t i = 0; i < VOLUME_SEGMENTS; i += 1) {
-      setStatusPartColor(segments[i],
-                         i < level ? statusPrimaryColor(topbar)
-                                   : statusMutedColor(topbar));
-    }
+    if (topbar && capsuleLabel) lv_label_set_text(capsuleLabel, "VOL");
 
     if (value && !topbar) {
       char text[10];
@@ -598,11 +664,15 @@ class VolumeStatusWidget : public Widget
   }
 
  protected:
-  static constexpr uint8_t VOLUME_SEGMENTS = 4;
-  StaticIcon* icon = nullptr;
-  lv_obj_t* segments[VOLUME_SEGMENTS] = {};
+  lv_obj_t* track = nullptr;
+  lv_obj_t* fill = nullptr;
+  lv_obj_t* capsuleLabel = nullptr;
   lv_obj_t* title = nullptr;
   lv_obj_t* value = nullptr;
+  coord_t trackMaxW = 1;
+  coord_t trackH = 1;
+  coord_t fillMaxW = 1;
+  coord_t fillH = 1;
   uint8_t lastLevel = 255;
   uint8_t lastPercent = 255;
 };
@@ -1031,6 +1101,150 @@ const WidgetOption DateTimeWidget::options[] = {
 BaseWidgetFactory<DateTimeWidget> DateTimeWidget("Date Time",
                                                  DateTimeWidget::options,
                                                  STR_DATE_TIME_WIDGET);
+
+enum class DateTextKind { Clock, Today };
+
+class DateTextWidget : public Widget
+{
+ protected:
+  DateTextWidget(const WidgetFactory* factory, Window* parent,
+                 const rect_t& rect, int screenNum, int zoneNum,
+                 DateTextKind kind) :
+      Widget(factory, parent, rect, screenNum, zoneNum),
+      kind(kind)
+  {
+    label = etx_label_create(lvobj, FONT_XS_INDEX);
+    if (label) lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
+
+    update();
+    foreground();
+  }
+
+ public:
+  void foreground() override
+  {
+    if (_deleted || !label) return;
+
+    struct gtm time;
+    gettime(&time);
+    if (textValid && !shouldRefresh(time)) return;
+
+    char text[16];
+    formatText(text, sizeof(text), time);
+    layoutText(text);
+    lv_label_set_text(label, text);
+    lastTime = time;
+    textValid = true;
+  }
+
+  void update() override
+  {
+    if (_deleted || !label) return;
+
+    auto widgetData = getPersistentData();
+
+    memcpy(&color, &widgetData->options[0].value.unsignedValue, sizeof(color));
+
+    const bool topbar = isCompactTopBarWidget();
+    const coord_t pad = topbar ? TOPBAR_CONTENT_PAD : PAD_SMALL;
+    if (topbar) {
+      textBox = topbarContentBox(width(), height());
+    } else {
+      textBox = {pad, pad,
+                 width() > 2 * pad ? width() - 2 * pad : width(),
+                 height() > 2 * pad ? height() - 2 * pad : height()};
+    }
+
+    textValid = false;
+  }
+
+  static const WidgetOption options[];
+
+ private:
+  bool shouldRefresh(const struct gtm& time) const
+  {
+    if (kind == DateTextKind::Clock) {
+      return time.tm_min != lastTime.tm_min || time.tm_hour != lastTime.tm_hour;
+    }
+
+    return time.tm_mday != lastTime.tm_mday || time.tm_mon != lastTime.tm_mon ||
+           time.tm_year != lastTime.tm_year;
+  }
+
+  void formatText(char* text, size_t size, const struct gtm& time) const
+  {
+    if (kind == DateTextKind::Clock) {
+      const TimerOptions timerOptions = {.options = SHOW_TIME};
+      getTimerString(text, getValue(MIXSRC_TX_TIME), timerOptions);
+      return;
+    }
+
+#if defined(TRANSLATIONS_CN) || defined(TRANSLATIONS_TW)
+    snprintf(text, size, "%02d-%02d", time.tm_mon + 1, time.tm_mday);
+#else
+    snprintf(text, size, "%d %s", time.tm_mday, STR_MONTHS[time.tm_mon]);
+#endif
+  }
+
+  void layoutText(const char* text)
+  {
+    const bool topbar = isCompactTopBarWidget();
+    FontIndex font = topbar ? chipTextFontForBox(text, textBox.w, textBox.h)
+                            : textFontForBox(text, textBox.w, textBox.h);
+    coord_t labelH = getFontHeight(LcdFlags(font) << 8u);
+    coord_t labelY = textBox.y + (textBox.h - labelH) / 2;
+
+    etx_font(label, font);
+    if (topbar)
+      etx_txt_color(label, statusPrimaryColor(topbar));
+    else
+      etx_txt_color_from_flags(label, color);
+    lv_obj_set_style_text_align(
+        label, topbar ? LV_TEXT_ALIGN_CENTER : LV_TEXT_ALIGN_LEFT,
+        LV_PART_MAIN);
+    lv_obj_set_pos(label, textBox.x, labelY);
+    lv_obj_set_size(label, textBox.w, labelH);
+  }
+
+  DateTextKind kind;
+  lv_obj_t* label = nullptr;
+  StatusContentBox textBox = {};
+  uint32_t color = COLOR2FLAGS(COLOR_THEME_PRIMARY2_INDEX);
+  struct gtm lastTime = {};
+  bool textValid = false;
+};
+
+const WidgetOption DateTextWidget::options[] = {
+    {STR_COLOR, WidgetOption::Color, COLOR2FLAGS(COLOR_THEME_PRIMARY2_INDEX)},
+    {nullptr, WidgetOption::Bool}};
+
+class ClockWidget : public DateTextWidget
+{
+ public:
+  ClockWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
+              int screenNum, int zoneNum) :
+      DateTextWidget(factory, parent, rect, screenNum, zoneNum,
+                     DateTextKind::Clock)
+  {
+  }
+};
+
+BaseWidgetFactory<ClockWidget> clockWidget("Clock", DateTextWidget::options,
+                                           "Clock");
+
+class TodayWidget : public DateTextWidget
+{
+ public:
+  TodayWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
+              int screenNum, int zoneNum) :
+      DateTextWidget(factory, parent, rect, screenNum, zoneNum,
+                     DateTextKind::Today)
+  {
+  }
+};
+
+BaseWidgetFactory<TodayWidget> todayWidget("Today", DateTextWidget::options,
+                                           "Today");
 
 #if defined(INTERNAL_GPS)
 

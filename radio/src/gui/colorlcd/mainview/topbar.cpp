@@ -264,6 +264,8 @@ coord_t TopBar::intrinsicZoneWidth(unsigned int index) const
 
   const char* name = g_eeGeneral.getTopbarData()->getWidgetName(index);
   if (!strcmp(name, "Date Time")) return TOPBAR_DATETIME_WIDTH;
+  if (!strcmp(name, "Clock")) return TOPBAR_CLOCK_WIDTH;
+  if (!strcmp(name, "Today")) return TOPBAR_TODAY_WIDTH;
   if (!strcmp(name, "Link")) return TOPBAR_LINK_WIDTH;
   if (!strcmp(name, "TX Battery")) return TOPBAR_BATTERY_WIDTH;
   if (!strcmp(name, "Volume")) return TOPBAR_VOLUME_WIDTH;
