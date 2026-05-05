@@ -502,7 +502,15 @@ inline int8_t defaultModuleChannels_M8(uint8_t idx)
 
 inline uint8_t sentModulePXXChannels(uint8_t idx)
 {
-  return 8 + g_model.moduleData[idx].channelsCount;
+  int channels = 8 + g_model.moduleData[idx].channelsCount;
+  channels = limit<int>(0, channels, maxModuleChannels(idx));
+
+  uint8_t channelsStart = g_model.moduleData[idx].channelsStart;
+  if (channelsStart >= MAX_OUTPUT_CHANNELS) {
+    return 0;
+  }
+
+  return min<int>(channels, MAX_OUTPUT_CHANNELS - channelsStart);
 }
 
 extern int8_t sentModuleChannels(uint8_t idx);

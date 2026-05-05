@@ -275,6 +275,21 @@ TEST_F(PulsesTest, pxx2SendPulsesHonorsChannelCount)
 
   Pxx2Driver.deinit(ctx);
 }
+
+TEST_F(PulsesTest, pxx2SendPulsesRejectsInvalidChannelCount)
+{
+  modulePortInit();
+  g_model.moduleData[INTERNAL_MODULE].type = MODULE_TYPE_ISRM_PXX2;
+  g_model.moduleData[INTERNAL_MODULE].channelsCount = 127;
+
+  auto ctx = Pxx2Driver.init(INTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  uint8_t buffer[MODULE_BUFFER_SIZE] = {};
+  Pxx2Driver.sendPulses(ctx, buffer, nullptr, 0);
+
+  Pxx2Driver.deinit(ctx);
+}
 #endif
 
 #if defined(PPM) && defined(HARDWARE_EXTERNAL_MODULE)
