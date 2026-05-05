@@ -39,6 +39,11 @@ static uint32_t read_u32_le(const uint8_t* data)
          (uint32_t(data[2]) << 16) | (uint32_t(data[3]) << 24);
 }
 
+static bool pxx2FrameHasIndex(const uint8_t * frame, uint8_t index)
+{
+  return frame[0] >= index;
+}
+
 static const char * const PXX2ModulesNames[] = {
   "---",
   "XJT",
@@ -254,7 +259,7 @@ static void processRegisterFrame(uint8_t module, const uint8_t * frame)
   PXX2ModuleSetup& mod = reusableBuffer.moduleSetup.pxx2;
   switch(frame[3]) {
     case 0x00:
-      if (mod.registerStep == REGISTER_INIT) {
+      if (mod.registerStep == REGISTER_INIT && pxx2FrameHasIndex(frame, 12)) {
         // RX_NAME follows, we store it for the next step
         memcpy(mod.registerRxName, (const char *)&frame[4], PXX2_LEN_RX_NAME);
         mod.registerLoopIndex = frame[12];
@@ -263,7 +268,8 @@ static void processRegisterFrame(uint8_t module, const uint8_t * frame)
       break;
 
     case 0x01:
-      if (mod.registerStep == REGISTER_RX_NAME_SELECTED) {
+      if (mod.registerStep == REGISTER_RX_NAME_SELECTED &&
+          pxx2FrameHasIndex(frame, 12 + PXX2_LEN_REGISTRATION_ID - 1)) {
         // RX_NAME + PASSWORD follow, we check they are good
         if (memcmp(&frame[4], mod.registerRxName, PXX2_LEN_RX_NAME) == 0 &&
             memcmp(&frame[12], g_model.modelRegistrationID, PXX2_LEN_REGISTRATION_ID) == 0) {

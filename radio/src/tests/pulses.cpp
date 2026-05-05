@@ -48,6 +48,8 @@
 #if defined(PXX2)
 #include "pulses/pxx2.h"
 #include "pulses/pxx2_transport.h"
+#include <sys/mman.h>
+#include <unistd.h>
 #endif
 
 #if defined(AFHDS3)
@@ -464,6 +466,36 @@ TEST_F(PulsesTest, pxx2XjtLiteRejectsInvalidSubtype)
   ASSERT_TRUE(frame.setupFrame(EXTERNAL_MODULE, nullptr, 0));
 
   EXPECT_EQ(buffer[5], 0x10);
+}
+#endif
+
+#if defined(PXX2)
+TEST_F(PulsesTest, pxx2RejectsShortRegisterFrame)
+{
+  moduleState[INTERNAL_MODULE].mode = MODULE_MODE_REGISTER;
+  reusableBuffer.moduleSetup.pxx2.registerStep = REGISTER_INIT;
+
+  long pageSize = sysconf(_SC_PAGESIZE);
+  ASSERT_GT(pageSize, 0);
+
+  auto mappingSize = static_cast<size_t>(pageSize * 2);
+  void * mapping = mmap(nullptr, mappingSize, PROT_READ | PROT_WRITE,
+                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(mapping, MAP_FAILED);
+  ASSERT_EQ(mprotect(static_cast<uint8_t *>(mapping) + pageSize, pageSize,
+                     PROT_NONE), 0);
+
+  uint8_t * frame = static_cast<uint8_t *>(mapping) + pageSize - 5;
+  frame[0] = 4;
+  frame[1] = PXX2_TYPE_C_MODULE;
+  frame[2] = PXX2_TYPE_ID_REGISTER;
+  frame[3] = 0;
+  frame[4] = 0;
+
+  processPXX2Frame(INTERNAL_MODULE, frame, nullptr, nullptr);
+
+  EXPECT_EQ(reusableBuffer.moduleSetup.pxx2.registerStep, REGISTER_INIT);
+  EXPECT_EQ(munmap(mapping, mappingSize), 0);
 }
 #endif
 
