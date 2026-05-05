@@ -169,6 +169,10 @@ static void processGetHardwareInfoFrame(uint8_t module, const uint8_t * frame)
 
   ModuleInformation * destination = moduleState[module].moduleInformation;
 
+  if (!pxx2FrameHasIndex(frame, 4)) {
+    return;
+  }
+
   uint8_t index = frame[3];
   uint8_t modelId = frame[4];
   uint8_t length = min<uint8_t>(frame[0] - 3, sizeof(PXX2HardwareInformation));

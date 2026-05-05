@@ -569,6 +569,25 @@ TEST_F(PulsesTest, pxx2RejectsShortBindFrame)
   EXPECT_EQ(reusableBuffer.moduleSetup.bindInformation.candidateReceiversCount,
             0);
 }
+
+TEST_F(PulsesTest, pxx2RejectsShortHardwareInfoFrame)
+{
+  ModuleInformation moduleInformation = {};
+  moduleState[INTERNAL_MODULE].readModuleInformation(
+      &moduleInformation, PXX2_HW_INFO_TX_ID, PXX2_HW_INFO_TX_ID);
+
+  GuardedPxx2Frame guardedFrame(3);
+  ASSERT_TRUE(guardedFrame.isValid());
+
+  uint8_t * frame = guardedFrame.data();
+  frame[1] = PXX2_TYPE_C_MODULE;
+  frame[2] = PXX2_TYPE_ID_HW_INFO;
+  frame[3] = PXX2_HW_INFO_TX_ID;
+
+  processPXX2Frame(INTERNAL_MODULE, frame, nullptr, nullptr);
+
+  EXPECT_EQ(moduleInformation.information.modelID, 0);
+}
 #endif
 
 #if defined(AFHDS3) && defined(HARDWARE_EXTERNAL_MODULE)
