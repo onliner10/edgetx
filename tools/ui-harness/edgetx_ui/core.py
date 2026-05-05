@@ -21,13 +21,14 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 class Target:
     name: str
     pcb: str
-    pcbrev: str
+    pcbrev: str | None
     width: int
     height: int
 
 
 TARGETS = {
     "tx16s": Target("tx16s", "X10", "TX16S", 480, 272),
+    "tx16smk3": Target("tx16smk3", "TX16SMK3", None, 800, 480),
 }
 
 
@@ -67,13 +68,24 @@ def target_config(target: str) -> Target:
 
 
 def build_dir(target: str) -> Path:
+    root = os.environ.get("EDGETX_UI_BUILD_ROOT")
+    if root:
+        return Path(root) / target.lower()
     return REPO_ROOT / "build" / "ui-harness" / target.lower()
+
+
+def simulator_environment() -> dict[str, str]:
+    env = os.environ.copy()
+    has_display = env.get("DISPLAY") or env.get("WAYLAND_DISPLAY")
+    if sys.platform.startswith("linux") and not has_display:
+        env.setdefault("SDL_VIDEODRIVER", "dummy")
+    return env
 
 
 def configure_command(target: str) -> list[str]:
     cfg = target_config(target)
     python_exec = project_python_executable()
-    return [
+    command = [
         "cmake",
         "-S",
         str(REPO_ROOT),
@@ -87,8 +99,10 @@ def configure_command(target: str) -> list[str]:
         "-DEDGE_TX_BUILD_TESTS=OFF",
         f"-DPython3_EXECUTABLE={python_exec}",
         f"-DPCB={cfg.pcb}",
-        f"-DPCBREV={cfg.pcbrev}",
     ]
+    if cfg.pcbrev:
+        command.append(f"-DPCBREV={cfg.pcbrev}")
+    return command
 
 
 def build_command(target: str) -> list[str]:
@@ -207,6 +221,7 @@ class SdlAutomationSession:
                 "--automation-stdio",
             ],
             cwd=REPO_ROOT,
+            env=simulator_environment(),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,

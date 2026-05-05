@@ -84,7 +84,12 @@ def findLibClang():
                         version_paths.append((version, llvm_lib_path))
 
         version_paths.sort(key=lambda x: natural_sort_key(x[0]), reverse=True)
-        knownPaths = [path for _, path in version_paths]
+        knownPaths = []
+        env_path = os.environ.get("LIBCLANG_PATH")
+        if env_path:
+            knownPaths.append(env_path)
+
+        knownPaths.extend([path for _, path in version_paths])
         knownPaths.extend(["/usr/local/lib", "/usr/lib", "/usr/lib64"])
         
         libSuffix = ".so"
