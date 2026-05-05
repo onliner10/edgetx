@@ -20,6 +20,7 @@
 
 #include "bitmaps.h"
 #include "debug.h"
+#include "mainwindow.h"
 #include "lz4/lz4.h"
 #include "sdcard.h"
 #include "etx_lv_theme.h"
@@ -30,6 +31,23 @@
 static uint16_t read_u16_le(const uint8_t* data)
 {
   return uint16_t(data[0]) | (uint16_t(data[1]) << 8);
+}
+
+#if defined(SIMU)
+static bool forceStaticLZ4ImageBufferAllocationFailure = false;
+
+void staticLZ4ImageForceBufferAllocationFailureForTest(bool force)
+{
+  forceStaticLZ4ImageBufferAllocationFailure = force;
+}
+#endif
+
+static uint8_t* allocStaticLZ4ImageBuffer(size_t size)
+{
+#if defined(SIMU)
+  if (forceStaticLZ4ImageBufferAllocationFailure) return nullptr;
+#endif
+  return static_cast<uint8_t*>(lv_mem_alloc(size));
 }
 
 //-----------------------------------------------------------------------------
@@ -367,7 +385,9 @@ StaticLZ4Image::StaticLZ4Image(Window* parent, coord_t x, coord_t y,
 
   uint32_t pixels = w * h;
   uint32_t size = (pixels + 1) & 0xFFFFFFFE;
-  imgData = (uint8_t*)lv_mem_alloc(size * 3);
+  imgData = allocStaticLZ4ImageBuffer(size * 3);
+  if (!imgData) return;
+
   uint8_t* decompData = imgData + size;
 
   LZ4_decompress_safe((const char*)lz4Bitmap->data, (char*)decompData,
@@ -386,6 +406,33 @@ StaticLZ4Image::StaticLZ4Image(Window* parent, coord_t x, coord_t y,
 
   lv_canvas_set_buffer(lvobj, imgData, w, h, LV_IMG_CF_TRUE_COLOR_ALPHA);
 }
+
+#if defined(SIMU)
+bool staticLZ4ImageBufferAllocationFailureLeavesNoImageDataForTest()
+{
+  class TestStaticLZ4Image : public StaticLZ4Image
+  {
+   public:
+    TestStaticLZ4Image(Window* parent, const LZ4Bitmap* bitmap) :
+        StaticLZ4Image(parent, 0, 0, bitmap)
+    {
+    }
+
+    bool hasImageData() const { return imgData != nullptr; }
+  };
+
+  alignas(LZ4Bitmap) static const uint8_t lz4Bitmap[] = {
+      1, 0, 1, 0, 0, 0, 0, 0};
+
+  staticLZ4ImageForceBufferAllocationFailureForTest(true);
+  auto image = new (std::nothrow)
+      TestStaticLZ4Image(MainWindow::instance(),
+                         reinterpret_cast<const LZ4Bitmap*>(lz4Bitmap));
+  staticLZ4ImageForceBufferAllocationFailureForTest(false);
+
+  return image && !image->hasImageData();
+}
+#endif
 
 void StaticLZ4Image::deleteLater()
 {
