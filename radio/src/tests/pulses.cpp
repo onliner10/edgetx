@@ -132,6 +132,35 @@ TEST_F(PulsesTest, multiSendPulsesHonorsChannelCount)
 
   MultiDriver.deinit(ctx);
 }
+
+TEST_F(PulsesTest, multiFailsafeHonorsChannelStart)
+{
+  modulePortInit();
+  g_model.moduleData[EXTERNAL_MODULE].channelsStart = 4;
+  g_model.moduleData[EXTERNAL_MODULE].failsafeMode = FAILSAFE_CUSTOM;
+  g_model.failsafeChannels[0] = 1024;
+  g_model.failsafeChannels[4] = -1024;
+
+  auto ctx = MultiDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  uint8_t buffer[MODULE_BUFFER_SIZE] = {};
+  bool failsafeSent = false;
+  for (int i = 0; i <= 1000; i++) {
+    memset(buffer, 0, sizeof(buffer));
+    MultiDriver.sendPulses(ctx, buffer, nullptr, 0);
+    if (buffer[0] & 0x02) {
+      failsafeSent = true;
+      break;
+    }
+  }
+
+  ASSERT_TRUE(failsafeSent);
+  uint16_t firstPulse = buffer[4] | ((buffer[5] & 0x07) << 8);
+  EXPECT_EQ(firstPulse, 205);
+
+  MultiDriver.deinit(ctx);
+}
 #endif
 
 #if defined(DSM2) && defined(HARDWARE_EXTERNAL_MODULE)
@@ -197,6 +226,35 @@ TEST_F(PulsesTest, pxx1SendPulsesHonorsChannelCount)
   Pxx1Driver.sendPulses(ctx, highFrame, nullptr, 0);
 
   EXPECT_EQ(memcmp(neutralFrame, highFrame, sizeof(neutralFrame)), 0);
+
+  Pxx1Driver.deinit(ctx);
+}
+
+TEST_F(PulsesTest, pxx1FailsafeHonorsChannelStart)
+{
+  modulePortInit();
+  g_model.moduleData[EXTERNAL_MODULE].type = MODULE_TYPE_R9M_PXX1;
+  g_model.moduleData[EXTERNAL_MODULE].channelsStart = 4;
+  g_model.moduleData[EXTERNAL_MODULE].channelsCount = 0;
+  g_model.moduleData[EXTERNAL_MODULE].failsafeMode = FAILSAFE_CUSTOM;
+  g_model.failsafeChannels[4] = -1024;
+
+  auto ctx = Pxx1Driver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  uint8_t skippedChannelHighFrame[MODULE_BUFFER_SIZE] = {};
+  g_model.failsafeChannels[0] = 1024;
+  moduleState[EXTERNAL_MODULE].counter = 0;
+  Pxx1Driver.sendPulses(ctx, skippedChannelHighFrame, nullptr, 0);
+
+  uint8_t skippedChannelLowFrame[MODULE_BUFFER_SIZE] = {};
+  g_model.failsafeChannels[0] = -1024;
+  moduleState[EXTERNAL_MODULE].counter = 0;
+  Pxx1Driver.sendPulses(ctx, skippedChannelLowFrame, nullptr, 0);
+
+  EXPECT_EQ(memcmp(skippedChannelHighFrame, skippedChannelLowFrame,
+                   sizeof(skippedChannelHighFrame)),
+            0);
 
   Pxx1Driver.deinit(ctx);
 }

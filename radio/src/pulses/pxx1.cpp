@@ -134,8 +134,12 @@ void Pxx1Pulses<PxxTransport>::addChannels(uint8_t moduleIdx,
         pulseValue = (i < sendUpperChannels ? 2048 : 0);
       }
       else {
+        uint8_t index = (i < sendUpperChannels ? 8 + i : i);
+        uint16_t channel = getModuleChannelIndex(moduleIdx, index);
+        int16_t failsafeValue =
+            channel < MAX_OUTPUT_CHANNELS ? g_model.failsafeChannels[channel]
+                                          : 0;
         if (i < sendUpperChannels) {
-          int16_t failsafeValue = g_model.failsafeChannels[8+i];
           if (failsafeValue == FAILSAFE_CHANNEL_HOLD) {
             pulseValue = 4095;
           }
@@ -143,12 +147,11 @@ void Pxx1Pulses<PxxTransport>::addChannels(uint8_t moduleIdx,
             pulseValue = 2048;
           }
           else {
-            failsafeValue = addChannelCenter(moduleIdx, 8 + i, failsafeValue);
+            failsafeValue = addChannelCenter(moduleIdx, index, failsafeValue);
             pulseValue = limit(2049, (failsafeValue * 512 / 682) + 3072, 4094);
           }
         }
         else {
-          int16_t failsafeValue = g_model.failsafeChannels[i];
           if (failsafeValue == FAILSAFE_CHANNEL_HOLD) {
             pulseValue = 2047;
           }
@@ -156,7 +159,7 @@ void Pxx1Pulses<PxxTransport>::addChannels(uint8_t moduleIdx,
             pulseValue = 0;
           }
           else {
-            failsafeValue = addChannelCenter(moduleIdx, i, failsafeValue);
+            failsafeValue = addChannelCenter(moduleIdx, index, failsafeValue);
             pulseValue = limit(1, (failsafeValue * 512 / 682) + 1024, 2046);
           }
         }

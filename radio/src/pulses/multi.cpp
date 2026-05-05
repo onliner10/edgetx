@@ -113,7 +113,9 @@ static void sendFailsafeChannels(uint8_t*& p_buf, uint8_t module)
   uint8_t bitsavailable = 0;
 
   for (int i = 0; i < MULTI_CHANS; i++) {
-    int16_t failsafeValue = g_model.failsafeChannels[i];
+    uint16_t channel = getModuleChannelIndex(module, i);
+    int16_t failsafeValue =
+        channel < MAX_OUTPUT_CHANNELS ? g_model.failsafeChannels[channel] : 0;
     int pulseValue;
 
     if (g_model.moduleData[module].failsafeMode == FAILSAFE_HOLD ||
