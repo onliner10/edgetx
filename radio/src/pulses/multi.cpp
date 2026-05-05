@@ -349,7 +349,7 @@ void sendFrameProtocolHeader(uint8_t*& p_buf, uint8_t module, bool failsafe)
   // Our enumeration starts at 0
   uint8_t rfProtocol = getModuleMultiRfProtocol(module);
   int type = rfProtocol + 1;
-  int subtype = g_model.moduleData[module].subType;
+  int subtype = getModuleMultiSubType(module);
   int8_t optionValue = g_model.moduleData[module].multi.optionValue;
 
   uint8_t protoByte = 0;

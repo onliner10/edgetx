@@ -124,6 +124,12 @@ extern uint32_t NV14internalModuleFwVersion;
     return max(max_status, max_pdef);
   }
 
+  inline uint8_t getModuleMultiSubType(uint8_t moduleIdx)
+  {
+    uint8_t subType = g_model.moduleData[moduleIdx].subType;
+    return subType <= getMaxMultiSubtype(moduleIdx) ? subType : 0;
+  }
+
   inline bool isModuleMultimodule(uint8_t idx)
   {
     return g_model.moduleData[idx].type == MODULE_TYPE_MULTIMODULE;
