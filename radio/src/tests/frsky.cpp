@@ -226,6 +226,17 @@ TEST(FrSkySPORT, checkCrc)
   EXPECT_TRUE(checkSportPacket(pkt2+1));
 }
 
+TEST(FrSkySPORT, shortPacketDoesNotReadPastFrame)
+{
+  GuardedFrSkyDFrame frame(4);
+  ASSERT_TRUE(frame.isValid());
+
+  frame.data()[0] = DATA_ID_FLVSS;
+  frame.data()[1] = DATA_FRAME;
+
+  EXPECT_FALSE(sportProcessTelemetryPacket(0, frame.data(), 4));
+}
+
 void setSportPacketCrc(uint8_t * packet)
 {
   short crc = 0;
