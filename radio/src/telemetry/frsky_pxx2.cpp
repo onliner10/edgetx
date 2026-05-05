@@ -227,6 +227,10 @@ static void processReceiverSettingsFrame(uint8_t module, const uint8_t * frame)
 
   ReceiverSettings * destination = moduleState[module].receiverSettings;
 
+  if (!pxx2FrameHasIndex(frame, 4)) {
+    return;
+  }
+
   if (frame[4] & PXX2_RX_SETTINGS_FLAG1_FPORT)
     destination->fport = 1;
 

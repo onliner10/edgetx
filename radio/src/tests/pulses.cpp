@@ -740,6 +740,24 @@ TEST_F(PulsesTest, pxx2RejectsShortModuleSettingsFrame)
   EXPECT_EQ(moduleSettings.state, PXX2_SETTINGS_READ);
 }
 
+TEST_F(PulsesTest, pxx2RejectsShortReceiverSettingsFrame)
+{
+  ReceiverSettings receiverSettings = {};
+  moduleState[INTERNAL_MODULE].readReceiverSettings(&receiverSettings);
+
+  GuardedPxx2Frame guardedFrame(3);
+  ASSERT_TRUE(guardedFrame.isValid());
+
+  uint8_t * frame = guardedFrame.data();
+  frame[1] = PXX2_TYPE_C_MODULE;
+  frame[2] = PXX2_TYPE_ID_RX_SETTINGS;
+  frame[3] = 0;
+
+  processPXX2Frame(INTERNAL_MODULE, frame, nullptr, nullptr);
+
+  EXPECT_EQ(receiverSettings.state, PXX2_SETTINGS_READ);
+}
+
 TEST_F(PulsesTest, pxx2RejectsShortTelemetryFrame)
 {
   GuardedPxx2Frame guardedFrame(3);
