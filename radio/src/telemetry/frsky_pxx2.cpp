@@ -438,6 +438,10 @@ static void processSpectrumAnalyserFrame(uint8_t module, const uint8_t * frame)
     return;
   }
 
+  if (!pxx2FrameHasIndex(frame, 8)) {
+    return;
+  }
+
   uint32_t frequency = read_u32_le(&frame[4]);
   int8_t power = frame[8];
 
