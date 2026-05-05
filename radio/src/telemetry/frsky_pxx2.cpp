@@ -509,6 +509,10 @@ static void processOtaUpdateFrame(uint8_t module, const uint8_t * frame)
     }
   }
   else if (destination->step == OTA_UPDATE_TRANSFER) {
+    if (!pxx2FrameHasIndex(frame, 7)) {
+      return;
+    }
+
     uint32_t address = read_u32_le(&frame[4]);
     if (frame[3] == 0x01 && destination->address == address) {
       destination->step = OTA_UPDATE_TRANSFER_ACK;

@@ -856,6 +856,26 @@ TEST_F(PulsesTest, pxx2RejectsShortOtaStartFrame)
   EXPECT_EQ(otaUpdateInformation.step, OTA_UPDATE_START);
 }
 
+TEST_F(PulsesTest, pxx2RejectsShortOtaTransferFrame)
+{
+  OtaUpdateInformation otaUpdateInformation = {};
+  otaUpdateInformation.step = OTA_UPDATE_TRANSFER;
+  otaUpdateInformation.address = 0x12345678;
+  moduleState[INTERNAL_MODULE].otaUpdateInformation = &otaUpdateInformation;
+  moduleState[INTERNAL_MODULE].mode = MODULE_MODE_OTA_UPDATE;
+
+  GuardedPxx2Frame guardedFrame(3);
+  ASSERT_TRUE(guardedFrame.isValid());
+
+  uint8_t * frame = guardedFrame.data();
+  frame[1] = PXX2_TYPE_C_OTA;
+  frame[3] = 1;
+
+  processPXX2Frame(INTERNAL_MODULE, frame, nullptr, nullptr);
+
+  EXPECT_EQ(otaUpdateInformation.step, OTA_UPDATE_TRANSFER);
+}
+
 TEST_F(PulsesTest, pxx2RejectsShortTelemetryFrame)
 {
   GuardedPxx2Frame guardedFrame(3);
