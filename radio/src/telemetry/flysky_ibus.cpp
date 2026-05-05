@@ -413,14 +413,18 @@ void processFlySkySensor(const uint8_t * packet, uint8_t type)
   setTelemetryValue(PROTOCOL_TELEMETRY_FLYSKY_IBUS, id, 0, instance, value, UNIT_RAW, 0);
 }
 
-void processFlySkyPacket(const uint8_t * packet)
+void processFlySkyPacket(const uint8_t * packet, uint8_t len)
 {
+  if (len < 1)
+    return;
+
   // Set TX RSSI Value, reverse MULTIs scaling
   setFlyskyTelemetryValue(AFHDS2A_ID_TX_RSSI, 0, packet[0], UNIT_RAW, 0);
 
   const uint8_t * buffer = packet + 1;
+  const uint8_t * end = packet + len;
   int sensor = 0;
-  while (sensor++ < 7) {
+  while (sensor++ < 7 && end - buffer >= 4) {
     if (*buffer == SENSOR_TYPE_END) break;
     processFlySkySensor(buffer, 0xAA);
     buffer += 4;
@@ -474,7 +478,7 @@ void processFlySkyTelemetryData(uint8_t data, uint8_t * rxBuffer, uint8_t &rxBuf
     }
     debugPrintf(CRLF);
 #endif
-    if (data == 0xAA) processFlySkyPacket(rxBuffer + 1);
+    if (data == 0xAA) processFlySkyPacket(rxBuffer + 1, rxBufferCount - 1);
     else if (data == 0xAC) processFlySkyPacketAC(rxBuffer + 1);
     rxBufferCount = 0;
   }
