@@ -48,6 +48,15 @@
 #include "pulses/pxx2.h"
 #endif
 
+#if defined(AFHDS3)
+#include "pulses/afhds3.h"
+#include "pulses/afhds3_config.h"
+namespace afhds3 {
+Config_u * getConfig(uint8_t module);
+void applyModelConfig(uint8_t module);
+}
+#endif
+
 #if defined(PPM)
 #include "pulses/ppm.h"
 #endif
@@ -289,6 +298,30 @@ TEST_F(PulsesTest, pxx2SendPulsesRejectsInvalidChannelCount)
   Pxx2Driver.sendPulses(ctx, buffer, nullptr, 0);
 
   Pxx2Driver.deinit(ctx);
+}
+#endif
+
+#if defined(AFHDS3) && defined(HARDWARE_EXTERNAL_MODULE)
+TEST_F(PulsesTest, afhds3ApplyConfigRejectsInvalidChannelStart)
+{
+  modulePortInit();
+  g_model.moduleData[EXTERNAL_MODULE].type = MODULE_TYPE_FLYSKY_AFHDS3;
+  g_model.moduleData[EXTERNAL_MODULE].channelsStart = MAX_OUTPUT_CHANNELS;
+  g_model.moduleData[EXTERNAL_MODULE].channelsCount = 0;
+  g_model.moduleData[EXTERNAL_MODULE].failsafeMode = FAILSAFE_CUSTOM;
+  g_model.trainerData.mode = 0x34;
+  g_model.trainerData.channelsStart = 0x12;
+
+  auto ctx = afhds3::ProtoDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  afhds3::applyModelConfig(EXTERNAL_MODULE);
+
+  auto cfg = afhds3::getConfig(EXTERNAL_MODULE);
+  ASSERT_NE(cfg, nullptr);
+  EXPECT_EQ(cfg->v0.FailSafe[0], 0);
+
+  afhds3::ProtoDriver.deinit(ctx);
 }
 #endif
 

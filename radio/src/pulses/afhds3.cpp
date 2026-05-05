@@ -64,6 +64,15 @@ static uint8_t _phyMode_channels[] = {
   12, // ROUTINE_LORA_12CH
 };
 
+static uint8_t getPhyModeChannels(uint8_t phyMode)
+{
+  if (phyMode >= DIM(_phyMode_channels)) {
+    return AFHDS3_MAX_CHANNELS;
+  }
+
+  return _phyMode_channels[phyMode];
+}
+
 // enum COMMAND_DIRECTION
 // {
 //   RADIO_TO_MODULE = 0,
@@ -512,7 +521,7 @@ void ProtoState::setupFrame()
 
     if (cmd == COMMAND::VIRTUAL_FAILSAFE) {
       Config_u* cfg = this->getConfig();
-      uint8_t len =_phyMode_channels[cfg->v0.PhyMode];
+      uint8_t len = getPhyModeChannels(cfg->v0.PhyMode);
       if (!hasTelemetry()) {
           uint16_t failSafe[AFHDS3_MAX_CHANNELS + 1] = {
           ((AFHDS3_MAX_CHANNELS << 8) | CHANNELS_DATA_MODE::FAIL_SAFE), 0};
@@ -970,19 +979,19 @@ bool ProtoState::syncSettings()
 void ProtoState::sendChannelsData()
 {
   uint8_t channels_start = moduleData->channelsStart;
-  uint8_t channelsCount = 8 + moduleData->channelsCount;
-  uint8_t channels_last = channels_start + channelsCount;
+  uint8_t channelsCount = sentModuleChannels(module_index);
 
   int16_t buffer[AFHDS3_MAX_CHANNELS + 1] = {0};
 
   uint8_t* header = (uint8_t*)buffer;
   header[0] = CHANNELS_DATA_MODE::CHANNELS;
 
-  uint8_t channels = _phyMode_channels[cfg.v0.PhyMode];
+  uint8_t channels = getPhyModeChannels(cfg.v0.PhyMode);
+  channelsCount = min<uint8_t>(channelsCount, channels);
   header[1] = channels;
 
-  for (uint8_t channel = channels_start, index = 1; channel < channels_last;
-       channel++, index++) {
+  for (uint8_t index = 1; index <= channelsCount; index++) {
+    uint8_t channel = channels_start + index - 1;
     int16_t channelValue = convert(::getChannelValue(channel));
     buffer[index] = channelValue;
   }
@@ -1094,10 +1103,11 @@ uint8_t ProtoState::setFailSafe(int16_t* target, uint8_t rfchannelsCount )
 {
   int16_t pulseValue = 0;
   uint8_t channels_start = moduleData->channelsStart;
-  uint8_t channelsCount = 8 + moduleData->channelsCount;
-  uint8_t channels_last = channels_start + channelsCount;
+  uint8_t channelsCount = min<uint8_t>(rfchannelsCount,
+                                       sentModuleChannels(module_index));
   std::memset(target, 0, 2*rfchannelsCount );
-  for (uint8_t channel = channels_start, i=0; i<rfchannelsCount && channel < channels_last; channel++, i++) {
+  for (uint8_t i = 0; i < channelsCount; i++) {
+    uint8_t channel = channels_start + i;
     if (moduleData->failsafeMode == FAILSAFE_CUSTOM) {
       if(FAILSAFE_CHANNEL_HOLD==g_model.failsafeChannels[channel]){
         pulseValue = FAILSAFE_HOLD_VALUE;
