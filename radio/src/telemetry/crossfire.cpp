@@ -396,27 +396,32 @@ void processCrossfireTelemetryFrame(uint8_t module, uint8_t* rxBuffer,
 
 #if defined(LUA)
     default:
-      if (id == DEVICE_INFO_ID && rxBuffer[4]== MODULE_ADDRESS) {
-        uint8_t nameSize = rxBuffer[1] - 18;
-        strncpy((char *)&crossfireModuleStatus[module].name, (const char *)&rxBuffer[5], CRSF_NAME_MAXSIZE);
-        crossfireModuleStatus[module].name[CRSF_NAME_MAXSIZE -1] = 0; // For some reason, GH din't like strlcpy
-        if (strncmp((const char *) &rxBuffer[5 + nameSize], "ELRS", 4) == 0)
-          crossfireModuleStatus[module].isELRS = true;
-        crossfireModuleStatus[module].major = rxBuffer[14 + nameSize];
-        crossfireModuleStatus[module].minor = rxBuffer[15 + nameSize];
-        crossfireModuleStatus[module].revision = rxBuffer[16 + nameSize];
+      if (id == DEVICE_INFO_ID && rxBufferCount > 4 &&
+          rxBuffer[4] == MODULE_ADDRESS) {
+        if (crsfPayloadLen >= 18 && rxBufferCount >= crsfPayloadLen + 2) {
+          uint8_t nameSize = crsfPayloadLen - 18;
+          uint8_t copySize = min<uint8_t>(nameSize, CRSF_NAME_MAXSIZE - 1);
+          memcpy(crossfireModuleStatus[module].name, &rxBuffer[5], copySize);
+          crossfireModuleStatus[module].name[copySize] = 0;
+          if (strncmp((const char *)&rxBuffer[5 + nameSize], "ELRS", 4) == 0)
+            crossfireModuleStatus[module].isELRS = true;
+          crossfireModuleStatus[module].major = rxBuffer[14 + nameSize];
+          crossfireModuleStatus[module].minor = rxBuffer[15 + nameSize];
+          crossfireModuleStatus[module].revision = rxBuffer[16 + nameSize];
 
-        ModuleData *md = &g_model.moduleData[module];
+          ModuleData *md = &g_model.moduleData[module];
 
-        if(!CRSF_ELRS_MIN_VER(module, 4, 0) &&
-           (md->crsf.crsfArmingMode != ARMING_MODE_CH5 || md->crsf.crsfArmingMode != SWSRC_NONE)) {
-          md->crsf.crsfArmingMode = ARMING_MODE_CH5;
-          md->crsf.crsfArmingTrigger = SWSRC_NONE;
+          if (!CRSF_ELRS_MIN_VER(module, 4, 0) &&
+              (md->crsf.crsfArmingMode != ARMING_MODE_CH5 ||
+               md->crsf.crsfArmingMode != SWSRC_NONE)) {
+            md->crsf.crsfArmingMode = ARMING_MODE_CH5;
+            md->crsf.crsfArmingTrigger = SWSRC_NONE;
 
-          storageDirty(EE_MODEL);
+            storageDirty(EE_MODEL);
+          }
+
+          crossfireModuleStatus[module].queryCompleted = true;
         }
-
-        crossfireModuleStatus[module].queryCompleted = true;
       }
 
       // destination address and CRC are skipped

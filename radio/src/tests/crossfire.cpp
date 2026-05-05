@@ -263,6 +263,17 @@ TEST(Crossfire, shortChannelsFrameDoesNotUpdateTrainerInputs)
   EXPECT_EQ(trainerInput[0], 123);
 }
 
+TEST(Crossfire, shortDeviceInfoFrameDoesNotUpdateModuleStatus)
+{
+  memset(&crossfireModuleStatus[EXTERNAL_MODULE], 0,
+         sizeof(crossfireModuleStatus[EXTERNAL_MODULE]));
+
+  uint8_t frame[] = {RADIO_ADDRESS, 3, DEVICE_INFO_ID, 0, MODULE_ADDRESS};
+  processCrossfireTelemetryFrame(EXTERNAL_MODULE, frame, sizeof(frame));
+
+  EXPECT_FALSE(crossfireModuleStatus[EXTERNAL_MODULE].queryCompleted);
+}
+
 static uint8_t jumboFrame1[]={
   0xEA, 0x3E, 0xFE, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
