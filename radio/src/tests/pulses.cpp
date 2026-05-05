@@ -79,6 +79,10 @@ int32_t getChannelValue(uint8_t channel);
 namespace {
 
 bool sendPulsesCalled = false;
+uint8_t capturedNChannels = 0;
+int16_t * capturedChannels = nullptr;
+int16_t capturedLastChannel = 0;
+uint8_t expectedMinChannels = 0;
 
 void sendPulsesReadsWhenChannelsAreExposed(void*, uint8_t*, int16_t* channels,
                                            uint8_t nChannels)
@@ -93,11 +97,36 @@ void sendPulsesReadsWhenChannelsAreExposed(void*, uint8_t*, int16_t* channels,
   }
 }
 
+void captureSendPulsesChannels(void*, uint8_t*, int16_t* channels,
+                               uint8_t nChannels)
+{
+  sendPulsesCalled = true;
+  capturedChannels = channels;
+  capturedNChannels = nChannels;
+  EXPECT_GE(nChannels, expectedMinChannels);
+
+  if (channels != nullptr && expectedMinChannels > 0 &&
+      nChannels >= expectedMinChannels) {
+    capturedLastChannel = channels[expectedMinChannels - 1];
+  }
+}
+
 const etx_proto_driver_t ChannelBoundsDriver = {
     .protocol = PROTOCOL_CHANNELS_NONE,
     .init = nullptr,
     .deinit = nullptr,
     .sendPulses = sendPulsesReadsWhenChannelsAreExposed,
+    .processData = nullptr,
+    .processFrame = nullptr,
+    .onConfigChange = nullptr,
+    .txCompleted = nullptr,
+};
+
+const etx_proto_driver_t ChannelCaptureDriver = {
+    .protocol = PROTOCOL_CHANNELS_NONE,
+    .init = nullptr,
+    .deinit = nullptr,
+    .sendPulses = captureSendPulsesChannels,
     .processData = nullptr,
     .processFrame = nullptr,
     .onConfigChange = nullptr,
@@ -270,6 +299,39 @@ TEST_F(PulsesTest, invalidChannelStartDoesNotExposeOutputBuffer)
   EXPECT_TRUE(sendPulsesCalled);
   memset(mod, 0, sizeof(*mod));
 }
+
+#if defined(PXX2) && defined(HARDWARE_INTERNAL_MODULE)
+TEST_F(PulsesTest, pxx2ModuleExposesUpperChannelsToDriver)
+{
+  pulsesInit();
+
+  constexpr uint8_t module = INTERNAL_MODULE;
+  g_eeGeneral.internalModule = MODULE_TYPE_ISRM_PXX2;
+  g_model.moduleData[module].type = MODULE_TYPE_ISRM_PXX2;
+  g_model.moduleData[module].channelsStart = 0;
+  moduleState[module].protocol = getRequiredProtocol(module);
+  channelOutputs[PXX2_MAX_CHANNELS - 1] = 512;
+
+  auto mod = pulsesGetModuleDriver(module);
+  mod->drv = &ChannelCaptureDriver;
+  mod->ctx = nullptr;
+  sendPulsesCalled = false;
+  capturedNChannels = 0;
+  capturedChannels = nullptr;
+  capturedLastChannel = 0;
+  expectedMinChannels = PXX2_MAX_CHANNELS;
+
+  pulsesSendNextFrame(module);
+
+  EXPECT_TRUE(sendPulsesCalled);
+  EXPECT_EQ(capturedChannels, &channelOutputs[0]);
+  EXPECT_GE(capturedNChannels, PXX2_MAX_CHANNELS);
+  EXPECT_EQ(capturedLastChannel, 512);
+
+  expectedMinChannels = 0;
+  memset(mod, 0, sizeof(*mod));
+}
+#endif
 
 TEST_F(PulsesTest, getChannelValueRejectsInvalidChannel)
 {
@@ -549,6 +611,23 @@ TEST_F(PulsesTest, dsmpRejectsZeroLengthDebugPacket)
   for (uint8_t byte : debugPacket) {
     DSMPDriver.processData(ctx, byte, rxBuffer.data(), &len);
   }
+
+  DSMPDriver.deinit(ctx);
+}
+
+TEST_F(PulsesTest, dsmpRejectsShortTelemetryPacket)
+{
+  modulePortInit();
+  g_model.moduleData[EXTERNAL_MODULE].type = MODULE_TYPE_LEMON_DSMP;
+
+  auto ctx = DSMPDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  GuardedAfhds3RxBuffer rxBuffer(1);
+  ASSERT_TRUE(rxBuffer.isValid());
+
+  uint8_t len = 0;
+  DSMPDriver.processData(ctx, 0xAA, rxBuffer.data(), &len);
 
   DSMPDriver.deinit(ctx);
 }
@@ -983,6 +1062,36 @@ TEST_F(PulsesTest, pxx2RejectsShortTelemetryFrame)
 
   SUCCEED();
 }
+
+TEST_F(PulsesTest, pxx2RejectsAuthenticationFrameWithoutCryptoType)
+{
+  GuardedPxx2Frame guardedFrame(2);
+  ASSERT_TRUE(guardedFrame.isValid());
+
+  uint8_t * frame = guardedFrame.data();
+  frame[1] = PXX2_TYPE_C_MODULE;
+  frame[2] = PXX2_TYPE_ID_AUTHENTICATION;
+
+  processPXX2Frame(INTERNAL_MODULE, frame, nullptr, nullptr);
+
+  SUCCEED();
+}
+
+TEST_F(PulsesTest, pxx2RejectsShortAuthenticationChallenge)
+{
+  GuardedPxx2Frame guardedFrame(4);
+  ASSERT_TRUE(guardedFrame.isValid());
+
+  uint8_t * frame = guardedFrame.data();
+  frame[1] = PXX2_TYPE_C_MODULE;
+  frame[2] = PXX2_TYPE_ID_AUTHENTICATION;
+  frame[3] = 0;
+  frame[4] = 0;
+
+  processPXX2Frame(INTERNAL_MODULE, frame, nullptr, nullptr);
+
+  SUCCEED();
+}
 #endif
 
 #if defined(AFHDS3) && defined(HARDWARE_EXTERNAL_MODULE)
@@ -1143,5 +1252,36 @@ TEST_F(PulsesTest, sbusSendPulsesHonorsChannelCount)
   EXPECT_EQ(firstPulse, 992);
 
   SBusDriver.deinit(ctx);
+}
+
+TEST_F(PulsesTest, sbusSendNextFrameIncludesDigitalChannels)
+{
+  pulsesInit();
+  modulePortInit();
+
+  constexpr uint8_t module = EXTERNAL_MODULE;
+  g_model.moduleData[INTERNAL_MODULE].type = MODULE_TYPE_NONE;
+  g_model.moduleData[module].type = MODULE_TYPE_SBUS;
+  g_model.moduleData[module].channelsStart = 0;
+  moduleState[module].protocol = getRequiredProtocol(module);
+  channelOutputs[16] = 1024;
+  channelOutputs[17] = 1024;
+
+  auto ctx = SBusDriver.init(module);
+  ASSERT_NE(ctx, nullptr);
+
+  auto mod = pulsesGetModuleDriver(module);
+  mod->drv = &SBusDriver;
+  mod->ctx = ctx;
+
+  uint8_t * buffer = pulsesGetModuleBuffer(module);
+  memset(buffer, 0, MODULE_BUFFER_SIZE);
+
+  pulsesSendNextFrame(module);
+
+  EXPECT_EQ(buffer[23] & 0x03, 0x03);
+
+  SBusDriver.deinit(ctx);
+  memset(mod, 0, sizeof(*mod));
 }
 #endif

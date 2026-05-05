@@ -389,6 +389,10 @@ volatile int16_t authenticateFrames = 0;
 static void processAuthenticationFrame(uint8_t module, const uint8_t * frame,
                                        const etx_serial_driver_t* drv, void* ctx)
 {
+  if (!pxx2FrameHasIndex(frame, 3)) {
+    return;
+  }
+
   uint8_t cryptoType = frame[3];
   uint8_t messageDigest[16] = {0};
 
@@ -398,6 +402,10 @@ static void processAuthenticationFrame(uint8_t module, const uint8_t * frame,
       POPUP_INFORMATION(STR_AUTH_FAILURE);
     }
     TRACE("[authFailed]\r\n", authenticateFrames);
+    return;
+  }
+
+  if (!pxx2FrameHasIndex(frame, 4 + sizeof(messageDigest) - 1)) {
     return;
   }
 

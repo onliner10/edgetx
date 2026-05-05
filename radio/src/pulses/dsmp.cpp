@@ -400,6 +400,8 @@ static void dsmpTelemetryData(uint8_t module, uint8_t data,
 {
     dsmpStatus.lastUpdate = get_tmr10ms();
 
+    if (rxBufferCount < 2) return;
+
     if (rxBuffer[1] == 0x80 && rxBufferCount >= DSM_BIND_PACKET_LENGTH) {
         processDSMPBindPacket(module, rxBuffer + 2);  // Skip 0xAA 0x80
         rxBufferCount = 0;

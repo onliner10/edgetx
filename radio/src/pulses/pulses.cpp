@@ -539,7 +539,7 @@ static int16_t* getModuleChannels(uint8_t module, uint8_t& nChannels)
     return nullptr;
   }
 
-  nChannels = min<uint8_t>(16, MAX_OUTPUT_CHANNELS - channelStart);
+  nChannels = MAX_OUTPUT_CHANNELS - channelStart;
   return &channelOutputs[channelStart];
 }
 
