@@ -180,19 +180,29 @@ inline bool isModuleXJT(uint8_t idx)
   return isModuleTypeXJT(g_model.moduleData[idx].type);
 }
 
+inline uint8_t getModuleXJTSubType(uint8_t idx)
+{
+  uint8_t subType = g_model.moduleData[idx].subType;
+  return subType <= MODULE_SUBTYPE_PXX1_LAST ? subType
+                                             : MODULE_SUBTYPE_PXX1_ACCST_D16;
+}
+
 inline bool isModuleXJTD8(uint8_t idx)
 {
-  return isModuleXJT(idx) && g_model.moduleData[idx].subType == MODULE_SUBTYPE_PXX1_ACCST_D8;
+  return isModuleXJT(idx) &&
+         getModuleXJTSubType(idx) == MODULE_SUBTYPE_PXX1_ACCST_D8;
 }
 
 inline bool isModuleXJTLR12(uint8_t idx)
 {
-  return isModuleXJT(idx) && g_model.moduleData[idx].subType == MODULE_SUBTYPE_PXX1_ACCST_LR12;
+  return isModuleXJT(idx) &&
+         getModuleXJTSubType(idx) == MODULE_SUBTYPE_PXX1_ACCST_LR12;
 }
 
 inline bool isModuleXJTD16(uint8_t idx)
 {
-  return isModuleXJT(idx) && g_model.moduleData[idx].subType == MODULE_SUBTYPE_PXX1_ACCST_D16;
+  return isModuleXJT(idx) &&
+         getModuleXJTSubType(idx) == MODULE_SUBTYPE_PXX1_ACCST_D16;
 }
 
 inline bool isModuleTypeISRM(uint8_t type)
@@ -523,7 +533,7 @@ inline bool isDefaultModelRegistrationID()
 inline bool isModuleRxNumAvailable(uint8_t moduleIdx)
 {
   if (isModuleXJT(moduleIdx))
-    return g_model.moduleData[moduleIdx].subType != MODULE_SUBTYPE_PXX1_ACCST_D8;
+    return getModuleXJTSubType(moduleIdx) != MODULE_SUBTYPE_PXX1_ACCST_D8;
 
   if (isModuleR9M(moduleIdx))
     return true;
@@ -549,7 +559,7 @@ inline bool isModuleRxNumAvailable(uint8_t moduleIdx)
 inline bool isModuleModelIndexAvailable(uint8_t idx)
 {
   if (isModuleXJT(idx))
-    return g_model.moduleData[idx].subType != MODULE_SUBTYPE_PXX1_ACCST_D8;
+    return getModuleXJTSubType(idx) != MODULE_SUBTYPE_PXX1_ACCST_D8;
 
   if (isModuleR9M(idx))
     return true;
@@ -583,7 +593,7 @@ inline bool isModuleFailsafeAvailable(uint8_t moduleIdx)
 #endif
 
   if (isModuleXJT(moduleIdx))
-    return g_model.moduleData[moduleIdx].subType == MODULE_SUBTYPE_PXX1_ACCST_D16;
+    return getModuleXJTSubType(moduleIdx) == MODULE_SUBTYPE_PXX1_ACCST_D16;
 
 #if defined(MULTIMODULE)
   if (isModuleMultimodule(moduleIdx)) {
