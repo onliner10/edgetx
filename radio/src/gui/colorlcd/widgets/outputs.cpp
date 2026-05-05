@@ -173,8 +173,8 @@ class OutputsWidget : public Widget
 {
  public:
   OutputsWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
-                int screenNum, int zoneNum) :
-      Widget(factory, parent, rect, screenNum, zoneNum)
+                WidgetLocation location) :
+      Widget(factory, parent, rect, location)
   {
     padAll(PAD_ZERO);
 
@@ -290,16 +290,16 @@ class OutputsWidgetFactory : public WidgetFactory
   }
 
   Widget* createNew(Window* parent, const rect_t& rect,
-                 int screenNum, int zoneNum) const override
+                    WidgetLocation location) const override
   {
-    return new (std::nothrow) T(this, parent, rect, screenNum, zoneNum);
+    return new (std::nothrow) T(this, parent, rect, location);
   }
 
   // Fix the options loaded from the model file to account for
   // addition of the 'last channel' option
-  const void checkOptions(int screenNum, int zoneNum) const override
+  const void checkOptions(const WidgetLocation& location) const override
   {
-    auto widgetData = g_model.getWidgetData(screenNum, zoneNum);
+    auto widgetData = location.persistentData();
     if (widgetData && widgetData->options.size() >= 4) {
       if (widgetData->options[1].type == WOV_Bool) {
         widgetData->options[5] = widgetData->options[4];
@@ -308,7 +308,7 @@ class OutputsWidgetFactory : public WidgetFactory
         widgetData->options[2] = widgetData->options[1];
         widgetData->options[1].type = WOV_Signed;
         widgetData->options[1].value.signedValue = MAX_OUTPUT_CHANNELS;
-        storageDirty(EE_MODEL);
+        storageDirty(location.isTopBar() ? EE_GENERAL : EE_MODEL);
       }
     }
   }

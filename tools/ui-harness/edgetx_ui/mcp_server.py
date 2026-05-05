@@ -55,6 +55,21 @@ TOOLS: dict[str, dict[str, Any]] = {
             "required": ["x", "y"],
         },
     },
+    "edgetx_drag": {
+        "description": "Drag across the touch screen.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "x1": {"type": "integer"},
+                "y1": {"type": "integer"},
+                "x2": {"type": "integer"},
+                "y2": {"type": "integer"},
+                "duration_ms": {"type": "integer", "default": 300},
+                "steps": {"type": "integer", "default": 12},
+            },
+            "required": ["x1", "y1", "x2", "y2"],
+        },
+    },
     "edgetx_wait": {
         "description": "Wait for a number of milliseconds.",
         "inputSchema": {"type": "object", "properties": {"ms": {"type": "integer"}}, "required": ["ms"]},
@@ -113,6 +128,15 @@ class McpServer:
             return self.service.rotate(int(args["steps"]))
         if name == "edgetx_touch":
             return self.service.touch(int(args["x"]), int(args["y"]), int(args.get("duration_ms", 120)))
+        if name == "edgetx_drag":
+            return self.service.drag(
+                int(args["x1"]),
+                int(args["y1"]),
+                int(args["x2"]),
+                int(args["y2"]),
+                int(args.get("duration_ms", 300)),
+                int(args.get("steps", 12)),
+            )
         if name == "edgetx_wait":
             return self.service.wait(int(args["ms"]))
         if name == "edgetx_screenshot":

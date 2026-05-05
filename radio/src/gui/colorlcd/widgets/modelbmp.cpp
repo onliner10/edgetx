@@ -32,8 +32,8 @@ class ModelBitmapWidget : public Widget
 {
  public:
   ModelBitmapWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
-                    int screenNum, int zoneNum) :
-      Widget(factory, parent, rect, screenNum, zoneNum)
+                    WidgetLocation location) :
+      Widget(factory, parent, rect, location)
   {
     etx_obj_add_style(lvobj, styles->bg_opacity_transparent, LV_PART_MAIN);
     etx_obj_add_style(lvobj, styles->bg_opacity_cover,

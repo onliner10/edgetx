@@ -839,7 +839,6 @@ PACK(struct ModelData {
   bool hasScreenData(int screenNum);
   CustomScreenData* getScreenData(int screenNum);
   LayoutPersistentData* getScreenLayoutData(int screenNum);
-  WidgetPersistentData* getWidgetData(int screenNum, int zoneNum);
   void removeScreenLayout(int idx);
 #else
   uint8_t screensType SKIP; /* 2bits per screen (None/Gauges/Numbers/Script) */

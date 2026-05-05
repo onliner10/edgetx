@@ -35,7 +35,7 @@ class LuaWidgetFactory : public WidgetFactory
   ~LuaWidgetFactory();
 
   Widget* createNew(Window* parent, const rect_t& rect,
-                 int screenNum, int zoneNum) const override;
+                    WidgetLocation location) const override;
 
   bool isLuaWidgetFactory() const override { return true; }
 

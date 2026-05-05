@@ -409,7 +409,9 @@ void TopBar::load()
   for (unsigned int i = 0; i < zoneCount; i++) {
     // and load new one if required
     if (g_eeGeneral.getTopbarData()->hasWidget(i)) {
-      widgets[i] = WidgetFactory::newWidget(g_eeGeneral.getTopbarData()->getWidgetName(i), this, getZone(i), -1, i);
+      widgets[i] = WidgetFactory::newWidget(
+          g_eeGeneral.getTopbarData()->getWidgetName(i), this, getZone(i),
+          WidgetLocation(TopBarWidgetLocation{static_cast<uint8_t>(i)}));
     }
   }
 }
@@ -425,7 +427,9 @@ Widget* TopBar::createWidget(unsigned int index,
   Widget* widget = nullptr;
   if (factory) {
     g_eeGeneral.getTopbarData()->setWidgetName(index, factory->getName());
-    widget = factory->create(this, getZone(index), -1, index);
+    widget = factory->create(
+        this, getZone(index),
+        WidgetLocation(TopBarWidgetLocation{static_cast<uint8_t>(index)}));
   }
   widgets[index] = widget;
 

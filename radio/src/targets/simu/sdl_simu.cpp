@@ -242,6 +242,21 @@ static void automation_handle_command(const std::string& line)
     SDL_Delay(std::max(1, duration_ms));
     simuTouchUp();
     automation_reply_ok();
+  } else if (command == "drag") {
+    int x1 = 0, y1 = 0, x2 = 0, y2 = 0, duration_ms = 300, steps = 12;
+    in >> x1 >> y1 >> x2 >> y2 >> duration_ms >> steps;
+    steps = std::max(1, steps);
+    const int step_delay = std::max(1, duration_ms / steps);
+
+    simuTouchDown(x1, y1);
+    for (int i = 1; i <= steps; i += 1) {
+      int x = x1 + ((x2 - x1) * i) / steps;
+      int y = y1 + ((y2 - y1) * i) / steps;
+      SDL_Delay(step_delay);
+      simuTouchDown(x, y);
+    }
+    simuTouchUp();
+    automation_reply_ok();
   } else if (command == "wait") {
     int duration_ms = 0;
     in >> duration_ms;

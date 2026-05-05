@@ -226,14 +226,6 @@ LayoutPersistentData* ModelData::getScreenLayoutData(int screenNum)
   return &getScreenData(screenNum)->layoutData;
 }
 
-WidgetPersistentData* ModelData::getWidgetData(int screenNum, int zoneNum)
-{
-  if (screenNum == -1)
-    return g_eeGeneral.getTopbarData()->getWidgetData(zoneNum);
-  else
-    return getScreenLayoutData(screenNum)->getWidgetData(zoneNum);
-}
-
 void ModelData::removeScreenLayout(int idx)
 {
   if (_screenData[idx]) delete _screenData[idx];

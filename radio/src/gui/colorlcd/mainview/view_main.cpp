@@ -243,6 +243,23 @@ void ViewMain::updateTopbarVisibility()
 }
 
 #if defined(HARDWARE_KEYS)
+void ViewMain::onEvent(event_t event)
+{
+  switch (event) {
+    case EVT_KEY_BREAK(KEY_LEFT):
+      if (!widget_select) previousMainView();
+      break;
+
+    case EVT_KEY_BREAK(KEY_RIGHT):
+      if (!widget_select) nextMainView();
+      break;
+
+    default:
+      NavWindow::onEvent(event);
+      break;
+  }
+}
+
 void ViewMain::doKeyShortcut(event_t event)
 {
   QMPage pg = g_eeGeneral.getKeyShortcut(event);

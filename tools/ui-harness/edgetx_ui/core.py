@@ -318,6 +318,19 @@ class SdlAutomationSession:
     def touch(self, x: int, y: int, duration_ms: int = 120) -> dict[str, Any]:
         return self.command(f"touch {int(x)} {int(y)} {int(duration_ms)}")
 
+    def drag(
+        self,
+        x1: int,
+        y1: int,
+        x2: int,
+        y2: int,
+        duration_ms: int = 300,
+        steps: int = 12,
+    ) -> dict[str, Any]:
+        return self.command(
+            f"drag {int(x1)} {int(y1)} {int(x2)} {int(y2)} {int(duration_ms)} {int(steps)}"
+        )
+
     def wait(self, ms: int) -> dict[str, Any]:
         return self.command(f"wait {int(ms)}")
 
@@ -415,6 +428,17 @@ class HarnessService:
     def touch(self, x: int, y: int, duration_ms: int = 120) -> dict[str, Any]:
         return self.require_session().touch(x, y, duration_ms)
 
+    def drag(
+        self,
+        x1: int,
+        y1: int,
+        x2: int,
+        y2: int,
+        duration_ms: int = 300,
+        steps: int = 12,
+    ) -> dict[str, Any]:
+        return self.require_session().drag(x1, y1, x2, y2, duration_ms, steps)
+
     def wait(self, ms: int) -> dict[str, Any]:
         return self.require_session().wait(ms)
 
@@ -466,6 +490,16 @@ class HarnessService:
         elif "touch" in step:
             value = step["touch"]
             self.touch(int(value["x"]), int(value["y"]), int(value.get("duration_ms", 120)))
+        elif "drag" in step:
+            value = step["drag"]
+            self.drag(
+                int(value["x1"]),
+                int(value["y1"]),
+                int(value["x2"]),
+                int(value["y2"]),
+                int(value.get("duration_ms", 300)),
+                int(value.get("steps", 12)),
+            )
         elif "screenshot" in step:
             screenshots.append(self.screenshot(str(step["screenshot"]), str(output_dir)))
         else:

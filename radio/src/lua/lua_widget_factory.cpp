@@ -70,11 +70,12 @@ LuaWidgetFactory::~LuaWidgetFactory() {
 }
 
 Widget* LuaWidgetFactory::createNew(Window* parent, const rect_t& rect,
-                                    int screenNum, int zoneNum) const
+                                    WidgetLocation location) const
 {
   if (lsWidgets == 0) return 0;
 
-  auto widgetData = g_model.getWidgetData(screenNum, zoneNum);
+  auto widgetData = location.persistentData();
+  if (!widgetData) return 0;
 
   luaSetInstructionsLimit(lsWidgets, MAX_INSTRUCTIONS);
 
@@ -108,7 +109,8 @@ Widget* LuaWidgetFactory::createNew(Window* parent, const rect_t& rect,
   // Store the options data in registry for later updates
   int optionsDataRef = luaL_ref(lsWidgets, LUA_REGISTRYINDEX);
 
-  return new LuaWidget(this, parent, rect, screenNum, zoneNum, zoneRectDataRef, optionsDataRef, createFunction, path);
+  return new LuaWidget(this, parent, rect, location, zoneRectDataRef,
+                       optionsDataRef, createFunction, path);
 }
 
 void LuaWidgetFactory::translateOptions(WidgetOption * options)

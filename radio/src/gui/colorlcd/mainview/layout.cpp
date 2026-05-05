@@ -406,7 +406,10 @@ Widget* Layout::createWidget(unsigned int index,
   Widget* widget = nullptr;
   if (factory) {
     g_model.getScreenLayoutData(screenNum)->setWidgetName(index, factory->getName());
-    widget = factory->create(this, getZone(index), screenNum, index);
+    widget = factory->create(
+        this, getZone(index),
+        WidgetLocation(MainViewWidgetLocation{
+            static_cast<uint8_t>(screenNum), static_cast<uint8_t>(index)}));
   }
   widgets[index] = widget;
 
@@ -428,7 +431,11 @@ void Layout::load()
   for (unsigned int i = 0; i < count; i++) {
     // and load new one if required
     if (g_model.getScreenLayoutData(screenNum)->hasWidget(i)) {
-      widgets[i] = WidgetFactory::newWidget(g_model.getScreenLayoutData(screenNum)->getWidgetName(i), this, getZone(i), screenNum, i);
+      widgets[i] = WidgetFactory::newWidget(
+          g_model.getScreenLayoutData(screenNum)->getWidgetName(i), this,
+          getZone(i),
+          WidgetLocation(MainViewWidgetLocation{
+              static_cast<uint8_t>(screenNum), static_cast<uint8_t>(i)}));
     }
   }
 }

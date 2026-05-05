@@ -113,11 +113,11 @@ static void timer10msStart();
 
 static void menusTask()
 {
-  edgeTxInit();
-
 #if defined(SIMU)
   timer10msStart();
 #endif
+
+  edgeTxInit();
 
   mixerTaskInit();
 

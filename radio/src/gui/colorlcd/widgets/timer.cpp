@@ -35,8 +35,8 @@ class TimerWidget : public Widget
 {
  public:
   TimerWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
-              int screenNum, int zoneNum) :
-      Widget(factory, parent, rect, screenNum, zoneNum)
+              WidgetLocation location) :
+      Widget(factory, parent, rect, location)
   {
     delayLoad();
   }

@@ -231,10 +231,10 @@ void LuaWidget::redraw_cb(lv_event_t* e)
 }
 
 LuaWidget::LuaWidget(const WidgetFactory* factory, Window* parent,
-                     const rect_t& rect, int screenNum, int zoneNum,
+                     const rect_t& rect, WidgetLocation location,
                      int zoneRectDataRef, int optionsDataRef,
                      int createFunctionRef, const std::string& path) :
-    Widget(factory, parent, rect, screenNum, zoneNum),
+    Widget(factory, parent, rect, location),
     zoneRectDataRef(zoneRectDataRef), optionsDataRef(optionsDataRef),
     errorMessage(nullptr)
 {

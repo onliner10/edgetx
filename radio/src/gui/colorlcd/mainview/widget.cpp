@@ -155,13 +155,31 @@ void WidgetPersistentData::setString(int idx, const char* s)
 
 //-----------------------------------------------------------------------------
 
+WidgetPersistentData* WidgetLocation::persistentData() const
+{
+  switch (placement_) {
+    case Placement::MainView:
+      return g_model.getScreenLayoutData(screen_)->getWidgetData(zone_);
+    case Placement::TopBar:
+      return g_eeGeneral.getTopbarData()->getWidgetData(zone_);
+  }
+
+  return nullptr;
+}
+
+//-----------------------------------------------------------------------------
+
 Widget::Widget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
-               int screenNum, int zoneNum) :
+               WidgetLocation location) :
     ButtonBase(parent, rect, nullptr, window_create),
     factory(factory),
-    screenNum(screenNum), zoneNum(zoneNum)
+    location(location)
 {
   setWindowFlag(NO_FOCUS | NO_SCROLL);
+  if (isMainViewWidget()) {
+    lv_obj_add_flag(lvobj, LV_OBJ_FLAG_SCROLL_CHAIN_HOR);
+    lv_obj_add_flag(lvobj, LV_OBJ_FLAG_SCROLL_CHAIN_VER);
+  }
 
   setPressHandler([&]() -> uint8_t {
     // When ViewMain is in "widget select mode",
@@ -215,17 +233,17 @@ void Widget::layoutTextLabel(lv_obj_t* label, const rect_t& rect,
 void Widget::openMenu()
 {
   auto viewMain = ViewMain::instance();
-  if (!parent->isTopBar() && viewMain && viewMain->isAppMode())
+  if (isMainViewWidget() && viewMain && viewMain->isAppMode())
   {
     setFullscreen(true);
     return;
   }
 
-  if (hasOptions() || !parent->isTopBar()) {
+  if (hasOptions() || isMainViewWidget()) {
     Menu* menu = new (std::nothrow) Menu();
     if (!menu) return;
     menu->setTitle(getFactory()->getDisplayName());
-    if (!parent->isTopBar()) {
+    if (isMainViewWidget()) {
       menu->addLine(STR_WIDGET_FULLSCREEN, [&]() { setFullscreen(true); });
     }
     if (hasOptions()) {
@@ -238,9 +256,14 @@ void Widget::openMenu()
 #if defined(HARDWARE_KEYS)
 void Widget::onEvent(event_t event)
 {
-  if (fullscreen && (EVT_KEY_LONG(KEY_EXIT) == event)) {
-    setFullscreen(false);
+  if (fullscreen) {
+    if (EVT_KEY_LONG(KEY_EXIT) == event) {
+      setFullscreen(false);
+    }
+    return;
   }
+
+  ButtonBase::onEvent(event);
 }
 #endif
 
@@ -251,7 +274,7 @@ void Widget::onCancel()
 
 void Widget::setFullscreen(bool enable)
 {
-  if (parent->isTopBar() || (enable == fullscreen)) return;
+  if (!isMainViewWidget() || (enable == fullscreen)) return;
 
   fullscreen = enable;
 
@@ -360,7 +383,7 @@ void Widget::enableFocus(bool enable)
   }
 }
 
-WidgetPersistentData* Widget::getPersistentData() { return g_model.getWidgetData(screenNum, zoneNum); }
+WidgetPersistentData* Widget::getPersistentData() { return location.persistentData(); }
 
 //-----------------------------------------------------------------------------
 
@@ -422,27 +445,27 @@ void WidgetFactory::registerWidget(const WidgetFactory& factory)
 }
 
 Widget* WidgetFactory::newWidget(const char* name, Window* parent,
-                                 const rect_t& rect, int screenNum, int zoneNum)
+                                 const rect_t& rect, WidgetLocation location)
 {
   const WidgetFactory* factory = getWidgetFactory(name);
   if (factory) {
-    return factory->create(parent, rect, screenNum, zoneNum, false);
+    return factory->create(parent, rect, location, false);
   }
   return nullptr;
 }
 
 Widget* WidgetFactory::create(Window* parent, const rect_t& rect,
-                int screenNum, int zoneNum,
-                bool init) const
+                              WidgetLocation location, bool init) const
 {
-  auto widgetData = g_model.getWidgetData(screenNum, zoneNum);
+  auto widgetData = location.persistentData();
+  if (!widgetData) return nullptr;
 
   if (init) {
     widgetData->clear();
     parseOptionDefaults();
   }
   if (options) {
-    checkOptions(screenNum, zoneNum);
+    checkOptions(location);
     int i = 0;
     for (const WidgetOption* option = options; option->name; option++, i++) {
       TRACE("WidgetFactory::create() setting option '%s'", option->name);
@@ -450,5 +473,5 @@ Widget* WidgetFactory::create(Window* parent, const rect_t& rect,
     }
   }
 
-  return createNew(parent, rect, screenNum, zoneNum);
+  return createNew(parent, rect, location);
 }

@@ -21,6 +21,7 @@
 
 #pragma once
 
+#include <stdint.h>
 #include <string.h>
 #include <functional>
 #include <new>
@@ -32,6 +33,54 @@
 #include "datastructs_screen.h"
 
 class WidgetFactory;
+
+//-----------------------------------------------------------------------------
+
+struct MainViewWidgetLocation
+{
+  uint8_t screen;
+  uint8_t zone;
+};
+
+struct TopBarWidgetLocation
+{
+  uint8_t zone;
+};
+
+class WidgetLocation
+{
+ public:
+  // Explicit placement selects storage and interaction policy without sentinel
+  // screen ids such as -1 for the top bar.
+  enum class Placement : uint8_t {
+    MainView,
+    TopBar,
+  };
+
+  explicit WidgetLocation(MainViewWidgetLocation location) :
+      placement_(Placement::MainView),
+      screen_(location.screen),
+      zone_(location.zone)
+  {
+  }
+
+  explicit WidgetLocation(TopBarWidgetLocation location) :
+      placement_(Placement::TopBar),
+      screen_(0),
+      zone_(location.zone)
+  {
+  }
+
+  bool isMainView() const { return placement_ == Placement::MainView; }
+  bool isTopBar() const { return placement_ == Placement::TopBar; }
+
+  WidgetPersistentData* persistentData() const;
+
+ private:
+  Placement placement_;
+  uint8_t screen_;
+  uint8_t zone_;
+};
 
 //-----------------------------------------------------------------------------
 
@@ -73,7 +122,7 @@ class Widget : public ButtonBase
  public:
 
   Widget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
-         int screenNum, int zoneNum);
+         WidgetLocation location);
 
   ~Widget() override = default;
 
@@ -81,8 +130,8 @@ class Widget : public ButtonBase
 
   const WidgetOption* getOptionDefinitions() const;
   bool hasOptions() const { return getOptionDefinitions() && getOptionDefinitions()->name; }
-  bool isTopBarWidget() const { return parent && parent->isTopBar(); }
-  bool isMainViewWidget() const { return !isTopBarWidget(); }
+  bool isTopBarWidget() const { return location.isTopBar(); }
+  bool isMainViewWidget() const { return location.isMainView(); }
   bool isCompactTopBarWidget() const
   {
     return isTopBarWidget() && height() <= EdgeTxStyles::MENU_HEADER_HEIGHT;
@@ -130,8 +179,7 @@ class Widget : public ButtonBase
 
  protected:
   const WidgetFactory* factory;
-  int screenNum;
-  int zoneNum;
+  WidgetLocation location;
   bool fullscreen = false;
   bool closeFS = false;
   lv_obj_t* focusBorder = nullptr;
@@ -171,7 +219,7 @@ class WidgetFactory
 
   const WidgetOption* getDefaultOptions() const { return options; }
   virtual const void parseOptionDefaults() const {}
-  virtual const void checkOptions(int screenNum, int zoneNum) const {}
+  virtual const void checkOptions(const WidgetLocation& location) const {}
 
   const char* getDisplayName() const
   {
@@ -179,17 +227,17 @@ class WidgetFactory
   }
 
   Widget* create(Window* parent, const rect_t& rect,
-                         int screenNum, int zoneNum,
-                         bool init = true) const;
+                 WidgetLocation location, bool init = true) const;
 
-  virtual Widget* createNew(Window* parent, const rect_t& rect, int screenNum, int zoneNum) const = 0;
+  virtual Widget* createNew(Window* parent, const rect_t& rect,
+                            WidgetLocation location) const = 0;
 
   virtual bool isLuaWidgetFactory() const { return false; }
 
   static const RegisteredWidgets& getRegisteredWidgets();
   static const WidgetFactory* getWidgetFactory(const char* name);
   static Widget* newWidget(const char* name, Window* parent, const rect_t& rect,
-                           int screenNum, int zoneNum);
+                           WidgetLocation location);
 
  protected:
   const char* name = nullptr;
@@ -215,9 +263,9 @@ class BaseWidgetFactory : public WidgetFactory
   }
 
   Widget* createNew(Window* parent, const rect_t& rect,
-                 int screenNum, int zoneNum) const override
+                    WidgetLocation location) const override
   {
-    return new (std::nothrow) T(this, parent, rect, screenNum, zoneNum);
+    return new (std::nothrow) T(this, parent, rect, location);
   }
 };
 

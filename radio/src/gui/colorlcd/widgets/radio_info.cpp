@@ -203,8 +203,8 @@ class LinkStatusWidget : public Widget
 {
  public:
   LinkStatusWidget(const WidgetFactory* factory, Window* parent,
-                   const rect_t& rect, int screenNum, int zoneNum) :
-      Widget(factory, parent, rect, screenNum, zoneNum)
+                   const rect_t& rect, WidgetLocation location) :
+      Widget(factory, parent, rect, location)
   {
     for (uint8_t i = 0; i < LINK_BARS; i += 1) {
       bars[i] = makeStatusPart(lvobj);
@@ -338,8 +338,8 @@ class TxBatteryStatusWidget : public Widget
 {
  public:
   TxBatteryStatusWidget(const WidgetFactory* factory, Window* parent,
-                        const rect_t& rect, int screenNum, int zoneNum) :
-      Widget(factory, parent, rect, screenNum, zoneNum)
+                        const rect_t& rect, WidgetLocation location) :
+      Widget(factory, parent, rect, location)
   {
     shell = makeStatusPart(lvobj);
     fill = makeStatusPart(lvobj);
@@ -499,8 +499,8 @@ class VolumeStatusWidget : public Widget
 {
  public:
   VolumeStatusWidget(const WidgetFactory* factory, Window* parent,
-                     const rect_t& rect, int screenNum, int zoneNum) :
-      Widget(factory, parent, rect, screenNum, zoneNum)
+                     const rect_t& rect, WidgetLocation location) :
+      Widget(factory, parent, rect, location)
   {
     track = makeStatusPart(lvobj);
     fill = makeStatusPart(lvobj);
@@ -686,8 +686,8 @@ class RadioInfoWidget : public Widget
 {
  public:
   RadioInfoWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
-                  int screenNum, int zoneNum) :
-      Widget(factory, parent, rect, screenNum, zoneNum)
+                  WidgetLocation location) :
+      Widget(factory, parent, rect, location)
   {
     bool compact = isCompactTopBarWidget();
 
@@ -1038,8 +1038,8 @@ class DateTimeWidget : public Widget
 {
  public:
   DateTimeWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
-                 int screenNum, int zoneNum) :
-      Widget(factory, parent, rect, screenNum, zoneNum)
+                 WidgetLocation location) :
+      Widget(factory, parent, rect, location)
   {
     coord_t x = isCompactTopBarWidget()
                     ? TOPBAR_CONTENT_PAD
@@ -1108,9 +1108,9 @@ class DateTextWidget : public Widget
 {
  protected:
   DateTextWidget(const WidgetFactory* factory, Window* parent,
-                 const rect_t& rect, int screenNum, int zoneNum,
+                 const rect_t& rect, WidgetLocation location,
                  DateTextKind kind) :
-      Widget(factory, parent, rect, screenNum, zoneNum),
+      Widget(factory, parent, rect, location),
       kind(kind)
   {
     label = etx_label_create(lvobj, FONT_XS_INDEX);
@@ -1222,9 +1222,8 @@ class ClockWidget : public DateTextWidget
 {
  public:
   ClockWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
-              int screenNum, int zoneNum) :
-      DateTextWidget(factory, parent, rect, screenNum, zoneNum,
-                     DateTextKind::Clock)
+              WidgetLocation location) :
+      DateTextWidget(factory, parent, rect, location, DateTextKind::Clock)
   {
   }
 };
@@ -1236,9 +1235,8 @@ class TodayWidget : public DateTextWidget
 {
  public:
   TodayWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
-              int screenNum, int zoneNum) :
-      DateTextWidget(factory, parent, rect, screenNum, zoneNum,
-                     DateTextKind::Today)
+              WidgetLocation location) :
+      DateTextWidget(factory, parent, rect, location, DateTextKind::Today)
   {
   }
 };
@@ -1252,8 +1250,8 @@ class InternalGPSWidget : public Widget
 {
  public:
   InternalGPSWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
-                    int screenNum, int zoneNum) :
-      Widget(factory, parent, rect, screenNum, zoneNum)
+                    WidgetLocation location) :
+      Widget(factory, parent, rect, location)
   {
     icon =
         new (std::nothrow) StaticIcon(this, width() / 2 - PAD_LARGE - PAD_TINY, ICON_H,
