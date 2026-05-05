@@ -457,17 +457,47 @@ bool etxLabelAllocationFailureReturnsNullForTest()
   forceEtxLabelAllocationFailureForTest = false;
   return obj == nullptr;
 }
+
+void etx_std_settings(lv_obj_t* obj, lv_style_selector_t selector);
+
+bool etxStyleHelpersIgnoreNullObjectForTest()
+{
+  etx_obj_add_style(nullptr, styles->rounded, LV_PART_MAIN);
+  etx_font(nullptr, FONT_STD_INDEX);
+  etx_solid_bg(nullptr);
+  etx_bg_color(nullptr, COLOR_THEME_SECONDARY1_INDEX);
+  etx_bg_color_from_flags(nullptr, COLOR_THEME_SECONDARY1);
+  etx_txt_color(nullptr, COLOR_THEME_SECONDARY1_INDEX);
+  etx_txt_color_from_flags(nullptr, COLOR_THEME_SECONDARY1);
+  etx_border_color(nullptr, COLOR_THEME_SECONDARY1_INDEX);
+  etx_arc_color(nullptr, COLOR_THEME_SECONDARY1_INDEX);
+  etx_arc_color_from_flags(nullptr, COLOR_THEME_SECONDARY1);
+  etx_line_color(nullptr, COLOR_THEME_SECONDARY1_INDEX);
+  etx_line_color_from_flags(nullptr, COLOR_THEME_SECONDARY1);
+  etx_img_color(nullptr, COLOR_THEME_SECONDARY1_INDEX);
+  etx_std_ctrl_colors(nullptr);
+  etx_keyboard_key_colors(nullptr);
+  etx_std_settings(nullptr, LV_PART_MAIN);
+  etx_btn_style(nullptr);
+  etx_padding(nullptr, PAD_ZERO);
+  etx_std_style(nullptr);
+  etx_scrollbar(nullptr);
+  return true;
+}
 #endif
 
 void etx_solid_bg(lv_obj_t* obj, LcdColorIndex bg_color,
                   lv_style_selector_t selector)
 {
+  if (!obj) return;
   etx_bg_color(obj, bg_color, selector);
   etx_obj_add_style(obj, styles->bg_opacity_cover, selector);
 }
 
 void etx_font(lv_obj_t* obj, FontIndex fontIdx, lv_style_selector_t selector)
 {
+  if (!obj) return;
+
   const auto fontCount = static_cast<int>(std::size(styles->font));
   if (fontIdx < FONT_STD_INDEX || fontIdx >= fontCount) {
     fontIdx = FONT_STD_INDEX;
@@ -481,6 +511,8 @@ void etx_font(lv_obj_t* obj, FontIndex fontIdx, lv_style_selector_t selector)
 
 void etx_remove_bg_color(lv_obj_t* obj, lv_style_selector_t selector)
 {
+  if (!obj) return;
+
   // Remove styles
   for (int i = 0; i < TOTAL_COLOR_COUNT; i += 1)
     lv_obj_remove_style(obj, &styles->bg_color[i], selector);
@@ -489,6 +521,8 @@ void etx_remove_bg_color(lv_obj_t* obj, lv_style_selector_t selector)
 void etx_bg_color(lv_obj_t* obj, LcdColorIndex colorIdx,
                   lv_style_selector_t selector)
 {
+  if (!obj) return;
+
   // Remove old style first
   etx_remove_bg_color(obj, selector);
   etx_obj_add_style(obj, styles->bg_color[colorIdx], selector);
@@ -497,6 +531,8 @@ void etx_bg_color(lv_obj_t* obj, LcdColorIndex colorIdx,
 void etx_bg_color_from_flags(lv_obj_t* obj, LcdFlags colorFlags,
                              lv_style_selector_t selector)
 {
+  if (!obj) return;
+
   if (colorFlags & RGB_FLAG) {
     etx_remove_bg_color(obj, selector);
     lv_obj_set_style_bg_color(obj,
@@ -509,6 +545,8 @@ void etx_bg_color_from_flags(lv_obj_t* obj, LcdFlags colorFlags,
 
 void etx_remove_txt_color(lv_obj_t* obj, lv_style_selector_t selector)
 {
+  if (!obj) return;
+
   // Remove styles
   for (int i = 0; i < TOTAL_COLOR_COUNT; i += 1)
     lv_obj_remove_style(obj, &styles->txt_color[i], selector);
@@ -517,6 +555,8 @@ void etx_remove_txt_color(lv_obj_t* obj, lv_style_selector_t selector)
 void etx_txt_color(lv_obj_t* obj, LcdColorIndex colorIdx,
                    lv_style_selector_t selector)
 {
+  if (!obj) return;
+
   // Remove old style first
   etx_remove_txt_color(obj, selector);
   etx_obj_add_style(obj, styles->txt_color[colorIdx], selector);
@@ -525,6 +565,8 @@ void etx_txt_color(lv_obj_t* obj, LcdColorIndex colorIdx,
 void etx_txt_color_from_flags(lv_obj_t* obj, LcdFlags colorFlags,
                               lv_style_selector_t selector)
 {
+  if (!obj) return;
+
   if (colorFlags & RGB_FLAG) {
     etx_remove_txt_color(obj, selector);
     lv_obj_set_style_text_color(obj,
@@ -537,6 +579,8 @@ void etx_txt_color_from_flags(lv_obj_t* obj, LcdFlags colorFlags,
 
 void etx_remove_border_color(lv_obj_t* obj, lv_style_selector_t selector)
 {
+  if (!obj) return;
+
   // Remove styles
   for (int i = 0; i < TOTAL_COLOR_COUNT; i += 1)
     lv_obj_remove_style(obj, &styles->border_color[i], selector);
@@ -545,6 +589,8 @@ void etx_remove_border_color(lv_obj_t* obj, lv_style_selector_t selector)
 void etx_border_color(lv_obj_t* obj, LcdColorIndex colorIdx,
                    lv_style_selector_t selector)
 {
+  if (!obj) return;
+
   // Remove old style first
   etx_remove_border_color(obj, selector);
   etx_obj_add_style(obj, styles->border_color[colorIdx], selector);
@@ -552,6 +598,8 @@ void etx_border_color(lv_obj_t* obj, LcdColorIndex colorIdx,
 
 void etx_remove_arc_color(lv_obj_t* obj, lv_style_selector_t selector)
 {
+  if (!obj) return;
+
   // Remove styles
   for (int i = 0; i < TOTAL_COLOR_COUNT; i += 1)
     lv_obj_remove_style(obj, &styles->arc_color[i], selector);
@@ -560,6 +608,8 @@ void etx_remove_arc_color(lv_obj_t* obj, lv_style_selector_t selector)
 void etx_arc_color(lv_obj_t* obj, LcdColorIndex colorIdx,
                   lv_style_selector_t selector)
 {
+  if (!obj) return;
+
   // Remove old style first
   etx_remove_arc_color(obj, selector);
   etx_obj_add_style(obj, styles->arc_color[colorIdx], selector);
@@ -568,6 +618,8 @@ void etx_arc_color(lv_obj_t* obj, LcdColorIndex colorIdx,
 void etx_arc_color_from_flags(lv_obj_t* obj, LcdFlags colorFlags,
                              lv_style_selector_t selector)
 {
+  if (!obj) return;
+
   if (colorFlags & RGB_FLAG) {
     etx_remove_arc_color(obj, selector);
     lv_obj_set_style_arc_color(obj,
@@ -580,6 +632,8 @@ void etx_arc_color_from_flags(lv_obj_t* obj, LcdFlags colorFlags,
 
 void etx_remove_line_color(lv_obj_t* obj, lv_style_selector_t selector)
 {
+  if (!obj) return;
+
   // Remove styles
   for (int i = 0; i < TOTAL_COLOR_COUNT; i += 1)
     lv_obj_remove_style(obj, &styles->line_color[i], selector);
@@ -588,6 +642,8 @@ void etx_remove_line_color(lv_obj_t* obj, lv_style_selector_t selector)
 void etx_line_color(lv_obj_t* obj, LcdColorIndex colorIdx,
                   lv_style_selector_t selector)
 {
+  if (!obj) return;
+
   // Remove old style first
   etx_remove_line_color(obj, selector);
   etx_obj_add_style(obj, styles->line_color[colorIdx], selector);
@@ -596,6 +652,8 @@ void etx_line_color(lv_obj_t* obj, LcdColorIndex colorIdx,
 void etx_line_color_from_flags(lv_obj_t* obj, LcdFlags colorFlags,
                              lv_style_selector_t selector)
 {
+  if (!obj) return;
+
   if (colorFlags & RGB_FLAG) {
     etx_remove_line_color(obj, selector);
     lv_obj_set_style_line_color(obj,
@@ -608,6 +666,8 @@ void etx_line_color_from_flags(lv_obj_t* obj, LcdFlags colorFlags,
 
 void etx_remove_img_color(lv_obj_t* obj, lv_style_selector_t selector)
 {
+  if (!obj) return;
+
   // Remove styles
   for (int i = 0; i < TOTAL_COLOR_COUNT; i += 1)
     lv_obj_remove_style(obj, &styles->img_color[i], selector);
@@ -616,6 +676,8 @@ void etx_remove_img_color(lv_obj_t* obj, lv_style_selector_t selector)
 void etx_img_color(lv_obj_t* obj, LcdColorIndex colorIdx,
                    lv_style_selector_t selector)
 {
+  if (!obj) return;
+
   // Remove old style first
   etx_remove_img_color(obj, selector);
   etx_obj_add_style(obj, styles->img_color[colorIdx], selector);
@@ -623,6 +685,8 @@ void etx_img_color(lv_obj_t* obj, LcdColorIndex colorIdx,
 
 void etx_std_ctrl_colors(lv_obj_t* obj, lv_style_selector_t selector)
 {
+  if (!obj) return;
+
   etx_solid_bg(obj, COLOR_THEME_PRIMARY2_INDEX, selector);
   etx_txt_color(obj, COLOR_THEME_SECONDARY1_INDEX, selector);
 
@@ -655,6 +719,8 @@ void etx_std_ctrl_colors(lv_obj_t* obj, lv_style_selector_t selector)
 
 void etx_keyboard_key_colors(lv_obj_t* obj, lv_style_selector_t selector)
 {
+  if (!obj) return;
+
   etx_std_style(obj, selector, PAD_SMALL);
   etx_txt_color(obj, COLOR_THEME_PRIMARY1_INDEX, selector);
 
@@ -689,6 +755,8 @@ void etx_keyboard_key_colors(lv_obj_t* obj, lv_style_selector_t selector)
 
 void etx_std_settings(lv_obj_t* obj, lv_style_selector_t selector)
 {
+  if (!obj) return;
+
   etx_obj_add_style(obj, styles->border, selector);
   etx_obj_add_style(obj, styles->border_color[COLOR_THEME_SECONDARY2_INDEX], selector);
   etx_obj_add_style(obj, styles->rounded, selector);
@@ -699,6 +767,8 @@ void etx_std_settings(lv_obj_t* obj, lv_style_selector_t selector)
 
 void etx_btn_style(lv_obj_t* obj, lv_style_selector_t selector)
 {
+  if (!obj) return;
+
   etx_std_settings(obj, selector);
   etx_std_ctrl_colors(obj, selector);
   etx_obj_add_style(obj, styles->pad_button, selector);
@@ -707,6 +777,8 @@ void etx_btn_style(lv_obj_t* obj, lv_style_selector_t selector)
 void etx_padding(lv_obj_t* obj, PaddingSize padding,
                  lv_style_selector_t selector)
 {
+  if (!obj) return;
+
   lv_obj_remove_style(obj, (lv_style_t*)&styles->pad_tiny, selector);
   lv_obj_remove_style(obj, (lv_style_t*)&styles->pad_small, selector);
   lv_obj_remove_style(obj, (lv_style_t*)&styles->pad_medium, selector);
@@ -735,6 +807,8 @@ void etx_padding(lv_obj_t* obj, PaddingSize padding,
 void etx_std_style(lv_obj_t* obj, lv_style_selector_t selector,
                    PaddingSize padding)
 {
+  if (!obj) return;
+
   etx_std_settings(obj, selector);
   etx_std_ctrl_colors(obj, selector);
   etx_padding(obj, padding, selector);
@@ -742,6 +816,8 @@ void etx_std_style(lv_obj_t* obj, lv_style_selector_t selector,
 
 void etx_scrollbar(lv_obj_t* obj)
 {
+  if (!obj) return;
+
   etx_obj_add_style(obj, styles->scrollbar, LV_PART_SCROLLBAR);
   etx_obj_add_style(obj, styles->bg_color[COLOR_GREY_INDEX], LV_PART_SCROLLBAR);
   etx_obj_add_style(obj, styles->bg_opacity_cover,
