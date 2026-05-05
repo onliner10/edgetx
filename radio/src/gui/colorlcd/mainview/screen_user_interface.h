@@ -34,9 +34,6 @@ class ScreenUserInterfacePage : public PageGroupItem
 
   void build(Window* window) override;
 
-  static LAYOUT_VAL_SCALED(WWBTN_W, 60)
-
  protected:
-  Choice* widths[MAX_TOPBAR_ZONES];
   ThemeView* themeView = nullptr;
 };

@@ -176,28 +176,25 @@ void postModelLoad(bool alarms)
   if (!g_model.hasScreenData(0))
     LayoutFactory::loadDefaultLayout();
 
-  if (g_model.topbarWidgetWidth[0] == 0) {
+  if (g_eeGeneral.topbarWidgetWidth[0] == 0) {
     // Set default width for top bar widgets
     for (int i = 0; i < MAX_TOPBAR_ZONES; i += 1)
-      g_model.topbarWidgetWidth[i] = 1;
+      g_eeGeneral.topbarWidgetWidth[i] = 1;
 
-    // Load 'date time' widget if slot is empty
-    if (!g_model.getTopbarData()->hasWidget(MAX_TOPBAR_ZONES-1)) {
-      g_model.getTopbarData()->setWidgetName(MAX_TOPBAR_ZONES-1, "Date Time");
-      storageDirty(EE_MODEL);
+    // Load the default topbar as an ordered list: flexible model identity on
+    // the left, then flight-critical status on the right.
+    if (!g_eeGeneral.getTopbarData()->hasWidget(0)) {
+      g_eeGeneral.getTopbarData()->setWidgetName(0, "ModelBmp");
+      storageDirty(EE_GENERAL);
     }
-    // Load 'radio info' widget if slot is empty
-    if (!g_model.getTopbarData()->hasWidget(MAX_TOPBAR_ZONES-2)) {
-      g_model.getTopbarData()->setWidgetName(MAX_TOPBAR_ZONES-2, "Radio Info");
-      storageDirty(EE_MODEL);
+    if (!g_eeGeneral.getTopbarData()->hasWidget(1)) {
+      g_eeGeneral.getTopbarData()->setWidgetName(1, "Link");
+      storageDirty(EE_GENERAL);
     }
-#if defined(INTERNAL_GPS)
-    // Load 'internal gps' widget if slot is empty
-    if (!g_model.getTopbarData()->hasWidget(MAX_TOPBAR_ZONES-3)) {
-      g_model.getTopbarData()->setWidgetName(MAX_TOPBAR_ZONES-3, "Internal GPS");
-      storageDirty(EE_MODEL);
+    if (!g_eeGeneral.getTopbarData()->hasWidget(2)) {
+      g_eeGeneral.getTopbarData()->setWidgetName(2, "TX Battery");
+      storageDirty(EE_GENERAL);
     }
-#endif
   }
 #elif LCD_W == 128
   // Prevent GVARS to be off when imported or manually modified yaml

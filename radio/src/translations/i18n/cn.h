@@ -728,6 +728,8 @@
 #define TR_LABEL_MODEL                 "模型标签"
 #define TR_MOVE_UP                     "上移"
 #define TR_MOVE_DOWN                   "下移"
+#define TR_MOVE_LEFT                   "Move left"
+#define TR_MOVE_RIGHT                  "Move right"
 #define TR_ENTER_LABEL                 "输入分组名称"
 #define TR_LABEL                       "分组"
 #define TR_LABELS                      "分组"

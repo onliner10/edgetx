@@ -727,6 +727,8 @@
 #define TR_LABEL_MODEL                 "Štítek modelu"
 #define TR_MOVE_UP                     "Posunout nahoru"
 #define TR_MOVE_DOWN                   "Posunout dolů"
+#define TR_MOVE_LEFT                   "Move left"
+#define TR_MOVE_RIGHT                  "Move right"
 #define TR_ENTER_LABEL                 "Vložit štítek"
 #define TR_LABEL                       "Štítek"
 #define TR_LABELS                      "Štítky"

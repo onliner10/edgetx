@@ -722,6 +722,8 @@
 #define TR_LABEL_MODEL         "Etykietuj model"
 #define TR_MOVE_UP             "Wyżej"
 #define TR_MOVE_DOWN           "Niżej"
+#define TR_MOVE_LEFT                   "Move left"
+#define TR_MOVE_RIGHT                  "Move right"
 #define TR_ENTER_LABEL         "Wpisz etykietę"
 #define TR_LABEL               "Etykieta"
 #define TR_LABELS              "Etykiety"

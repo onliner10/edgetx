@@ -62,8 +62,10 @@ class ColorBar : public FormField
                         nullptr);
 
     etx_std_style(lvobj, LV_PART_MAIN, PAD_ZERO);
-    etx_obj_add_style(lvobj, styles->border_color[COLOR_THEME_EDIT_INDEX], LV_PART_MAIN | LV_STATE_EDITED);
-    etx_obj_add_style(lvobj, styles->outline_color_edit, LV_PART_MAIN | LV_STATE_EDITED);
+    etx_obj_add_style(lvobj, styles->border_color[COLOR_THEME_PRIMARY1_INDEX],
+                      LV_PART_MAIN | LV_STATE_EDITED);
+    etx_obj_add_style(lvobj, styles->state_edit_frame,
+                      LV_PART_MAIN | LV_STATE_EDITED);
   }
 
   int valueToScreen(int val)

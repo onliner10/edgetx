@@ -827,15 +827,15 @@ PACK(struct ModelData {
 #if defined(COLORLCD)
 #if defined(YAML_GENERATOR)
   NOBACKUP(CustomScreenData screenData[MAX_CUSTOM_SCREENS]) FUNC(screen_is_active);
-  NOBACKUP(TopBarPersistentData topbarData) FUNC(isAlwaysActive);
 #endif
-  NOBACKUP(uint8_t topbarWidgetWidth[MAX_TOPBAR_ZONES]);
+  // Legacy model top bar fields are intentionally unused by the UI. The
+  // radio-wide top bar lives in RadioData.
+  NOBACKUP(uint8_t topbarWidgetWidth[MAX_TOPBAR_ZONES]) SKIP;
   NOBACKUP(uint8_t view);
 
   void resetScreenData();
   const char* getScreenLayoutId(int screenNum);
   void setScreenLayoutId(int screenNum, const char* s);
-  TopBarPersistentData* getTopbarData();
   bool hasScreenData(int screenNum);
   CustomScreenData* getScreenData(int screenNum);
   LayoutPersistentData* getScreenLayoutData(int screenNum);
@@ -1176,6 +1176,10 @@ PACK(struct RadioData {
 #if defined(COLORLCD)
   NOBACKUP(KeyShortcut keyShortcuts[MAX_KEY_SHORTCUTS]);
   NOBACKUP(QMFavorite qmFavorites[MAX_QM_FAVORITES]);
+#if defined(YAML_GENERATOR)
+  NOBACKUP(TopBarPersistentData topbarData) FUNC(isAlwaysActive);
+#endif
+  NOBACKUP(uint8_t topbarWidgetWidth[MAX_TOPBAR_ZONES]);
 #endif
 
   NOBACKUP(uint8_t getBrightness() const
@@ -1207,6 +1211,7 @@ PACK(struct RadioData {
 #endif
 
 #if defined(COLORLCD) && !defined(BACKUP)
+  TopBarPersistentData* getTopbarData();
   int getKeyShortcutNum(event_t event);
   event_t getKeyShortcutEvent(int n);
   QMPage getKeyShortcut(event_t event);

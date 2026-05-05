@@ -83,6 +83,7 @@ class Widget : public ButtonBase
   const WidgetOption* getOptionDefinitions() const;
   bool hasOptions() const { return getOptionDefinitions() && getOptionDefinitions()->name; }
   bool isTopBarWidget() const { return parent && parent->isTopBar(); }
+  bool isMainViewWidget() const { return !isTopBarWidget(); }
   bool isCompactTopBarWidget() const
   {
     return isTopBarWidget() && height() <= EdgeTxStyles::MENU_HEADER_HEIGHT;
@@ -137,6 +138,11 @@ class Widget : public ButtonBase
   lv_obj_t* focusBorder = nullptr;
   lv_style_t borderStyle;
   lv_point_t borderPts[5];
+
+  static FontIndex responsiveTextFont(coord_t height);
+  static void layoutTextLabel(lv_obj_t* label, const rect_t& rect,
+                              FontIndex font, coord_t xOffset = 0,
+                              coord_t yOffset = 0);
 
   void onCancel() override;
   bool onLongPress() override;

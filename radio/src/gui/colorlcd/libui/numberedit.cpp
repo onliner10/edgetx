@@ -223,6 +223,28 @@ class NumberArea : public FormField
   }
 };
 
+static void sync_edit_overlay(Window* field, Window* overlay)
+{
+  lv_obj_t* fieldObj = field->getLvObj();
+  lv_obj_t* overlayObj = overlay->getLvObj();
+  lv_obj_t* fieldParent = lv_obj_get_parent(fieldObj);
+
+  if (!fieldParent) return;
+
+  lv_obj_update_layout(fieldParent);
+  lv_obj_add_flag(overlayObj, LV_OBJ_FLAG_IGNORE_LAYOUT);
+  if (lv_obj_get_parent(overlayObj) != fieldParent) {
+    lv_obj_set_parent(overlayObj, fieldParent);
+  }
+  overlay->setRect({
+      lv_obj_get_x(fieldObj),
+      lv_obj_get_y(fieldObj),
+      lv_obj_get_width(fieldObj),
+      lv_obj_get_height(fieldObj),
+  });
+  lv_obj_move_foreground(overlayObj);
+}
+
 /*
   The lv_textarea object is slow. To avoid too much overhead on views with multiple
   edit fields, the text area is initially displayed as a button. When the button
@@ -268,9 +290,7 @@ void NumberEdit::openEdit()
 {
   if (edit == nullptr) {
     edit = new (std::nothrow) NumberArea(
-        this,
-        {-(PAD_MEDIUM + 2), -(PAD_BORDER * 2),
-        lv_obj_get_width(lvobj), lv_obj_get_height(lvobj)});
+        this, {0, 0, width(), height()});
     if (!edit) return;
     edit->setChangeHandler([=]() {
       update();
@@ -280,9 +300,11 @@ void NumberEdit::openEdit()
       edit->hide();
     });
   }
+  sync_edit_overlay(this, edit);
   edit->update();
   edit->show();
   lv_group_focus_obj(edit->getLvObj());
+  lv_obj_add_state(edit->getLvObj(), LV_STATE_FOCUSED | LV_STATE_EDITED);
   lv_indev_type_t indev_type =
       lv_indev_get_type(lv_indev_get_act());
   if (indev_type == LV_INDEV_TYPE_POINTER) {
@@ -290,7 +312,6 @@ void NumberEdit::openEdit()
   } else {
     edit->directEdit();
   }
-  lv_obj_add_state(lvobj, LV_STATE_FOCUSED);
 }
 
 void NumberEdit::update()

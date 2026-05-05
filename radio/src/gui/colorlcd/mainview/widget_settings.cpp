@@ -35,7 +35,10 @@
 
 #include <new>
 
-#define SET_DIRTY() storageDirty(EE_MODEL)
+static void setWidgetStorageDirty(Widget* widget)
+{
+  storageDirty(widget && widget->isTopBarWidget() ? EE_GENERAL : EE_MODEL);
+}
 
 static const rect_t widgetSettingsDialogRect = {
     LCD_W / 10,              // x
@@ -62,6 +65,12 @@ WidgetSettings::WidgetSettings(Widget* w) :
   auto* widgetData = widget->getPersistentData();
 
   while (opt && opt->name != nullptr) {
+    if (opt->name[0] == '\0') {
+      optIdx++;
+      opt++;
+      continue;
+    }
+
     auto line = form->newLine(grid);
 
     new (std::nothrow) StaticText(
@@ -77,7 +86,7 @@ WidgetSettings::WidgetSettings(Widget* w) :
              },
              [=](int32_t newValue) {
                widgetData->setSignedValue(optIdx, newValue);
-               SET_DIRTY();
+               setWidgetStorageDirty(widget);
              })) {
           edit->setDefault(opt->deflt.signedValue);
         }
@@ -91,7 +100,7 @@ WidgetSettings::WidgetSettings(Widget* w) :
             },
             [=](int16_t newValue) {
               widgetData->setUnsignedValue(optIdx, (uint32_t)newValue);
-              SET_DIRTY();
+              setWidgetStorageDirty(widget);
             });
         break;
 
@@ -103,7 +112,7 @@ WidgetSettings::WidgetSettings(Widget* w) :
             },
             [=](int8_t newValue) {
               widgetData->setBoolValue(optIdx, newValue);
-              SET_DIRTY();
+              setWidgetStorageDirty(widget);
             });
         break;
 
@@ -112,6 +121,7 @@ WidgetSettings::WidgetSettings(Widget* w) :
                                            widgetData->getString(optIdx),
                                            [=](const char* s) {
                                              widgetData->setString(optIdx, s);
+                                             setWidgetStorageDirty(widget);
                                            });
         break;
 
@@ -123,7 +133,7 @@ WidgetSettings::WidgetSettings(Widget* w) :
             },
             [=](int newValue) {  // setValue
               widgetData->setUnsignedValue(optIdx, (uint32_t)newValue);
-              SET_DIRTY();
+              setWidgetStorageDirty(widget);
             });
         break;
 
@@ -135,7 +145,7 @@ WidgetSettings::WidgetSettings(Widget* w) :
             },
             [=](int newValue) {  // setValue
               widgetData->setUnsignedValue(optIdx, (uint32_t)newValue);
-              SET_DIRTY();
+              setWidgetStorageDirty(widget);
             });
         break;
 
@@ -148,7 +158,7 @@ WidgetSettings::WidgetSettings(Widget* w) :
             },
             [=](int newValue) {  // setValue
               widgetData->setUnsignedValue(optIdx, (uint32_t)newValue);
-              SET_DIRTY();
+              setWidgetStorageDirty(widget);
             });
 
         if (tmChoice) {
@@ -168,7 +178,7 @@ WidgetSettings::WidgetSettings(Widget* w) :
             },
             [=](int16_t newValue) {  // setValue
               widgetData->setSignedValue(optIdx, newValue);
-              SET_DIRTY();
+              setWidgetStorageDirty(widget);
             });
         break;
 
@@ -180,7 +190,7 @@ WidgetSettings::WidgetSettings(Widget* w) :
             },
             [=](uint32_t newValue) {  // setValue
               widgetData->setUnsignedValue(optIdx, newValue);
-              SET_DIRTY();
+              setWidgetStorageDirty(widget);
             });
         break;
 
@@ -192,7 +202,7 @@ WidgetSettings::WidgetSettings(Widget* w) :
             },
             [=](uint32_t newValue) {
               widgetData->setUnsignedValue(optIdx, newValue);
-              SET_DIRTY();
+              setWidgetStorageDirty(widget);
             });
         break;
 
@@ -204,7 +214,7 @@ WidgetSettings::WidgetSettings(Widget* w) :
             },
             [=](uint32_t newValue) {
               widgetData->setUnsignedValue(optIdx, newValue + 1);
-              SET_DIRTY();
+              setWidgetStorageDirty(widget);
             });
         break;
 
@@ -216,7 +226,7 @@ WidgetSettings::WidgetSettings(Widget* w) :
                                       },
                                       [=](std::string s) {
                                         widgetData->setString(optIdx, s.c_str());
-                                        SET_DIRTY();
+                                        setWidgetStorageDirty(widget);
                                       });
         break;
     }

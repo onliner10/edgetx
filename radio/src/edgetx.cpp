@@ -323,6 +323,7 @@ void generalDefault()
 
 #if defined(COLORLCD)
   g_eeGeneral.blOffBright = 20;
+  g_eeGeneral.getTopbarData()->clear();
 #endif
 
 #if defined(LCD_CONTRAST_DEFAULT)

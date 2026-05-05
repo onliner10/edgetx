@@ -727,6 +727,8 @@
 #define TR_LABEL_MODEL                 "モデルラベル"
 #define TR_MOVE_UP                     "上へ移動"
 #define TR_MOVE_DOWN                   "下へ移動"
+#define TR_MOVE_LEFT                   "Move left"
+#define TR_MOVE_RIGHT                  "Move right"
 #define TR_ENTER_LABEL                 "ラベル適用"
 #define TR_LABEL                       "ラベル"
 #define TR_LABELS                      "ラベル"

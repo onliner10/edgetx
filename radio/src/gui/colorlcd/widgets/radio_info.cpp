@@ -27,6 +27,660 @@
 #include "theme_manager.h"
 
 #include <new>
+#include <stdio.h>
+
+namespace {
+
+constexpr uint8_t LINK_BARS = 5;
+const uint8_t linkBarThresholds[LINK_BARS] = {30, 40, 50, 60, 80};
+
+struct StatusContentBox {
+  coord_t x;
+  coord_t y;
+  coord_t w;
+  coord_t h;
+};
+
+coord_t minCoord(coord_t a, coord_t b) { return a < b ? a : b; }
+coord_t maxCoord(coord_t a, coord_t b) { return a > b ? a : b; }
+
+coord_t clampCoord(coord_t value, coord_t low, coord_t high)
+{
+  if (value < low) return low;
+  if (value > high) return high;
+  return value;
+}
+
+FontIndex textFontForBox(const char* text, coord_t width, coord_t height)
+{
+  static const FontIndex candidates[] = {
+      FONT_XXL_INDEX, FONT_LXL_INDEX, FONT_XL_INDEX, FONT_L_INDEX,
+      FONT_BOLD_INDEX, FONT_STD_INDEX, FONT_XS_INDEX, FONT_XXS_INDEX};
+
+  for (auto font : candidates) {
+    LcdFlags flags = LcdFlags(font) << 8u;
+    if (getFontHeight(flags) <= height &&
+        getTextWidth(text, 0, flags) <= width) {
+      return font;
+    }
+  }
+
+  return FONT_XXS_INDEX;
+}
+
+FontIndex chipTextFontForBox(const char* text, coord_t width, coord_t height)
+{
+  static const FontIndex candidates[] = {
+      FONT_BOLD_INDEX, FONT_STD_INDEX, FONT_XS_INDEX, FONT_XXS_INDEX};
+
+  for (auto font : candidates) {
+    LcdFlags flags = LcdFlags(font) << 8u;
+    if (getFontHeight(flags) <= height &&
+        getTextWidth(text, 0, flags) <= width) {
+      return font;
+    }
+  }
+
+  return FONT_XXS_INDEX;
+}
+
+constexpr coord_t TOPBAR_CONTENT_PAD = PAD_TINY;
+
+StatusContentBox topbarContentBox(coord_t w, coord_t h)
+{
+  coord_t contentW = w > 2 * TOPBAR_CONTENT_PAD
+                         ? w - 2 * TOPBAR_CONTENT_PAD
+                         : maxCoord(w, (coord_t)1);
+  coord_t contentH = h > 2 * TOPBAR_CONTENT_PAD
+                         ? h - 2 * TOPBAR_CONTENT_PAD
+                         : maxCoord(h, (coord_t)1);
+  return {TOPBAR_CONTENT_PAD, TOPBAR_CONTENT_PAD, contentW, contentH};
+}
+
+lv_obj_t* makeStatusPart(lv_obj_t* parent)
+{
+  auto obj = lv_obj_create(parent);
+  if (!obj) return nullptr;
+
+  lv_obj_remove_style_all(obj);
+  lv_obj_clear_flag(obj, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_PART_MAIN);
+  lv_obj_set_style_border_opa(obj, LV_OPA_COVER, LV_PART_MAIN);
+  return obj;
+}
+
+LcdColorIndex statusPrimaryColor(bool topbar)
+{
+  return topbar ? COLOR_THEME_PRIMARY2_INDEX : COLOR_THEME_SECONDARY1_INDEX;
+}
+
+LcdColorIndex statusMutedColor(bool topbar)
+{
+  return topbar ? COLOR_THEME_SECONDARY2_INDEX : COLOR_THEME_SECONDARY2_INDEX;
+}
+
+void setStatusPartColor(lv_obj_t* obj, LcdColorIndex color)
+{
+  if (!obj) return;
+  etx_solid_bg(obj, color);
+}
+
+void setStatusPartBorder(lv_obj_t* obj, LcdColorIndex color, coord_t width)
+{
+  if (!obj) return;
+  etx_border_color(obj, color);
+  lv_obj_set_style_border_width(obj, width, LV_PART_MAIN);
+}
+
+void setStatusLabel(lv_obj_t* label, const char* text, LcdColorIndex color,
+                    FontIndex font, coord_t x, coord_t y, coord_t w, coord_t h)
+{
+  if (!label) return;
+
+  etx_font(label, font);
+  etx_txt_color(label, color);
+  lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
+  lv_label_set_text(label, text);
+  lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+  lv_obj_set_pos(label, x, y);
+  lv_obj_set_size(label, w, h);
+}
+
+void setLvVisible(lv_obj_t* obj, bool visible)
+{
+  if (!obj) return;
+  if (visible)
+    lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
+  else
+    lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+}
+
+uint8_t activeLinkBars(uint8_t rssi)
+{
+  uint8_t bars = 0;
+  for (uint8_t i = 0; i < LINK_BARS; i += 1) {
+    if (rssi >= linkBarThresholds[i]) bars = i + 1;
+  }
+  return bars;
+}
+
+bool linkWarning(uint8_t rssi)
+{
+  return rssi > 0 && rssi < (uint8_t)g_model.rfAlarms.warning;
+}
+
+uint8_t speakerVolumeLevel()
+{
+#if defined(AUDIO)
+  if (requiredSpeakerVolume == 0 || g_eeGeneral.beepMode == e_mode_quiet)
+    return 0;
+  if (requiredSpeakerVolume < 7)
+    return 1;
+  if (requiredSpeakerVolume < 13)
+    return 2;
+  if (requiredSpeakerVolume < 19)
+    return 3;
+  return 4;
+#else
+  return 0;
+#endif
+}
+
+uint8_t speakerVolumePercent()
+{
+#if defined(AUDIO)
+  if (g_eeGeneral.beepMode == e_mode_quiet) return 0;
+  return divRoundClosest((uint16_t)requiredSpeakerVolume * 100, VOLUME_LEVEL_MAX);
+#else
+  return 0;
+#endif
+}
+
+}  // namespace
+
+class LinkStatusWidget : public Widget
+{
+ public:
+  LinkStatusWidget(const WidgetFactory* factory, Window* parent,
+                   const rect_t& rect, int screenNum, int zoneNum) :
+      Widget(factory, parent, rect, screenNum, zoneNum)
+  {
+    for (uint8_t i = 0; i < LINK_BARS; i += 1) {
+      bars[i] = makeStatusPart(lvobj);
+      if (bars[i]) lv_obj_set_style_radius(bars[i], 1, LV_PART_MAIN);
+    }
+
+    title = etx_label_create(lvobj, FONT_XXS_INDEX);
+    value = etx_label_create(lvobj, FONT_BOLD_INDEX);
+
+    update();
+    foreground();
+  }
+
+  void update() override
+  {
+    if (_deleted) return;
+
+    const bool topbar = isCompactTopBarWidget();
+    const coord_t pad = topbar ? TOPBAR_CONTENT_PAD : PAD_SMALL;
+    const coord_t labelW = width() > 2 * pad ? width() - 2 * pad : width();
+
+    setLvVisible(title, !topbar && height() >= 54);
+    setLvVisible(value, !topbar);
+
+    coord_t graphX = pad;
+    coord_t graphY = pad;
+    coord_t graphW = width() > 2 * pad ? width() - 2 * pad : width();
+    coord_t graphH = height() > 2 * pad ? height() - 2 * pad : height();
+
+    if (topbar) {
+      auto box = topbarContentBox(width(), height());
+      graphX = box.x;
+      graphY = box.y;
+      graphW = box.w;
+      graphH = box.h;
+    } else {
+      coord_t textW = maxCoord(labelW / 3, (coord_t)34);
+      if (width() > 110) {
+        graphW = minCoord((coord_t)(width() - textW - 3 * pad), (coord_t)58);
+      } else {
+        graphW = minCoord(graphW, (coord_t)58);
+      }
+      graphH = minCoord(graphH, height() >= 72 ? (coord_t)42 : (coord_t)32);
+      graphY = (height() - graphH) / 2;
+
+      coord_t textX = graphX + graphW + pad;
+      coord_t textRight = width() > pad ? width() - pad : width();
+      if (textX + 22 < textRight) {
+        coord_t textAreaW = textRight - textX;
+        coord_t titleH = height() >= 54 ? EdgeTxStyles::STD_FONT_HEIGHT / 2 : 0;
+        FontIndex valueFont = responsiveTextFont(height() - 2 * pad - titleH);
+        coord_t valueH = getFontHeight(LcdFlags(valueFont) << 8u);
+        coord_t textBlockH = titleH + valueH;
+        coord_t textY = (height() - textBlockH) / 2;
+
+        setStatusLabel(title, "LINK", COLOR_THEME_PRIMARY1_INDEX,
+                       FONT_XXS_INDEX, textX, textY, textAreaW, titleH);
+        setStatusLabel(value, "--", statusPrimaryColor(false), valueFont,
+                       textX, textY + titleH, textAreaW, valueH);
+      } else {
+        setLvVisible(title, false);
+        setLvVisible(value, false);
+      }
+    }
+
+    coord_t gap = topbar ? TOPBAR_CONTENT_PAD : PAD_THREE;
+    coord_t barW = (graphW - (LINK_BARS - 1) * gap) / LINK_BARS;
+    if (topbar)
+      barW = maxCoord(barW, (coord_t)1);
+    else
+      barW = clampCoord(barW, (coord_t)6, (coord_t)14);
+
+    for (uint8_t i = 0; i < LINK_BARS; i += 1) {
+      if (!bars[i]) continue;
+      coord_t barH = ((i + 1) * graphH + LINK_BARS - 1) / LINK_BARS;
+      if (i == 0) barH = maxCoord(barH, topbar ? (coord_t)8 : (coord_t)9);
+      lv_obj_set_pos(bars[i], graphX + i * (barW + gap),
+                     graphY + graphH - barH);
+      lv_obj_set_size(bars[i], barW, barH);
+    }
+
+    lastRSSI = 255;
+  }
+
+  void foreground() override
+  {
+    if (_deleted) return;
+
+    uint8_t rssi = TELEMETRY_RSSI();
+    if (rssi == lastRSSI) return;
+    lastRSSI = rssi;
+
+    bool topbar = isCompactTopBarWidget();
+    bool warning = linkWarning(rssi);
+    uint8_t active = activeLinkBars(rssi);
+    LcdColorIndex activeColor = warning ? COLOR_THEME_WARNING_INDEX
+                                        : statusPrimaryColor(topbar);
+    LcdColorIndex mutedColor = statusMutedColor(topbar);
+
+    for (uint8_t i = 0; i < LINK_BARS; i += 1) {
+      setStatusPartColor(bars[i], i < active ? activeColor : mutedColor);
+    }
+
+    if (value && !topbar) {
+      char text[8];
+      if (rssi == 0)
+        snprintf(text, sizeof(text), "--");
+      else
+        snprintf(text, sizeof(text), "%u", rssi);
+
+      FontIndex font = responsiveTextFont(height() - 2 * PAD_SMALL -
+                                          EdgeTxStyles::STD_FONT_HEIGHT / 2);
+      setStatusLabel(value, text,
+                     warning ? COLOR_THEME_WARNING_INDEX
+                             : statusPrimaryColor(false),
+                     font, lv_obj_get_x(value), lv_obj_get_y(value),
+                     lv_obj_get_width(value), lv_obj_get_height(value));
+    }
+  }
+
+ protected:
+  lv_obj_t* bars[LINK_BARS] = {};
+  lv_obj_t* title = nullptr;
+  lv_obj_t* value = nullptr;
+  uint8_t lastRSSI = 255;
+};
+
+BaseWidgetFactory<LinkStatusWidget> linkStatusWidget("Link", nullptr, "Link");
+
+class TxBatteryStatusWidget : public Widget
+{
+ public:
+  TxBatteryStatusWidget(const WidgetFactory* factory, Window* parent,
+                        const rect_t& rect, int screenNum, int zoneNum) :
+      Widget(factory, parent, rect, screenNum, zoneNum)
+  {
+    shell = makeStatusPart(lvobj);
+    fill = makeStatusPart(lvobj);
+    cap = makeStatusPart(lvobj);
+    title = etx_label_create(lvobj, FONT_XXS_INDEX);
+    value = etx_label_create(lvobj, FONT_BOLD_INDEX);
+
+    if (shell) {
+      lv_obj_set_style_bg_opa(shell, LV_OPA_TRANSP, LV_PART_MAIN);
+      lv_obj_set_style_radius(shell, 3, LV_PART_MAIN);
+    }
+    if (fill) lv_obj_set_style_radius(fill, 2, LV_PART_MAIN);
+    if (cap) lv_obj_set_style_radius(cap, 1, LV_PART_MAIN);
+
+    update();
+    foreground();
+  }
+
+  void update() override
+  {
+    if (_deleted) return;
+
+    const bool topbar = isCompactTopBarWidget();
+    const coord_t pad = topbar ? TOPBAR_CONTENT_PAD : PAD_SMALL;
+
+    setLvVisible(title, !topbar && height() >= 54);
+    setLvVisible(value, !topbar);
+
+    coord_t capW = PAD_THREE;
+    coord_t battW = 0;
+    coord_t battH = 0;
+    coord_t battX = pad;
+    coord_t battY = 0;
+
+    if (topbar) {
+      auto box = topbarContentBox(width(), height());
+      capW = minCoord(PAD_THREE, maxCoord((coord_t)(box.w / 8), (coord_t)1));
+      battW = maxCoord((coord_t)(box.w - capW), (coord_t)1);
+      battH = minCoord(box.h, maxCoord((coord_t)(battW / 2), (coord_t)1));
+      battX = box.x;
+      battY = box.y + (box.h - battH) / 2;
+    } else {
+      battH = minCoord((coord_t)30, height() - 2 * pad);
+      battH = maxCoord(battH, (coord_t)18);
+      battW = minCoord((coord_t)58, width() - 3 * pad);
+      battW = maxCoord(battW, (coord_t)36);
+      battY = (height() - battH) / 2;
+
+      if (width() < 110) {
+        battW = minCoord(battW, (coord_t)(width() - 3 * pad));
+      }
+    }
+
+    if (shell) {
+      lv_obj_set_pos(shell, battX, battY);
+      lv_obj_set_size(shell, battW, battH);
+      setStatusPartBorder(shell, statusPrimaryColor(topbar), 2);
+    }
+    if (cap) {
+      lv_obj_set_pos(cap, battX + battW, battY + battH / 4);
+      lv_obj_set_size(cap, capW, battH / 2);
+    }
+
+    coord_t fillInset = PAD_THREE;
+    coord_t fillX = battX + fillInset;
+    coord_t fillY = battY + fillInset;
+    fillMaxW = battW > 2 * fillInset ? battW - 2 * fillInset : battW;
+    fillH = battH > 2 * fillInset ? battH - 2 * fillInset : battH;
+
+    if (fill) {
+      lv_obj_set_pos(fill, fillX, fillY);
+      lv_obj_set_size(fill, fillMaxW, fillH);
+    }
+
+    if (!topbar) {
+      coord_t textX = battX + battW + PAD_SMALL + 3;
+      coord_t textRight = width() > pad ? width() - pad : width();
+      if (textX + 24 < textRight) {
+        coord_t titleH = height() >= 54 ? EdgeTxStyles::STD_FONT_HEIGHT / 2 : 0;
+        FontIndex valueFont = responsiveTextFont(height() - 2 * pad - titleH);
+        coord_t valueH = getFontHeight(LcdFlags(valueFont) << 8u);
+        coord_t textBlockH = titleH + valueH;
+        coord_t textY = (height() - textBlockH) / 2;
+        coord_t textW = textRight - textX;
+
+        setStatusLabel(title, "TX BAT", COLOR_THEME_PRIMARY1_INDEX,
+                       FONT_XXS_INDEX, textX, textY, textW, titleH);
+        setStatusLabel(value, "", statusPrimaryColor(false), valueFont,
+                       textX, textY + titleH, textW, valueH);
+      } else {
+        setLvVisible(title, false);
+        setLvVisible(value, false);
+      }
+    }
+
+    lastBattBars = 255;
+    lastVoltage = 255;
+  }
+
+  void foreground() override
+  {
+    if (_deleted) return;
+
+    bool topbar = isCompactTopBarWidget();
+    bool warning = IS_TXBATT_WARNING();
+    uint8_t bars = GET_TXBATT_BARS(fillMaxW);
+    LcdColorIndex color = warning ? COLOR_THEME_WARNING_INDEX
+                                  : statusPrimaryColor(topbar);
+
+    setStatusPartBorder(shell, color, 2);
+    setStatusPartColor(cap, color);
+
+    if (bars != lastBattBars) {
+      lastBattBars = bars;
+      if (fill) {
+        lv_obj_set_size(fill, bars, fillH);
+      }
+    }
+    setStatusPartColor(fill, color);
+
+    if (value && !topbar && g_vbat100mV != lastVoltage) {
+      lastVoltage = g_vbat100mV;
+
+      char text[10];
+      snprintf(text, sizeof(text), "%u.%uV", g_vbat100mV / 10,
+               g_vbat100mV % 10);
+
+      setStatusLabel(value, text,
+                     warning ? COLOR_THEME_WARNING_INDEX
+                             : statusPrimaryColor(false),
+                     responsiveTextFont(height() - 2 * PAD_SMALL -
+                                        EdgeTxStyles::STD_FONT_HEIGHT / 2),
+                     lv_obj_get_x(value), lv_obj_get_y(value),
+                     lv_obj_get_width(value), lv_obj_get_height(value));
+    }
+  }
+
+ protected:
+  lv_obj_t* shell = nullptr;
+  lv_obj_t* fill = nullptr;
+  lv_obj_t* cap = nullptr;
+  lv_obj_t* title = nullptr;
+  lv_obj_t* value = nullptr;
+  coord_t fillMaxW = 1;
+  coord_t fillH = 1;
+  uint8_t lastBattBars = 255;
+  uint8_t lastVoltage = 255;
+};
+
+BaseWidgetFactory<TxBatteryStatusWidget> txBatteryStatusWidget("TX Battery",
+                                                               nullptr,
+                                                               "TX Battery");
+
+#if defined(AUDIO)
+
+class VolumeStatusWidget : public Widget
+{
+ public:
+  VolumeStatusWidget(const WidgetFactory* factory, Window* parent,
+                     const rect_t& rect, int screenNum, int zoneNum) :
+      Widget(factory, parent, rect, screenNum, zoneNum)
+  {
+    track = makeStatusPart(lvobj);
+    fill = makeStatusPart(lvobj);
+    if (track) lv_obj_set_style_radius(track, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+    if (fill) lv_obj_set_style_radius(fill, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+
+    capsuleLabel = etx_label_create(lvobj, FONT_BOLD_INDEX);
+    if (capsuleLabel) lv_label_set_long_mode(capsuleLabel, LV_LABEL_LONG_DOT);
+
+    title = etx_label_create(lvobj, FONT_XXS_INDEX);
+    value = etx_label_create(lvobj, FONT_BOLD_INDEX);
+
+    update();
+    foreground();
+  }
+
+  void update() override
+  {
+    if (_deleted) return;
+
+    const bool topbar = isCompactTopBarWidget();
+    const coord_t pad = topbar ? TOPBAR_CONTENT_PAD : PAD_SMALL;
+
+    setLvVisible(title, !topbar && height() >= 54);
+    setLvVisible(value, !topbar);
+    setLvVisible(capsuleLabel, topbar);
+    setLvVisible(track, true);
+    setLvVisible(fill, true);
+
+    StatusContentBox box = topbar ? topbarContentBox(width(), height())
+                                  : StatusContentBox{pad, pad,
+                                                     width() > 2 * pad
+                                                         ? width() - 2 * pad
+                                                         : width(),
+                                                     height() > 2 * pad
+                                                         ? height() - 2 * pad
+                                                         : height()};
+
+    coord_t trackX = box.x;
+    coord_t trackRight = box.x + box.w;
+    coord_t textX = 0;
+
+    if (!topbar && width() > 110) {
+      coord_t textW = maxCoord((coord_t)(box.w / 3), (coord_t)38);
+      trackRight = width() > pad + textW + PAD_SMALL
+                       ? width() - pad - textW - PAD_SMALL
+                       : trackRight;
+      textX = trackRight + PAD_SMALL;
+    }
+
+    trackMaxW = trackRight > trackX ? trackRight - trackX : 1;
+    trackH = topbar ? clampCoord((coord_t)(box.h / 4), PAD_THREE, PAD_LARGE)
+                    : clampCoord((coord_t)(box.h / 5), PAD_LARGE,
+                                 (coord_t)18);
+    coord_t trackY = topbar ? box.y + box.h - trackH
+                            : box.y + (box.h - trackH) / 2;
+
+    if (track) {
+      lv_obj_set_pos(track, trackX, trackY);
+      lv_obj_set_size(track, trackMaxW, trackH);
+    }
+
+    coord_t fillX = trackX;
+    coord_t fillY = trackY;
+    fillMaxW = trackMaxW;
+    fillH = trackH;
+
+    if (fill) {
+      lv_obj_set_pos(fill, fillX, fillY);
+      lv_obj_set_size(fill, fillMaxW, fillH);
+    }
+    if (topbar && capsuleLabel) {
+      coord_t textW = trackMaxW > 2 * PAD_TINY
+                          ? trackMaxW - 2 * PAD_TINY
+                          : trackMaxW;
+      coord_t textX = trackX + PAD_TINY;
+      coord_t labelAreaH = trackY > box.y ? trackY - box.y : box.h;
+      FontIndex font = chipTextFontForBox("VOL", textW, labelAreaH);
+      coord_t labelH = getFontHeight(LcdFlags(font) << 8u);
+      coord_t labelY = box.y + (labelAreaH - labelH) / 2;
+
+      etx_font(capsuleLabel, font);
+      etx_txt_color(capsuleLabel, statusPrimaryColor(topbar));
+      lv_obj_set_style_text_align(capsuleLabel, LV_TEXT_ALIGN_CENTER,
+                                  LV_PART_MAIN);
+      lv_obj_set_pos(capsuleLabel, textX, labelY);
+      lv_obj_set_size(capsuleLabel, textW, labelH);
+    }
+
+    if (!topbar && textX > 0) {
+      coord_t textRight = width() > pad ? width() - pad : width();
+      if (textX + 24 < textRight) {
+        coord_t titleH = height() >= 54 ? EdgeTxStyles::STD_FONT_HEIGHT / 2 : 0;
+        FontIndex valueFont = responsiveTextFont(height() - 2 * pad - titleH);
+        coord_t valueH = getFontHeight(LcdFlags(valueFont) << 8u);
+        coord_t textBlockH = titleH + valueH;
+        coord_t textY = (height() - textBlockH) / 2;
+        coord_t textW = textRight - textX;
+
+        setStatusLabel(title, "VOL", COLOR_THEME_PRIMARY1_INDEX,
+                       FONT_XXS_INDEX, textX, textY, textW, titleH);
+        setStatusLabel(value, "", statusPrimaryColor(false), valueFont,
+                       textX, textY + titleH, textW, valueH);
+      } else {
+        setLvVisible(title, false);
+        setLvVisible(value, false);
+      }
+    } else if (!topbar) {
+      setLvVisible(title, false);
+      setLvVisible(value, false);
+    }
+
+    lastLevel = 255;
+    lastPercent = 255;
+  }
+
+  void foreground() override
+  {
+    if (_deleted) return;
+
+    bool topbar = isCompactTopBarWidget();
+    uint8_t level = speakerVolumeLevel();
+    uint8_t percent = speakerVolumePercent();
+    if (level == lastLevel && percent == lastPercent) return;
+
+    lastLevel = level;
+    lastPercent = percent;
+
+    setStatusPartColor(track, statusMutedColor(topbar));
+
+    coord_t fillW = percent > 0
+                        ? maxCoord((coord_t)1,
+                                   (coord_t)divRoundClosest(
+                                       (uint16_t)fillMaxW * percent, 100))
+                        : 0;
+    if (fillW > fillMaxW) fillW = fillMaxW;
+
+    setLvVisible(fill, level > 0 && fillW > 0);
+    if (fill) {
+      lv_obj_set_size(fill, fillW, fillH);
+      setStatusPartColor(fill, statusPrimaryColor(topbar));
+    }
+
+    if (topbar && capsuleLabel) lv_label_set_text(capsuleLabel, "VOL");
+
+    if (value && !topbar) {
+      char text[10];
+      if (level == 0)
+        snprintf(text, sizeof(text), "MUTE");
+      else
+        snprintf(text, sizeof(text), "%u%%", percent);
+
+      setStatusLabel(value, text,
+                     level == 0 ? COLOR_THEME_DISABLED_INDEX
+                                : statusPrimaryColor(false),
+                     responsiveTextFont(height() - 2 * PAD_SMALL -
+                                        EdgeTxStyles::STD_FONT_HEIGHT / 2),
+                     lv_obj_get_x(value), lv_obj_get_y(value),
+                     lv_obj_get_width(value), lv_obj_get_height(value));
+    }
+  }
+
+ protected:
+  lv_obj_t* track = nullptr;
+  lv_obj_t* fill = nullptr;
+  lv_obj_t* capsuleLabel = nullptr;
+  lv_obj_t* title = nullptr;
+  lv_obj_t* value = nullptr;
+  coord_t trackMaxW = 1;
+  coord_t trackH = 1;
+  coord_t fillMaxW = 1;
+  coord_t fillH = 1;
+  uint8_t lastLevel = 255;
+  uint8_t lastPercent = 255;
+};
+
+BaseWidgetFactory<VolumeStatusWidget> volumeStatusWidget("Volume", nullptr,
+                                                         STR_VOLUME);
+
+#endif
 
 class RadioInfoWidget : public Widget
 {
@@ -35,6 +689,8 @@ class RadioInfoWidget : public Widget
                   int screenNum, int zoneNum) :
       Widget(factory, parent, rect, screenNum, zoneNum)
   {
+    bool compact = isCompactTopBarWidget();
+
     // Logs
     logsIcon = new (std::nothrow) StaticIcon(this, W_LOG_X, PAD_THREE, ICON_DOT,
                                              COLOR_THEME_PRIMARY2_INDEX);
@@ -46,65 +702,80 @@ class RadioInfoWidget : public Widget
     if (usbIcon) usbIcon->hide();
 
 #if defined(AUDIO)
-    audioScale = new (std::nothrow) StaticIcon(this, W_AUDIO_SCALE_X, PAD_TINY,
-                                               ICON_TOPMENU_VOLUME_SCALE,
-                                               COLOR_THEME_SECONDARY2_INDEX);
+    if (!compact) {
+      audioScale = new (std::nothrow) StaticIcon(this, W_AUDIO_SCALE_X, PAD_TINY,
+                                                 ICON_TOPMENU_VOLUME_SCALE,
+                                                 COLOR_THEME_SECONDARY2_INDEX);
 
-    for (int i = 0; i < 5; i += 1) {
-      audioVol[i] = new (std::nothrow) StaticIcon(
-          this, W_AUDIO_X, PAD_TINY,
-         (EdgeTxIcon)(ICON_TOPMENU_VOLUME_0 + i),
-          COLOR_THEME_PRIMARY2_INDEX);
-      if (audioVol[i]) audioVol[i]->hide();
+      for (int i = 0; i < 5; i += 1) {
+        audioVol[i] = new (std::nothrow) StaticIcon(
+            this, W_AUDIO_X, PAD_TINY,
+           (EdgeTxIcon)(ICON_TOPMENU_VOLUME_0 + i),
+            COLOR_THEME_PRIMARY2_INDEX);
+        if (audioVol[i]) audioVol[i]->hide();
+      }
+      if (audioVol[0]) audioVol[0]->show();
     }
-    if (audioVol[0]) audioVol[0]->show();
 #endif
 
-    batteryIcon = new (std::nothrow) StaticIcon(this, W_AUDIO_X, W_BATT_Y,
-                                                ICON_TOPMENU_TXBATT,
-                                                COLOR_THEME_PRIMARY2_INDEX);
+    if (!compact) {
+      batteryIcon = new (std::nothrow) StaticIcon(this, W_AUDIO_X, W_BATT_Y,
+                                                  ICON_TOPMENU_TXBATT,
+                                                  COLOR_THEME_PRIMARY2_INDEX);
+    }
 #if defined(USB_CHARGER)
-    batteryChargeIcon = new (std::nothrow) StaticIcon(
-        this, W_BATT_CHG_X, W_BATT_CHG_Y,
-        ICON_TOPMENU_TXBATT_CHARGE, COLOR_THEME_PRIMARY2_INDEX);
-    if (batteryChargeIcon) batteryChargeIcon->hide();
+    if (!compact) {
+      batteryChargeIcon = new (std::nothrow) StaticIcon(
+          this, W_BATT_CHG_X, W_BATT_CHG_Y,
+          ICON_TOPMENU_TXBATT_CHARGE, COLOR_THEME_PRIMARY2_INDEX);
+      if (batteryChargeIcon) batteryChargeIcon->hide();
+    }
 #endif
+
+    if (compact) {
+      batteryShell = lv_obj_create(lvobj);
+      if (batteryShell) {
+        lv_obj_clear_flag(batteryShell, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_style_bg_opa(batteryShell, LV_OPA_TRANSP, LV_PART_MAIN);
+        lv_obj_set_style_border_width(batteryShell, 2, LV_PART_MAIN);
+        lv_obj_set_style_border_opa(batteryShell, LV_OPA_COVER, LV_PART_MAIN);
+        lv_obj_set_style_border_color(batteryShell,
+                                      makeLvColor(COLOR_THEME_PRIMARY2),
+                                      LV_PART_MAIN);
+        lv_obj_set_style_radius(batteryShell, 2, LV_PART_MAIN);
+      }
+      batteryCap = lv_obj_create(lvobj);
+      if (batteryCap) {
+        lv_obj_clear_flag(batteryCap, LV_OBJ_FLAG_CLICKABLE);
+        etx_solid_bg(batteryCap, COLOR_THEME_PRIMARY2_INDEX);
+      }
+    }
 
 #if defined(INTERNAL_MODULE_PXX1) && defined(EXTERNAL_ANTENNA)
-    extAntenna = new (std::nothrow) StaticIcon(this, W_RSSI_X - PAD_SMALL, 1,
-                                               ICON_TOPMENU_ANTENNA,
-                                               COLOR_THEME_PRIMARY2_INDEX);
-    if (extAntenna) extAntenna->hide();
+    if (!compact) {
+      extAntenna = new (std::nothrow) StaticIcon(this, W_RSSI_X - PAD_SMALL, 1,
+                                                 ICON_TOPMENU_ANTENNA,
+                                                 COLOR_THEME_PRIMARY2_INDEX);
+      if (extAntenna) extAntenna->hide();
+    }
 #endif
 
     batteryFill = lv_obj_create(lvobj);
     if (batteryFill) {
-      lv_obj_set_pos(batteryFill, W_AUDIO_X + 1, W_BATT_Y + 1);
-      lv_obj_set_size(batteryFill, W_BATT_FILL_W, W_BATT_FILL_H);
       lv_obj_set_style_bg_opa(batteryFill, LV_OPA_COVER, LV_PART_MAIN);
     }
     update();
 
     // RSSI bars
-    LAYOUT_VAL_SCALED(RSSI_BH, 31)
-    const uint8_t rssiBarsHeight[] = {
-      (RSSI_BH * 5 + 15) / 31,
-      (RSSI_BH * 10 + 15) / 31,
-      (RSSI_BH * 15 + 15) / 31,
-      (RSSI_BH * 21 + 15) / 31,
-      RSSI_BH};
-    for (unsigned int i = 0; i < DIM(rssiBarsHeight); i++) {
-      uint8_t height = rssiBarsHeight[i];
+    for (unsigned int i = 0; i < DIM(rssiBars); i++) {
       rssiBars[i] = lv_obj_create(lvobj);
       if (rssiBars[i]) {
-        lv_obj_set_pos(rssiBars[i], W_RSSI_X + i * W_RSSI_BAR_SZ,
-                       W_RSSI_BAR_H - height);
-        lv_obj_set_size(rssiBars[i], W_RSSI_BAR_W, height);
         etx_solid_bg(rssiBars[i], COLOR_THEME_SECONDARY2_INDEX);
         etx_bg_color(rssiBars[i], COLOR_THEME_PRIMARY2_INDEX, LV_STATE_USER_1);
       }
     }
 
+    layoutStatus();
     foreground();
   }
 
@@ -114,6 +785,8 @@ class RadioInfoWidget : public Widget
 
     auto widgetData = getPersistentData();
     if (!batteryFill) return;
+
+    layoutStatus();
 
     // get colors from options
     etx_bg_color_from_flags(batteryFill, widgetData->options[2].value.unsignedValue, LV_PART_MAIN);
@@ -125,14 +798,16 @@ class RadioInfoWidget : public Widget
   {
     if (_deleted) return;
 
-    if (usbIcon) usbIcon->show(usbPlugged());
+    bool compact = isCompactTopBarWidget();
+
+    if (usbIcon) usbIcon->show(!compact && usbPlugged());
     if (getSelectedUsbMode() == USB_UNSELECTED_MODE)
       { if (usbIcon) usbIcon->setColor(COLOR_THEME_SECONDARY2_INDEX); }
     else
       { if (usbIcon) usbIcon->setColor(COLOR_THEME_PRIMARY2_INDEX); }
 
     if (logsIcon) {
-      logsIcon->show(!usbPlugged() && isFunctionActive(FUNCTION_LOGS) &&
+      logsIcon->show(!compact && !usbPlugged() && isFunctionActive(FUNCTION_LOGS) &&
                      BLINK_ON_PHASE);
     }
 
@@ -155,24 +830,24 @@ class RadioInfoWidget : public Widget
 #endif
 
 #if defined(USB_CHARGER)
-    if (batteryChargeIcon) batteryChargeIcon->show(usbChargerLed());
+    if (batteryChargeIcon) batteryChargeIcon->show(!compact && usbChargerLed());
 #endif
 
 #if defined(INTERNAL_MODULE_PXX1) && defined(EXTERNAL_ANTENNA)
     if (extAntenna) {
-      extAntenna->show(isModuleXJT(INTERNAL_MODULE) &&
+      extAntenna->show(!compact && isModuleXJT(INTERNAL_MODULE) &&
                        isExternalAntennaEnabled());
     }
 #endif
 
     // Battery level
-    uint8_t bars = GET_TXBATT_BARS(W_BATT_FILL_W);
+    uint8_t bars = GET_TXBATT_BARS(batteryFillWidth());
     if (bars != lastBatt) {
       lastBatt = bars;
-      lv_obj_set_size(batteryFill, bars, W_BATT_FILL_H);
-      if (bars >= W_BATT_FILL_GRN) {
+      lv_obj_set_size(batteryFill, bars, batteryFillHeight());
+      if (bars >= batteryGreenThreshold()) {
         lv_obj_clear_state(batteryFill, LV_STATE_USER_1 | LV_STATE_USER_2);
-      } else if (bars >= W_BATT_FILL_ORA) {
+      } else if (bars >= batteryOrangeThreshold()) {
         lv_obj_add_state(batteryFill, LV_STATE_USER_1);
         lv_obj_clear_state(batteryFill, LV_STATE_USER_2);
       } else {
@@ -213,8 +888,76 @@ class RadioInfoWidget : public Widget
   static LAYOUT_VAL_SCALED(W_BATT_FILL_H, 10)
   static LAYOUT_VAL_SCALED(W_BATT_FILL_GRN, 12)
   static LAYOUT_VAL_SCALED(W_BATT_FILL_ORA, 5)
+  static LAYOUT_VAL_SCALED(W_BATT_HUD_X, 2)
+  static LAYOUT_VAL_SCALED(W_BATT_HUD_W, 29)
+  static LAYOUT_VAL_SCALED(W_BATT_HUD_H, 13)
+  static LAYOUT_VAL_SCALED(W_BATT_HUD_FILL_W, 25)
+  static LAYOUT_VAL_SCALED(W_BATT_HUD_FILL_H, 9)
+  static LAYOUT_VAL_SCALED(W_BATT_HUD_FILL_GRN, 14)
+  static LAYOUT_VAL_SCALED(W_BATT_HUD_FILL_ORA, 6)
   static LAYOUT_VAL_SCALED(W_BATT_CHG_X, 25)
   static LAYOUT_VAL_SCALED(W_BATT_CHG_Y, 23)
+  static LAYOUT_VAL_SCALED(W_RSSI_HUD_BAR_W, 5)
+  static LAYOUT_VAL_SCALED(W_RSSI_HUD_BAR_SZ, 7)
+
+  coord_t batteryFillX() const
+  {
+    return isCompactTopBarWidget() ? W_BATT_HUD_X + 2 : W_AUDIO_X + 1;
+  }
+
+  coord_t batteryFillY() const
+  {
+    return isCompactTopBarWidget() ? batteryShellY() + 2 : W_BATT_Y + 1;
+  }
+
+  uint8_t batteryFillWidth() const
+  {
+    return isCompactTopBarWidget() ? W_BATT_HUD_FILL_W : W_BATT_FILL_W;
+  }
+
+  coord_t batteryFillHeight() const
+  {
+    return isCompactTopBarWidget() ? W_BATT_HUD_FILL_H : W_BATT_FILL_H;
+  }
+
+  uint8_t batteryGreenThreshold() const
+  {
+    return isCompactTopBarWidget() ? W_BATT_HUD_FILL_GRN : W_BATT_FILL_GRN;
+  }
+
+  uint8_t batteryOrangeThreshold() const
+  {
+    return isCompactTopBarWidget() ? W_BATT_HUD_FILL_ORA : W_BATT_FILL_ORA;
+  }
+
+  coord_t rssiX() const
+  {
+    if (!isCompactTopBarWidget()) return W_RSSI_X;
+
+    coord_t minX = W_BATT_HUD_X + W_BATT_HUD_W + PAD_MEDIUM;
+    coord_t alignX = width() - rssiClusterWidth();
+    return alignX > minX ? alignX : minX;
+  }
+
+  coord_t rssiBarWidth() const
+  {
+    return isCompactTopBarWidget() ? W_RSSI_HUD_BAR_W : W_RSSI_BAR_W;
+  }
+
+  coord_t rssiBarStep() const
+  {
+    return isCompactTopBarWidget() ? W_RSSI_HUD_BAR_SZ : W_RSSI_BAR_SZ;
+  }
+
+  coord_t rssiBarHeight() const
+  {
+    return isCompactTopBarWidget() ? height() - 2 * PAD_TINY : (coord_t)31;
+  }
+
+  coord_t rssiBarBottom() const
+  {
+    return isCompactTopBarWidget() ? height() - PAD_TINY : W_RSSI_BAR_H;
+  }
 
  protected:
   uint8_t lastVol = 0;
@@ -227,6 +970,8 @@ class RadioInfoWidget : public Widget
   StaticIcon* audioVol[5] = {};
 #endif
   StaticIcon* batteryIcon = nullptr;
+  lv_obj_t* batteryShell = nullptr;
+  lv_obj_t* batteryCap = nullptr;
   lv_obj_t* batteryFill = nullptr;
   lv_obj_t* rssiBars[5] = {nullptr};
 #if defined(USB_CHARGER)
@@ -235,6 +980,49 @@ class RadioInfoWidget : public Widget
 #if defined(INTERNAL_MODULE_PXX1) && defined(EXTERNAL_ANTENNA)
   StaticIcon* extAntenna = nullptr;
 #endif
+
+  coord_t batteryShellY() const
+  {
+    return height() - W_BATT_HUD_H - PAD_TINY;
+  }
+
+  coord_t rssiClusterWidth() const
+  {
+    return 4 * rssiBarStep() + rssiBarWidth();
+  }
+
+  void layoutStatus()
+  {
+    if (batteryShell) {
+      lv_obj_set_pos(batteryShell, W_BATT_HUD_X, batteryShellY());
+      lv_obj_set_size(batteryShell, W_BATT_HUD_W, W_BATT_HUD_H);
+    }
+    if (batteryCap) {
+      lv_obj_set_pos(batteryCap, W_BATT_HUD_X + W_BATT_HUD_W,
+                     batteryShellY() + 3);
+      lv_obj_set_size(batteryCap, 3, W_BATT_HUD_H - 6);
+    }
+    if (batteryFill) {
+      lv_obj_set_pos(batteryFill, batteryFillX(), batteryFillY());
+      lv_obj_set_size(batteryFill, batteryFillWidth(), batteryFillHeight());
+      lastBatt = 255;
+    }
+
+    coord_t rssiBh = rssiBarHeight();
+    const uint8_t rssiBarsHeight[] = {
+      (uint8_t)((rssiBh * 5 + 15) / 31),
+      (uint8_t)((rssiBh * 10 + 15) / 31),
+      (uint8_t)((rssiBh * 15 + 15) / 31),
+      (uint8_t)((rssiBh * 21 + 15) / 31),
+      (uint8_t)rssiBh};
+    for (unsigned int i = 0; i < DIM(rssiBars); i++) {
+      if (!rssiBars[i]) continue;
+      uint8_t height = rssiBarsHeight[i];
+      lv_obj_set_pos(rssiBars[i], rssiX() + i * rssiBarStep(),
+                     rssiBarBottom() - height);
+      lv_obj_set_size(rssiBars[i], rssiBarWidth(), height);
+    }
+  }
 };
 
 const WidgetOption RadioInfoWidget::options[] = {
@@ -253,8 +1041,15 @@ class DateTimeWidget : public Widget
                  int screenNum, int zoneNum) :
       Widget(factory, parent, rect, screenNum, zoneNum)
   {
-    coord_t x = rect.w - HeaderDateTime::HDR_DATE_WIDTH - DT_XO;
-    dateTime = new (std::nothrow) HeaderDateTime(this, x, PAD_THREE);
+    coord_t x = isCompactTopBarWidget()
+                    ? TOPBAR_CONTENT_PAD
+                    : rect.w - HeaderDateTime::HDR_DATE_WIDTH - DT_XO;
+    coord_t dateTimeHeight =
+        HeaderDateTime::HDR_DATE_LINE2 + HeaderDateTime::HDR_DATE_HEIGHT + 2;
+    coord_t y = isCompactTopBarWidget()
+                    ? maxCoord((rect.h - dateTimeHeight) / 2, (coord_t)0)
+                    : PAD_THREE;
+    dateTime = new (std::nothrow) HeaderDateTime(this, x, y);
     update();
   }
 
@@ -276,8 +1071,18 @@ class DateTimeWidget : public Widget
     memcpy(&color, &widgetData->options[0].value.unsignedValue, sizeof(color));
     if (!dateTime) return;
     dateTime->setColor(color);
-    coord_t x = width() - HeaderDateTime::HDR_DATE_WIDTH - DT_XO;
-    dateTime->setPos(x, PAD_THREE);
+    bool compact = isCompactTopBarWidget();
+    coord_t pad = TOPBAR_CONTENT_PAD;
+    coord_t displayWidth =
+        compact ? maxCoord((coord_t)(width() - 2 * pad), (coord_t)1)
+                : HeaderDateTime::HDR_DATE_WIDTH;
+    coord_t x = compact ? pad : width() - displayWidth - DT_XO;
+    coord_t y = compact ? maxCoord((height() - dateTime->height()) / 2,
+                                   (coord_t)0)
+                        : PAD_THREE;
+    dateTime->setDisplayWidth(displayWidth);
+    dateTime->setTextAlign(LV_TEXT_ALIGN_LEFT);
+    dateTime->setPos(x, y);
   }
 
   HeaderDateTime* dateTime = nullptr;
@@ -296,6 +1101,150 @@ const WidgetOption DateTimeWidget::options[] = {
 BaseWidgetFactory<DateTimeWidget> DateTimeWidget("Date Time",
                                                  DateTimeWidget::options,
                                                  STR_DATE_TIME_WIDGET);
+
+enum class DateTextKind { Clock, Today };
+
+class DateTextWidget : public Widget
+{
+ protected:
+  DateTextWidget(const WidgetFactory* factory, Window* parent,
+                 const rect_t& rect, int screenNum, int zoneNum,
+                 DateTextKind kind) :
+      Widget(factory, parent, rect, screenNum, zoneNum),
+      kind(kind)
+  {
+    label = etx_label_create(lvobj, FONT_XS_INDEX);
+    if (label) lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
+
+    update();
+    foreground();
+  }
+
+ public:
+  void foreground() override
+  {
+    if (_deleted || !label) return;
+
+    struct gtm time;
+    gettime(&time);
+    if (textValid && !shouldRefresh(time)) return;
+
+    char text[16];
+    formatText(text, sizeof(text), time);
+    layoutText(text);
+    lv_label_set_text(label, text);
+    lastTime = time;
+    textValid = true;
+  }
+
+  void update() override
+  {
+    if (_deleted || !label) return;
+
+    auto widgetData = getPersistentData();
+
+    memcpy(&color, &widgetData->options[0].value.unsignedValue, sizeof(color));
+
+    const bool topbar = isCompactTopBarWidget();
+    const coord_t pad = topbar ? TOPBAR_CONTENT_PAD : PAD_SMALL;
+    if (topbar) {
+      textBox = topbarContentBox(width(), height());
+    } else {
+      textBox = {pad, pad,
+                 width() > 2 * pad ? width() - 2 * pad : width(),
+                 height() > 2 * pad ? height() - 2 * pad : height()};
+    }
+
+    textValid = false;
+  }
+
+  static const WidgetOption options[];
+
+ private:
+  bool shouldRefresh(const struct gtm& time) const
+  {
+    if (kind == DateTextKind::Clock) {
+      return time.tm_min != lastTime.tm_min || time.tm_hour != lastTime.tm_hour;
+    }
+
+    return time.tm_mday != lastTime.tm_mday || time.tm_mon != lastTime.tm_mon ||
+           time.tm_year != lastTime.tm_year;
+  }
+
+  void formatText(char* text, size_t size, const struct gtm& time) const
+  {
+    if (kind == DateTextKind::Clock) {
+      const TimerOptions timerOptions = {.options = SHOW_TIME};
+      getTimerString(text, getValue(MIXSRC_TX_TIME), timerOptions);
+      return;
+    }
+
+#if defined(TRANSLATIONS_CN) || defined(TRANSLATIONS_TW)
+    snprintf(text, size, "%02d-%02d", time.tm_mon + 1, time.tm_mday);
+#else
+    snprintf(text, size, "%d %s", time.tm_mday, STR_MONTHS[time.tm_mon]);
+#endif
+  }
+
+  void layoutText(const char* text)
+  {
+    const bool topbar = isCompactTopBarWidget();
+    FontIndex font = topbar ? chipTextFontForBox(text, textBox.w, textBox.h)
+                            : textFontForBox(text, textBox.w, textBox.h);
+    coord_t labelH = getFontHeight(LcdFlags(font) << 8u);
+    coord_t labelY = textBox.y + (textBox.h - labelH) / 2;
+
+    etx_font(label, font);
+    if (topbar)
+      etx_txt_color(label, statusPrimaryColor(topbar));
+    else
+      etx_txt_color_from_flags(label, color);
+    lv_obj_set_style_text_align(
+        label, topbar ? LV_TEXT_ALIGN_CENTER : LV_TEXT_ALIGN_LEFT,
+        LV_PART_MAIN);
+    lv_obj_set_pos(label, textBox.x, labelY);
+    lv_obj_set_size(label, textBox.w, labelH);
+  }
+
+  DateTextKind kind;
+  lv_obj_t* label = nullptr;
+  StatusContentBox textBox = {};
+  uint32_t color = COLOR2FLAGS(COLOR_THEME_PRIMARY2_INDEX);
+  struct gtm lastTime = {};
+  bool textValid = false;
+};
+
+const WidgetOption DateTextWidget::options[] = {
+    {STR_COLOR, WidgetOption::Color, COLOR2FLAGS(COLOR_THEME_PRIMARY2_INDEX)},
+    {nullptr, WidgetOption::Bool}};
+
+class ClockWidget : public DateTextWidget
+{
+ public:
+  ClockWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
+              int screenNum, int zoneNum) :
+      DateTextWidget(factory, parent, rect, screenNum, zoneNum,
+                     DateTextKind::Clock)
+  {
+  }
+};
+
+BaseWidgetFactory<ClockWidget> clockWidget("Clock", DateTextWidget::options,
+                                           "Clock");
+
+class TodayWidget : public DateTextWidget
+{
+ public:
+  TodayWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
+              int screenNum, int zoneNum) :
+      DateTextWidget(factory, parent, rect, screenNum, zoneNum,
+                     DateTextKind::Today)
+  {
+  }
+};
+
+BaseWidgetFactory<TodayWidget> todayWidget("Today", DateTextWidget::options,
+                                           "Today");
 
 #if defined(INTERNAL_GPS)
 

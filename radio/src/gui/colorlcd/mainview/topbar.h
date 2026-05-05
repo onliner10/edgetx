@@ -24,6 +24,7 @@
 #include "layout.h"
 
 class HeaderIcon;
+class SetupWidgetsPageSlot;
 
 //-----------------------------------------------------------------------------
 
@@ -39,6 +40,7 @@ class SetupTopBarWidgetsPage : public NavWindow
   void onClicked() override;
   void onCancel() override;
   void deleteLater() override;
+  void refreshSlots();
 
 #if defined(HARDWARE_KEYS)
   void onPressSYS() override {}
@@ -51,6 +53,9 @@ class SetupTopBarWidgetsPage : public NavWindow
   void onLongPressPGDN() override {}
   void onPressTELE() override { onCancel(); }
 #endif
+
+ protected:
+  SetupWidgetsPageSlot* slots[MAX_TOPBAR_ZONES] = {};
 };
 
 //-----------------------------------------------------------------------------
@@ -74,10 +79,14 @@ class TopBar: public WidgetsContainer
   void setVisible(float visible);
   void setEdgeTxButtonVisible(float visible);
   coord_t getVisibleHeight(float visible) const; // 0.0 -> 1.0
+  void setSetupMode(bool enable) { setupMode = enable; }
 
   bool isTopBar() override { return true; }
 
   void removeWidget(unsigned int index) override;
+  bool canMoveWidget(unsigned int index,
+                     WidgetMoveDirection direction) const override;
+  bool moveWidget(unsigned int index, WidgetMoveDirection direction) override;
 
   Widget* createWidget(unsigned int index, const WidgetFactory* factory) override;
 
@@ -88,10 +97,27 @@ class TopBar: public WidgetsContainer
   static LAYOUT_VAL_SCALED(HDR_DATE_XO, 48)
 
   static constexpr coord_t TOPBAR_ZONE_HEIGHT = EdgeTxStyles::MENU_HEADER_HEIGHT - 2 * PAD_THREE;
+  static constexpr coord_t TOPBAR_WIDGET_GAP = PAD_TINY;
+  static LAYOUT_VAL_SCALED(TOPBAR_FLEX_MIN_WIDTH, 96)
+  static LAYOUT_VAL_SCALED(TOPBAR_STATUS_WIDTH, 50)
+  static LAYOUT_VAL_SCALED(TOPBAR_LINK_WIDTH, 48)
+  static LAYOUT_VAL_SCALED(TOPBAR_BATTERY_WIDTH, 50)
+  static LAYOUT_VAL_SCALED(TOPBAR_VOLUME_WIDTH, 56)
+  static LAYOUT_VAL_SCALED(TOPBAR_DATETIME_WIDTH, 50)
+  static LAYOUT_VAL_SCALED(TOPBAR_CLOCK_WIDTH, 64)
+  static LAYOUT_VAL_SCALED(TOPBAR_TODAY_WIDTH, 52)
+  static LAYOUT_VAL_SCALED(TOPBAR_GPS_WIDTH, 38)
+  static LAYOUT_VAL_SCALED(TOPBAR_LEGACY_STATUS_WIDTH, 74)
 
  protected:
   uint32_t lastRefresh = 0;
   HeaderIcon* headerIcon = nullptr;
+  bool setupMode = false;
+
+  bool hasLayoutWidget(unsigned int index) const;
+  int firstLayoutWidget() const;
+  coord_t intrinsicZoneWidth(unsigned int index) const;
+  void compactLayoutWidgets();
 };
 
 //-----------------------------------------------------------------------------

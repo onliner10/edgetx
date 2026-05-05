@@ -29,13 +29,18 @@
 #include "widget_settings.h"
 #include "pagegroup.h"
 #include "screen_setup.h"
+#include "topbar.h"
 
 #include <new>
 
 SetupWidgetsPageSlot::SetupWidgetsPageSlot(Window* parent, const rect_t& rect,
                                            WidgetsContainer* container,
-                                           uint8_t slotIndex) :
-    ButtonBase(parent, rect)
+                                           uint8_t slotIndex,
+                                           SetupTopBarWidgetsPage* topBarSetupPage) :
+    ButtonBase(parent, rect),
+    container(container),
+    topBarSetupPage(topBarSetupPage),
+    slotIndex(slotIndex)
 {
   setPressHandler([=]() -> uint8_t {
     if (!container) return 0;
@@ -48,6 +53,14 @@ SetupWidgetsPageSlot::SetupWidgetsPageSlot(Window* parent, const rect_t& rect,
       if (widget->hasOptions())
         menu->addLine(STR_WIDGET_SETTINGS,
                       [=]() { new (std::nothrow) WidgetSettings(widget); });
+      if (container->canMoveWidget(slotIndex, WidgetMoveDirection::Left))
+        menu->addLine(STR_MOVE_LEFT,
+                      [=]() { moveWidget(container, slotIndex,
+                                         WidgetMoveDirection::Left); });
+      if (container->canMoveWidget(slotIndex, WidgetMoveDirection::Right))
+        menu->addLine(STR_MOVE_RIGHT,
+                      [=]() { moveWidget(container, slotIndex,
+                                         WidgetMoveDirection::Right); });
       menu->addLine(STR_REMOVE_WIDGET,
                     [=]() { container->removeWidget(slotIndex); });
     } else {
@@ -58,9 +71,9 @@ SetupWidgetsPageSlot::SetupWidgetsPageSlot(Window* parent, const rect_t& rect,
   });
 
   etx_obj_add_style(lvobj, styles->border, LV_STATE_FOCUSED);
-  etx_obj_add_style(lvobj, styles->border_color[COLOR_THEME_FOCUS_INDEX], LV_STATE_FOCUSED);
-  etx_obj_add_style(lvobj, styles->outline, LV_STATE_FOCUSED);
-  etx_obj_add_style(lvobj, styles->outline_color_focus, LV_STATE_FOCUSED);
+  etx_obj_add_style(lvobj, styles->border_color[COLOR_THEME_PRIMARY1_INDEX],
+                    LV_STATE_FOCUSED);
+  etx_obj_add_style(lvobj, styles->state_focus_frame, LV_STATE_FOCUSED);
 
   lv_style_init(&borderStyle);
   lv_style_set_line_width(&borderStyle, PAD_BORDER);
@@ -110,6 +123,7 @@ void SetupWidgetsPageSlot::addNewWidget(WidgetsContainer* container,
   int selected = -1;
   int index = 0;
   for (auto factory : WidgetFactory::getRegisteredWidgets()) {
+    if (strcmp(factory->getName(), "Radio Info") == 0) continue;
     menu->addLine(factory->getDisplayName(), [=]() {
       container->createWidget(slotIndex, factory);
       auto widget = container->getWidget(slotIndex);
@@ -123,6 +137,14 @@ void SetupWidgetsPageSlot::addNewWidget(WidgetsContainer* container,
 
   if (selected >= 0)
     menu->select(selected);
+}
+
+void SetupWidgetsPageSlot::moveWidget(WidgetsContainer* container,
+                                      uint8_t slotIndex,
+                                      WidgetMoveDirection direction)
+{
+  if (container && container->moveWidget(slotIndex, direction) && topBarSetupPage)
+    topBarSetupPage->refreshSlots();
 }
 
 SetupWidgetsPage::SetupWidgetsPage(uint8_t customScreenIdx) :

@@ -32,6 +32,25 @@
 #include "widget.h"
 
 #include <new>
+#include <utility>
+
+//-----------------------------------------------------------------------------
+
+namespace {
+
+int moveDirectionOffset(WidgetMoveDirection direction)
+{
+  switch (direction) {
+    case WidgetMoveDirection::Left:
+      return -1;
+    case WidgetMoveDirection::Right:
+      return 1;
+  }
+
+  return 0;
+}
+
+}  // namespace
 
 //-----------------------------------------------------------------------------
 
@@ -88,14 +107,38 @@ SetupTopBarWidgetsPage::SetupTopBarWidgetsPage() :
   setRect(viewMain->getRect());
 
   auto topbar = viewMain->getTopbar();
-  for (unsigned i = 0; i < topbar->getZonesCount(); i++) {
-    auto rect = topbar->getZone(i);
-    new (std::nothrow) SetupWidgetsPageSlot(this, rect, topbar, i);
-  }
+  topbar->setSetupMode(true);
+  refreshSlots();
 
 #if defined(HARDWARE_TOUCH)
   addBackButton();
 #endif
+}
+
+void SetupTopBarWidgetsPage::refreshSlots()
+{
+  auto viewMain = ViewMain::instance();
+  if (!viewMain) return;
+
+  auto topbar = viewMain->getTopbar();
+  if (!topbar) return;
+
+  topbar->updateZones();
+  const unsigned int count = topbar->getZonesCount();
+  for (unsigned int i = 0; i < MAX_TOPBAR_ZONES; i += 1) {
+    if (i < count) {
+      auto rect = topbar->getZone(i);
+      if (slots[i]) {
+        slots[i]->setRect(rect);
+      } else {
+        slots[i] =
+            new (std::nothrow) SetupWidgetsPageSlot(this, rect, topbar, i, this);
+      }
+    } else if (slots[i]) {
+      slots[i]->deleteLater();
+      slots[i] = nullptr;
+    }
+  }
 }
 
 void SetupTopBarWidgetsPage::onClicked()
@@ -115,7 +158,13 @@ void SetupTopBarWidgetsPage::deleteLater()
   // restore screen setting tab on top
   QuickMenu::openPage(QM_UI_SETUP);
 
-  storageDirty(EE_MODEL);
+  auto viewMain = ViewMain::instance();
+  if (viewMain && viewMain->getTopbar()) {
+    viewMain->getTopbar()->setSetupMode(false);
+    viewMain->getTopbar()->load();
+  }
+
+  storageDirty(EE_GENERAL);
 }
 
 //-----------------------------------------------------------------------------
@@ -131,25 +180,119 @@ TopBar::TopBar(Window * parent) :
 
 unsigned int TopBar::getZonesCount() const
 {
-  unsigned int zc = 0;
-  for (int i = 0; i < zoneCount; i += 1)
-    if (g_model.topbarWidgetWidth[i] > 0)
-      zc += 1;
-  return zc;
+  int last = -1;
+  for (int i = 0; i < zoneCount; i += 1) {
+    if (hasLayoutWidget(i)) last = i;
+  }
+
+  // Keep one empty setup slot after the last configured widget so the topbar
+  // behaves like an ordered list instead of a fixed-width grid.
+  unsigned int count = last < 0 ? 1 : last + 2;
+  if (count > zoneCount) count = zoneCount;
+  return count;
 }
 
 rect_t TopBar::getZone(unsigned int index) const
 {
-  coord_t x = MENU_HEADER_BUTTONS_LEFT + 1;
+  if (index >= zoneCount) return rect_t{};
 
-  for (unsigned int i = 0; i < index; i += 1)
-    x += (g_model.topbarWidgetWidth[i] * (TOPBAR_ZONE_WIDTH + PAD_TINY));
+  const coord_t left = MENU_HEADER_BUTTONS_LEFT + 1;
+  const coord_t right = LCD_W - PAD_TINY;
+  const coord_t gap = TOPBAR_WIDGET_GAP;
+  const int first = firstLayoutWidget();
+  const bool layoutWidget = hasLayoutWidget(index);
+  const int pendingSetupIndex =
+      setupMode && !hasLayoutWidget(getZonesCount() - 1) ? getZonesCount() - 1
+                                                         : -1;
+  const bool pendingSetupSlot = !layoutWidget && (int)index == pendingSetupIndex;
 
-  coord_t size = ((g_model.topbarWidgetWidth[index] - 1) * (TOPBAR_ZONE_WIDTH + PAD_TINY) + TOPBAR_ZONE_WIDTH);
+  if (first < 0 || index == (unsigned int)first) {
+    coord_t x = left;
+    coord_t w = right - left;
 
-  if ((x + size) > LCD_W) size = LCD_W - x;
+    coord_t statusWidth = 0;
+    unsigned int statusCount = 0;
+    for (unsigned int i = (first < 0 ? 1 : first + 1); i < zoneCount; i += 1) {
+      if (!hasLayoutWidget(i) && (int)i != pendingSetupIndex) continue;
+      statusWidth += intrinsicZoneWidth(i);
+      statusCount += 1;
+    }
 
-  return {x, PAD_THREE, size, TOPBAR_ZONE_HEIGHT};
+    if (statusCount > 0) statusWidth += statusCount * gap;
+    if (statusWidth > 0 && w > statusWidth) w -= statusWidth;
+    if (w < TOPBAR_FLEX_MIN_WIDTH) w = TOPBAR_FLEX_MIN_WIDTH;
+    if (x + w > right) w = right - x;
+
+    return {x, PAD_THREE, w, TOPBAR_ZONE_HEIGHT};
+  }
+
+  if (!layoutWidget && !pendingSetupSlot) {
+    return {left, PAD_THREE, TOPBAR_FLEX_MIN_WIDTH, TOPBAR_ZONE_HEIGHT};
+  }
+
+  coord_t x = right;
+  for (int i = zoneCount - 1; i > first; i -= 1) {
+    bool useSlot = hasLayoutWidget(i) || i == pendingSetupIndex;
+    if (!useSlot) continue;
+
+    coord_t w = intrinsicZoneWidth(i);
+    x -= w;
+    if (i == (int)index) return {x, PAD_THREE, w, TOPBAR_ZONE_HEIGHT};
+    x -= gap;
+  }
+
+  return {left, PAD_THREE, TOPBAR_FLEX_MIN_WIDTH, TOPBAR_ZONE_HEIGHT};
+}
+
+bool TopBar::hasLayoutWidget(unsigned int index) const
+{
+  if (index >= zoneCount) return false;
+  return g_eeGeneral.getTopbarData()->hasWidget(index);
+}
+
+int TopBar::firstLayoutWidget() const
+{
+  for (int i = 0; i < zoneCount; i += 1) {
+    if (hasLayoutWidget(i)) return i;
+  }
+  return -1;
+}
+
+coord_t TopBar::intrinsicZoneWidth(unsigned int index) const
+{
+  if (index >= zoneCount) return TOPBAR_STATUS_WIDTH;
+
+  const char* name = g_eeGeneral.getTopbarData()->getWidgetName(index);
+  if (!strcmp(name, "Date Time")) return TOPBAR_DATETIME_WIDTH;
+  if (!strcmp(name, "Clock")) return TOPBAR_CLOCK_WIDTH;
+  if (!strcmp(name, "Today")) return TOPBAR_TODAY_WIDTH;
+  if (!strcmp(name, "Link")) return TOPBAR_LINK_WIDTH;
+  if (!strcmp(name, "TX Battery")) return TOPBAR_BATTERY_WIDTH;
+  if (!strcmp(name, "Volume")) return TOPBAR_VOLUME_WIDTH;
+  if (!strcmp(name, "Internal GPS")) return TOPBAR_GPS_WIDTH;
+  if (!strcmp(name, "Radio Info")) return TOPBAR_LEGACY_STATUS_WIDTH;
+
+  return TOPBAR_STATUS_WIDTH;
+}
+
+void TopBar::compactLayoutWidgets()
+{
+  auto topbarData = g_eeGeneral.getTopbarData();
+  unsigned int writeIndex = 0;
+  bool changed = false;
+
+  for (unsigned int readIndex = 0; readIndex < zoneCount; readIndex += 1) {
+    if (!topbarData->hasWidget(readIndex)) continue;
+
+    if (readIndex != writeIndex) {
+      topbarData->zones[writeIndex] = topbarData->zones[readIndex];
+      topbarData->clearZone(readIndex);
+      changed = true;
+    }
+    writeIndex += 1;
+  }
+
+  if (changed) storageDirty(EE_GENERAL);
 }
 
 void TopBar::setVisible(float visible) // 0.0 -> 1.0
@@ -194,29 +337,68 @@ void TopBar::removeWidget(unsigned int index)
   bool mark = false;
 
   // If user manually removes 'system' widgets, mark name so widget does not get reloaded on restart
-  if ((index == (unsigned int)(zoneCount - 1)) && g_model.getTopbarData()->isWidget(index, "Date Time"))
+  if ((index == (unsigned int)(zoneCount - 1)) && g_eeGeneral.getTopbarData()->isWidget(index, "Date Time"))
     mark = true;
-  if ((index == (unsigned int)(zoneCount - 2)) && g_model.getTopbarData()->isWidget(index, "Radio Info"))
+  if ((index == (unsigned int)(zoneCount - 2)) &&
+      (g_eeGeneral.getTopbarData()->isWidget(index, "Volume") ||
+       g_eeGeneral.getTopbarData()->isWidget(index, "Radio Info")))
+    mark = true;
+  if ((zoneCount > 2) && (index == (unsigned int)(zoneCount - 3)) &&
+      g_eeGeneral.getTopbarData()->isWidget(index, "TX Battery"))
+    mark = true;
+  if ((zoneCount > 3) && (index == (unsigned int)(zoneCount - 4)) &&
+      g_eeGeneral.getTopbarData()->isWidget(index, "Link"))
     mark = true;
 #if defined(INTERNAL_GPS)
-  if ((index == (unsigned int)(zoneCount - 3)) && g_model.getTopbarData()->isWidget(index, "Internal GPS"))
+  if ((zoneCount > 4) && (index == (unsigned int)(zoneCount - 5)) &&
+      g_eeGeneral.getTopbarData()->isWidget(index, "Internal GPS"))
     mark = true;
 #endif
 
   // If user manually removes 'system' widgets, mark name so widget does not get reloaded on restart
   if (mark)
-    g_model.getTopbarData()->setWidgetName(index, "---");
+    g_eeGeneral.getTopbarData()->setWidgetName(index, "---");
 
-  g_model.getTopbarData()->clearZone(index);
+  g_eeGeneral.getTopbarData()->clearZone(index);
 
   WidgetsContainer::removeWidget(index);
 }
 
+bool TopBar::canMoveWidget(unsigned int index,
+                           WidgetMoveDirection direction) const
+{
+  if (index >= zoneCount) return false;
+
+  int offset = moveDirectionOffset(direction);
+  if (offset == 0) return false;
+
+  int targetIndex = (int)index + offset;
+  if (targetIndex < 0 || targetIndex >= zoneCount) return false;
+
+  auto topbarData = g_eeGeneral.getTopbarData();
+  return topbarData->hasWidget(index) && topbarData->hasWidget(targetIndex);
+}
+
+bool TopBar::moveWidget(unsigned int index, WidgetMoveDirection direction)
+{
+  if (!widgets || !canMoveWidget(index, direction))
+    return false;
+
+  auto topbarData = g_eeGeneral.getTopbarData();
+  int targetIndex = (int)index + moveDirectionOffset(direction);
+  std::swap(topbarData->zones[index], topbarData->zones[targetIndex]);
+
+  storageDirty(EE_GENERAL);
+  load();
+  return true;
+}
+
 void TopBar::load()
 {
-  unsigned int count = getZonesCount();
   if (!widgets) return;
-  for (unsigned int i = 0; i < count; i++) {
+  compactLayoutWidgets();
+
+  for (unsigned int i = 0; i < zoneCount; i++) {
     // remove old widget
     if (widgets[i]) {
       widgets[i]->deleteLater();
@@ -224,10 +406,10 @@ void TopBar::load()
     }
   }
 
-  for (unsigned int i = 0; i < count; i++) {
+  for (unsigned int i = 0; i < zoneCount; i++) {
     // and load new one if required
-    if (g_model.getTopbarData()->hasWidget(i)) {
-      widgets[i] = WidgetFactory::newWidget(g_model.getTopbarData()->getWidgetName(i), this, getZone(i), -1, i);
+    if (g_eeGeneral.getTopbarData()->hasWidget(i)) {
+      widgets[i] = WidgetFactory::newWidget(g_eeGeneral.getTopbarData()->getWidgetName(i), this, getZone(i), -1, i);
     }
   }
 }
@@ -242,7 +424,7 @@ Widget* TopBar::createWidget(unsigned int index,
 
   Widget* widget = nullptr;
   if (factory) {
-    g_model.getTopbarData()->setWidgetName(index, factory->getName());
+    g_eeGeneral.getTopbarData()->setWidgetName(index, factory->getName());
     widget = factory->create(this, getZone(index), -1, index);
   }
   widgets[index] = widget;
@@ -252,7 +434,7 @@ Widget* TopBar::createWidget(unsigned int index,
 
 void TopBar::create()
 {
-  g_model.getTopbarData()->clear();
+  g_eeGeneral.getTopbarData()->clear();
 }
 
 //-----------------------------------------------------------------------------

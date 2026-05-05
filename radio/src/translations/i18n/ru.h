@@ -730,6 +730,8 @@
 #define TR_LABEL_MODEL                 "Метка модели"
 #define TR_MOVE_UP                     "Перемес вверх"
 #define TR_MOVE_DOWN                   "Перемес вниз"
+#define TR_MOVE_LEFT                   "Move left"
+#define TR_MOVE_RIGHT                  "Move right"
 #define TR_ENTER_LABEL                 "Ввести метку"
 #define TR_LABEL                       "Метка"
 #define TR_LABELS                      "Метки"

@@ -728,6 +728,8 @@
 #define TR_LABEL_MODEL                  "Etichetta modello"
 #define TR_MOVE_UP                      "Muovi Su"
 #define TR_MOVE_DOWN                    "Muovi Giù"
+#define TR_MOVE_LEFT                   "Move left"
+#define TR_MOVE_RIGHT                  "Move right"
 #define TR_ENTER_LABEL                  "Edita Etichetta"
 #define TR_LABEL                        "Etichetta"
 #define TR_LABELS                       "Etichette"

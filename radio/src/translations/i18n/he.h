@@ -731,6 +731,8 @@
 #define TR_LABEL_MODEL                 "שינוי לשונית"
 #define TR_MOVE_UP                     "עלה למעלה"
 #define TR_MOVE_DOWN                   "רד למטה"
+#define TR_MOVE_LEFT                   "Move left"
+#define TR_MOVE_RIGHT                  "Move right"
 #define TR_ENTER_LABEL                 "הוספת לשונית"
 #define TR_LABEL                       "לשונית"
 #define TR_LABELS                      "לשוניות"

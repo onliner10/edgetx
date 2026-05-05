@@ -26,6 +26,11 @@
 class Widget;
 class WidgetFactory;
 
+enum class WidgetMoveDirection : int8_t {
+  Left = -1,
+  Right = 1,
+};
+
 class WidgetsContainer: public Window
 {
  public:
@@ -37,6 +42,10 @@ class WidgetsContainer: public Window
 
   Widget* getWidget(unsigned int index);
   virtual void removeWidget(unsigned int index);
+  virtual bool canMoveWidget(unsigned int,
+                             WidgetMoveDirection) const { return false; }
+  virtual bool moveWidget(unsigned int,
+                          WidgetMoveDirection) { return false; }
   void removeAllWidgets();
   void updateZones();
   void showWidgets(bool visible = true);

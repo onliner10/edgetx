@@ -598,7 +598,7 @@ static ZonePersistentData* get_zoneData(void* user)
   uint16_t zone = tw->getElmts(o);
   if (topBar) {
     // Top Bar
-    return &g_model.getTopbarData()->zones[zone];
+    return &g_eeGeneral.getTopbarData()->zones[zone];
   } else {
     // Screen
     uint16_t screen = tw->getElmts(o + 3);
@@ -641,7 +641,7 @@ static WidgetPersistentData* get_widgetData(void* user, uint16_t& option)
   uint16_t zone = tw->getElmts(o + 3);
   if (topBar) {
     // Top Bar
-    return g_model.getTopbarData()->getWidgetData(zone);
+    return g_eeGeneral.getTopbarData()->getWidgetData(zone);
   } else {
     // Screen
     uint16_t screen = tw->getElmts(o + 6);
@@ -663,7 +663,7 @@ bool widget_option_is_active(void* user, uint8_t* data, uint32_t bitoffs)
   uint16_t zone = tw->getElmts(o + 3);
   if (topBar) {
     // Top Bar
-    widgetData = g_model.getTopbarData()->getWidgetData(zone);
+    widgetData = g_eeGeneral.getTopbarData()->getWidgetData(zone);
   } else {
     // Screen
     uint16_t screen = tw->getElmts(o + 6);

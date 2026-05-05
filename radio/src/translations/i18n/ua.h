@@ -729,6 +729,8 @@
 #define TR_LABEL_MODEL                 "Мітка моделі"
 #define TR_MOVE_UP                     "Перем. вгору"
 #define TR_MOVE_DOWN                   "Перем. вниз"
+#define TR_MOVE_LEFT                   "Move left"
+#define TR_MOVE_RIGHT                  "Move right"
 #define TR_ENTER_LABEL                 "Введіть мітку"
 #define TR_LABEL                       "Мітка"
 #define TR_LABELS                      "Мітки"

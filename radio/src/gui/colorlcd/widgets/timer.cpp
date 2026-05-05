@@ -276,17 +276,16 @@ class TimerWidget : public Widget
       isLarge = false;
       etx_font(nameLabel, compact ? FONT_XXS_INDEX : FONT_XS_INDEX);
       etx_font(valLabel, compact ? FONT_BOLD_INDEX : FONT_STD_INDEX);
-      lv_obj_set_style_text_align(nameLabel,
-                                  compact ? LV_TEXT_ALIGN_CENTER : LV_TEXT_ALIGN_LEFT,
-                                  LV_PART_MAIN);
-      lv_obj_set_style_text_align(valLabel,
-                                  compact ? LV_TEXT_ALIGN_CENTER : LV_TEXT_ALIGN_LEFT,
-                                  LV_PART_MAIN);
+      lv_obj_set_style_text_align(nameLabel, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+      lv_obj_set_style_text_align(valLabel, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
       lv_obj_clear_state(nameLabel, EXT_NAME_ALIGN_RIGHT);
-      lv_obj_set_pos(nameLabel, compact ? 0 : PAD_TINY, 0);
-      lv_obj_set_width(nameLabel, lv_pct(100));
+      coord_t labelPad = PAD_TINY;
+      coord_t labelWidth = width() > 2 * labelPad ? width() - 2 * labelPad : width();
+      lv_obj_set_pos(nameLabel, labelPad, 0);
+      lv_obj_set_width(nameLabel, labelWidth);
       lv_obj_add_state(nameLabel, ETX_NAME_COLOR_WHITE);
-      lv_obj_set_pos(valLabel, compact ? 0 : PAD_THREE,
+      lv_obj_set_width(valLabel, labelWidth);
+      lv_obj_set_pos(valLabel, compact ? labelPad : PAD_THREE,
                      compact ? COMPACT_VAL_LBL_Y : VAL_LBL_Y);
 
       lv_obj_clear_flag(valLabel, LV_OBJ_FLAG_HIDDEN);
