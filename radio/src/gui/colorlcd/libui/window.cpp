@@ -89,9 +89,20 @@ void Layer::pop(Window* w)
       lv_group_set_default(NULL);
     }
   } else {
-    for (auto layer = stack.crbegin(); layer != stack.crend(); layer++) {
+    for (auto layer = stack.rbegin(); layer != stack.rend(); layer++) {
       if (layer->window == w) {
-        stack.erase(layer.base());
+        auto current = layer.base();
+        --current;
+
+        lv_group_t* group = current->group;
+        lv_group_t* prevGroup = current->prevGroup;
+        for (auto& stackedLayer : stack) {
+          if (stackedLayer.prevGroup == group) {
+            stackedLayer.prevGroup = prevGroup;
+          }
+        }
+
+        stack.erase(current);
         return;
       }
     }
