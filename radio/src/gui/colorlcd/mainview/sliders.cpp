@@ -24,9 +24,27 @@
 #include "bitmaps.h"
 #include "hal/adc_driver.h"
 #include "edgetx.h"
+#include "mainwindow.h"
 #include "switches.h"
 
 #include <new>
+
+#if defined(SIMU)
+static bool forceSliderCanvasCreateFailure = false;
+
+void slidersForceCanvasCreateFailureForTest(bool force)
+{
+  forceSliderCanvasCreateFailure = force;
+}
+#endif
+
+static lv_obj_t* createSliderCanvas(lv_obj_t* parent)
+{
+#if defined(SIMU)
+  if (forceSliderCanvasCreateFailure) return nullptr;
+#endif
+  return lv_canvas_create(parent);
+}
 
 SliderIcon::SliderIcon(Window* parent) :
     Window(parent, rect_t{0, 0, MainViewSlider::SLIDER_BAR_SIZE, MainViewSlider::SLIDER_BAR_SIZE})
@@ -34,14 +52,20 @@ SliderIcon::SliderIcon(Window* parent) :
   setWindowFlag(NO_FOCUS);
 
   auto icon = getBuiltinIcon(ICON_TRIM_SHADOW);
-  shadow = lv_canvas_create(lvobj);
-  lv_canvas_set_buffer(shadow, (void*)icon->data, icon->width, icon->height, LV_IMG_CF_ALPHA_8BIT);
-  etx_img_color(shadow, COLOR_THEME_PRIMARY1_INDEX);
+  shadow = createSliderCanvas(lvobj);
+  if (shadow) {
+    lv_canvas_set_buffer(shadow, (void*)icon->data, icon->width, icon->height,
+                         LV_IMG_CF_ALPHA_8BIT);
+    etx_img_color(shadow, COLOR_THEME_PRIMARY1_INDEX);
+  }
 
   icon = getBuiltinIcon(ICON_TRIM);
-  mask = lv_canvas_create(lvobj);
-  lv_canvas_set_buffer(mask, (void*)icon->data, icon->width, icon->height, LV_IMG_CF_ALPHA_8BIT);
-  etx_img_color(mask, COLOR_THEME_FOCUS_INDEX);
+  mask = createSliderCanvas(lvobj);
+  if (mask) {
+    lv_canvas_set_buffer(mask, (void*)icon->data, icon->width, icon->height,
+                         LV_IMG_CF_ALPHA_8BIT);
+    etx_img_color(mask, COLOR_THEME_FOCUS_INDEX);
+  }
 }
 
 std::vector<MaskBitmap*> MainViewSlider::tickMasks;
@@ -55,14 +79,17 @@ MainViewSlider::MainViewSlider(Window* parent, const rect_t& rect, uint8_t idx,
   auto mask = getTicksMask();
 
   if (mask) {
-    maskCanvas = lv_canvas_create(lvobj);
-    etx_img_color(maskCanvas, COLOR_THEME_SECONDARY1_INDEX);
-    lv_canvas_set_buffer(maskCanvas, mask->data, mask->width, mask->height, LV_IMG_CF_ALPHA_8BIT);
+    maskCanvas = createSliderCanvas(lvobj);
+    if (maskCanvas) {
+      etx_img_color(maskCanvas, COLOR_THEME_SECONDARY1_INDEX);
+      lv_canvas_set_buffer(maskCanvas, mask->data, mask->width, mask->height,
+                           LV_IMG_CF_ALPHA_8BIT);
 
-    if (isVertical) {
-      lv_obj_set_pos(maskCanvas, PAD_TINY, SLIDER_BAR_SIZE / 2);
-    } else {
-      lv_obj_set_pos(maskCanvas, SLIDER_BAR_SIZE / 2, PAD_TINY);
+      if (isVertical) {
+        lv_obj_set_pos(maskCanvas, PAD_TINY, SLIDER_BAR_SIZE / 2);
+      } else {
+        lv_obj_set_pos(maskCanvas, SLIDER_BAR_SIZE / 2, PAD_TINY);
+      }
     }
   }
 
@@ -70,6 +97,26 @@ MainViewSlider::MainViewSlider(Window* parent, const rect_t& rect, uint8_t idx,
 
   setPos();
 }
+
+#if defined(SIMU)
+bool sliderIconCanvasCreateFailureLeavesNoCanvasForTest()
+{
+  class TestSliderIcon : public SliderIcon
+  {
+   public:
+    TestSliderIcon(Window* parent) : SliderIcon(parent) {}
+
+    bool hasMask() const { return mask != nullptr; }
+    bool hasShadow() const { return shadow != nullptr; }
+  };
+
+  slidersForceCanvasCreateFailureForTest(true);
+  auto icon = new TestSliderIcon(MainWindow::instance());
+  slidersForceCanvasCreateFailureForTest(false);
+
+  return icon && !icon->hasMask() && !icon->hasShadow();
+}
+#endif
 
 MaskBitmap* MainViewSlider::getTicksMask()
 {
