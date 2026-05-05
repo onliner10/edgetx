@@ -18,6 +18,7 @@
 
 #include "menu.h"
 
+#include "bitmaps.h"
 #include "edgetx.h"
 #include "etx_lv_theme.h"
 #include "keyboard_base.h"
@@ -26,6 +27,23 @@
 #include "table.h"
 
 #include <new>
+
+#if defined(SIMU)
+static bool forceMenuIconCanvasCreateFailure = false;
+
+void menuForceIconCanvasCreateFailureForTest(bool force)
+{
+  forceMenuIconCanvasCreateFailure = force;
+}
+#endif
+
+static lv_obj_t* createMenuIconCanvas(lv_obj_t* parent)
+{
+#if defined(SIMU)
+  if (forceMenuIconCanvasCreateFailure) return nullptr;
+#endif
+  return lv_canvas_create(parent);
+}
 
 //-----------------------------------------------------------------------------
 
@@ -137,11 +155,13 @@ class MenuBody : public TableField
   {
     lv_obj_t* canvas = nullptr;
     if (icon_mask) {
-      canvas = lv_canvas_create(nullptr);
-
-      lv_coord_t w = icon_mask->width;
-      lv_coord_t h = icon_mask->height;
-      lv_canvas_set_buffer(canvas, (void*)&icon_mask->data[0], w, h, LV_IMG_CF_ALPHA_8BIT);
+      canvas = createMenuIconCanvas(nullptr);
+      if (canvas) {
+        lv_coord_t w = icon_mask->width;
+        lv_coord_t h = icon_mask->height;
+        lv_canvas_set_buffer(canvas, (void*)&icon_mask->data[0], w, h,
+                             LV_IMG_CF_ALPHA_8BIT);
+      }
     }
 
     auto l = new (std::nothrow) MenuLine(text, onPress, isChecked, canvas);
@@ -464,3 +484,15 @@ void Menu::checkEvents()
   if (waitHandler)
     waitHandler();
 }
+
+#if defined(SIMU)
+bool menuIconCanvasCreateFailureStillAddsLineForTest()
+{
+  auto menu = new Menu();
+  menuForceIconCanvasCreateFailureForTest(true);
+  menu->addLine(getBuiltinIcon(ICON_BTN_NEXT), "Next", []() {});
+  menuForceIconCanvasCreateFailureForTest(false);
+
+  return menu->count() == 1;
+}
+#endif
