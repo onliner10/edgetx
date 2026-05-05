@@ -24,7 +24,7 @@
 #include "hal/module_port.h"
 #include "pulses/pulses.h"
 
-#if defined(PXX2) || defined(AFHDS3)
+#if defined(PXX2) || defined(AFHDS3) || defined(DSMP)
 #include <sys/mman.h>
 #include <unistd.h>
 #endif
@@ -163,7 +163,7 @@ class GuardedPxx2Frame
 };
 #endif
 
-#if defined(AFHDS3)
+#if defined(AFHDS3) || defined(DSMP)
 class GuardedAfhds3RxBuffer
 {
  public:
@@ -217,7 +217,9 @@ class GuardedAfhds3RxBuffer
   void * mapping;
   uint8_t * frame;
 };
+#endif
 
+#if defined(AFHDS3)
 void feedShortAfhds3Response(void* ctx, afhds3::COMMAND command,
                              uint8_t value)
 {
@@ -527,6 +529,26 @@ TEST_F(PulsesTest, dsmpBindPacketIgnoredOutsideBindMode)
 
   EXPECT_EQ(g_model.moduleData[EXTERNAL_MODULE].channelsCount, 0);
   EXPECT_EQ(moduleState[EXTERNAL_MODULE].mode, MODULE_MODE_NORMAL);
+
+  DSMPDriver.deinit(ctx);
+}
+
+TEST_F(PulsesTest, dsmpRejectsZeroLengthDebugPacket)
+{
+  modulePortInit();
+  g_model.moduleData[EXTERNAL_MODULE].type = MODULE_TYPE_LEMON_DSMP;
+
+  auto ctx = DSMPDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  GuardedAfhds3RxBuffer rxBuffer(2);
+  ASSERT_TRUE(rxBuffer.isValid());
+
+  uint8_t len = 0;
+  const uint8_t debugPacket[] = {0xAB, 0x00};
+  for (uint8_t byte : debugPacket) {
+    DSMPDriver.processData(ctx, byte, rxBuffer.data(), &len);
+  }
 
   DSMPDriver.deinit(ctx);
 }

@@ -437,6 +437,10 @@ static void dsmpDebugData(uint8_t module, uint8_t data, uint8_t* rxBuffer,
     if (rxBufferCount < 2) return;  // Keep buiding
 
     auto expectedLen = rxBuffer[1];
+    if (expectedLen < 1) {
+        rxBufferCount = 0;
+        return;
+    }
 
     // Overflow???
     if (expectedLen + 2 > TELEMETRY_RX_PACKET_SIZE) {
