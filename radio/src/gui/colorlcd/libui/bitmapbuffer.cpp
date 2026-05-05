@@ -32,10 +32,16 @@
 
 #if defined(SIMU)
 static bool forceBitmapBufferDataMallocFailure = false;
+static bool forceBitmapBufferResizeMallocFailure = false;
 
 void bitmapBufferForceDataMallocFailureForTest(bool force)
 {
   forceBitmapBufferDataMallocFailure = force;
+}
+
+void bitmapBufferForceResizeMallocFailureForTest(bool force)
+{
+  forceBitmapBufferResizeMallocFailure = force;
 }
 #endif
 
@@ -564,6 +570,19 @@ coord_t BitmapBuffer::drawText(coord_t x, coord_t y, const char* s, LcdFlags fla
 // background color
 void BitmapBuffer::resizeToLVGL(coord_t w, coord_t h)
 {
+  auto invalidateSize = [this]() {
+    _width = 0;
+    _height = 0;
+    xmax = 0;
+    ymax = 0;
+    data_end = data;
+  };
+
+  if (!data || width() == 0 || height() == 0 || w <= 0 || h <= 0) {
+    invalidateSize();
+    return;
+  }
+
   // Scale values from ARGB4444 to RGB565 with alpha
   static uint8_t rbcnv[16] = {0,  2,  4,  6,  8,  10, 12, 14,
                               17, 19, 21, 23, 25, 27, 29, 31};
@@ -585,27 +604,62 @@ void BitmapBuffer::resizeToLVGL(coord_t w, coord_t h)
     scaledw = w;
     scaledh = height() * scale;
   }
-
-  pixel_t *ndata =
-      (pixel_t *)malloc(align32(scaledw * scaledh * 3));
-
-  if (ndata) {
-    uint8_t *dst = (uint8_t *)ndata;
-    for (int i = 0; i < scaledh; i += 1) {
-      pixel_t *src = &data[(coord_t)(i / scale) * width()];
-      for (int j = 0; j < scaledw; j += 1) {
-        ARGB_SPLIT(src[(coord_t)(j / scale)], a, r, g, b);
-        auto c = RGB_JOIN(rbcnv[r], gcnv[g], rbcnv[b]);
-        *dst++ = c & 0xFF;
-        *dst++ = c >> 8;
-        *dst++ = alpha[a];
-      }
-    }
-
-    free(data);
-    data = ndata;
-    _width = scaledw;
-    _height = scaledh;
-    data_end = data + ((scaledw * scaledh * 3 + 1) / 2);
+  if (scaledw <= 0 || scaledh <= 0) {
+    invalidateSize();
+    return;
   }
+
+#if defined(SIMU)
+  pixel_t* ndata =
+      forceBitmapBufferResizeMallocFailure
+          ? nullptr
+          : (pixel_t*)malloc(align32(scaledw * scaledh * 3));
+#else
+  pixel_t* ndata = (pixel_t*)malloc(align32(scaledw * scaledh * 3));
+#endif
+
+  if (!ndata) {
+    invalidateSize();
+    return;
+  }
+
+  uint8_t* dst = (uint8_t*)ndata;
+  for (int i = 0; i < scaledh; i += 1) {
+    pixel_t* src = &data[(coord_t)(i / scale) * width()];
+    for (int j = 0; j < scaledw; j += 1) {
+      ARGB_SPLIT(src[(coord_t)(j / scale)], a, r, g, b);
+      auto c = RGB_JOIN(rbcnv[r], gcnv[g], rbcnv[b]);
+      *dst++ = c & 0xFF;
+      *dst++ = c >> 8;
+      *dst++ = alpha[a];
+    }
+  }
+
+  free(data);
+  data = ndata;
+  _width = scaledw;
+  _height = scaledh;
+  xmax = scaledw;
+  ymax = scaledh;
+  data_end = data + ((scaledw * scaledh * 3 + 1) / 2);
 }
+
+#if defined(SIMU)
+bool bitmapBufferResizeAllocationFailurePreventsLvglOverreadForTest()
+{
+  BitmapBuffer bitmap(BMP_ARGB4444, 512, 512);
+  if (!bitmap.getData()) return false;
+
+  bitmapBufferForceResizeMallocFailureForTest(true);
+  bitmap.resizeToLVGL(256, 256);
+  bitmapBufferForceResizeMallocFailureForTest(false);
+
+  if (bitmap.width() == 0 || bitmap.height() == 0) return true;
+
+  auto lvglByteCount = bitmap.width() * bitmap.height() * 3;
+  volatile auto lastByte =
+      reinterpret_cast<const uint8_t*>(bitmap.getData())[lvglByteCount - 1];
+  (void)lastByte;
+  return false;
+}
+#endif

@@ -308,6 +308,11 @@ void StaticBitmap::setSource(const char *filename)
     BitmapBuffer* newImg = BitmapBuffer::loadBitmap(filename, BMP_ARGB4444);
     if (newImg) {
       newImg->resizeToLVGL(width(), height());
+      if (!newImg->getData() || newImg->width() == 0 || newImg->height() == 0) {
+        delete newImg;
+        return;
+      }
+
       lv_obj_t* newCanvas = lv_canvas_create(lvobj);
       if (!newCanvas) {
         delete newImg;
