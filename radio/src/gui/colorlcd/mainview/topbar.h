@@ -41,6 +41,7 @@ class SetupTopBarWidgetsPage : public NavWindow
   void onCancel() override;
   void deleteLater() override;
   void refreshSlots();
+  void refreshSlots(const WidgetMoveResult& moveResult);
 
 #if defined(HARDWARE_KEYS)
   void onPressSYS() override {}
@@ -84,9 +85,10 @@ class TopBar: public WidgetsContainer
   bool isTopBar() override { return true; }
 
   void removeWidget(unsigned int index) override;
-  bool canMoveWidget(unsigned int index,
+  bool canMoveWidget(WidgetSlotIndex index,
                      WidgetMoveDirection direction) const override;
-  bool moveWidget(unsigned int index, WidgetMoveDirection direction) override;
+  [[nodiscard]] WidgetMoveResult moveWidget(WidgetSlotIndex index,
+                                            WidgetMoveDirection direction) override;
 
   Widget* createWidget(unsigned int index, const WidgetFactory* factory) override;
 

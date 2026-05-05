@@ -129,7 +129,7 @@ void SetupTopBarWidgetsPage::refreshSlots()
     if (i < count) {
       auto rect = topbar->getZone(i);
       if (slots[i]) {
-        slots[i]->setRect(rect);
+        slots[i]->setSlotRect(rect);
       } else {
         slots[i] =
             new (std::nothrow) SetupWidgetsPageSlot(this, rect, topbar, i, this);
@@ -138,6 +138,16 @@ void SetupTopBarWidgetsPage::refreshSlots()
       slots[i]->deleteLater();
       slots[i] = nullptr;
     }
+  }
+}
+
+void SetupTopBarWidgetsPage::refreshSlots(const WidgetMoveResult& moveResult)
+{
+  refreshSlots();
+
+  const unsigned int index = moveResult.to.asUnsigned();
+  if (index < MAX_TOPBAR_ZONES && slots[index]) {
+    lv_group_focus_obj(slots[index]->getLvObj());
   }
 }
 
@@ -364,9 +374,10 @@ void TopBar::removeWidget(unsigned int index)
   WidgetsContainer::removeWidget(index);
 }
 
-bool TopBar::canMoveWidget(unsigned int index,
+bool TopBar::canMoveWidget(WidgetSlotIndex slot,
                            WidgetMoveDirection direction) const
 {
+  unsigned int index = slot.asUnsigned();
   if (index >= zoneCount) return false;
 
   int offset = moveDirectionOffset(direction);
@@ -379,18 +390,21 @@ bool TopBar::canMoveWidget(unsigned int index,
   return topbarData->hasWidget(index) && topbarData->hasWidget(targetIndex);
 }
 
-bool TopBar::moveWidget(unsigned int index, WidgetMoveDirection direction)
+WidgetMoveResult TopBar::moveWidget(WidgetSlotIndex slot,
+                                    WidgetMoveDirection direction)
 {
-  if (!widgets || !canMoveWidget(index, direction))
-    return false;
+  if (!widgets || !canMoveWidget(slot, direction))
+    return {slot, slot};
 
   auto topbarData = g_eeGeneral.getTopbarData();
+  unsigned int index = slot.asUnsigned();
   int targetIndex = (int)index + moveDirectionOffset(direction);
+  WidgetSlotIndex targetSlot{static_cast<uint8_t>(targetIndex)};
   std::swap(topbarData->zones[index], topbarData->zones[targetIndex]);
 
   storageDirty(EE_GENERAL);
   load();
-  return true;
+  return {slot, targetSlot};
 }
 
 void TopBar::load()
