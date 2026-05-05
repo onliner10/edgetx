@@ -357,6 +357,10 @@ static void processResetFrame(uint8_t module, const uint8_t * frame)
     return;
   }
 
+  if (!pxx2FrameHasIndex(frame, 3)) {
+    return;
+  }
+
   if (reusableBuffer.moduleSetup.pxx2.resetReceiverIndex == frame[3]) {
     memclear(g_model.moduleData[module].pxx2.receiverName[reusableBuffer.moduleSetup.pxx2.resetReceiverIndex], PXX2_LEN_RX_NAME);
   }

@@ -758,6 +758,28 @@ TEST_F(PulsesTest, pxx2RejectsShortReceiverSettingsFrame)
   EXPECT_EQ(receiverSettings.state, PXX2_SETTINGS_READ);
 }
 
+TEST_F(PulsesTest, pxx2RejectsShortResetFrame)
+{
+  reusableBuffer.moduleSetup.pxx2.resetReceiverIndex = 0;
+  moduleState[INTERNAL_MODULE].mode = MODULE_MODE_RESET;
+  memcpy(g_model.moduleData[INTERNAL_MODULE].pxx2.receiverName[0], "RX123456",
+         PXX2_LEN_RX_NAME);
+
+  GuardedPxx2Frame guardedFrame(2);
+  ASSERT_TRUE(guardedFrame.isValid());
+
+  uint8_t * frame = guardedFrame.data();
+  frame[1] = PXX2_TYPE_C_MODULE;
+  frame[2] = PXX2_TYPE_ID_RESET;
+
+  processPXX2Frame(INTERNAL_MODULE, frame, nullptr, nullptr);
+
+  EXPECT_EQ(strncmp(g_model.moduleData[INTERNAL_MODULE].pxx2.receiverName[0],
+                    "RX123456", PXX2_LEN_RX_NAME),
+            0);
+  EXPECT_EQ(moduleState[INTERNAL_MODULE].mode, MODULE_MODE_RESET);
+}
+
 TEST_F(PulsesTest, pxx2RejectsShortTelemetryFrame)
 {
   GuardedPxx2Frame guardedFrame(3);
