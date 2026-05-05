@@ -144,6 +144,7 @@ class ModelButton : public Button
           }
         }
         showNoImgMsg();
+        return true;
       }
 
       return false;
@@ -181,6 +182,38 @@ class ModelButton : public Button
     if (m_setSelected) m_setSelected();
   }
 };
+
+#if defined(SIMU)
+bool modelSelectMissingImageLoadReportsWorkForTest()
+{
+  class TestModelButton : public ModelButton
+  {
+   public:
+    TestModelButton(Window* parent, const rect_t& rect, ModelCell* modelCell,
+                    std::function<void()> setSelected, uint8_t layout) :
+        ModelButton(parent, rect, modelCell, std::move(setSelected), layout)
+    {
+    }
+
+    void markLoaded() { loaded = true; }
+  };
+
+  ModelCell cell("model1.yml");
+  strncpy(cell.modelName, "Model 1", LEN_MODEL_NAME);
+  cell.modelName[LEN_MODEL_NAME] = '\0';
+#if LEN_BITMAP_NAME > 0
+  strncpy(cell.modelBitmap, "missing-image.png", LEN_BITMAP_NAME);
+  cell.modelBitmap[LEN_BITMAP_NAME] = '\0';
+#endif
+
+  auto button = new TestModelButton(
+      MainWindow::instance(),
+      {0, 0, modelLayouts[0].width, modelLayouts[0].height}, &cell, [] {}, 0);
+  button->markLoaded();
+
+  return button->loadImage();
+}
+#endif
 
 //-----------------------------------------------------------------------------
 
