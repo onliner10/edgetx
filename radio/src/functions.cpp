@@ -256,9 +256,16 @@ void evalFunctions(CustomFunctionData * functions, CustomFunctionsContext & func
             }
             break;
 
-          case FUNC_SET_TIMER:
-            timerSet(CFN_TIMER_INDEX(cfn), CFN_PARAM(cfn));
+          case FUNC_SET_TIMER: {
+            uint8_t timer = CFN_TIMER_INDEX(cfn);
+            if (timer < TIMERS) {
+              timerSet(timer, CFN_PARAM(cfn));
+            } else {
+              TRACE("Invalid timer function! Disabling...");
+              cfn->active = false;
+            }
             break;
+          }
 
           case FUNC_SET_FAILSAFE:
             setCustomFailsafe(CFN_PARAM(cfn));

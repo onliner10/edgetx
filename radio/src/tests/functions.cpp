@@ -83,6 +83,19 @@ TEST_F(SpecialFunctionsTest, InvalidOverrideChannelDoesNotCrash)
   EXPECT_FALSE(g_model.customFn[0].active);
 }
 
+TEST_F(SpecialFunctionsTest, InvalidSetTimerDoesNotCrash)
+{
+  g_model.customFn[0].swtch = SWSRC_ON;
+  g_model.customFn[0].func = FUNC_SET_TIMER;
+  g_model.customFn[0].all.param = 255;
+  g_model.customFn[0].all.val = 100;
+  g_model.customFn[0].active = true;
+
+  evalFunctions(g_model.customFn, modelFunctionsContext);
+
+  EXPECT_FALSE(g_model.customFn[0].active);
+}
+
 #if defined(GVARS)
 TEST_F(SpecialFunctionsTest, GvarsInc)
 {
