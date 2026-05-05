@@ -295,6 +295,20 @@ TEST_F(PulsesTest, pxx1SendPulsesRejectsInvalidSubtype)
 
   EXPECT_EQ(buffer[2], MODULE_SUBTYPE_PXX1_ACCST_D16 << 6);
 }
+
+TEST_F(PulsesTest, pxx1R9MRejectsInvalidSubtype)
+{
+  g_model.moduleData[EXTERNAL_MODULE].type = MODULE_TYPE_R9M_PXX1;
+  g_model.moduleData[EXTERNAL_MODULE].subType = 15;
+  g_model.moduleData[EXTERNAL_MODULE].channelsCount = 0;
+  g_model.moduleData[EXTERNAL_MODULE].failsafeMode = FAILSAFE_NOT_SET;
+
+  uint8_t buffer[MODULE_BUFFER_SIZE] = {};
+  UartPxx1Pulses frame(buffer);
+  frame.setupFrame(EXTERNAL_MODULE, Pxx1Type::FAST_SERIAL, nullptr, 0);
+
+  EXPECT_EQ(buffer[2], MODULE_SUBTYPE_R9M_FCC << 6);
+}
 #endif
 
 #if defined(PXX2) && defined(HARDWARE_INTERNAL_MODULE)

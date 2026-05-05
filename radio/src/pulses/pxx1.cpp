@@ -66,8 +66,13 @@ static int getChannelValue(uint8_t moduleIdx, const int16_t* channels,
 template <class PxxTransport>
 void Pxx1Pulses<PxxTransport>::addFlag1(uint8_t module, uint8_t sendFailsafe)
 {
-  uint8_t subType = isModuleXJT(module) ? getModuleXJTSubType(module)
-                                        : g_model.moduleData[module].subType;
+  uint8_t subType = g_model.moduleData[module].subType;
+  if (isModuleXJT(module)) {
+    subType = getModuleXJTSubType(module);
+  }
+  else if (isModuleR9MNonAccess(module)) {
+    subType = getModuleR9MSubType(module);
+  }
   uint8_t flag1 = (subType << 6);
 
   if (moduleState[module].mode == MODULE_MODE_BIND) {
