@@ -65,20 +65,28 @@ const MLinkSensor * getMLinkSensor(uint16_t id)
   return nullptr;
 }
 
-void processMLinkPacket(const uint8_t * packet, bool multi)
+void processMLinkPacket(const uint8_t * packet, bool multi, uint8_t len)
 {
+  if (len == 0)
+    return;
+
   const uint8_t * data = packet;    // pointer to setup for external module
+  uint8_t dataLen = len;
 
   if(multi) {
+    if (len < 2)
+      return;
+
     // Multi telem
     setTelemetryValue(PROTOCOL_TELEMETRY_MLINK, MLINK_TX_RSSI, 0, 0, (packet[0] * 100) / 31, UNIT_RAW, 0);
     setTelemetryValue(PROTOCOL_TELEMETRY_MLINK, MLINK_TX_LQI, 0, 0, packet[1], UNIT_RAW, 0);
-    
+
     data = &packet[2];              // correct pointer to data for Multimodule
+    dataLen = len - 2;
   } 
 
   // M-Link telem
-  if (data[0] == 0x13) {  // Telemetry type RX-9
+  if (dataLen >= 7 && data[0] == 0x13) {  // Telemetry type RX-9
     for (uint8_t i = 1; i < 5; i += 3) {  //2 sensors per packet
       int32_t val = (int16_t )(data[i + 2] << 8 | data[i + 1]);
       val = val >> 1; // remove alarm flag
@@ -148,7 +156,7 @@ void processMLinkPacket(const uint8_t * packet, bool multi)
       }
     }
   }
-  else if (packet[2] == 0x03) {  // Telemetry type RX-5
+  else if (len >= 8 && packet[2] == 0x03) {  // Telemetry type RX-5
     uint16_t mlinkLQI = (packet[4] * 100) / 35;
     setTelemetryValue(PROTOCOL_TELEMETRY_MLINK, MLINK_LQI, 0, 0, mlinkLQI, UNIT_RAW, 0);
     telemetryData.rssi.set(mlinkLQI);
@@ -240,5 +248,7 @@ void processExternalMLinkSerialData(uint8_t module, uint8_t data,
 
                                               // buffer is sane, build MPM like buffer and process it
   buffer[6] = MSB_VALID_TELEMETRY;            // indicate valid telemetry, bytes 7-12 contain 2 Mlink parameters
-  processMLinkPacket(&buffer[6], false);      // process telemetry packet as if it came from MPM
+                                              // process telemetry packet as if it came from MPM
+  processMLinkPacket(&buffer[6], false,
+                     MSB_EXT_MODULE_PACKET_LEN - 6);
 }

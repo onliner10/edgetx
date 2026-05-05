@@ -274,7 +274,9 @@ int16_t applyLimits(uint8_t channel, int32_t value)
 #endif
 
   if (isFunctionActive(FUNCTION_TRAINER_CHANNELS) && isTrainerValid()) {
-    return trainerInput[channel] * 2;
+    if (channel < MAX_TRAINER_CHANNELS) {
+      return trainerInput[channel] * 2;
+    }
   }
 
   LimitData * lim = limitAddress(channel);
@@ -622,7 +624,7 @@ void evalInputs(uint8_t mode)
           isTrainerValid()) {
         // trainer mode
         TrainerMix* td = &g_eeGeneral.trainer.mix[ch];
-        if (td->mode) {
+        if (td->mode && td->srcChn < DIM(g_eeGeneral.trainer.calib)) {
           uint8_t chStud = td->srcChn;
           int32_t vStud =
               (trainerInput[chStud] - g_eeGeneral.trainer.calib[chStud]);
@@ -1317,9 +1319,15 @@ void doMixerPeriodicUpdates()
   if (tick10ms) {
     /* Throttle trace */
     int16_t val;
+    uint8_t thrTraceSrc = g_model.thrTraceSrc;
+    if (thrTraceSrc > MAX_POTS + MAX_OUTPUT_CHANNELS) {
+      TRACE("Invalid throttle trace source! Fixing...");
+      g_model.thrTraceSrc = 0;
+      thrTraceSrc = 0;
+    }
 
-    if (g_model.thrTraceSrc > MAX_POTS) {
-      uint8_t ch = g_model.thrTraceSrc - MAX_POTS - 1;
+    if (thrTraceSrc > MAX_POTS) {
+      uint8_t ch = thrTraceSrc - MAX_POTS - 1;
       val = channelOutputs[ch];
 
       LimitData * lim = limitAddress(ch);
@@ -1347,7 +1355,7 @@ void doMixerPeriodicUpdates()
         val=0;  // prevent val be negative, which would corrupt throttle trace and timers; could occur if safetyswitch is smaller than limits
     }
     else {
-      val = RESX + calibratedAnalogs[g_model.thrTraceSrc == 0 ? inputMappingConvertMode(inputMappingGetThrottle()) : g_model.thrTraceSrc + MAX_STICKS - 1];
+      val = RESX + calibratedAnalogs[thrTraceSrc == 0 ? inputMappingConvertMode(inputMappingGetThrottle()) : thrTraceSrc + MAX_STICKS - 1];
     }
 
     // calibrate it (resolution increased by factor 4)

@@ -187,7 +187,8 @@ class Pxx1Pulses: public PxxTransport
 {
   public:
     Pxx1Pulses(uint8_t* buffer);
-    void setupFrame(uint8_t module, Pxx1Type type);
+    void setupFrame(uint8_t module, Pxx1Type type, const int16_t* channels,
+                    uint8_t nChannels);
 
   protected:
     void addHead()
@@ -204,8 +205,12 @@ class Pxx1Pulses: public PxxTransport
 
     void addFlag1(uint8_t port, uint8_t sendFailsafe);
     void addExtraFlags(uint8_t port);
-    void addChannels(uint8_t port, uint8_t sendFailsafe, uint8_t sendUpperChannels);
-    void add8ChannelsFrame(uint8_t port, uint8_t sendUpperChannels, uint8_t sendFailsafe);
+    void addChannels(uint8_t port, uint8_t sendFailsafe,
+                     uint8_t sendUpperChannels, const int16_t* channels,
+                     uint8_t nChannels);
+    void add8ChannelsFrame(uint8_t port, uint8_t sendUpperChannels,
+                           uint8_t sendFailsafe, const int16_t* channels,
+                           uint8_t nChannels);
 };
 
 typedef Pxx1Pulses<UartPxx1Transport> UartPxx1Pulses;

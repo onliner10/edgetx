@@ -238,6 +238,9 @@ void processFlySkyAFHDS3Sensor(const uint8_t * packet, uint8_t len )
     }
     else if( SENSOR_TYPE_RF_MODULE == type )
     {
+      if (len < 7) {
+        return;
+      }
       uint8_t data1[] = { (uint8_t)(SENSOR_TYPE_RF_MODULE_TEMP>>8), (uint8_t)SENSOR_TYPE_RF_MODULE_TEMP, id, packet[3] };
       uint8_t data2[] = { (uint8_t)(SENSOR_TYPE_RF_MODULE_VOL>>8), (uint8_t)SENSOR_TYPE_RF_MODULE_VOL, id, packet[4], packet[5] };
       uint8_t data3[] = { (uint8_t)(SENSOR_TYPE_RF_MODULE_POWER>>8), (uint8_t)SENSOR_TYPE_RF_MODULE_POWER, id, packet[8], packet[9] };
@@ -413,30 +416,38 @@ void processFlySkySensor(const uint8_t * packet, uint8_t type)
   setTelemetryValue(PROTOCOL_TELEMETRY_FLYSKY_IBUS, id, 0, instance, value, UNIT_RAW, 0);
 }
 
-void processFlySkyPacket(const uint8_t * packet)
+void processFlySkyPacket(const uint8_t * packet, uint8_t len)
 {
+  if (len < 1)
+    return;
+
   // Set TX RSSI Value, reverse MULTIs scaling
   setFlyskyTelemetryValue(AFHDS2A_ID_TX_RSSI, 0, packet[0], UNIT_RAW, 0);
 
   const uint8_t * buffer = packet + 1;
+  const uint8_t * end = packet + len;
   int sensor = 0;
-  while (sensor++ < 7) {
+  while (sensor++ < 7 && end - buffer >= 4) {
     if (*buffer == SENSOR_TYPE_END) break;
     processFlySkySensor(buffer, 0xAA);
     buffer += 4;
   }
 }
 
-void processFlySkyPacketAC(const uint8_t * packet)
+void processFlySkyPacketAC(const uint8_t * packet, uint8_t len)
 {
+  if (len < 1)
+    return;
+
   // Set TX RSSI Value, reverse MULTIs scaling
   setFlyskyTelemetryValue(AFHDS2A_ID_TX_RSSI, 0, packet[0], UNIT_RAW, 0);
   const uint8_t * buffer = packet + 1;
-  while (buffer - packet < 26) //28 + 1(multi TX rssi) - 3(ac header)
+  const uint8_t * end = packet + len;
+  while (end - buffer >= 3)
   {
     if (*buffer == SENSOR_TYPE_END) break;
     uint8_t size = buffer[2];
-    if (size > 26 - (buffer - packet) - 3) break;
+    if (size < 4 || size > end - buffer - 3) break;
     processFlySkySensor(buffer, 0xAC);
     buffer += size + 3;
   }
@@ -474,8 +485,8 @@ void processFlySkyTelemetryData(uint8_t data, uint8_t * rxBuffer, uint8_t &rxBuf
     }
     debugPrintf(CRLF);
 #endif
-    if (data == 0xAA) processFlySkyPacket(rxBuffer + 1);
-    else if (data == 0xAC) processFlySkyPacketAC(rxBuffer + 1);
+    if (data == 0xAA) processFlySkyPacket(rxBuffer + 1, rxBufferCount - 1);
+    else if (data == 0xAC) processFlySkyPacketAC(rxBuffer + 1, rxBufferCount - 1);
     rxBufferCount = 0;
   }
 }

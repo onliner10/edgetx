@@ -36,6 +36,9 @@ extern int32_t act [MAX_MIXERS];
 
 void insertMix(uint8_t idx, uint8_t channel)
 {
+  if (idx >= MAX_MIXERS)
+    return;
+
   mixerTaskStop();
   MixData * mix = mixAddress(idx);
   memmove(mix + 1, mix, (MAX_MIXERS - (idx + 1)) * sizeof(MixData));
@@ -65,6 +68,9 @@ void insertMix(uint8_t idx, uint8_t channel)
 
 void deleteMix(uint8_t idx)
 {
+  if (idx >= MAX_MIXERS)
+    return;
+
   mixerTaskStop();
   MixData * mix = mixAddress(idx);
   memmove(mix, mix + 1, (MAX_MIXERS - (idx + 1)) * sizeof(MixData));
@@ -81,6 +87,9 @@ void deleteMix(uint8_t idx)
 
 void copyMix(uint8_t src, uint8_t dst, uint8_t channel)
 {
+  if (src >= MAX_MIXERS || dst >= MAX_MIXERS)
+    return;
+
   mixerTaskStop();
   MixData sourceMix;
   memcpy(&sourceMix, mixAddress(src), sizeof(MixData));

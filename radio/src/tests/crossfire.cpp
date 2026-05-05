@@ -49,7 +49,12 @@ TEST(Crossfire, crc8)
 }
 
 #if defined(HARDWARE_EXTERNAL_MODULE)
+#include "hal/module_port.h"
 #include "pulses/crossfire.h"
+#include "pulses/pulses.h"
+#include "telemetry/crossfire.h"
+#include <sys/mman.h>
+#include <unistd.h>
 
 struct crsf_frame_test {
   void* ctx = nullptr;
@@ -80,6 +85,69 @@ struct crsf_frame_test {
     }
   }
 };
+
+class GuardedCrossfireFrame
+{
+ public:
+  explicit GuardedCrossfireFrame(size_t size):
+      pageSize(sysconf(_SC_PAGESIZE)),
+      mappingSize(pageSize * 2),
+      frameSize(size)
+  {
+    mapping = static_cast<uint8_t*>(
+        mmap(nullptr, mappingSize, PROT_READ | PROT_WRITE,
+             MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+    if (mapping == MAP_FAILED) {
+      mapping = nullptr;
+      return;
+    }
+    if (mprotect(mapping + pageSize, pageSize, PROT_NONE) != 0) {
+      munmap(mapping, mappingSize);
+      mapping = nullptr;
+      return;
+    }
+    frame = mapping + pageSize - frameSize;
+    memset(frame, 0, frameSize);
+  }
+
+  ~GuardedCrossfireFrame()
+  {
+    if (mapping) {
+      munmap(mapping, mappingSize);
+    }
+  }
+
+  bool isValid() const { return frame != nullptr; }
+  uint8_t* data() { return frame; }
+  uint8_t& operator[](size_t index) { return frame[index]; }
+
+ private:
+  long pageSize = 0;
+  size_t mappingSize = 0;
+  size_t frameSize = 0;
+  uint8_t* mapping = nullptr;
+  uint8_t* frame = nullptr;
+};
+
+TEST(Crossfire, sendPulsesHonorsChannelCount)
+{
+  modulePortInit();
+
+  auto ctx = CrossfireDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  moduleState[EXTERNAL_MODULE].counter = CRSF_FRAME_MODELID_SENT;
+  crossfireModuleStatus[EXTERNAL_MODULE].queryCompleted = true;
+
+  uint8_t buffer[MODULE_BUFFER_SIZE] = {};
+  CrossfireDriver.sendPulses(ctx, buffer, nullptr, 0);
+  memset(buffer, 0, sizeof(buffer));
+  CrossfireDriver.sendPulses(ctx, buffer, nullptr, 0);
+
+  EXPECT_EQ(buffer[2], CHANNELS_ID);
+
+  CrossfireDriver.deinit(ctx);
+}
 
 static uint8_t incomplete_frame[] = {
     // first frame
@@ -229,6 +297,72 @@ TEST(Crossfire, frameParser_badFrames)
   EXPECT_EQ(lua_buffer[offset + 0x1F - 1], 0xFE);
 }
 
+TEST(Crossfire, shortChannelsFrameDoesNotUpdateTrainerInputs)
+{
+  g_model.trainerData.mode = TRAINER_MODE_CRSF;
+  trainerInput[0] = 123;
+
+  uint8_t frame[] = {RADIO_ADDRESS, 2, CHANNELS_ID, 0};
+  processCrossfireTelemetryFrame(EXTERNAL_MODULE, frame, sizeof(frame));
+
+  EXPECT_EQ(trainerInput[0], 123);
+}
+
+TEST(Crossfire, shortDeviceInfoFrameDoesNotUpdateModuleStatus)
+{
+  memset(&crossfireModuleStatus[EXTERNAL_MODULE], 0,
+         sizeof(crossfireModuleStatus[EXTERNAL_MODULE]));
+
+  uint8_t frame[] = {RADIO_ADDRESS, 3, DEVICE_INFO_ID, 0, MODULE_ADDRESS};
+  processCrossfireTelemetryFrame(EXTERNAL_MODULE, frame, sizeof(frame));
+
+  EXPECT_FALSE(crossfireModuleStatus[EXTERNAL_MODULE].queryCompleted);
+}
+
+TEST(Crossfire, shortRadioTimingFrameDoesNotUpdateModuleSync)
+{
+  ModuleSyncStatus &status = getModuleSyncStatus(EXTERNAL_MODULE);
+  status.refreshRate = 4000;
+  status.inputLag = 25;
+  status.currentLag = 25;
+
+  uint8_t frame[] = {RADIO_ADDRESS, 4, RADIO_ID, 0xEA, 0, 0x10, 0x00,
+                     0x00,          0x27, 0x10,     0x00, 0x00, 0x00,
+                     0x64};
+  processCrossfireTelemetryFrame(EXTERNAL_MODULE, frame, sizeof(frame));
+
+  EXPECT_EQ(status.refreshRate, 4000);
+  EXPECT_EQ(status.inputLag, 25);
+  EXPECT_EQ(status.currentLag, 25);
+}
+
+TEST(Crossfire, shortFlightModeFrameDoesNotWritePastFrame)
+{
+  GuardedCrossfireFrame frame(4);
+  ASSERT_TRUE(frame.isValid());
+  frame[0] = RADIO_ADDRESS;
+  frame[1] = 16;
+  frame[2] = FLIGHT_MODE_ID;
+  frame[3] = 'A';
+
+  processCrossfireTelemetryFrame(EXTERNAL_MODULE, frame.data(), 4);
+
+  SUCCEED();
+}
+
+TEST(Crossfire, shortGpsFrameDoesNotReadPastFrame)
+{
+  GuardedCrossfireFrame frame(3);
+  ASSERT_TRUE(frame.isValid());
+  frame[0] = RADIO_ADDRESS;
+  frame[1] = 1;
+  frame[2] = GPS_ID;
+
+  processCrossfireTelemetryFrame(EXTERNAL_MODULE, frame.data(), 3);
+
+  SUCCEED();
+}
+
 static uint8_t jumboFrame1[]={
   0xEA, 0x3E, 0xFE, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
@@ -278,4 +412,3 @@ TEST(Crossfire, frameParser_multipleJumboFrames)
 }
 #endif // HARDWARE_EXTERNAL_MODULE
 #endif
-

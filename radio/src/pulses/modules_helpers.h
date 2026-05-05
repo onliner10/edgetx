@@ -50,31 +50,40 @@ extern uint32_t NV14internalModuleFwVersion;
    (moduleState[module].protocol == PROTOCOL_CHANNELS_PXX2))
 
 #if defined (MULTIMODULE)
+  inline uint8_t getModuleMultiRfProtocol(uint8_t moduleIdx)
+  {
+    uint8_t protocol = g_model.moduleData[moduleIdx].multi.rfProtocol;
+    return (protocol <= MODULE_SUBTYPE_MULTI_LAST ||
+            protocol == MM_RF_CUSTOM_SELECTED)
+               ? protocol
+               : MODULE_SUBTYPE_MULTI_FIRST;
+  }
+
   #define IS_D16_MULTI(module)                                            \
-    ((g_model.moduleData[module].multi.rfProtocol == MODULE_SUBTYPE_MULTI_FRSKYX) || \
-    (g_model.moduleData[module].multi.rfProtocol == MODULE_SUBTYPE_MULTI_FRSKYX2))
+    ((getModuleMultiRfProtocol(module) == MODULE_SUBTYPE_MULTI_FRSKYX) || \
+    (getModuleMultiRfProtocol(module) == MODULE_SUBTYPE_MULTI_FRSKYX2))
 
   #define IS_R9_MULTI(module)                         \
-    (g_model.moduleData[module].multi.rfProtocol == \
+    (getModuleMultiRfProtocol(module) == \
     MODULE_SUBTYPE_MULTI_FRSKY_R9)
 
   #define IS_HOTT_MULTI(module)                                           \
-    (g_model.moduleData[module].multi.rfProtocol == MODULE_SUBTYPE_MULTI_HOTT)
+    (getModuleMultiRfProtocol(module) == MODULE_SUBTYPE_MULTI_HOTT)
 
   #define IS_CONFIG_MULTI(module)                                         \
-    (g_model.moduleData[module].multi.rfProtocol == MODULE_SUBTYPE_MULTI_CONFIG)
+    (getModuleMultiRfProtocol(module) == MODULE_SUBTYPE_MULTI_CONFIG)
 
   #define IS_DSM_MULTI(module)                                            \
-    (g_model.moduleData[module].multi.rfProtocol == MODULE_SUBTYPE_MULTI_DSM2)
+    (getModuleMultiRfProtocol(module) == MODULE_SUBTYPE_MULTI_DSM2)
 
   #define IS_RX_MULTI(module)                          \
-    ((g_model.moduleData[module].multi.rfProtocol == \
+    ((getModuleMultiRfProtocol(module) == \
       MODULE_SUBTYPE_MULTI_AFHDS2A_RX) ||              \
-    (g_model.moduleData[module].multi.rfProtocol == \
+    (getModuleMultiRfProtocol(module) == \
       MODULE_SUBTYPE_MULTI_FRSKYX_RX) ||               \
-    (g_model.moduleData[module].multi.rfProtocol == \
+    (getModuleMultiRfProtocol(module) == \
       MODULE_SUBTYPE_MULTI_BAYANG_RX) ||               \
-    (g_model.moduleData[module].multi.rfProtocol == \
+    (getModuleMultiRfProtocol(module) == \
       MODULE_SUBTYPE_MULTI_DSM_RX))
 
   // When using packed, the pointer in here end up not being aligned, which clang and gcc complain about
@@ -101,7 +110,7 @@ extern uint32_t NV14internalModuleFwVersion;
     MultiModuleStatus &status = getMultiModuleStatus(moduleIdx);
 
     uint8_t max_pdef = 0;
-    auto proto = g_model.moduleData[moduleIdx].multi.rfProtocol;
+    auto proto = getModuleMultiRfProtocol(moduleIdx);
     const mm_protocol_definition *pdef = getMultiProtocolDefinition(proto);
     if (pdef) {
       max_pdef = pdef->maxSubtype;
@@ -115,6 +124,12 @@ extern uint32_t NV14internalModuleFwVersion;
     return max(max_status, max_pdef);
   }
 
+  inline uint8_t getModuleMultiSubType(uint8_t moduleIdx)
+  {
+    uint8_t subType = g_model.moduleData[moduleIdx].subType;
+    return subType <= getMaxMultiSubtype(moduleIdx) ? subType : 0;
+  }
+
   inline bool isModuleMultimodule(uint8_t idx)
   {
     return g_model.moduleData[idx].type == MODULE_TYPE_MULTIMODULE;
@@ -123,7 +138,7 @@ extern uint32_t NV14internalModuleFwVersion;
   inline bool isModuleMultimoduleDSM2(uint8_t idx)
   {
     return isModuleMultimodule(idx) &&
-          g_model.moduleData[idx].multi.rfProtocol ==
+          getModuleMultiRfProtocol(idx) ==
               MODULE_SUBTYPE_MULTI_DSM2;
   }
 
@@ -133,7 +148,7 @@ extern uint32_t NV14internalModuleFwVersion;
       return;
 
     // Sensible default for DSM2 (same as for ppm): 7ch@22ms + Autodetect settings enabled
-    if (g_model.moduleData[moduleIdx].multi.rfProtocol == MODULE_SUBTYPE_MULTI_DSM2) {
+    if (getModuleMultiRfProtocol(moduleIdx) == MODULE_SUBTYPE_MULTI_DSM2) {
       g_model.moduleData[moduleIdx].multi.autoBindMode = 1;
     }
     else {
@@ -180,19 +195,29 @@ inline bool isModuleXJT(uint8_t idx)
   return isModuleTypeXJT(g_model.moduleData[idx].type);
 }
 
+inline uint8_t getModuleXJTSubType(uint8_t idx)
+{
+  uint8_t subType = g_model.moduleData[idx].subType;
+  return subType <= MODULE_SUBTYPE_PXX1_LAST ? subType
+                                             : MODULE_SUBTYPE_PXX1_ACCST_D16;
+}
+
 inline bool isModuleXJTD8(uint8_t idx)
 {
-  return isModuleXJT(idx) && g_model.moduleData[idx].subType == MODULE_SUBTYPE_PXX1_ACCST_D8;
+  return isModuleXJT(idx) &&
+         getModuleXJTSubType(idx) == MODULE_SUBTYPE_PXX1_ACCST_D8;
 }
 
 inline bool isModuleXJTLR12(uint8_t idx)
 {
-  return isModuleXJT(idx) && g_model.moduleData[idx].subType == MODULE_SUBTYPE_PXX1_ACCST_LR12;
+  return isModuleXJT(idx) &&
+         getModuleXJTSubType(idx) == MODULE_SUBTYPE_PXX1_ACCST_LR12;
 }
 
 inline bool isModuleXJTD16(uint8_t idx)
 {
-  return isModuleXJT(idx) && g_model.moduleData[idx].subType == MODULE_SUBTYPE_PXX1_ACCST_D16;
+  return isModuleXJT(idx) &&
+         getModuleXJTSubType(idx) == MODULE_SUBTYPE_PXX1_ACCST_D16;
 }
 
 inline bool isModuleTypeISRM(uint8_t type)
@@ -205,10 +230,18 @@ inline bool isModuleISRM(uint8_t idx)
   return isModuleTypeISRM(g_model.moduleData[idx].type);
 }
 
+inline uint8_t getModuleISRMSubType(uint8_t idx)
+{
+  uint8_t subType = g_model.moduleData[idx].subType;
+  return subType <= MODULE_SUBTYPE_ISRM_PXX2_LAST
+             ? subType
+             : MODULE_SUBTYPE_ISRM_PXX2_ACCESS;
+}
+
 inline bool isModuleISRMD16(uint8_t idx)
 {
   return isModuleISRM(idx) &&
-         g_model.moduleData[idx].subType == MODULE_SUBTYPE_ISRM_PXX2_ACCST_D16;
+         getModuleISRMSubType(idx) == MODULE_SUBTYPE_ISRM_PXX2_ACCST_D16;
 }
 
 inline bool isModuleD16(uint8_t idx)
@@ -219,7 +252,7 @@ inline bool isModuleD16(uint8_t idx)
 inline bool isModuleISRMAccess(uint8_t idx)
 {
   return isModuleISRM(idx) &&
-         g_model.moduleData[idx].subType == MODULE_SUBTYPE_ISRM_PXX2_ACCESS;
+         getModuleISRMSubType(idx) == MODULE_SUBTYPE_ISRM_PXX2_ACCESS;
 }
 
 #if defined(CROSSFIRE)
@@ -291,6 +324,12 @@ inline bool isModuleR9MNonAccess(uint8_t idx)
   return isModuleTypeR9MNonAccess(g_model.moduleData[idx].type);
 }
 
+inline uint8_t getModuleR9MSubType(uint8_t idx)
+{
+  uint8_t subType = g_model.moduleData[idx].subType;
+  return subType <= MODULE_SUBTYPE_R9M_LAST ? subType : MODULE_SUBTYPE_R9M_FCC;
+}
+
 inline bool isModuleTypeR9MAccess(uint8_t type)
 {
   return type == MODULE_TYPE_R9M_PXX2 || type == MODULE_TYPE_R9M_LITE_PXX2 || type == MODULE_TYPE_R9M_LITE_PRO_PXX2;
@@ -338,7 +377,8 @@ inline bool isModuleR9MLite(uint8_t idx)
 
 inline bool isModuleR9M_FCC(uint8_t idx)
 {
-  return isModuleR9MNonAccess(idx) && g_model.moduleData[idx].subType == MODULE_SUBTYPE_R9M_FCC;
+  return isModuleR9MNonAccess(idx) &&
+         getModuleR9MSubType(idx) == MODULE_SUBTYPE_R9M_FCC;
 }
 
 inline bool isModuleTypeLite(uint8_t type)
@@ -348,22 +388,26 @@ inline bool isModuleTypeLite(uint8_t type)
 
 inline bool isModuleR9M_LBT(uint8_t idx)
 {
-  return isModuleR9MNonAccess(idx) && g_model.moduleData[idx].subType == MODULE_SUBTYPE_R9M_EU;
+  return isModuleR9MNonAccess(idx) &&
+         getModuleR9MSubType(idx) == MODULE_SUBTYPE_R9M_EU;
 }
 
 inline bool isModuleR9M_FCC_VARIANT(uint8_t idx)
 {
-  return isModuleR9MNonAccess(idx) && g_model.moduleData[idx].subType != MODULE_SUBTYPE_R9M_EU;
+  return isModuleR9MNonAccess(idx) &&
+         getModuleR9MSubType(idx) != MODULE_SUBTYPE_R9M_EU;
 }
 
 inline bool isModuleR9M_EUPLUS(uint8_t idx)
 {
-  return isModuleR9MNonAccess(idx) && g_model.moduleData[idx].subType == MODULE_SUBTYPE_R9M_EUPLUS;
+  return isModuleR9MNonAccess(idx) &&
+         getModuleR9MSubType(idx) == MODULE_SUBTYPE_R9M_EUPLUS;
 }
 
 inline bool isModuleR9M_AU_PLUS(uint8_t idx)
 {
-  return isModuleR9MNonAccess(idx) && g_model.moduleData[idx].subType == MODULE_SUBTYPE_R9M_AUPLUS;
+  return isModuleR9MNonAccess(idx) &&
+         getModuleR9MSubType(idx) == MODULE_SUBTYPE_R9M_AUPLUS;
 }
 
 inline bool isModuleTypePXX1(uint8_t type)
@@ -502,7 +546,15 @@ inline int8_t defaultModuleChannels_M8(uint8_t idx)
 
 inline uint8_t sentModulePXXChannels(uint8_t idx)
 {
-  return 8 + g_model.moduleData[idx].channelsCount;
+  int channels = 8 + g_model.moduleData[idx].channelsCount;
+  channels = limit<int>(0, channels, maxModuleChannels(idx));
+
+  uint8_t channelsStart = g_model.moduleData[idx].channelsStart;
+  if (channelsStart >= MAX_OUTPUT_CHANNELS) {
+    return 0;
+  }
+
+  return min<int>(channels, MAX_OUTPUT_CHANNELS - channelsStart);
 }
 
 extern int8_t sentModuleChannels(uint8_t idx);
@@ -515,7 +567,7 @@ inline bool isDefaultModelRegistrationID()
 inline bool isModuleRxNumAvailable(uint8_t moduleIdx)
 {
   if (isModuleXJT(moduleIdx))
-    return g_model.moduleData[moduleIdx].subType != MODULE_SUBTYPE_PXX1_ACCST_D8;
+    return getModuleXJTSubType(moduleIdx) != MODULE_SUBTYPE_PXX1_ACCST_D8;
 
   if (isModuleR9M(moduleIdx))
     return true;
@@ -541,7 +593,7 @@ inline bool isModuleRxNumAvailable(uint8_t moduleIdx)
 inline bool isModuleModelIndexAvailable(uint8_t idx)
 {
   if (isModuleXJT(idx))
-    return g_model.moduleData[idx].subType != MODULE_SUBTYPE_PXX1_ACCST_D8;
+    return getModuleXJTSubType(idx) != MODULE_SUBTYPE_PXX1_ACCST_D8;
 
   if (isModuleR9M(idx))
     return true;
@@ -575,7 +627,7 @@ inline bool isModuleFailsafeAvailable(uint8_t moduleIdx)
 #endif
 
   if (isModuleXJT(moduleIdx))
-    return g_model.moduleData[moduleIdx].subType == MODULE_SUBTYPE_PXX1_ACCST_D16;
+    return getModuleXJTSubType(moduleIdx) == MODULE_SUBTYPE_PXX1_ACCST_D16;
 
 #if defined(MULTIMODULE)
   if (isModuleMultimodule(moduleIdx)) {
@@ -584,7 +636,7 @@ inline bool isModuleFailsafeAvailable(uint8_t moduleIdx)
       return status.supportsFailsafe();
     }
     else {
-      auto proto = g_model.moduleData[moduleIdx].multi.rfProtocol;
+      auto proto = getModuleMultiRfProtocol(moduleIdx);
       const mm_protocol_definition * pdef = getMultiProtocolDefinition(proto);
       if (pdef) return pdef->failsafe;
       return false;
@@ -616,7 +668,7 @@ inline bool isMultiProtocolDSMCloneAvailable(uint8_t moduleIdx)
     return false;
   }
 
-  return g_model.moduleData[moduleIdx].multi.rfProtocol == MODULE_SUBTYPE_MULTI_DSM2;
+  return getModuleMultiRfProtocol(moduleIdx) == MODULE_SUBTYPE_MULTI_DSM2;
 }
 #endif
 

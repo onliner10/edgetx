@@ -181,6 +181,11 @@ void sportProcessTelemetryPacket(uint16_t id, uint8_t subId, uint8_t instance,
 
 bool sportProcessTelemetryPacket(uint8_t module, const uint8_t * packet, uint8_t len)
 {
+  if (len < FRSKY_SPORT_PACKET_SIZE) {
+    TRACE("sportProcessTelemetryPacket(): packet too short %d", len);
+    return false;
+  }
+
   if (!checkSportPacket(packet)) {
     TRACE("sportProcessTelemetryPacket(): checksum error ");
     DUMP(packet, FRSKY_SPORT_PACKET_SIZE);

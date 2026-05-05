@@ -92,8 +92,15 @@ uint8_t createCrossfireModelIDFrame(uint8_t moduleIdx, uint8_t * frame)
   return buf - frame;
 }
 
+static int16_t getCrossfirePulse(const int16_t * pulses, uint8_t nChannels,
+                                 uint8_t index)
+{
+  return (pulses && index < nChannels) ? pulses[index] : 0;
+}
+
 // Range for pulses (channels output) is [-1024:+1024]
-uint8_t createCrossfireChannelsFrame(uint8_t moduleIdx, uint8_t * frame, int16_t * pulses)
+uint8_t createCrossfireChannelsFrame(uint8_t moduleIdx, uint8_t * frame,
+                                     int16_t * pulses, uint8_t nChannels)
 {
   //
   // sends channel data and also communicates commanded armed status in arming mode Switch.
@@ -113,7 +120,12 @@ uint8_t createCrossfireChannelsFrame(uint8_t moduleIdx, uint8_t * frame, int16_t
   uint32_t bits = 0;
   uint8_t bitsavailable = 0;
   for (int i=0; i<CROSSFIRE_CHANNELS_COUNT; i++) {
-    uint32_t val = limit(0, CROSSFIRE_CENTER + (CROSSFIRE_CENTER_CH_OFFSET(i) * 4) / 5 + (pulses[i] * 4) / 5, 2 * CROSSFIRE_CENTER);
+    int16_t pulse = getCrossfirePulse(pulses, nChannels, i);
+    uint32_t val = limit(
+        0,
+        CROSSFIRE_CENTER + (CROSSFIRE_CENTER_CH_OFFSET(i) * 4) / 5 +
+            (pulse * 4) / 5,
+        2 * CROSSFIRE_CENTER);
     bits |= val << bitsavailable;
     bitsavailable += CROSSFIRE_CH_BITS;
     while (bitsavailable >= 8) {
@@ -131,6 +143,13 @@ uint8_t createCrossfireChannelsFrame(uint8_t moduleIdx, uint8_t * frame, int16_t
   
   *buf++ = crc8(crc_start, 23 + lenAdjust);
   return buf - frame;
+}
+
+uint8_t createCrossfireChannelsFrame(uint8_t moduleIdx, uint8_t * frame,
+                                     int16_t * pulses)
+{
+  return createCrossfireChannelsFrame(moduleIdx, frame, pulses,
+                                      CROSSFIRE_CHANNELS_COUNT);
 }
 
 static void setupPulsesCrossfire(uint8_t module, uint8_t*& p_buf,
@@ -183,8 +202,7 @@ static void setupPulsesCrossfire(uint8_t module, uint8_t*& p_buf,
       p_buf += createCrossfireBindFrame(module, p_buf);
       moduleState[module].mode = MODULE_MODE_NORMAL;
     } else {
-      /* TODO: nChannels */
-      p_buf += createCrossfireChannelsFrame(module, p_buf, channels);
+      p_buf += createCrossfireChannelsFrame(module, p_buf, channels, nChannels);
     }
   }
 }

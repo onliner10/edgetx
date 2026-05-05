@@ -421,8 +421,11 @@ uint8_t processHoTTWarnings(const uint8_t * packet) {
   return 0;                                       // return 0 (no warning)
 }
 
-void processHottPacket(const uint8_t * packet)
+void processHottPacket(const uint8_t * packet, uint8_t len)
 {
+  if (len < 15)
+    return;
+
   #if defined(LUA)
   #define HOTT_MENU_NBR_PAGE 0x13
     // Config menu consists of the different telem pages put all together

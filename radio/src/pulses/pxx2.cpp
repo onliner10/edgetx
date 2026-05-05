@@ -253,10 +253,10 @@ void Pxx2Pulses::addFlag1(uint8_t module)
   uint8_t subType = 0;
   if (isModuleXJT(module)) {
     static const uint8_t PXX2_XJT_MODULE_SUBTYPES[] = {0x01, 0x03, 0x02};
-    subType = PXX2_XJT_MODULE_SUBTYPES[min<uint8_t>(g_model.moduleData[module].subType, 2)];
+    subType = PXX2_XJT_MODULE_SUBTYPES[getModuleXJTSubType(module)];
   }
   else if (isModuleISRM(module)) {
-    subType = g_model.moduleData[module].subType;
+    subType = getModuleISRMSubType(module);
   }
 
   uint8_t flag1 = subType << 4u;
@@ -279,11 +279,14 @@ void Pxx2Pulses::addChannels(uint8_t module, int16_t* channels, uint8_t nChannel
   uint16_t pulseValue = 0;
   uint16_t pulseValueLow = 0;
 
-  uint8_t channel = g_model.moduleData[module].channelsStart;
+  uint16_t channel = g_model.moduleData[module].channelsStart;
   uint8_t count = sentModuleChannels(module);
 
   for (int8_t i = 0; i < count; i++, channel++) {
-    int value = channels[i] + 2*PPM_CH_CENTER(channel) - 2*PPM_CENTER;
+    int value = 0;
+    if (channels && i < nChannels && channel < MAX_OUTPUT_CHANNELS) {
+      value = channels[i] + 2*PPM_CH_CENTER(channel) - 2*PPM_CENTER;
+    }
     pulseValue = limit(1, (value * 512 / 682) + 1024, 2046);
 #if defined(DEBUG_LATENCY_RF_ONLY)
     if (latencyToggleSwitch)
@@ -303,7 +306,7 @@ void Pxx2Pulses::addFailsafe(uint8_t module)
   uint16_t pulseValue = 0;
   uint16_t pulseValueLow = 0;
 
-  uint8_t channel = g_model.moduleData[module].channelsStart;
+  uint16_t channel = g_model.moduleData[module].channelsStart;
   uint8_t count = sentModuleChannels(module);
 
   for (int8_t i = 0; i < count; i++, channel++) {
@@ -314,16 +317,21 @@ void Pxx2Pulses::addFailsafe(uint8_t module)
       pulseValue = 0;
     }
     else {
-      int16_t failsafeValue = g_model.failsafeChannels[channel];
-      if (failsafeValue == FAILSAFE_CHANNEL_HOLD) {
-        pulseValue = 2047;
-      }
-      else if (failsafeValue == FAILSAFE_CHANNEL_NOPULSE) {
-        pulseValue = 0;
+      if (channel >= MAX_OUTPUT_CHANNELS) {
+        pulseValue = 1024;
       }
       else {
-        failsafeValue += 2*PPM_CH_CENTER(channel) - 2*PPM_CENTER;
-        pulseValue = limit(1, (failsafeValue * 512 / 682) + 1024, 2046);
+        int16_t failsafeValue = g_model.failsafeChannels[channel];
+        if (failsafeValue == FAILSAFE_CHANNEL_HOLD) {
+          pulseValue = 2047;
+        }
+        else if (failsafeValue == FAILSAFE_CHANNEL_NOPULSE) {
+          pulseValue = 0;
+        }
+        else {
+          failsafeValue += 2*PPM_CH_CENTER(channel) - 2*PPM_CENTER;
+          pulseValue = limit(1, (failsafeValue * 512 / 682) + 1024, 2046);
+        }
       }
     }
     if (i & 1)

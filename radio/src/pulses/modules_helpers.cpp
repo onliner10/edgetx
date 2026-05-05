@@ -48,7 +48,7 @@ int8_t maxModuleChannels_M8(uint8_t moduleIdx)
   if (isExtraModule(moduleIdx)) {
     return MAX_EXTRA_MODULE_CHANNELS_M8;
   } else if (isModuleXJT(moduleIdx)) {
-    return maxChannelsXJT_M8[1 + g_model.moduleData[moduleIdx].subType];
+    return maxChannelsXJT_M8[1 + getModuleXJTSubType(moduleIdx)];
   } else if (isModuleISRMD16(moduleIdx)) {
     return maxChannelsXJT_M8[MODULE_SUBTYPE_ISRM_PXX2_ACCST_D16];
   } else if (isModuleR9M(moduleIdx)) {
@@ -70,7 +70,8 @@ int8_t maxModuleChannels_M8(uint8_t moduleIdx)
   } else if (isModuleDSMP(moduleIdx)) {
     return 4; //  12 channels
   } else {
-    return maxChannelsModules_M8[g_model.moduleData[moduleIdx].type];
+    uint8_t type = g_model.moduleData[moduleIdx].type;
+    return type < DIM(maxChannelsModules_M8) ? maxChannelsModules_M8[type] : -8;
   }
 }
 

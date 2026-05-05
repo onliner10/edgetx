@@ -1360,7 +1360,7 @@ static int luaModelSetCurve(lua_State *L)
 
       for (lua_pushnil(L); lua_next(L, -2); lua_pop(L, 1)) {
         int idx = luaL_checkinteger(L, -2) - 1; // key is integer
-        if (idx < 0 || idx > MAX_POINTS_PER_CURVE) {
+        if (idx < 0 || idx >= MAX_POINTS_PER_CURVE) {
           lua_pushinteger(L, 4);
           return 1;
         }

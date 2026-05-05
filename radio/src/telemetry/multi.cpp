@@ -274,6 +274,8 @@ static void processMultiRxChannels(const uint8_t * data, uint8_t len)
       bits |= (uint32_t)(data[byteIdx++]) << (uint32_t)bitsavailable;
       bitsavailable += 8;
     }
+    if (bitsavailable < MULTI_CHAN_BITS)
+      break;
 
     int value = bits & ((1 << MULTI_CHAN_BITS) - 1);
     bitsavailable -= MULTI_CHAN_BITS;
@@ -339,6 +341,11 @@ static void processMultiProtoDef(uint8_t module, const uint8_t * packet, uint8_t
  
 static void processMultiDSMBindPacket(uint8_t module, const uint8_t *packet)
 {
+  if (getModuleMode(module) != MODULE_MODE_BIND) {
+    TRACE("[MP] DSM bind packet ignored outside bind mode");
+    return;
+  }
+
   if (//g_model.moduleData[module].type == MODULE_TYPE_MULTIMODULE &&
       //g_model.moduleData[module].multi.rfProtocol ==
       //    MODULE_SUBTYPE_MULTI_DSM2 &&
@@ -381,9 +388,7 @@ static void processMultiDSMBindPacket(uint8_t module, const uint8_t *packet)
   }
 
   /* Finally stop binding as the rx just told us that it is bound */
-  if (getModuleMode(module) == MODULE_MODE_BIND) {
-      setMultiBindStatus(module, MULTI_BIND_FINISHED);
-  }
+  setMultiBindStatus(module, MULTI_BIND_FINISHED);
 
   // Continue with the common Spektrum Processing
   processDSMBindPacket(packet);
@@ -417,15 +422,15 @@ static void processMultiTelemetryPaket(const uint8_t * packet, uint8_t module)
       break;
 
     case FlyskyIBusTelemetry:
-      if (len >= 28)
-        processFlySkyPacket(data);
+      if (len >= 29)
+        processFlySkyPacket(data, len);
       else
-        TRACE("[MP] Received IBUS telemetry len %d < 28", len);
+        TRACE("[MP] Received IBUS telemetry len %d < 29", len);
       break;
 
     case FlyskyIBusTelemetryAC:
       if (len >= 28)
-        processFlySkyPacketAC(data);
+        processFlySkyPacketAC(data, len);
       else
         TRACE("[MP] Received IBUS telemetry AC len %d < 28", len);
       break;
@@ -438,15 +443,15 @@ static void processMultiTelemetryPaket(const uint8_t * packet, uint8_t module)
       break;
 
     case HottTelemetry:
-      if (len >= 14)
-        processHottPacket(data);
+      if (len >= 15)
+        processHottPacket(data, len);
       else
-        TRACE("[MP] Received HoTT telemetry len %d < 14", len);
+        TRACE("[MP] Received HoTT telemetry len %d < 15", len);
       break;
 
     case MLinkTelemetry:
       if (len > 6)
-        processMLinkPacket(data, true);
+        processMLinkPacket(data, true, len);
       else
         TRACE("[MP] Received M-Link telemetry len %d <= 6", len);
       break;

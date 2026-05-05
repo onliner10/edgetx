@@ -103,6 +103,9 @@ static void curveMove_unsafe(uint8_t index, int8_t shift)
 
 bool moveCurve(uint8_t index, int8_t shift)
 {
+  if (index >= MAX_CURVES)
+    return false;
+
   if (curveEnd[MAX_CURVES-1] + shift > g_model.points + sizeof(g_model.points)) {
     AUDIO_WARNING2();
     return false;
@@ -164,6 +167,9 @@ void curveMirror(uint8_t index)
 
 bool isCurveUsed(uint8_t index)
 {
+  if (index >= MAX_CURVES)
+    return false;
+
   return !is_memclear(&g_model.curves[index], sizeof(CurveHeader)) ||
          !is_memclear(curveAddress(index), DEFAULT_POINTS);
 }
@@ -402,6 +408,9 @@ int applyCustomCurve(int x, uint8_t idx)
 point_t getPoint(uint8_t curveIndex, uint8_t index)
 {
   point_t result = {0, 0};
+  if (curveIndex >= MAX_CURVES)
+    return result;
+
   CurveHeader & crv = g_model.curves[curveIndex];
   int8_t * points = curveAddress(curveIndex);
   bool custom = (crv.type == CURVE_TYPE_CUSTOM);

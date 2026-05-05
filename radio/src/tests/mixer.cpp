@@ -21,6 +21,7 @@
 
 #include "gtests.h"
 #include "hal/adc_driver.h"
+#include "mixes.h"
 
 class TrimsTest : public EdgeTxTest {};
 class MixerTest : public EdgeTxTest {};
@@ -642,6 +643,16 @@ TEST_F(MixerTest, InfiniteRecursiveChannels)
   EXPECT_EQ(chans[0], 0);
 }
 
+TEST_F(MixerTest, InvalidThrottleTraceSourceDoesNotCrashPeriodicUpdate)
+{
+  g_model.thrTraceSrc = 255;
+  g_tmr10ms += 1;
+
+  doMixerPeriodicUpdates();
+
+  EXPECT_EQ(g_model.thrTraceSrc, 0);
+}
+
 TEST_F(MixerTest, BlockingChannel)
 {
   g_model.mixData[0].destCh = 0;
@@ -681,6 +692,58 @@ TEST_F(MixerTest, InvalidCurvePointCountDoesNotCrashPointLookup)
 
   EXPECT_EQ(0, point.x);
   EXPECT_EQ(0, point.y);
+}
+
+TEST_F(MixerTest, InvalidCurveIndexDoesNotCrashPointLookup)
+{
+  point_t point = getPoint(MAX_CURVES, 0);
+
+  EXPECT_EQ(0, point.x);
+  EXPECT_EQ(0, point.y);
+}
+
+TEST_F(MixerTest, InvalidCurveIndexIsNotUsed)
+{
+  EXPECT_FALSE(isCurveUsed(MAX_CURVES));
+}
+
+TEST_F(MixerTest, InvalidCurveIndexDoesNotMoveCurveMemory)
+{
+  EXPECT_FALSE(moveCurve(MAX_CURVES, 1));
+}
+
+TEST_F(MixerTest, InvalidMixIndexDoesNotInsertMix)
+{
+  updateMixCount();
+  uint8_t mixCount = getMixCount();
+
+  insertMix(MAX_MIXERS, 0);
+
+  updateMixCount();
+  EXPECT_EQ(mixCount, getMixCount());
+}
+
+TEST_F(MixerTest, InvalidMixIndexDoesNotDeleteMix)
+{
+  updateMixCount();
+  uint8_t mixCount = getMixCount();
+
+  deleteMix(MAX_MIXERS);
+
+  updateMixCount();
+  EXPECT_EQ(mixCount, getMixCount());
+}
+
+TEST_F(MixerTest, InvalidMixIndexDoesNotCopyMix)
+{
+  updateMixCount();
+  uint8_t mixCount = getMixCount();
+
+  copyMix(MAX_MIXERS, 0, 0);
+  copyMix(0, MAX_MIXERS, 0);
+
+  updateMixCount();
+  EXPECT_EQ(mixCount, getMixCount());
 }
 
 TEST_F(MixerTest, RecursiveAddChannel)
@@ -1072,6 +1135,57 @@ TEST(Trainer, UnpluggedTest)
   trainerSetTimer(0);
   trainerInput[0] = 1024;
   CHECK_DELAY(0, 5000);
+}
+
+TEST_F(MixerTest, TrainerChannelsDoesNotReadPastTrainerInputs)
+{
+  for (uint8_t i = 0; i < MAX_TRAINER_CHANNELS; i++) {
+    trainerInput[i] = i + 1;
+  }
+
+  g_model.customFn[0].swtch = SWSRC_ON;
+  g_model.customFn[0].func = FUNC_TRAINER;
+  g_model.customFn[0].all.param = MAX_STICKS + 1;
+  g_model.customFn[0].active = true;
+  g_model.mixData[0].destCh = MAX_TRAINER_CHANNELS;
+  g_model.mixData[0].mltpx = MLTPX_REPL;
+  g_model.mixData[0].srcRaw = MIXSRC_MAX;
+  g_model.mixData[0].weight = makeSourceNumVal(100);
+  trainerSetTimer(1);
+
+  evalMixes(1);
+
+  EXPECT_EQ(channelOutputs[0], trainerInput[0] * 2);
+  EXPECT_EQ(channelOutputs[MAX_TRAINER_CHANNELS - 1],
+            trainerInput[MAX_TRAINER_CHANNELS - 1] * 2);
+  EXPECT_EQ(channelOutputs[MAX_TRAINER_CHANNELS], CHANNEL_MAX / 256);
+  EXPECT_EQ(channelOutputs[MAX_OUTPUT_CHANNELS - 1], 0);
+}
+
+TEST_F(MixerTest, InvalidTrainerStickSourceDoesNotOverrideStick)
+{
+  const uint8_t stick = 0;
+  anaSetFiltered(inputMappingConvertMode(stick), 512);
+
+  g_eeGeneral.trainer.mix[stick].srcChn = MAX_STICKS;
+  g_eeGeneral.trainer.mix[stick].mode = TRAINER_REPL;
+  g_eeGeneral.trainer.mix[stick].studWeight = 100;
+  trainerInput[MAX_STICKS] = -512;
+
+  g_model.customFn[0].swtch = SWSRC_ON;
+  g_model.customFn[0].func = FUNC_TRAINER;
+  g_model.customFn[0].all.param = stick + 1;
+  g_model.customFn[0].active = true;
+  g_model.mixData[0].destCh = 0;
+  g_model.mixData[0].mltpx = MLTPX_REPL;
+  g_model.mixData[0].srcRaw = MIXSRC_FIRST_STICK + stick;
+  g_model.mixData[0].weight = makeSourceNumVal(100);
+  trainerSetTimer(1);
+
+  evalMixes(1);
+  evalMixes(1);
+
+  EXPECT_EQ(channelOutputs[0], 512);
 }
 
 TEST_F(MixerTest, flightModeTransition)

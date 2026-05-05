@@ -531,6 +531,18 @@ static bool _handle_async_restart(uint8_t module)
   return false;
 }
 
+static int16_t* getModuleChannels(uint8_t module, uint8_t& nChannels)
+{
+  uint8_t channelStart = g_model.moduleData[module].channelsStart;
+  if (channelStart >= MAX_OUTPUT_CHANNELS) {
+    nChannels = 0;
+    return nullptr;
+  }
+
+  nChannels = MAX_OUTPUT_CHANNELS - channelStart;
+  return &channelOutputs[channelStart];
+}
+
 void pulsesSendNextFrame(uint8_t module)
 {
   if (module >= MAX_MODULES) return;
@@ -567,9 +579,8 @@ void pulsesSendNextFrame(uint8_t module)
     // if previous frame not completed, skip this one
     if (drv->txCompleted && !drv->txCompleted(ctx)) return;
 
-    uint8_t channelStart = g_model.moduleData[module].channelsStart;
-    int16_t* channels = &channelOutputs[channelStart];
-    uint8_t nChannels = 16;  // TODO: MAX_CHANNELS - channelsStart
+    uint8_t nChannels;
+    int16_t* channels = getModuleChannels(module, nChannels);
 
     auto buffer = _module_buffers[module]._buffer;
     drv->sendPulses(ctx, buffer, channels, nChannels);
@@ -602,5 +613,7 @@ void setCustomFailsafe(uint8_t moduleIndex)
 
 int32_t getChannelValue(uint8_t channel)
 {
+  if (channel >= MAX_OUTPUT_CHANNELS) return 0;
+
   return channelOutputs[channel] + 2 * PPM_CH_CENTER(channel) - 2 * PPM_CENTER;
 }

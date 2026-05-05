@@ -36,10 +36,44 @@ void pxx1SetInternalBaudrate(uint32_t baudrate)
   _pxx1_internal_baudrate = baudrate;
 }
 
+static uint16_t getModuleChannelIndex(uint8_t moduleIdx, uint8_t index)
+{
+  return static_cast<uint16_t>(g_model.moduleData[moduleIdx].channelsStart) +
+         index;
+}
+
+static int addChannelCenter(uint8_t moduleIdx, uint8_t index, int value)
+{
+  uint16_t channel = getModuleChannelIndex(moduleIdx, index);
+  if (channel >= MAX_OUTPUT_CHANNELS) {
+    return value;
+  }
+
+  return value + 2 * PPM_CH_CENTER(channel) - 2 * PPM_CENTER;
+}
+
+static int getChannelValue(uint8_t moduleIdx, const int16_t* channels,
+                           uint8_t nChannels, uint8_t index)
+{
+  uint16_t channel = getModuleChannelIndex(moduleIdx, index);
+  if (!channels || index >= nChannels || channel >= MAX_OUTPUT_CHANNELS) {
+    return 0;
+  }
+
+  return channels[index] + 2 * PPM_CH_CENTER(channel) - 2 * PPM_CENTER;
+}
+
 template <class PxxTransport>
 void Pxx1Pulses<PxxTransport>::addFlag1(uint8_t module, uint8_t sendFailsafe)
 {
-  uint8_t flag1 = (g_model.moduleData[module].subType << 6);
+  uint8_t subType = g_model.moduleData[module].subType;
+  if (isModuleXJT(module)) {
+    subType = getModuleXJTSubType(module);
+  }
+  else if (isModuleR9MNonAccess(module)) {
+    subType = getModuleR9MSubType(module);
+  }
+  uint8_t flag1 = (subType << 6);
 
   if (moduleState[module].mode == MODULE_MODE_BIND) {
     flag1 |= (g_eeGeneral.countryCode << 1) | PXX_SEND_BIND;
@@ -89,7 +123,11 @@ void Pxx1Pulses<PxxTransport>::addExtraFlags(uint8_t module)
 }
 
 template <class PxxTransport>
-void Pxx1Pulses<PxxTransport>::addChannels(uint8_t moduleIdx, uint8_t sendFailsafe, uint8_t sendUpperChannels)
+void Pxx1Pulses<PxxTransport>::addChannels(uint8_t moduleIdx,
+                                           uint8_t sendFailsafe,
+                                           uint8_t sendUpperChannels,
+                                           const int16_t* channels,
+                                           uint8_t nChannels)
 {
   uint16_t pulseValue = 0;
   uint16_t pulseValueLow = 0;
@@ -103,8 +141,12 @@ void Pxx1Pulses<PxxTransport>::addChannels(uint8_t moduleIdx, uint8_t sendFailsa
         pulseValue = (i < sendUpperChannels ? 2048 : 0);
       }
       else {
+        uint8_t index = (i < sendUpperChannels ? 8 + i : i);
+        uint16_t channel = getModuleChannelIndex(moduleIdx, index);
+        int16_t failsafeValue =
+            channel < MAX_OUTPUT_CHANNELS ? g_model.failsafeChannels[channel]
+                                          : 0;
         if (i < sendUpperChannels) {
-          int16_t failsafeValue = g_model.failsafeChannels[8+i];
           if (failsafeValue == FAILSAFE_CHANNEL_HOLD) {
             pulseValue = 4095;
           }
@@ -112,12 +154,11 @@ void Pxx1Pulses<PxxTransport>::addChannels(uint8_t moduleIdx, uint8_t sendFailsa
             pulseValue = 2048;
           }
           else {
-            failsafeValue += 2*PPM_CH_CENTER(8+g_model.moduleData[moduleIdx].channelsStart+i) - 2*PPM_CENTER;
+            failsafeValue = addChannelCenter(moduleIdx, index, failsafeValue);
             pulseValue = limit(2049, (failsafeValue * 512 / 682) + 3072, 4094);
           }
         }
         else {
-          int16_t failsafeValue = g_model.failsafeChannels[i];
           if (failsafeValue == FAILSAFE_CHANNEL_HOLD) {
             pulseValue = 2047;
           }
@@ -125,7 +166,7 @@ void Pxx1Pulses<PxxTransport>::addChannels(uint8_t moduleIdx, uint8_t sendFailsa
             pulseValue = 0;
           }
           else {
-            failsafeValue += 2*PPM_CH_CENTER(g_model.moduleData[moduleIdx].channelsStart+i) - 2*PPM_CENTER;
+            failsafeValue = addChannelCenter(moduleIdx, index, failsafeValue);
             pulseValue = limit(1, (failsafeValue * 512 / 682) + 1024, 2046);
           }
         }
@@ -133,13 +174,11 @@ void Pxx1Pulses<PxxTransport>::addChannels(uint8_t moduleIdx, uint8_t sendFailsa
     }
     else {
       if (i < sendUpperChannels) {
-        int channel = 8 + g_model.moduleData[moduleIdx].channelsStart + i;
-        int value = channelOutputs[channel] + 2*PPM_CH_CENTER(channel) - 2*PPM_CENTER;
+        int value = getChannelValue(moduleIdx, channels, nChannels, 8 + i);
         pulseValue = limit(2049, (value * 512 / 682) + 3072, 4094);
       }
       else if (i < sentModulePXXChannels(moduleIdx)) {
-        int channel = g_model.moduleData[moduleIdx].channelsStart + i;
-        int value = channelOutputs[channel] + 2*PPM_CH_CENTER(channel) - 2*PPM_CENTER;
+        int value = getChannelValue(moduleIdx, channels, nChannels, i);
         pulseValue = limit(1, (value * 512 / 682) + 1024, 2046);
       }
       else {
@@ -159,7 +198,11 @@ void Pxx1Pulses<PxxTransport>::addChannels(uint8_t moduleIdx, uint8_t sendFailsa
 }
 
 template <class PxxTransport>
-void Pxx1Pulses<PxxTransport>::add8ChannelsFrame(uint8_t module, uint8_t sendUpperChannels, uint8_t sendFailsafe)
+void Pxx1Pulses<PxxTransport>::add8ChannelsFrame(uint8_t module,
+                                                 uint8_t sendUpperChannels,
+                                                 uint8_t sendFailsafe,
+                                                 const int16_t* channels,
+                                                 uint8_t nChannels)
 {
   PxxTransport::initCrc();
 
@@ -176,7 +219,7 @@ void Pxx1Pulses<PxxTransport>::add8ChannelsFrame(uint8_t module, uint8_t sendUpp
   PxxTransport::addByte(0);
 
   // Channels
-  addChannels(module, sendFailsafe, sendUpperChannels);
+  addChannels(module, sendFailsafe, sendUpperChannels, channels, nChannels);
 
   // Extra flags
   addExtraFlags(module);
@@ -198,7 +241,9 @@ Pxx1Pulses<PxxTransport>::Pxx1Pulses(uint8_t* buffer)
 }
 
 template <class PxxTransport>
-void Pxx1Pulses<PxxTransport>::setupFrame(uint8_t module, Pxx1Type type)
+void Pxx1Pulses<PxxTransport>::setupFrame(uint8_t module, Pxx1Type type,
+                                          const int16_t* channels,
+                                          uint8_t nChannels)
 {
   uint8_t sendUpperChannels = 0;
   uint8_t sendFailsafe = 0;
@@ -213,9 +258,9 @@ void Pxx1Pulses<PxxTransport>::setupFrame(uint8_t module, Pxx1Type type)
                       g_model.moduleData[module].failsafeMode != FAILSAFE_RECEIVER);
       moduleState[module].counter = 1000;
     }
-    add8ChannelsFrame(module, 0, sendFailsafe);
+    add8ChannelsFrame(module, 0, sendFailsafe, channels, nChannels);
     if (sentModulePXXChannels(module) > 8) {
-      add8ChannelsFrame(module, 8, sendFailsafe);
+      add8ChannelsFrame(module, 8, sendFailsafe, channels, nChannels);
     }
     return;
   }
@@ -240,7 +285,8 @@ void Pxx1Pulses<PxxTransport>::setupFrame(uint8_t module, Pxx1Type type)
     }
   }
 
-  add8ChannelsFrame(module, sendUpperChannels, sendFailsafe);
+  add8ChannelsFrame(module, sendUpperChannels, sendFailsafe, channels,
+                    nChannels);
 
   if (moduleState[module].counter-- == 0) {
     moduleState[module].counter = 999;
@@ -381,10 +427,6 @@ static void pxx1DeInit(void* ctx)
 
 static void pxx1SendPulses(void* ctx, uint8_t* buffer, int16_t* channels, uint8_t nChannels)
 {
-  // TODO:
-  (void)channels;
-  (void)nChannels;
-
   auto mod_st = (etx_module_state_t*)ctx;
   auto module = modulePortGetModule(mod_st);
   auto pxx1_type = (Pxx1Type)(uintptr_t)mod_st->user_data;
@@ -392,11 +434,11 @@ static void pxx1SendPulses(void* ctx, uint8_t* buffer, int16_t* channels, uint8_
   uint32_t frame_len = 0;
   if (pxx1_type == Pxx1Type::PWM) {
     PwmPxx1Pulses frame(buffer);
-    frame.setupFrame(module, pxx1_type);
+    frame.setupFrame(module, pxx1_type, channels, nChannels);
     frame_len = frame.getSize();
   } else {
     UartPxx1Pulses frame(buffer);
-    frame.setupFrame(module, pxx1_type);
+    frame.setupFrame(module, pxx1_type, channels, nChannels);
     frame_len = frame.getSize();
   }
 

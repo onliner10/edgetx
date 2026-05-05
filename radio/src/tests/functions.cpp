@@ -70,7 +70,47 @@ TEST_F(SpecialFunctionsTest, FlightReset)
   EXPECT_FALSE((bool)(mainRequestFlags & (1 << REQUEST_FLIGHT_RESET)));
 }
 
+TEST_F(SpecialFunctionsTest, InvalidOverrideChannelDoesNotCrash)
+{
+  g_model.customFn[0].swtch = SWSRC_ON;
+  g_model.customFn[0].func = FUNC_OVERRIDE_CHANNEL;
+  g_model.customFn[0].all.param = 255;
+  g_model.customFn[0].all.val = 100;
+  g_model.customFn[0].active = true;
+
+  evalFunctions(g_model.customFn, modelFunctionsContext);
+
+  EXPECT_FALSE(g_model.customFn[0].active);
+}
+
+TEST_F(SpecialFunctionsTest, InvalidSetTimerDoesNotCrash)
+{
+  g_model.customFn[0].swtch = SWSRC_ON;
+  g_model.customFn[0].func = FUNC_SET_TIMER;
+  g_model.customFn[0].all.param = 255;
+  g_model.customFn[0].all.val = 100;
+  g_model.customFn[0].active = true;
+
+  evalFunctions(g_model.customFn, modelFunctionsContext);
+
+  EXPECT_FALSE(g_model.customFn[0].active);
+}
+
 #if defined(GVARS)
+TEST_F(SpecialFunctionsTest, InvalidAdjustGvarDoesNotCrash)
+{
+  g_model.customFn[0].swtch = SWSRC_ON;
+  g_model.customFn[0].func = FUNC_ADJUST_GVAR;
+  g_model.customFn[0].all.mode = FUNC_ADJUST_GVAR_INCDEC;
+  g_model.customFn[0].all.param = 255;
+  g_model.customFn[0].all.val = 1;
+  g_model.customFn[0].active = true;
+
+  evalFunctions(g_model.customFn, modelFunctionsContext);
+
+  EXPECT_FALSE(g_model.customFn[0].active);
+}
+
 TEST_F(SpecialFunctionsTest, GvarsInc)
 {
   int sw;

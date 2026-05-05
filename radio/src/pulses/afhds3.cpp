@@ -32,6 +32,7 @@
 #include "mixer_scheduler.h"
 #include "hal/module_driver.h"
 #include "hal/module_port.h"
+#include "telemetry/flysky_ibus.h"
 
 #define SET_DIRTY() storageDirty(EE_MODEL)
 
@@ -50,8 +51,6 @@ extern uint16_t  sns_RFCurrentPower;
 
 //get channel value outside of afhds3 namespace
 int32_t getChannelValue(uint8_t channel);
-void processFlySkyAFHDS3Sensor(const uint8_t * packet, uint8_t type);
-void processFlySkySensor(const uint8_t * packet, uint8_t type);
 
 namespace afhds3
 {
@@ -63,6 +62,15 @@ static uint8_t _phyMode_channels[] = {
   8,  // ROUTINE_FLCR6_8CH
   12, // ROUTINE_LORA_12CH
 };
+
+static uint8_t getPhyModeChannels(uint8_t phyMode)
+{
+  if (phyMode >= DIM(_phyMode_channels)) {
+    return AFHDS3_MAX_CHANNELS;
+  }
+
+  return _phyMode_channels[phyMode];
+}
 
 // enum COMMAND_DIRECTION
 // {
@@ -368,6 +376,11 @@ static const COMMAND periodicRequestCommands[] =
 
 static const uint16_t AFHDS3_POWER[] = {56, 68, 80, 96, 108, 120, 132};
 
+static uint16_t getAfhds3PowerValue(uint8_t rfPower)
+{
+  return rfPower < DIM(AFHDS3_POWER) ? AFHDS3_POWER[rfPower] : AFHDS3_POWER[0];
+}
+
 //Static collection of afhds3 object instances by module
 static ProtoState protoState[MAX_MODULES];
 
@@ -512,7 +525,7 @@ void ProtoState::setupFrame()
 
     if (cmd == COMMAND::VIRTUAL_FAILSAFE) {
       Config_u* cfg = this->getConfig();
-      uint8_t len =_phyMode_channels[cfg->v0.PhyMode];
+      uint8_t len = getPhyModeChannels(cfg->v0.PhyMode);
       if (!hasTelemetry()) {
           uint16_t failSafe[AFHDS3_MAX_CHANNELS + 1] = {
           ((AFHDS3_MAX_CHANNELS << 8) | CHANNELS_DATA_MODE::FAIL_SAFE), 0};
@@ -540,11 +553,12 @@ void ProtoState::setupFrame()
   if (checkDirtyFlag(DC_RX_CMD_TX_PWR))
   {
 //     TRACE("AFHDS3 [RX_CMD_TX_PWR] %d", AFHDS3_POWER[moduleData->afhds3.rfPower] / 4);
+    uint16_t rfPower = getAfhds3PowerValue(moduleData->afhds3.rfPower);
     uint8_t data[] = { (uint8_t)(RX_CMD_TX_PWR&0xFF), (uint8_t)((RX_CMD_TX_PWR>>8)&0xFF), 2,
-                       (uint8_t)(AFHDS3_POWER[moduleData->afhds3.rfPower]&0xFF),  (uint8_t)((AFHDS3_POWER[moduleData->afhds3.rfPower]>>8)&0xFF)};
+                       (uint8_t)(rfPower&0xFF),  (uint8_t)((rfPower>>8)&0xFF)};
     trsp.putFrame(COMMAND::SEND_COMMAND, FRAME_TYPE::REQUEST_SET_EXPECT_DATA, data, sizeof(data));
     clearDirtyFlag(DC_RX_CMD_TX_PWR);
-    RFCurrentPower = (AFHDS3_POWER[moduleData->afhds3.rfPower]&0xFF);
+    RFCurrentPower = (rfPower&0xFF);
     return;
   }
   else if( EXTERNAL_MODULE == module_index )
@@ -616,6 +630,15 @@ bool containsData(enum FRAME_TYPE frameType)
       frameType == FRAME_TYPE::REQUEST_SET_NO_RESP);
 }
 
+constexpr size_t AFHDS3_MIN_FRAME_SIZE = offsetof(AfhdsFrame, value) + 2;
+
+size_t getPayloadLength(uint8_t rxBufferCount)
+{
+  return rxBufferCount >= AFHDS3_MIN_FRAME_SIZE
+             ? rxBufferCount - AFHDS3_MIN_FRAME_SIZE
+             : 0;
+}
+
 void ProtoState::setState(ModuleState state)
 {
   if (state == this->state) {
@@ -658,12 +681,21 @@ void ProtoState::requestInfoAndRun(bool send)
 
 void ProtoState::parseData(uint8_t* rxBuffer, uint8_t rxBufferCount)
 {
+  if (rxBufferCount < AFHDS3_MIN_FRAME_SIZE) {
+    return;
+  }
+
   AfhdsFrame* responseFrame = reinterpret_cast<AfhdsFrame*>(rxBuffer);
+  uint8_t* payload = responseFrame->GetValue();
+  size_t payloadLength = getPayloadLength(rxBufferCount);
   if (containsData((enum FRAME_TYPE) responseFrame->frameType)) {
     switch (responseFrame->command) {
       case COMMAND::MODULE_READY:
 //         TRACE("AFHDS3 [MODULE_READY] %02X", responseFrame->value);
-        if (responseFrame->value == MODULE_STATUS_READY) {
+        if (payloadLength < 1) {
+          break;
+        }
+        if (payload[0] == MODULE_STATUS_READY) {
           setState(ModuleState::STATE_READY);
           // requestInfoAndRun();
         }
@@ -674,8 +706,14 @@ void ProtoState::parseData(uint8_t* rxBuffer, uint8_t rxBufferCount)
       case COMMAND::MODULE_GET_CONFIG: {
 //        modelcfgGet = false;
 //         TRACE("AFHDS3 [MODULE_GET_CONFIG]");
-        size_t len = min<size_t>(sizeof(cfg.buffer), rxBufferCount);
-        std::memcpy((void*) cfg.buffer, responseFrame->GetValue(), len);
+        if (payloadLength < 1) {
+          break;
+        }
+        size_t configSize = payload[0] == 1 ? sizeof(cfg.v1) : sizeof(cfg.v0);
+        if (payloadLength < configSize) {
+          break;
+        }
+        std::memcpy((void*) cfg.buffer, payload, configSize);
         moduleData->afhds3.emi = cfg.v0.EMIStandard;
         moduleData->afhds3.telemetry = cfg.v0.IsTwoWay;
         moduleData->afhds3.phyMode = cfg.v0.PhyMode;
@@ -685,20 +723,28 @@ void ProtoState::parseData(uint8_t* rxBuffer, uint8_t rxBufferCount)
         cfg.others.lastUpdated = get_tmr10ms();
       } break;
       case COMMAND::MODULE_VERSION:
-        std::memcpy((void*) &version, responseFrame->GetValue(), sizeof(version));
+        if (payloadLength >= sizeof(version)) {
+          std::memcpy((void*)&version, payload, sizeof(version));
+        }
 //         TRACE("AFHDS3 [MODULE_VERSION] Product %d, HW %d, BOOT %d, FW %d",
 //               version.productNumber, version.hardwareVersion,
 //               version.bootloaderVersion, version.firmwareVersion);
         break;
       case COMMAND::MODULE_RFPOWER:
-        {  uint8_t* value = responseFrame->GetValue();
-          RFCurrentPower = (value[1]<<8) + value[0];
+        {
+          if (payloadLength < 2) {
+            break;
+          }
+          RFCurrentPower = (payload[1]<<8) + payload[0];
         }
         break;
       case COMMAND::MODULE_STATE:
 //        TRACE("AFHDS3 [MODULE_STATE] %02X", responseFrame->value);
-        setState((ModuleState)responseFrame->value);
-        if(STATE_SYNC_DONE == (ModuleState)responseFrame->value){
+        if (payloadLength < 1) {
+          break;
+        }
+        setState((ModuleState)payload[0]);
+        if(STATE_SYNC_DONE == (ModuleState)payload[0]){
           if( !this->rx_state )
           {
               auto *cfg = this->getConfig();
@@ -719,7 +765,10 @@ void ProtoState::parseData(uint8_t* rxBuffer, uint8_t rxBufferCount)
         break;
       case COMMAND::MODULE_MODE:
 //         TRACE("AFHDS3 [MODULE_MODE] %02X", responseFrame->value);
-        if (responseFrame->value != CMD_RESULT::SUCCESS) {
+        if (payloadLength < 1) {
+          break;
+        }
+        if (payload[0] != CMD_RESULT::SUCCESS) {
           setState(ModuleState::STATE_NOT_READY);
         }
         else if( !RFCurrentPower && INTERNAL_MODULE==module_index )
@@ -728,14 +777,20 @@ void ProtoState::parseData(uint8_t* rxBuffer, uint8_t rxBufferCount)
         }
         break;
       case COMMAND::MODULE_SET_CONFIG:
-        if (responseFrame->value != CMD_RESULT::SUCCESS) {
+        if (payloadLength < 1) {
+          break;
+        }
+        if (payload[0] != CMD_RESULT::SUCCESS) {
           setState(ModuleState::STATE_NOT_READY);
         }
 //         TRACE("AFHDS3 [MODULE_SET_CONFIG], %02X", responseFrame->value);
         break;
       case COMMAND::MODEL_ID:
 //         TRACE("AFHDS3 [MODEL_ID]");
-        if (responseFrame->value == CMD_RESULT::SUCCESS) {
+        if (payloadLength < 1) {
+          break;
+        }
+        if (payload[0] == CMD_RESULT::SUCCESS) {
 //         TRACE("Enqueue get config");
 //          trsp.enqueue(COMMAND::MODULE_GET_CONFIG, FRAME_TYPE::REQUEST_GET_DATA);
 //          trsp.enqueue(COMMAND::MODULE_GET_CONFIG, FRAME_TYPE::REQUEST_GET_DATA);
@@ -744,14 +799,18 @@ void ProtoState::parseData(uint8_t* rxBuffer, uint8_t rxBufferCount)
         break;
       case COMMAND::TELEMETRY_DATA:
         {
-        uint8_t* telemetry = responseFrame->GetValue();
+        if (payloadLength < 1) {
+          break;
+        }
+        uint8_t* telemetry = payload;
+        uint8_t* telemetryEnd = payload + payloadLength;
 
         if (telemetry[0] == 0x22) {
           telemetry++;
-          while (telemetry < rxBuffer + rxBufferCount) {
+          while (telemetry < telemetryEnd) {
 
             uint8_t len = telemetry[0];
-            if (len < 4 || telemetry + len > rxBuffer + rxBufferCount)
+            if (len < 4 || telemetry + len > telemetryEnd)
             {
               break;
             }
@@ -763,7 +822,11 @@ void ProtoState::parseData(uint8_t* rxBuffer, uint8_t rxBufferCount)
       }
         break;
       case COMMAND::COMMAND_RESULT: {
-        uint8_t *data = responseFrame->GetValue();
+        if (payloadLength < 3) {
+          break;
+        }
+        uint8_t *data = payload;
+        uint8_t *dataEnd = payload + payloadLength;
         uint16_t cmd_code = *data++;
         cmd_code |= (*data++)<<8;
         uint8_t result  = *data++;
@@ -800,13 +863,14 @@ void ProtoState::parseData(uint8_t* rxBuffer, uint8_t rxBufferCount)
               clearDirtyFlag(DC_RX_CMD_BUS_TYPE_V0_2);
             } break;
           case RX_CMD_IBUS_DIRECTION:
-            if(RX_CMDRESULT::RXSUCCESS==*data++) {
+            if(data < dataEnd && RX_CMDRESULT::RXSUCCESS==*data++) {
               clearDirtyFlag(DC_RX_CMD_BUS_DIRECTION);
               DIRTY_CMD(cfg, DC_RX_CMD_BUS_TYPE_V0_2);
             }break;
           case RX_CMD_GET_VERSION :
             if(RX_CMDRESULT::RXSUCCESS==result) {
-              if(14==*data++)
+              if(data < dataEnd && 14==*data++ &&
+                 static_cast<size_t>(dataEnd - data) >= sizeof(rx_version))
               {
                 std::memcpy((void*) &rx_version, data, sizeof(rx_version));
                 clearDirtyFlag(DC_RX_CMD_GET_RX_VERSION);
@@ -852,8 +916,9 @@ bool ProtoState::syncSettings()
   if (checkDirtyFlag(DC_RX_CMD_TX_PWR))
   {
 //     TRACE("AFHDS3 [RX_CMD_TX_PWR] %d", AFHDS3_POWER[moduleData->afhds3.rfPower] / 4);
+    uint16_t rfPower = getAfhds3PowerValue(moduleData->afhds3.rfPower);
     uint8_t data[] = { (uint8_t)(RX_CMD_TX_PWR&0xFF), (uint8_t)((RX_CMD_TX_PWR>>8)&0xFF), 2,
-                       (uint8_t)(AFHDS3_POWER[moduleData->afhds3.rfPower]&0xFF),  (uint8_t)((AFHDS3_POWER[moduleData->afhds3.rfPower]>>8)&0xFF)};
+                       (uint8_t)(rfPower&0xFF),  (uint8_t)((rfPower>>8)&0xFF)};
     trsp.putFrame(COMMAND::SEND_COMMAND, FRAME_TYPE::REQUEST_SET_EXPECT_DATA, data, sizeof(data));
     clearDirtyFlag(DC_RX_CMD_TX_PWR);
     return true;
@@ -970,19 +1035,19 @@ bool ProtoState::syncSettings()
 void ProtoState::sendChannelsData()
 {
   uint8_t channels_start = moduleData->channelsStart;
-  uint8_t channelsCount = 8 + moduleData->channelsCount;
-  uint8_t channels_last = channels_start + channelsCount;
+  uint8_t channelsCount = sentModuleChannels(module_index);
 
   int16_t buffer[AFHDS3_MAX_CHANNELS + 1] = {0};
 
   uint8_t* header = (uint8_t*)buffer;
   header[0] = CHANNELS_DATA_MODE::CHANNELS;
 
-  uint8_t channels = _phyMode_channels[cfg.v0.PhyMode];
+  uint8_t channels = getPhyModeChannels(cfg.v0.PhyMode);
+  channelsCount = min<uint8_t>(channelsCount, channels);
   header[1] = channels;
 
-  for (uint8_t channel = channels_start, index = 1; channel < channels_last;
-       channel++, index++) {
+  for (uint8_t index = 1; index <= channelsCount; index++) {
+    uint8_t channel = channels_start + index - 1;
     int16_t channelValue = convert(::getChannelValue(channel));
     buffer[index] = channelValue;
   }
@@ -1094,10 +1159,11 @@ uint8_t ProtoState::setFailSafe(int16_t* target, uint8_t rfchannelsCount )
 {
   int16_t pulseValue = 0;
   uint8_t channels_start = moduleData->channelsStart;
-  uint8_t channelsCount = 8 + moduleData->channelsCount;
-  uint8_t channels_last = channels_start + channelsCount;
+  uint8_t channelsCount = min<uint8_t>(rfchannelsCount,
+                                       sentModuleChannels(module_index));
   std::memset(target, 0, 2*rfchannelsCount );
-  for (uint8_t channel = channels_start, i=0; i<rfchannelsCount && channel < channels_last; channel++, i++) {
+  for (uint8_t i = 0; i < channelsCount; i++) {
+    uint8_t channel = channels_start + i;
     if (moduleData->failsafeMode == FAILSAFE_CUSTOM) {
       if(FAILSAFE_CHANNEL_HOLD==g_model.failsafeChannels[channel]){
         pulseValue = FAILSAFE_HOLD_VALUE;

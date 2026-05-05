@@ -129,8 +129,14 @@ void processCrossfireTelemetryValue(uint8_t index, int32_t value)
 
 template <int N>
 bool getCrossfireTelemetryValue(uint8_t index, int32_t& value,
-                                uint8_t* rxBuffer)
+                                uint8_t* rxBuffer, uint8_t rxBufferCount,
+                                uint8_t crsfPayloadLen)
 {
+  uint16_t lastIndex = index + N - 1;
+  if (lastIndex >= rxBufferCount || lastIndex > crsfPayloadLen) {
+    return false;
+  }
+
   bool result = false;
   uint8_t * byte = &rxBuffer[index];
   value = (*byte & 0x80) ? -1 : 0;
@@ -147,6 +153,10 @@ bool getCrossfireTelemetryValue(uint8_t index, int32_t& value,
 void processCrossfireTelemetryFrame(uint8_t module, uint8_t* rxBuffer,
                                     uint8_t rxBufferCount)
 {
+  if (rxBufferCount < 3) {
+    return;
+  }
+
   if (telemetryState == TELEMETRY_INIT &&
       moduleState[module].counter != CRSF_FRAME_MODELID_SENT) {
     moduleState[module].counter = CRSF_FRAME_MODELID;
@@ -157,27 +167,27 @@ void processCrossfireTelemetryFrame(uint8_t module, uint8_t* rxBuffer,
   int32_t value;
   switch(id) {
     case CF_VARIO_ID:
-      if (getCrossfireTelemetryValue<2>(3, value, rxBuffer))
+      if (getCrossfireTelemetryValue<2>(3, value, rxBuffer, rxBufferCount, crsfPayloadLen))
         processCrossfireTelemetryValue(VERTICAL_SPEED_INDEX, value);
       break;
 
     case GPS_ID:
-      if (getCrossfireTelemetryValue<4>(3, value, rxBuffer))
+      if (getCrossfireTelemetryValue<4>(3, value, rxBuffer, rxBufferCount, crsfPayloadLen))
         processCrossfireTelemetryValue(GPS_LATITUDE_INDEX, value/10);
-      if (getCrossfireTelemetryValue<4>(7, value, rxBuffer))
+      if (getCrossfireTelemetryValue<4>(7, value, rxBuffer, rxBufferCount, crsfPayloadLen))
         processCrossfireTelemetryValue(GPS_LONGITUDE_INDEX, value/10);
-      if (getCrossfireTelemetryValue<2>(11, value, rxBuffer))
+      if (getCrossfireTelemetryValue<2>(11, value, rxBuffer, rxBufferCount, crsfPayloadLen))
         processCrossfireTelemetryValue(GPS_GROUND_SPEED_INDEX, value);
-      if (getCrossfireTelemetryValue<2>(13, value, rxBuffer))
+      if (getCrossfireTelemetryValue<2>(13, value, rxBuffer, rxBufferCount, crsfPayloadLen))
         processCrossfireTelemetryValue(GPS_HEADING_INDEX, value);
-      if (getCrossfireTelemetryValue<2>(15, value, rxBuffer))
+      if (getCrossfireTelemetryValue<2>(15, value, rxBuffer, rxBufferCount, crsfPayloadLen))
         processCrossfireTelemetryValue(GPS_ALTITUDE_INDEX,  value - 1000);
-      if (getCrossfireTelemetryValue<1>(17, value, rxBuffer))
+      if (getCrossfireTelemetryValue<1>(17, value, rxBuffer, rxBufferCount, crsfPayloadLen))
         processCrossfireTelemetryValue(GPS_SATELLITES_INDEX, value);
       break;
 
     case BARO_ALT_ID:
-      if (getCrossfireTelemetryValue<2>(3, value, rxBuffer)) {
+      if (getCrossfireTelemetryValue<2>(3, value, rxBuffer, rxBufferCount, crsfPayloadLen)) {
         if (value & 0x8000) {
           // Altitude in meters
           value &= ~(0x8000);
@@ -193,7 +203,7 @@ void processCrossfireTelemetryFrame(uint8_t module, uint8_t* rxBuffer,
       // Length of TBS BARO_ALT has 4 payload bytes with just 2 bytes of altitude
       // but support including TBS VARIO if the declared payload length is 5 bytes
       if (crsfPayloadLen == 5 &&
-          getCrossfireTelemetryValue<1>(5, value, rxBuffer)) {
+          getCrossfireTelemetryValue<1>(5, value, rxBuffer, rxBufferCount, crsfPayloadLen)) {
        constexpr int Kl = 100;       // linearity constant;
        constexpr float Kr = .026;    // range constant;
 
@@ -205,12 +215,12 @@ void processCrossfireTelemetryFrame(uint8_t module, uint8_t* rxBuffer,
       // Length of TBS BARO_ALT has 4 payload bytes with just 2 bytes of altitude
       // but support including ELRS VARIO if the declared payload length is 6 bytes or more
       if (crsfPayloadLen > 5 &&
-          getCrossfireTelemetryValue<2>(5, value, rxBuffer))
+          getCrossfireTelemetryValue<2>(5, value, rxBuffer, rxBufferCount, crsfPayloadLen))
         processCrossfireTelemetryValue(VERTICAL_SPEED_INDEX, value);
       break;
 
     case AIRSPEED_ID:
-      if (getCrossfireTelemetryValue<2>(3, value, rxBuffer)) {
+      if (getCrossfireTelemetryValue<2>(3, value, rxBuffer, rxBufferCount, crsfPayloadLen)) {
         // Airspeed in 0.1 * km/h (hectometers/h)
         // Converstion to KMH is done through PREC1
         processCrossfireTelemetryValue(AIRSPEED_INDEX, value);
@@ -219,51 +229,73 @@ void processCrossfireTelemetryFrame(uint8_t module, uint8_t* rxBuffer,
 
     case CF_RPM_ID:
     {
-      getCrossfireTelemetryValue<1>(3, value, rxBuffer);
+      if (!getCrossfireTelemetryValue<1>(3, value, rxBuffer, rxBufferCount,
+                                         crsfPayloadLen)) {
+        break;
+      }
       uint8_t sensorID = value;
       for(uint8_t i = 0; i * 3 < (crsfPayloadLen - 4);  i++) {
-        getCrossfireTelemetryValue<3>(4 + i * 3, value, rxBuffer);
-        const CrossfireSensor & sensor = crossfireSensors[CF_RPM_INDEX];
-        setTelemetryValue(PROTOCOL_TELEMETRY_CROSSFIRE, sensor.id + (sensorID << 8), 0, i,
-                          value, sensor.unit, sensor.precision);
+        if (getCrossfireTelemetryValue<3>(4 + i * 3, value, rxBuffer,
+                                          rxBufferCount, crsfPayloadLen)) {
+          const CrossfireSensor & sensor = crossfireSensors[CF_RPM_INDEX];
+          setTelemetryValue(PROTOCOL_TELEMETRY_CROSSFIRE,
+                            sensor.id + (sensorID << 8), 0, i, value,
+                            sensor.unit, sensor.precision);
+        }
       }
       break;
     }
 
     case TEMP_ID:
     {
-      getCrossfireTelemetryValue<1>(3, value, rxBuffer);
+      if (!getCrossfireTelemetryValue<1>(3, value, rxBuffer, rxBufferCount,
+                                         crsfPayloadLen)) {
+        break;
+      }
       uint8_t sensorID = value;
       for(uint8_t i = 0; i * 2 < (crsfPayloadLen - 4);  i++) {
-        getCrossfireTelemetryValue<2>(4 + i * 2, value, rxBuffer);
-        const CrossfireSensor & sensor = crossfireSensors[TEMP_INDEX];
-        setTelemetryValue(PROTOCOL_TELEMETRY_CROSSFIRE, sensor.id + (sensorID << 8), 0, i,
-                          value, sensor.unit, sensor.precision);
+        if (getCrossfireTelemetryValue<2>(4 + i * 2, value, rxBuffer,
+                                          rxBufferCount, crsfPayloadLen)) {
+          const CrossfireSensor & sensor = crossfireSensors[TEMP_INDEX];
+          setTelemetryValue(PROTOCOL_TELEMETRY_CROSSFIRE,
+                            sensor.id + (sensorID << 8), 0, i, value,
+                            sensor.unit, sensor.precision);
+        }
       }
       break;
     }
 
     case CELLS_ID:
     {
-      getCrossfireTelemetryValue<1>(3, value, rxBuffer);
+      if (!getCrossfireTelemetryValue<1>(3, value, rxBuffer, rxBufferCount,
+                                         crsfPayloadLen)) {
+        break;
+      }
       uint8_t sensorID = value;
 
       if (sensorID < 128) {
         // Treating frame as Cells sensor
         // We can handle only up to 8 cells
         for(uint8_t i = 0; i * 2 < min(16, crsfPayloadLen - 4);  i++) {
-          getCrossfireTelemetryValue<2>(4 + i * 2, value, rxBuffer);
-          const CrossfireSensor & sensor = crossfireSensors[CELLS_INDEX];
-          setTelemetryValue(PROTOCOL_TELEMETRY_CROSSFIRE, sensor.id + (sensorID << 8), 0, 0,
-                          i << 16 | value / 10, sensor.unit, sensor.precision);
+          if (getCrossfireTelemetryValue<2>(4 + i * 2, value, rxBuffer,
+                                            rxBufferCount, crsfPayloadLen)) {
+            const CrossfireSensor & sensor = crossfireSensors[CELLS_INDEX];
+            setTelemetryValue(PROTOCOL_TELEMETRY_CROSSFIRE,
+                              sensor.id + (sensorID << 8), 0, 0,
+                              i << 16 | value / 10, sensor.unit,
+                              sensor.precision);
+          }
         }
       } else {
         // Treating frame as Voltage sensor array
         for(uint8_t i = 0; i * 2 < (crsfPayloadLen - 4);  i++) {
-          value = (rxBuffer[4 + i * 2] << 8) + rxBuffer[4 + i * 2 + 1];
-          const CrossfireSensor & sensor = crossfireSensors[VOLT_ARRAY_INDEX];
-          setTelemetryValue(PROTOCOL_TELEMETRY_CROSSFIRE, sensor.id + (sensorID << 8), 0, i,
-                                    value / 10, sensor.unit, sensor.precision);
+          if (getCrossfireTelemetryValue<2>(4 + i * 2, value, rxBuffer,
+                                            rxBufferCount, crsfPayloadLen)) {
+            const CrossfireSensor & sensor = crossfireSensors[VOLT_ARRAY_INDEX];
+            setTelemetryValue(PROTOCOL_TELEMETRY_CROSSFIRE,
+                              sensor.id + (sensorID << 8), 0, i, value / 10,
+                              sensor.unit, sensor.precision);
+          }
         }
       }
       break;
@@ -271,7 +303,7 @@ void processCrossfireTelemetryFrame(uint8_t module, uint8_t* rxBuffer,
 
     case LINK_ID:
       for (unsigned int i=0; i<=TX_SNR_INDEX; i++) {
-        if (getCrossfireTelemetryValue<1>(3+i, value, rxBuffer)) {
+        if (getCrossfireTelemetryValue<1>(3+i, value, rxBuffer, rxBufferCount, crsfPayloadLen)) {
           if (i == TX_POWER_INDEX) {
             static const int32_t power_values[] = {0,    10,   25,  100, 500,
                                                    1000, 2000, 250, 50};
@@ -299,12 +331,23 @@ void processCrossfireTelemetryFrame(uint8_t module, uint8_t* rxBuffer,
 
     case CHANNELS_ID:
       if (g_model.trainerData.mode == TRAINER_MODE_CRSF) {
+        constexpr uint8_t trainerChannels =
+            CROSSFIRE_CHANNELS_COUNT < MAX_TRAINER_CHANNELS
+                ? CROSSFIRE_CHANNELS_COUNT
+                : MAX_TRAINER_CHANNELS;
+        constexpr uint8_t channelBytes =
+            (trainerChannels * CROSSFIRE_CH_BITS + 7) / 8;
+        if (crsfPayloadLen < 2 + channelBytes ||
+            rxBufferCount < 3 + channelBytes) {
+          break;
+        }
+
         uint8_t inputbitsavailable = 0;
         uint32_t inputbits = 0;
         uint8_t  byteIdx = 3;
         int16_t *pulses = trainerInput;
 
-        for (int i = 0; i < min(CROSSFIRE_CHANNELS_COUNT, MAX_TRAINER_CHANNELS); i++) {
+        for (int i = 0; i < trainerChannels; i++) {
           while (inputbitsavailable < CROSSFIRE_CH_BITS) {
             inputbits |= (uint32_t)(rxBuffer[byteIdx++]) << inputbitsavailable;
             inputbitsavailable += 8;
@@ -319,60 +362,69 @@ void processCrossfireTelemetryFrame(uint8_t module, uint8_t* rxBuffer,
       break;
 
     case LINK_RX_ID:
-      if (getCrossfireTelemetryValue<1>(4, value, rxBuffer))
+      if (getCrossfireTelemetryValue<1>(4, value, rxBuffer, rxBufferCount, crsfPayloadLen))
         processCrossfireTelemetryValue(RX_RSSI_PERC_INDEX, value);
-      if (getCrossfireTelemetryValue<1>(7, value, rxBuffer))
+      if (getCrossfireTelemetryValue<1>(7, value, rxBuffer, rxBufferCount, crsfPayloadLen))
         processCrossfireTelemetryValue(TX_RF_POWER_INDEX, value);
       break;
 
     case LINK_TX_ID:
-      if (getCrossfireTelemetryValue<1>(4, value, rxBuffer))
+      if (getCrossfireTelemetryValue<1>(4, value, rxBuffer, rxBufferCount, crsfPayloadLen))
         processCrossfireTelemetryValue(TX_RSSI_PERC_INDEX, value);
-      if (getCrossfireTelemetryValue<1>(7, value, rxBuffer))
+      if (getCrossfireTelemetryValue<1>(7, value, rxBuffer, rxBufferCount, crsfPayloadLen))
         processCrossfireTelemetryValue(RX_RF_POWER_INDEX, value);
-      if (getCrossfireTelemetryValue<1>(8, value, rxBuffer))
+      if (getCrossfireTelemetryValue<1>(8, value, rxBuffer, rxBufferCount, crsfPayloadLen))
         processCrossfireTelemetryValue(TX_FPS_INDEX, value * 10);
       break;
 
     case BATTERY_ID:
-      if (getCrossfireTelemetryValue<2>(3, value, rxBuffer))
+      if (getCrossfireTelemetryValue<2>(3, value, rxBuffer, rxBufferCount, crsfPayloadLen))
         processCrossfireTelemetryValue(BATT_VOLTAGE_INDEX, value);
-      if (getCrossfireTelemetryValue<2>(5, value, rxBuffer))
+      if (getCrossfireTelemetryValue<2>(5, value, rxBuffer, rxBufferCount, crsfPayloadLen))
         processCrossfireTelemetryValue(BATT_CURRENT_INDEX, value);
-      if (getCrossfireTelemetryValue<3>(7, value, rxBuffer))
+      if (getCrossfireTelemetryValue<3>(7, value, rxBuffer, rxBufferCount, crsfPayloadLen))
         processCrossfireTelemetryValue(BATT_CAPACITY_INDEX, value);
-      if (getCrossfireTelemetryValue<1>(10, value, rxBuffer))
+      if (getCrossfireTelemetryValue<1>(10, value, rxBuffer, rxBufferCount, crsfPayloadLen))
         processCrossfireTelemetryValue(BATT_REMAINING_INDEX, value);
       break;
 
     case ATTITUDE_ID:
-      if (getCrossfireTelemetryValue<2>(3, value, rxBuffer))
+      if (getCrossfireTelemetryValue<2>(3, value, rxBuffer, rxBufferCount, crsfPayloadLen))
         processCrossfireTelemetryValue(ATTITUDE_PITCH_INDEX, value/10);
-      if (getCrossfireTelemetryValue<2>(5, value, rxBuffer))
+      if (getCrossfireTelemetryValue<2>(5, value, rxBuffer, rxBufferCount, crsfPayloadLen))
         processCrossfireTelemetryValue(ATTITUDE_ROLL_INDEX, value/10);
-      if (getCrossfireTelemetryValue<2>(7, value, rxBuffer))
+      if (getCrossfireTelemetryValue<2>(7, value, rxBuffer, rxBufferCount, crsfPayloadLen))
         processCrossfireTelemetryValue(ATTITUDE_YAW_INDEX, value/10);
       break;
 
     case FLIGHT_MODE_ID:
     {
       const CrossfireSensor & sensor = crossfireSensors[FLIGHT_MODE_INDEX];
-      auto textLength = min<int>(16, rxBuffer[1]);
-      rxBuffer[textLength] = '\0';
+      if (crsfPayloadLen < 2 || rxBufferCount <= 3) {
+        break;
+      }
+      uint8_t textLength =
+          min<uint8_t>(16, min<uint8_t>(crsfPayloadLen - 2, rxBufferCount - 3));
+      char text[17];
+      memcpy(text, rxBuffer + 3, textLength);
+      text[textLength] = '\0';
       setTelemetryText(PROTOCOL_TELEMETRY_CROSSFIRE, sensor.id, 0, sensor.subId,
-                       (const char *)rxBuffer + 3);
+                       text);
       break;
     }
 
     case RADIO_ID:
-      if (rxBuffer[3] == 0xEA     // radio address
+      if (crsfPayloadLen >= 13 &&
+          rxBufferCount >= 14 &&
+          rxBuffer[3] == 0xEA     // radio address
           && rxBuffer[5] == 0x10  // timing correction frame
       ) {
         uint32_t update_interval;
         int32_t offset;
         if (getCrossfireTelemetryValue<4>(6, (int32_t &)update_interval,
-                                          rxBuffer) &&
-            getCrossfireTelemetryValue<4>(10, offset, rxBuffer)) {
+                                          rxBuffer, rxBufferCount,
+                                          crsfPayloadLen) &&
+            getCrossfireTelemetryValue<4>(10, offset, rxBuffer, rxBufferCount, crsfPayloadLen)) {
           // values are in 10th of micro-seconds
           update_interval /= 10;
           offset /= 10;
@@ -385,27 +437,32 @@ void processCrossfireTelemetryFrame(uint8_t module, uint8_t* rxBuffer,
 
 #if defined(LUA)
     default:
-      if (id == DEVICE_INFO_ID && rxBuffer[4]== MODULE_ADDRESS) {
-        uint8_t nameSize = rxBuffer[1] - 18;
-        strncpy((char *)&crossfireModuleStatus[module].name, (const char *)&rxBuffer[5], CRSF_NAME_MAXSIZE);
-        crossfireModuleStatus[module].name[CRSF_NAME_MAXSIZE -1] = 0; // For some reason, GH din't like strlcpy
-        if (strncmp((const char *) &rxBuffer[5 + nameSize], "ELRS", 4) == 0)
-          crossfireModuleStatus[module].isELRS = true;
-        crossfireModuleStatus[module].major = rxBuffer[14 + nameSize];
-        crossfireModuleStatus[module].minor = rxBuffer[15 + nameSize];
-        crossfireModuleStatus[module].revision = rxBuffer[16 + nameSize];
+      if (id == DEVICE_INFO_ID && rxBufferCount > 4 &&
+          rxBuffer[4] == MODULE_ADDRESS) {
+        if (crsfPayloadLen >= 18 && rxBufferCount >= crsfPayloadLen + 2) {
+          uint8_t nameSize = crsfPayloadLen - 18;
+          uint8_t copySize = min<uint8_t>(nameSize, CRSF_NAME_MAXSIZE - 1);
+          memcpy(crossfireModuleStatus[module].name, &rxBuffer[5], copySize);
+          crossfireModuleStatus[module].name[copySize] = 0;
+          if (strncmp((const char *)&rxBuffer[5 + nameSize], "ELRS", 4) == 0)
+            crossfireModuleStatus[module].isELRS = true;
+          crossfireModuleStatus[module].major = rxBuffer[14 + nameSize];
+          crossfireModuleStatus[module].minor = rxBuffer[15 + nameSize];
+          crossfireModuleStatus[module].revision = rxBuffer[16 + nameSize];
 
-        ModuleData *md = &g_model.moduleData[module];
+          ModuleData *md = &g_model.moduleData[module];
 
-        if(!CRSF_ELRS_MIN_VER(module, 4, 0) &&
-           (md->crsf.crsfArmingMode != ARMING_MODE_CH5 || md->crsf.crsfArmingMode != SWSRC_NONE)) {
-          md->crsf.crsfArmingMode = ARMING_MODE_CH5;
-          md->crsf.crsfArmingTrigger = SWSRC_NONE;
+          if (!CRSF_ELRS_MIN_VER(module, 4, 0) &&
+              (md->crsf.crsfArmingMode != ARMING_MODE_CH5 ||
+               md->crsf.crsfArmingMode != SWSRC_NONE)) {
+            md->crsf.crsfArmingMode = ARMING_MODE_CH5;
+            md->crsf.crsfArmingTrigger = SWSRC_NONE;
 
-          storageDirty(EE_MODEL);
+            storageDirty(EE_MODEL);
+          }
+
+          crossfireModuleStatus[module].queryCompleted = true;
         }
-
-        crossfireModuleStatus[module].queryCompleted = true;
       }
 
       // destination address and CRC are skipped

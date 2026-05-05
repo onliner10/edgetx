@@ -27,7 +27,53 @@
 #include "pulses/ghost.h"
 #include "pulses/pulses.h"
 #include "telemetry/ghost.h"
+#include "telemetry/ghost_menu.h"
 #include "telemetry/telemetry.h"
+#include <sys/mman.h>
+#include <unistd.h>
+
+class GuardedGhostFrame
+{
+ public:
+  explicit GuardedGhostFrame(size_t size):
+      pageSize(sysconf(_SC_PAGESIZE)),
+      mappingSize(pageSize * 2),
+      frameSize(size)
+  {
+    mapping = static_cast<uint8_t*>(
+        mmap(nullptr, mappingSize, PROT_READ | PROT_WRITE,
+             MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+    if (mapping == MAP_FAILED) {
+      mapping = nullptr;
+      return;
+    }
+    if (mprotect(mapping + pageSize, pageSize, PROT_NONE) != 0) {
+      munmap(mapping, mappingSize);
+      mapping = nullptr;
+      return;
+    }
+    frame = mapping + pageSize - frameSize;
+    memset(frame, 0, frameSize);
+  }
+
+  ~GuardedGhostFrame()
+  {
+    if (mapping != nullptr) {
+      munmap(mapping, mappingSize);
+    }
+  }
+
+  bool isValid() const { return frame != nullptr; }
+  uint8_t* data() { return frame; }
+  uint8_t& operator[](size_t index) { return frame[index]; }
+
+ private:
+  long pageSize = 0;
+  size_t mappingSize = 0;
+  size_t frameSize = 0;
+  uint8_t* mapping = nullptr;
+  uint8_t* frame = nullptr;
+};
 
 TEST(Ghost, telemetryOutputIsBoundedByModuleBuffer)
 {
@@ -115,6 +161,145 @@ TEST(Ghost, telemetryOutputIsBoundedByTelemetryBuffer)
   EXPECT_EQ(outputTelemetryBuffer.destination, TELEMETRY_ENDPOINT_NONE);
 
   GhostDriver.deinit(ctx);
+}
+
+TEST(Ghost, channelsFrameHonorsChannelCount)
+{
+  modulePortInit();
+
+  auto ctx = GhostDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  uint8_t buffer[MODULE_BUFFER_SIZE] = {};
+  GhostDriver.sendPulses(ctx, buffer, nullptr, 0);
+
+  GhostDriver.deinit(ctx);
+}
+
+TEST(Ghost, shortSyncFrameDoesNotUpdateModuleSync)
+{
+  ModuleSyncStatus &status = getModuleSyncStatus(EXTERNAL_MODULE);
+  status.refreshRate = 4000;
+  status.inputLag = 25;
+  status.currentLag = 25;
+
+  uint8_t frame[] = {GHST_ADDR_RADIO, 2, GHST_DL_OPENTX_SYNC, 0,
+                     0x00,            0x00, 0x27,              0x10,
+                     0x00,            0x00, 0x00,              0x64};
+  frame[3] = crc8(&frame[2], 1);
+
+  processGhostTelemetryFrame(EXTERNAL_MODULE, frame, sizeof(frame));
+
+  EXPECT_EQ(status.refreshRate, 4000);
+  EXPECT_EQ(status.inputLag, 25);
+  EXPECT_EQ(status.currentLag, 25);
+}
+
+TEST(Ghost, shortLinkStatFrameDoesNotReadPastFrame)
+{
+  GuardedGhostFrame frame(4);
+  ASSERT_TRUE(frame.isValid());
+  frame[0] = GHST_ADDR_RADIO;
+  frame[1] = 2;
+  frame[2] = GHST_DL_LINK_STAT;
+  frame[3] = crc8(&frame[2], 1);
+
+  processGhostTelemetryFrame(EXTERNAL_MODULE, frame.data(), 4);
+
+  SUCCEED();
+}
+
+TEST(Ghost, shortVtxStatFrameDoesNotReadPastFrame)
+{
+  GuardedGhostFrame frame(4);
+  ASSERT_TRUE(frame.isValid());
+  frame[0] = GHST_ADDR_RADIO;
+  frame[1] = 2;
+  frame[2] = GHST_DL_VTX_STAT;
+  frame[3] = crc8(&frame[2], 1);
+
+  processGhostTelemetryFrame(EXTERNAL_MODULE, frame.data(), 4);
+
+  SUCCEED();
+}
+
+TEST(Ghost, shortPackStatFrameDoesNotReadPastFrame)
+{
+  GuardedGhostFrame frame(4);
+  ASSERT_TRUE(frame.isValid());
+  frame[0] = GHST_ADDR_RADIO;
+  frame[1] = 2;
+  frame[2] = GHST_DL_PACK_STAT;
+  frame[3] = crc8(&frame[2], 1);
+
+  processGhostTelemetryFrame(EXTERNAL_MODULE, frame.data(), 4);
+
+  SUCCEED();
+}
+
+TEST(Ghost, shortGpsPrimaryFrameDoesNotReadPastFrame)
+{
+  GuardedGhostFrame frame(4);
+  ASSERT_TRUE(frame.isValid());
+  frame[0] = GHST_ADDR_RADIO;
+  frame[1] = 2;
+  frame[2] = GHST_DL_GPS_PRIMARY;
+  frame[3] = crc8(&frame[2], 1);
+
+  processGhostTelemetryFrame(EXTERNAL_MODULE, frame.data(), 4);
+
+  SUCCEED();
+}
+
+TEST(Ghost, shortGpsSecondaryFrameDoesNotReadPastFrame)
+{
+  GuardedGhostFrame frame(4);
+  ASSERT_TRUE(frame.isValid());
+  frame[0] = GHST_ADDR_RADIO;
+  frame[1] = 2;
+  frame[2] = GHST_DL_GPS_SECONDARY;
+  frame[3] = crc8(&frame[2], 1);
+
+  processGhostTelemetryFrame(EXTERNAL_MODULE, frame.data(), 4);
+
+  SUCCEED();
+}
+
+TEST(Ghost, shortMenuDescFrameDoesNotReadPastFrame)
+{
+  GuardedGhostFrame frame(4);
+  ASSERT_TRUE(frame.isValid());
+  frame[0] = GHST_ADDR_RADIO;
+  frame[1] = 2;
+  frame[2] = GHST_DL_MENU_DESC;
+  frame[3] = crc8(&frame[2], 1);
+
+  processGhostTelemetryFrame(EXTERNAL_MODULE, frame.data(), 4);
+
+  SUCCEED();
+}
+
+TEST(Ghost, invalidMenuDescLineDoesNotOverwriteMenuControls)
+{
+  reusableBuffer.ghostMenu.menuStatus = 0xA5;
+  reusableBuffer.ghostMenu.menuAction = 0x5A;
+  reusableBuffer.ghostMenu.buttonAction = 0xC3;
+
+  uint8_t frame[sizeof(GhostMenuFrame)] = {};
+  frame[0] = GHST_ADDR_RADIO;
+  frame[1] = sizeof(GhostMenuFrame) - 2;
+  frame[2] = GHST_DL_MENU_DESC;
+  frame[3] = GHST_MENU_STATUS_OPENED;
+  frame[4] = GHST_LINE_FLAGS_VALUE_EDIT;
+  frame[5] = GHST_MENU_LINES + 1;
+  memset(&frame[6], 'A', GHST_MENU_CHARS);
+  frame[sizeof(frame) - 1] = crc8(&frame[2], frame[1] - 1);
+
+  processGhostTelemetryFrame(EXTERNAL_MODULE, frame, sizeof(frame));
+
+  EXPECT_EQ(reusableBuffer.ghostMenu.menuStatus, 0xA5);
+  EXPECT_EQ(reusableBuffer.ghostMenu.menuAction, 0x5A);
+  EXPECT_EQ(reusableBuffer.ghostMenu.buttonAction, 0xC3);
 }
 
 #endif

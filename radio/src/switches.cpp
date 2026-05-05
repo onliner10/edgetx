@@ -690,6 +690,8 @@ bool getSwitch(swsrc_t swtch, uint8_t flags)
     return true;
 
   uint16_t cs_idx = abs(swtch);
+  if (cs_idx > SWSRC_LAST)
+    return false;
 
   if (cs_idx == SWSRC_ONE) {
     result = !s_mixer_first_run_done;
@@ -745,7 +747,7 @@ bool getSwitch(swsrc_t swtch, uint8_t flags)
   else if (cs_idx == SWSRC_TRAINER_CONNECTED) {
     result = isTrainerConnected();
   }
-  else if (cs_idx >= SWSRC_FIRST_SENSOR) {
+  else if (cs_idx >= SWSRC_FIRST_SENSOR && cs_idx <= SWSRC_LAST_SENSOR) {
     result = !telemetryItems[cs_idx-SWSRC_FIRST_SENSOR].isOld();
   }
   else if (cs_idx == SWSRC_TELEMETRY_STREAMING) {
@@ -762,9 +764,12 @@ bool getSwitch(swsrc_t swtch, uint8_t flags)
     result = false;
 #endif
   }
-  else {
+  else if (cs_idx >= SWSRC_FIRST_LOGICAL_SWITCH && cs_idx <= SWSRC_LAST_LOGICAL_SWITCH) {
     cs_idx -= SWSRC_FIRST_LOGICAL_SWITCH;
     result = lswFm[mixerCurrentFlightMode].lsw[cs_idx].state;
+  }
+  else {
+    result = false;
   }
 
   return swtch > 0 ? result : !result;

@@ -157,7 +157,9 @@ static void updateModuleStatus(uint8_t flags)
     dsmpStatus.ch_order = (flags & DSMP_FLAGS_FUTABA) ? DSMP_CH_AETR : DSMP_CH_TAER;
 }
 
-static uint16_t getDSMPChannelValue(uint8_t module, uint8_t flags, uint8_t channel)
+static uint16_t getDSMPChannelValue(uint8_t module, uint8_t flags,
+                                    uint8_t channel, const int16_t* channels,
+                                    uint8_t nChannels)
 { 
     uint8_t txChannel = channel;
     // Map from AETR->TAER ???
@@ -165,7 +167,15 @@ static uint16_t getDSMPChannelValue(uint8_t module, uint8_t flags, uint8_t chann
         txChannel = AETR_TAER_MAP[channel];
     }
 
-    int value = channelOutputs[txChannel] + 2 * PPM_CH_CENTER(txChannel) - 2 * PPM_CENTER;
+    uint16_t outputChannel =
+        static_cast<uint16_t>(g_model.moduleData[module].channelsStart) +
+        txChannel;
+    int value = 0;
+    if (channels && txChannel < nChannels &&
+        outputChannel < MAX_OUTPUT_CHANNELS) {
+        value = channels[txChannel] + 2 * PPM_CH_CENTER(outputChannel) -
+                2 * PPM_CENTER;
+    }
     uint16_t pulse;
     
     if (flags & DSMP_FLAGS_2048) {  // Use 11-bit ?
@@ -178,13 +188,14 @@ static uint16_t getDSMPChannelValue(uint8_t module, uint8_t flags, uint8_t chann
     return pulse;
 }
 
-static void setupPulsesLemonDSMP(uint8_t module, uint8_t*& p_buf)
+static void setupPulsesLemonDSMP(uint8_t module, uint8_t*& p_buf,
+                                 const int16_t* channels, uint8_t nChannels)
 {
     const auto modelId = g_model.header.modelId[module];
   /* const*/ auto& md = g_model.moduleData[module];
 
     //uint8_t start_channel = md.channelsStart;
-    auto channels = md.getChannelsCount();
+    auto channelCount = sentModuleChannels(module);
     auto flags = md.dsmp.flags;
     auto module_mode = getModuleMode(module);
     auto version     = dsmpStatus.version[0];
@@ -216,7 +227,7 @@ static void setupPulsesLemonDSMP(uint8_t module, uint8_t*& p_buf)
 
         if (module_mode == MODULE_MODE_BIND) {
             flags = DSMP_FLAGS_BIND | DSMP_FLAGS_AUTO;
-            channels = min<uint8_t>(channels, MAX_REG_CHANNELS);
+            channelCount = min<uint8_t>(channelCount, MAX_REG_CHANNELS);
             md.dsmp.flags = DSMP_FLAGS_DSMX | DSMP_FLAGS_11mS | DSMP_FLAGS_2048;
             storageDirty(EE_MODEL);
         }
@@ -227,14 +238,14 @@ static void setupPulsesLemonDSMP(uint8_t module, uint8_t*& p_buf)
             pwr = DSMP_POWER_RANGE;
         }
         sendByte(p_buf, pwr);
-        sendByte(p_buf, channels );
+        sendByte(p_buf, channelCount);
         sendByte(p_buf, modelId); // V1.0 ignores it, V2.0 use it
 
         pass = 1; // move to send Ch data
         return; 
     } else {
 #if DSMP_SEND_X_PLUS
-        uint8_t xPlusEnabled = (version > 1) && (channels >= MAX_REG_CHANNELS) && (flags & DSMP_FLAGS_DSMX);
+        uint8_t xPlusEnabled = (version > 1) && (channelCount >= MAX_REG_CHANNELS) && (flags & DSMP_FLAGS_DSMX);
 #endif
         //  Channel DATA messages
         uint8_t current_channel = 0;
@@ -247,7 +258,7 @@ static void setupPulsesLemonDSMP(uint8_t module, uint8_t*& p_buf)
             uint16_t pulse = 0xFFFF;  // NO-DATA
             uint8_t ch_to_send = DSMP_NO_CHANNEL;
 
-            if (current_channel < min<uint8_t>(channels,MAX_REG_CHANNELS)) {
+            if (current_channel < min<uint8_t>(channelCount, MAX_REG_CHANNELS)) {
               ch_to_send = current_channel;
             }
 
@@ -260,7 +271,8 @@ static void setupPulsesLemonDSMP(uint8_t module, uint8_t*& p_buf)
 #endif
 
             if (ch_to_send != DSMP_NO_CHANNEL) {
-              pulse = getDSMPChannelValue(module, flags, ch_to_send);
+              pulse = getDSMPChannelValue(module, flags, ch_to_send,
+                                          channels, nChannels);
             }
 
             sendByte(p_buf, pulse >> 8);
@@ -270,7 +282,7 @@ static void setupPulsesLemonDSMP(uint8_t module, uint8_t*& p_buf)
     }
 
     if (++pass > 2) pass = 1;
-    if (channels < 8) pass = 1;
+    if (channelCount < 8) pass = 1;
 
     if (module_mode == MODULE_MODE_BIND) { // Force setup packet in Bind mode.
         pass = 0;
@@ -298,7 +310,7 @@ static void dsmpSendPulses(void* ctx, uint8_t* buffer, int16_t* channels, uint8_
     auto drvCtx = modulePortGetCtx(mod_st->tx);
 
     auto p_data = buffer;
-    setupPulsesLemonDSMP(module, p_data);
+    setupPulsesLemonDSMP(module, p_data, channels, nChannels);
     drv->sendBuffer(drvCtx, buffer, p_data - buffer);
 }
 
@@ -327,6 +339,16 @@ static void processDSMPBindPacket(uint8_t module, uint8_t* packet)
     uint8_t rxType   = packet[1];
     uint8_t channels = packet[2];
     uint8_t txMode   = packet[3];
+
+    if (getModuleMode(module) != MODULE_MODE_BIND) {
+      TRACE("[DSMP] bind packet ignored outside bind mode");
+      return;
+    }
+
+    if (channels == 0) {
+      TRACE("[DSMP] invalid bind channel count: 0");
+      return;
+    }
 
     // save flags, only the TXMode Part
     g_model.moduleData[module].dsmp.flags = flags & DSMP_FLAGS_TXMODE;
@@ -378,6 +400,8 @@ static void dsmpTelemetryData(uint8_t module, uint8_t data,
 {
     dsmpStatus.lastUpdate = get_tmr10ms();
 
+    if (rxBufferCount < 2) return;
+
     if (rxBuffer[1] == 0x80 && rxBufferCount >= DSM_BIND_PACKET_LENGTH) {
         processDSMPBindPacket(module, rxBuffer + 2);  // Skip 0xAA 0x80
         rxBufferCount = 0;
@@ -415,6 +439,10 @@ static void dsmpDebugData(uint8_t module, uint8_t data, uint8_t* rxBuffer,
     if (rxBufferCount < 2) return;  // Keep buiding
 
     auto expectedLen = rxBuffer[1];
+    if (expectedLen < 1) {
+        rxBufferCount = 0;
+        return;
+    }
 
     // Overflow???
     if (expectedLen + 2 > TELEMETRY_RX_PACKET_SIZE) {

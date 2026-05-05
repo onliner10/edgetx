@@ -23,6 +23,7 @@
 
 #if defined(PXX2)
 
+#include "io/frsky_sport.h"
 #include "pulses/pxx2.h"
 #include "pulses/pxx2_transport.h"
 
@@ -37,6 +38,11 @@ static uint32_t read_u32_le(const uint8_t* data)
 {
   return uint32_t(data[0]) | (uint32_t(data[1]) << 8) |
          (uint32_t(data[2]) << 16) | (uint32_t(data[3]) << 24);
+}
+
+static bool pxx2FrameHasIndex(const uint8_t * frame, uint8_t index)
+{
+  return frame[0] >= index;
 }
 
 static const char * const PXX2ModulesNames[] = {
@@ -164,6 +170,10 @@ static void processGetHardwareInfoFrame(uint8_t module, const uint8_t * frame)
 
   ModuleInformation * destination = moduleState[module].moduleInformation;
 
+  if (!pxx2FrameHasIndex(frame, 4)) {
+    return;
+  }
+
   uint8_t index = frame[3];
   uint8_t modelId = frame[4];
   uint8_t length = min<uint8_t>(frame[0] - 3, sizeof(PXX2HardwareInformation));
@@ -193,6 +203,10 @@ static void processModuleSettingsFrame(uint8_t module, const uint8_t * frame)
 
   ModuleSettings * destination = moduleState[module].moduleSettings;
 
+  if (!pxx2FrameHasIndex(frame, 5)) {
+    return;
+  }
+
   // Flag1
   if (frame[4] & PXX2_TX_SETTINGS_FLAG1_EXTERNAL_ANTENNA)
     destination->externalAntenna = 1;
@@ -212,6 +226,10 @@ static void processReceiverSettingsFrame(uint8_t module, const uint8_t * frame)
   }
 
   ReceiverSettings * destination = moduleState[module].receiverSettings;
+
+  if (!pxx2FrameHasIndex(frame, 4)) {
+    return;
+  }
 
   if (frame[4] & PXX2_RX_SETTINGS_FLAG1_FPORT)
     destination->fport = 1;
@@ -251,10 +269,14 @@ static void processRegisterFrame(uint8_t module, const uint8_t * frame)
     return;
   }
 
+  if (!pxx2FrameHasIndex(frame, 3)) {
+    return;
+  }
+
   PXX2ModuleSetup& mod = reusableBuffer.moduleSetup.pxx2;
   switch(frame[3]) {
     case 0x00:
-      if (mod.registerStep == REGISTER_INIT) {
+      if (mod.registerStep == REGISTER_INIT && pxx2FrameHasIndex(frame, 12)) {
         // RX_NAME follows, we store it for the next step
         memcpy(mod.registerRxName, (const char *)&frame[4], PXX2_LEN_RX_NAME);
         mod.registerLoopIndex = frame[12];
@@ -263,7 +285,8 @@ static void processRegisterFrame(uint8_t module, const uint8_t * frame)
       break;
 
     case 0x01:
-      if (mod.registerStep == REGISTER_RX_NAME_SELECTED) {
+      if (mod.registerStep == REGISTER_RX_NAME_SELECTED &&
+          pxx2FrameHasIndex(frame, 12 + PXX2_LEN_REGISTRATION_ID - 1)) {
         // RX_NAME + PASSWORD follow, we check they are good
         if (memcmp(&frame[4], mod.registerRxName, PXX2_LEN_RX_NAME) == 0 &&
             memcmp(&frame[12], g_model.modelRegistrationID, PXX2_LEN_REGISTRATION_ID) == 0) {
@@ -284,11 +307,16 @@ static void processBindFrame(uint8_t module, const uint8_t * frame)
     return;
   }
 
+  if (!pxx2FrameHasIndex(frame, 3)) {
+    return;
+  }
+
   BindInformation * destination = moduleState[module].bindInformation;
 
   switch(frame[3]) {
     case 0x00:
-      if (destination->step == BIND_INIT) {
+      if (destination->step == BIND_INIT &&
+          pxx2FrameHasIndex(frame, 4 + PXX2_LEN_RX_NAME - 1)) {
         bool found = false;
         for (uint8_t i=0; i<destination->candidateReceiversCount; i++) {
           if (memcmp(destination->candidateReceiversNames[i], &frame[4], PXX2_LEN_RX_NAME) == 0) {
@@ -306,7 +334,8 @@ static void processBindFrame(uint8_t module, const uint8_t * frame)
       break;
 
     case 0x01:
-      if (destination->step == BIND_START) {
+      if (destination->step == BIND_START &&
+          pxx2FrameHasIndex(frame, 4 + PXX2_LEN_RX_NAME - 1)) {
         if (memcmp(&destination->candidateReceiversNames[destination->selectedReceiverIndex], &frame[4], PXX2_LEN_RX_NAME) == 0) {
           memcpy(g_model.moduleData[module].pxx2.receiverName[destination->rxUid], &frame[4], PXX2_LEN_RX_NAME);
           storageDirty(EE_MODEL);
@@ -317,7 +346,8 @@ static void processBindFrame(uint8_t module, const uint8_t * frame)
       break;
 
     case 0x02:
-      if (destination->step == BIND_INFO_REQUEST) {
+      if (destination->step == BIND_INFO_REQUEST &&
+          pxx2FrameHasIndex(frame, 12 + sizeof(PXX2HardwareInformation) - 1)) {
         if (memcmp(&destination->candidateReceiversNames[destination->selectedReceiverIndex], &frame[4], PXX2_LEN_RX_NAME) == 0) {
           memcpy(&destination->receiverInformation, &frame[12], sizeof(PXX2HardwareInformation));
           if (moduleState[module].callback) {
@@ -335,6 +365,10 @@ static void processResetFrame(uint8_t module, const uint8_t * frame)
     return;
   }
 
+  if (!pxx2FrameHasIndex(frame, 3)) {
+    return;
+  }
+
   if (reusableBuffer.moduleSetup.pxx2.resetReceiverIndex == frame[3]) {
     memclear(g_model.moduleData[module].pxx2.receiverName[reusableBuffer.moduleSetup.pxx2.resetReceiverIndex], PXX2_LEN_RX_NAME);
   }
@@ -344,6 +378,10 @@ static void processResetFrame(uint8_t module, const uint8_t * frame)
 
 static void processTelemetryFrame(uint8_t module, const uint8_t * frame)
 {
+  if (!pxx2FrameHasIndex(frame, 4 + sizeof(SportTelemetryPacket) - 1)) {
+    return;
+  }
+
   uint8_t origin = frame[3] & 0x03;
   sportProcessTelemetryPacketWithoutCrc(module, origin, &frame[4]);
 }
@@ -359,6 +397,10 @@ volatile int16_t authenticateFrames = 0;
 static void processAuthenticationFrame(uint8_t module, const uint8_t * frame,
                                        const etx_serial_driver_t* drv, void* ctx)
 {
+  if (!pxx2FrameHasIndex(frame, 3)) {
+    return;
+  }
+
   uint8_t cryptoType = frame[3];
   uint8_t messageDigest[16] = {0};
 
@@ -368,6 +410,10 @@ static void processAuthenticationFrame(uint8_t module, const uint8_t * frame,
       POPUP_INFORMATION(STR_AUTH_FAILURE);
     }
     TRACE("[authFailed]\r\n", authenticateFrames);
+    return;
+  }
+
+  if (!pxx2FrameHasIndex(frame, 4 + sizeof(messageDigest) - 1)) {
     return;
   }
 
@@ -408,6 +454,10 @@ static void processSpectrumAnalyserFrame(uint8_t module, const uint8_t * frame)
     return;
   }
 
+  if (!pxx2FrameHasIndex(frame, 8)) {
+    return;
+  }
+
   uint32_t frequency = read_u32_le(&frame[4]);
   int8_t power = frame[8];
 
@@ -419,7 +469,11 @@ static void processSpectrumAnalyserFrame(uint8_t module, const uint8_t * frame)
   int32_t offset = frequency - (reusableBuffer.spectrumAnalyser.freq - reusableBuffer.spectrumAnalyser.span / 2);
   TRACE("Fq=%u => %d, Pw=%d", frequency, offset, int32_t(power));
 
-  uint32_t x = offset / reusableBuffer.spectrumAnalyser.step;
+  uint32_t x;
+  if (!divInto(offset, reusableBuffer.spectrumAnalyser.step, x)) {
+    return;
+  }
+
   if (x < LCD_W) {
     reusableBuffer.spectrumAnalyser.bars[x] = max<int>(0, -SPECTRUM_ANALYSER_POWER_FLOOR + power); // we remove everything below -120dB
 #if defined(COLORLCD)
@@ -443,6 +497,10 @@ static void processPowerMeterFrame(uint8_t module, const uint8_t * frame)
     return;
   }
 
+  if (!pxx2FrameHasIndex(frame, 9)) {
+    return;
+  }
+
   reusableBuffer.powerMeter.power = (int16_t)read_u16_le(&frame[8]);
   if (!reusableBuffer.powerMeter.peak || reusableBuffer.powerMeter.power > reusableBuffer.powerMeter.peak) {
     reusableBuffer.powerMeter.peak = reusableBuffer.powerMeter.power;
@@ -458,17 +516,29 @@ static void processOtaUpdateFrame(uint8_t module, const uint8_t * frame)
   OtaUpdateInformation * destination = moduleState[module].otaUpdateInformation;
 
   if (destination->step == OTA_UPDATE_START) {
+    if (!pxx2FrameHasIndex(frame, 4 + PXX2_LEN_RX_NAME - 1)) {
+      return;
+    }
+
     if (frame[3] == 0x00 && memcmp(destination->candidateReceiversNames[destination->selectedReceiverIndex], &frame[4], PXX2_LEN_RX_NAME) == 0) {
       destination->step = OTA_UPDATE_START_ACK;
     }
   }
   else if (destination->step == OTA_UPDATE_TRANSFER) {
+    if (!pxx2FrameHasIndex(frame, 7)) {
+      return;
+    }
+
     uint32_t address = read_u32_le(&frame[4]);
     if (frame[3] == 0x01 && destination->address == address) {
       destination->step = OTA_UPDATE_TRANSFER_ACK;
     }
   }
   else if (destination->step == OTA_UPDATE_EOF) {
+    if (!pxx2FrameHasIndex(frame, 3)) {
+      return;
+    }
+
     if (frame[3] == 0x02) {
       destination->step = OTA_UPDATE_EOF_ACK;
     }
@@ -478,6 +548,10 @@ static void processOtaUpdateFrame(uint8_t module, const uint8_t * frame)
 static void processModuleFrame(uint8_t module, const uint8_t *frame,
                                const etx_serial_driver_t* drv, void* ctx)
 {
+  if (!pxx2FrameHasIndex(frame, 2)) {
+    return;
+  }
+
   switch (frame[2]) {
     case PXX2_TYPE_ID_HW_INFO:
       processGetHardwareInfoFrame(module, frame);
@@ -515,6 +589,10 @@ static void processModuleFrame(uint8_t module, const uint8_t *frame,
 
 static void processToolsFrame(uint8_t module, const uint8_t * frame)
 {
+  if (!pxx2FrameHasIndex(frame, 2)) {
+    return;
+  }
+
   switch (frame[2]) {
     case PXX2_TYPE_ID_POWER_METER:
       processPowerMeterFrame(module, frame);
@@ -529,6 +607,9 @@ static void processToolsFrame(uint8_t module, const uint8_t * frame)
 void processPXX2Frame(uint8_t module, const uint8_t * frame,
                       const etx_serial_driver_t* drv, void* ctx)
 {
+  if (!pxx2FrameHasIndex(frame, 1)) {
+    return;
+  }
 
   switch (frame[1]) {
     case PXX2_TYPE_C_MODULE:
