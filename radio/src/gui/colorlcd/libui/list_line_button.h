@@ -151,6 +151,55 @@ class InputMixPageBase : public PageGroupItem
   InputMixGroupBase* getGroupBySrc(mixsrc_t src);
   virtual InputMixGroupBase* getGroupByIndex(uint8_t index) = 0;
 
+  template <typename Fn>
+  bool withLineByIndex(uint8_t index, Fn&& fn)
+  {
+    auto line = getLineByIndex(index);
+    if (!line) return false;
+    fn(*line);
+    return true;
+  }
+
+  template <typename Fn>
+  bool withGroupBySrc(mixsrc_t src, Fn&& fn)
+  {
+    auto group = getGroupBySrc(src);
+    if (!group) return false;
+    fn(*group);
+    return true;
+  }
+
+  template <typename Fn>
+  bool withGroupByIndex(uint8_t index, Fn&& fn)
+  {
+    auto group = getGroupByIndex(index);
+    if (!group) return false;
+    fn(*group);
+    return true;
+  }
+
+  template <typename Fn>
+  bool withGroupAndLineBySrc(mixsrc_t src, uint8_t index, Fn&& fn)
+  {
+    bool handled = false;
+    withGroupBySrc(src, [&](InputMixGroupBase& group) {
+      handled = withLineByIndex(
+          index, [&](InputMixButtonBase& line) { fn(group, line); });
+    });
+    return handled;
+  }
+
+  template <typename Fn>
+  bool withGroupAndLineByIndex(uint8_t index, Fn&& fn)
+  {
+    bool handled = false;
+    withGroupByIndex(index, [&](InputMixGroupBase& group) {
+      handled = withLineByIndex(
+          index, [&](InputMixButtonBase& line) { fn(group, line); });
+    });
+    return handled;
+  }
+
   virtual InputMixButtonBase* createLineButton(InputMixGroupBase* group, uint8_t index) = 0;
   virtual InputMixGroupBase* createGroup(Window* form, mixsrc_t src) = 0;
 

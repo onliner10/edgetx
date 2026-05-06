@@ -93,6 +93,8 @@ WINDOW_LIFETIME_BOUNDARY_SUFFIXES = (
     "radio/src/gui/colorlcd/LvglWrapper.cpp",
     "radio/src/gui/colorlcd/libui/etx_lv_theme.cpp",
     "radio/src/gui/colorlcd/libui/mainwindow.cpp",
+    "radio/src/gui/colorlcd/libui/list_line_button.cpp",
+    "radio/src/gui/colorlcd/libui/list_line_button.h",
     "radio/src/gui/colorlcd/libui/window.cpp",
     "radio/src/gui/colorlcd/libui/window.h",
     "radio/src/lua/lua_lvgl_widget.h",

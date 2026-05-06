@@ -324,17 +324,15 @@ void ModelInputsPage::editInput(uint8_t input, uint8_t index)
 {
   _copyMode = 0;
 
-  auto group = getGroupBySrc(MIXSRC_FIRST_INPUT + input);
-  if (!group) return;
-
-  auto line = getLineByIndex(index);
-  if (!line) return;
-
-  auto edit = new InputEditWindow(input, index);
-  edit->setCloseHandler([=]() {
-    Messaging::send(Messaging::REFRESH);
-    group->refresh();
-    group->adjustHeight();
+  withGroupAndLineBySrc(MIXSRC_FIRST_INPUT + input, index,
+                        [=](InputMixGroupBase& group, InputMixButtonBase&) {
+    auto groupPtr = &group;
+    auto edit = new InputEditWindow(input, index);
+    edit->setCloseHandler([=]() {
+      Messaging::send(Messaging::REFRESH);
+      groupPtr->refresh();
+      groupPtr->adjustHeight();
+    });
   });
 }
 
@@ -347,36 +345,33 @@ void ModelInputsPage::insertInput(uint8_t input, uint8_t index)
 
 void ModelInputsPage::deleteInput(uint8_t index)
 {
-  auto group = getGroupByIndex(index);
-    if (!group) return;
-
-  auto line = getLineByIndex(index);
-  if (!line) return;
-
-  auto expo = expoAddress(index);
-  std::string s(getSourceString(group->getMixSrc()));
-  s += " - ";
-  if (expo->name[0]) {
-    s += expo->name;
-  } else {
-    s += "#";
-    s += std::to_string(group->getLineNumber(index));
-  }
-
-  if (confirmationDialog(STR_DELETE_INPUT_LINE, s.c_str())) {
-    _copyMode = 0;
-
-    group->removeLine(line);
-    if (group->getLineCount() == 0) {
-      group->deleteLater();
-      removeGroup(group);
+  withGroupAndLineByIndex(index, [=](InputMixGroupBase& group,
+                                     InputMixButtonBase& line) {
+    auto expo = expoAddress(index);
+    std::string s(getSourceString(group.getMixSrc()));
+    s += " - ";
+    if (expo->name[0]) {
+      s += expo->name;
     } else {
-      line->deleteLater();
+      s += "#";
+      s += std::to_string(group.getLineNumber(index));
     }
-    removeLine(line);
 
-    ::deleteExpo(index);
-  }
+    if (confirmationDialog(STR_DELETE_INPUT_LINE, s.c_str())) {
+      _copyMode = 0;
+
+      group.removeLine(&line);
+      if (group.getLineCount() == 0) {
+        group.deleteLater();
+        removeGroup(&group);
+      } else {
+        line.deleteLater();
+      }
+      removeLine(&line);
+
+      ::deleteExpo(index);
+    }
+  });
 }
 
 void ModelInputsPage::pasteInput(uint8_t dst_idx, uint8_t input)

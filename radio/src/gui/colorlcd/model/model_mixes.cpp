@@ -345,18 +345,20 @@ void ModelMixesPage::editMix(uint8_t channel, uint8_t index)
 {
   _copyMode = 0;
 
-  auto line = getLineByIndex(index);
-  if (!line) return;
-
-  auto edit = new MixEditWindow(channel, index);
-  edit->setCloseHandler([=]() {
-    MixData* mix = mixAddress(index);
-    if (is_memclear(mix, sizeof(MixData))) {
-      deleteMix(index);
-    } else {
-      line->refresh();
-    }
-    (getGroupByIndex(index))->adjustHeight();
+  withGroupAndLineByIndex(index, [=](InputMixGroupBase& group,
+                                     InputMixButtonBase& line) {
+    auto groupPtr = &group;
+    auto linePtr = &line;
+    auto edit = new MixEditWindow(channel, index);
+    edit->setCloseHandler([=]() {
+      MixData* mix = mixAddress(index);
+      if (is_memclear(mix, sizeof(MixData))) {
+        deleteMix(index);
+      } else {
+        linePtr->refresh();
+        groupPtr->adjustHeight();
+      }
+    });
   });
 }
 
@@ -371,36 +373,33 @@ void ModelMixesPage::insertMix(uint8_t channel, uint8_t index)
 
 void ModelMixesPage::deleteMix(uint8_t index)
 {
-  auto group = getGroupByIndex(index);
-  if (!group) return;
-
-  auto line = getLineByIndex(index);
-  if (!line) return;
-
-  auto mix = mixAddress(index);
-  std::string s(getSourceString(group->getMixSrc()));
-  s += " - ";
-  if (mix->name[0]) {
-    s += mix->name;
-  } else {
-    s += "#";
-    s += std::to_string(group->getLineNumber(index));
-  }
-
-  if (confirmationDialog(STR_DELETE_MIX_LINE, s.c_str())) {
-    _copyMode = 0;
-
-    ::deleteMix(index);
-
-    group->removeLine(line);
-    if (group->getLineCount() == 0) {
-      group->deleteLater();
-      removeGroup(group);
+  withGroupAndLineByIndex(index, [=](InputMixGroupBase& group,
+                                     InputMixButtonBase& line) {
+    auto mix = mixAddress(index);
+    std::string s(getSourceString(group.getMixSrc()));
+    s += " - ";
+    if (mix->name[0]) {
+      s += mix->name;
     } else {
-      line->deleteLater();
+      s += "#";
+      s += std::to_string(group.getLineNumber(index));
     }
-    removeLine(line);
-  }
+
+    if (confirmationDialog(STR_DELETE_MIX_LINE, s.c_str())) {
+      _copyMode = 0;
+
+      ::deleteMix(index);
+
+      group.removeLine(&line);
+      if (group.getLineCount() == 0) {
+        group.deleteLater();
+        removeGroup(&group);
+      } else {
+        line.deleteLater();
+      }
+      removeLine(&line);
+    }
+  });
 }
 
 void ModelMixesPage::pasteMix(uint8_t dst_idx, uint8_t channel)

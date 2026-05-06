@@ -337,6 +337,144 @@ bool listLineGroupLabelAllocationFailureFailsClosedForTest()
   delete group;
   return ok;
 }
+
+bool listLinePageLookupRequiresGroupAndLineForTest()
+{
+  static const PageDef testPageDef = {
+      ICON_MODEL_INPUTS, STR_DEF(STR_QM_INPUTS), STR_DEF(STR_MENUINPUTS),
+      PAGE_CREATE, QM_MODEL_INPUTS, nullptr};
+
+  class TestInputMixButton : public InputMixButtonBase
+  {
+   public:
+    TestInputMixButton(Window* parent, uint8_t index) :
+        InputMixButtonBase(parent, index)
+    {
+    }
+
+    void onRefresh() override {}
+    void updatePos(coord_t, coord_t) override {}
+    void swapLvglGroup(InputMixButtonBase*) override {}
+
+   protected:
+    bool isActive() const override { return false; }
+  };
+
+  class TestInputMixGroup : public InputMixGroupBase
+  {
+   public:
+    explicit TestInputMixGroup(Window* parent) :
+        InputMixGroupBase(parent, MIXSRC_FIRST_INPUT)
+    {
+    }
+  };
+
+  class TestInputMixPage : public InputMixPageBase
+  {
+   public:
+    TestInputMixPage() : InputMixPageBase(testPageDef) {}
+
+    void build(Window*) override {}
+
+    void setGroup(InputMixGroupBase* group)
+    {
+      groups.clear();
+      groupForIndex = group;
+      if (group) groups.emplace_back(group);
+    }
+
+    void setLine(InputMixButtonBase* line)
+    {
+      lines.clear();
+      if (line) lines.emplace_back(line);
+    }
+
+    bool visitGroupAndLine(uint8_t index, int& calls,
+                           InputMixGroupBase*& seenGroup,
+                           InputMixButtonBase*& seenLine)
+    {
+      return withGroupAndLineByIndex(
+          index, [&](InputMixGroupBase& group, InputMixButtonBase& line) {
+            calls += 1;
+            seenGroup = &group;
+            seenLine = &line;
+          });
+    }
+
+   protected:
+    void addLineButton(uint8_t) override {}
+
+    InputMixButtonBase* createLineButton(InputMixGroupBase*, uint8_t) override
+    {
+      return nullptr;
+    }
+
+    InputMixGroupBase* createGroup(Window*, mixsrc_t) override
+    {
+      return nullptr;
+    }
+
+    InputMixGroupBase* getGroupByIndex(uint8_t index) override
+    {
+      return index == expectedIndex ? groupForIndex : nullptr;
+    }
+
+   private:
+    uint8_t expectedIndex = 3;
+    InputMixGroupBase* groupForIndex = nullptr;
+  };
+
+  auto group = new (std::nothrow) TestInputMixGroup(MainWindow::instance());
+  if (!group || !group->isAvailable()) {
+    delete group;
+    return false;
+  }
+
+  auto line = new (std::nothrow) TestInputMixButton(group, 3);
+  if (!line || !line->isAvailable()) {
+    delete group;
+    return false;
+  }
+  group->addLine(line);
+
+  TestInputMixPage page;
+  int calls = 0;
+  InputMixGroupBase* seenGroup = nullptr;
+  InputMixButtonBase* seenLine = nullptr;
+
+  page.setGroup(group);
+  if (page.visitGroupAndLine(3, calls, seenGroup, seenLine)) {
+    delete group;
+    return false;
+  }
+  if (calls != 0) {
+    delete group;
+    return false;
+  }
+
+  page.setLine(line);
+  if (!page.visitGroupAndLine(3, calls, seenGroup, seenLine)) {
+    delete group;
+    return false;
+  }
+  if (calls != 1 || seenGroup != group || seenLine != line) {
+    delete group;
+    return false;
+  }
+
+  page.setGroup(nullptr);
+  if (page.visitGroupAndLine(3, calls, seenGroup, seenLine)) {
+    delete group;
+    return false;
+  }
+  if (calls != 1) {
+    delete group;
+    return false;
+  }
+
+  delete group;
+  return true;
+}
 #endif
 
 void InputMixButtonBase::onLoadedCheckEvents(Window::LiveWindow& live)
