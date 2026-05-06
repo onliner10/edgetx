@@ -195,7 +195,7 @@ SetupWidgetsPage::SetupWidgetsPage(uint8_t customScreenIdx) :
   screen->show();
 }
 
-void SetupWidgetsPage::onClicked()
+void SetupWidgetsPage::onLiveClicked(Window::LiveWindow&)
 {
   // block event forwarding (window is transparent)
 }
@@ -206,12 +206,8 @@ void SetupWidgetsPage::onCancel()
   QuickMenu::openPage((QMPage)(QM_UI_SCREEN1 + customScreenIdx));
 }
 
-void SetupWidgetsPage::deleteLater()
+void SetupWidgetsPage::onDeleted()
 {
-  if (_deleted) return;
-
-  Window::deleteLater();
-
   // and continue async deletion...
   auto screen = customScreens[customScreenIdx];
   if (screen) {

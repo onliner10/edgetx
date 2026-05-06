@@ -144,7 +144,7 @@ class FrskyOtaFlashDialog : public BaseDialog
     }
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     if (moduleState[reusableBuffer.sdManager.otaUpdateInformation.module].mode == MODULE_MODE_BIND) {
       if (reusableBuffer.sdManager.otaUpdateInformation.step == BIND_INIT) {
@@ -181,7 +181,7 @@ class FrskyOtaFlashDialog : public BaseDialog
       }
     }
 
-    BaseDialog::checkEvents();
+    BaseDialog::onLiveCheckEvents(live);
   }
 
  protected:

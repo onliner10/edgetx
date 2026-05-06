@@ -84,20 +84,21 @@ StaticText::StaticText(Window* parent, const rect_t& rect, std::string txt,
 {
   setTextFlag(textFlags);
   setWindowFlag(NO_FOCUS);
-  if (!hasLvObj()) return;
 
-  etx_font(lvobj, FONT_INDEX(textFlags));
-  etx_txt_color(lvobj, color);
+  withLvObj([&](lv_obj_t* obj) {
+    etx_font(obj, FONT_INDEX(textFlags));
+    etx_txt_color(obj, color);
 
-  if (textFlags & CENTERED)
-    etx_obj_add_style(lvobj, styles->text_align_center, LV_PART_MAIN);
-  else if (textFlags & RIGHT)
-    etx_obj_add_style(lvobj, styles->text_align_right, LV_PART_MAIN);
+    if (textFlags & CENTERED)
+      etx_obj_add_style(obj, styles->text_align_center, LV_PART_MAIN);
+    else if (textFlags & RIGHT)
+      etx_obj_add_style(obj, styles->text_align_right, LV_PART_MAIN);
 
-  lv_obj_set_style_grid_cell_x_align(lvobj, LV_GRID_ALIGN_STRETCH,
-                                     LV_PART_MAIN);
-  lv_label_set_text(lvobj, text.c_str());
-  if (rect.h == 0) lv_obj_set_height(lvobj, LV_SIZE_CONTENT);
+    lv_obj_set_style_grid_cell_x_align(obj, LV_GRID_ALIGN_STRETCH,
+                                       LV_PART_MAIN);
+    lv_label_set_text(obj, text.c_str());
+    if (rect.h == 0) lv_obj_set_height(obj, LV_SIZE_CONTENT);
+  });
 }
 
 #if defined(DEBUG_WINDOWS)
@@ -133,76 +134,76 @@ std::string StaticText::automationText() const
 template <>
 void DynamicNumber<uint32_t>::updateText()
 {
-  if (lvobj) {
+  withLvObj([&](lv_obj_t* obj) {
     const char* p = prefix ? prefix : "";
     const char* s = suffix ? suffix : "";
     if ((textFlags & PREC2) == PREC2) {
-      lv_label_set_text_fmt(lvobj, "%s%" PRIu32 ".%02" PRIu32 "%s", p,
+      lv_label_set_text_fmt(obj, "%s%" PRIu32 ".%02" PRIu32 "%s", p,
                             value / 100, value % 100, s);
     } else if (textFlags & PREC1) {
-      lv_label_set_text_fmt(lvobj, "%s%" PRIu32 ".%01" PRIu32 "%s", p,
+      lv_label_set_text_fmt(obj, "%s%" PRIu32 ".%01" PRIu32 "%s", p,
                             value / 10, value % 10, s);
     } else {
-      lv_label_set_text_fmt(lvobj, "%s%" PRIu32 "%s", p, value, s);
+      lv_label_set_text_fmt(obj, "%s%" PRIu32 "%s", p, value, s);
     }
-  }
+  });
 }
 
 template <>
 void DynamicNumber<int32_t>::updateText()
 {
-  if (lvobj) {
+  withLvObj([&](lv_obj_t* obj) {
     const char* p = prefix ? prefix : "";
     const char* s = suffix ? suffix : "";
     if ((textFlags & PREC2) == PREC2) {
-      lv_label_set_text_fmt(lvobj, "%s%" PRId32 ".%02" PRIu32 "%s", p,
+      lv_label_set_text_fmt(obj, "%s%" PRId32 ".%02" PRIu32 "%s", p,
                             value / 100, (uint32_t)abs(value % 100), s);
     } else if (textFlags & PREC1) {
-      lv_label_set_text_fmt(lvobj, "%s%" PRId32 ".%01" PRIu32 "%s", p,
+      lv_label_set_text_fmt(obj, "%s%" PRId32 ".%01" PRIu32 "%s", p,
                             value / 10, (uint32_t)abs(value % 10), s);
     } else {
-      lv_label_set_text_fmt(lvobj, "%s%" PRId32 "%s", p, value, s);
+      lv_label_set_text_fmt(obj, "%s%" PRId32 "%s", p, value, s);
     }
-  }
+  });
 }
 
 template <>
 void DynamicNumber<uint16_t>::updateText()
 {
-  if (lvobj) {
+  withLvObj([&](lv_obj_t* obj) {
     const char* p = prefix ? prefix : "";
     const char* s = suffix ? suffix : "";
     if ((textFlags & PREC2) == PREC2) {
-      lv_label_set_text_fmt(lvobj, "%s%" PRIu16 ".%02" PRIu16 "%s", p,
+      lv_label_set_text_fmt(obj, "%s%" PRIu16 ".%02" PRIu16 "%s", p,
                             (uint16_t)(value / 100), (uint16_t)(value % 100),
                             s);
     } else if (textFlags & PREC1) {
-      lv_label_set_text_fmt(lvobj, "%s%" PRIu16 ".%01" PRIu16 "%s", p,
+      lv_label_set_text_fmt(obj, "%s%" PRIu16 ".%01" PRIu16 "%s", p,
                             (uint16_t)(value / 10), (uint16_t)(value % 10), s);
     } else {
-      lv_label_set_text_fmt(lvobj, "%s%" PRIu16 "%s", p, value, s);
+      lv_label_set_text_fmt(obj, "%s%" PRIu16 "%s", p, value, s);
     }
-  }
+  });
 }
 
 template <>
 void DynamicNumber<int16_t>::updateText()
 {
-  if (lvobj) {
+  withLvObj([&](lv_obj_t* obj) {
     const char* p = prefix ? prefix : "";
     const char* s = suffix ? suffix : "";
     if ((textFlags & PREC2) == PREC2) {
-      lv_label_set_text_fmt(lvobj, "%s%" PRId16 ".%02" PRIu16 "%s", p,
+      lv_label_set_text_fmt(obj, "%s%" PRId16 ".%02" PRIu16 "%s", p,
                             (int16_t)(value / 100), (uint16_t)abs(value % 100),
                             s);
     } else if (textFlags & PREC1) {
-      lv_label_set_text_fmt(lvobj, "%s%" PRId16 ".%01" PRIu16 "%s", p,
+      lv_label_set_text_fmt(obj, "%s%" PRId16 ".%01" PRIu16 "%s", p,
                             (int16_t)(value / 10), (uint16_t)abs(value % 10),
                             s);
     } else {
-      lv_label_set_text_fmt(lvobj, "%s%" PRId16 "%s", p, value, s);
+      lv_label_set_text_fmt(obj, "%s%" PRId16 "%s", p, value, s);
     }
-  }
+  });
 }
 
 //-----------------------------------------------------------------------------
@@ -213,11 +214,12 @@ StaticIcon::StaticIcon(Window* parent, coord_t x, coord_t y, EdgeTxIcon icon,
     currentColor(color)
 {
   setWindowFlag(NO_FOCUS | NO_CLICK);
-  if (!hasLvObj()) return;
 
   setIcon(icon);
 
-  etx_img_color(lvobj, currentColor, LV_PART_MAIN);
+  withLvObj([&](lv_obj_t* obj) {
+    etx_img_color(obj, currentColor, LV_PART_MAIN);
+  });
 }
 
 StaticIcon::StaticIcon(Window* parent, coord_t x, coord_t y, const char* filename,
@@ -226,29 +228,28 @@ StaticIcon::StaticIcon(Window* parent, coord_t x, coord_t y, const char* filenam
     currentColor(color)
 {
   setWindowFlag(NO_FOCUS | NO_CLICK);
-  if (!hasLvObj()) return;
 
-  auto bm = BitmapBuffer::loadBitmap(filename, BMP_RGB565);
-  if (bm) {
-    size_t size;
-    mask = bm->to8bitMask(&size);
-    if (mask) {
-      setSize(mask->width, mask->height);
-      lv_canvas_set_buffer(lvobj, (void*)mask->data, mask->width, mask->height,
-                           LV_IMG_CF_ALPHA_8BIT);
+  withLvObj([&](lv_obj_t* obj) {
+    auto bm = BitmapBuffer::loadBitmap(filename, BMP_RGB565);
+    if (bm) {
+      size_t size;
+      mask = bm->to8bitMask(&size);
+      if (mask) {
+        setSize(mask->width, mask->height);
+        lv_canvas_set_buffer(obj, (void*)mask->data, mask->width, mask->height,
+                             LV_IMG_CF_ALPHA_8BIT);
+      }
+      delete bm;
     }
-    delete bm;
-  }
 
-  etx_img_color(lvobj, currentColor, LV_PART_MAIN);
+    etx_img_color(obj, currentColor, LV_PART_MAIN);
+  });
 }
 
-void StaticIcon::deleteLater()
+void StaticIcon::onDelete()
 {
-  if (_deleted) return;
   if (mask) free(mask);
   mask = nullptr;
-  Window::deleteLater();
 }
 
 void StaticIcon::setColor(LcdColorIndex color)
@@ -292,30 +293,31 @@ StaticImage::StaticImage(Window* parent, const rect_t& rect,
 
 void StaticImage::setSource(std::string filename)
 {
-  auto obj = liveLvObj();
-  if (!obj) return;
+  dispatchLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
 
-  if (!filename.empty()) {
-    std::string fullpath = std::string("A");
-    if (filename[0] != PATH_SEPARATOR[0]) fullpath += PATH_SEPARATOR;
-    fullpath += filename;
+    if (!filename.empty()) {
+      std::string fullpath = std::string("A");
+      if (filename[0] != PATH_SEPARATOR[0]) fullpath += PATH_SEPARATOR;
+      fullpath += filename;
 
-    if (!image) image = createStaticImageObject(obj);
-    if (!image) return;
+      if (!image) image = createStaticImageObject(obj);
+      if (!image) return;
 
-    lv_obj_set_pos(image, 0, 0);
-    lv_obj_set_size(image, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_center(image);
-    lv_img_set_src(image, fullpath.c_str());
-    if (!hasImage()) {
-      // Failed to load
-      TRACE_ERROR("could not load image '%s' - %s\n", filename.c_str(), stbi_failure_reason());
+      lv_obj_set_pos(image, 0, 0);
+      lv_obj_set_size(image, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+      lv_obj_center(image);
+      lv_img_set_src(image, fullpath.c_str());
+      if (!hasImage()) {
+        // Failed to load
+        TRACE_ERROR("could not load image '%s' - %s\n", filename.c_str(), stbi_failure_reason());
+        clearSource();
+      }
+      setZoom();
+    } else {
       clearSource();
     }
-    setZoom();
-  } else {
-    clearSource();
-  }
+  });
 }
 
 void StaticImage::clearSource()
@@ -357,42 +359,43 @@ StaticBitmap::StaticBitmap(Window* parent, const rect_t& rect,
 
 void StaticBitmap::setSource(const char *filename)
 {
-  auto obj = liveLvObj();
-  if (!obj) return;
+  dispatchLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
 
-  if (filename) {
-    if (filename[0] == '\0') {
-      clearSource();
-      return;
-    }
-
-    BitmapBuffer* newImg = BitmapBuffer::loadBitmap(filename, BMP_ARGB4444);
-    if (newImg) {
-      newImg->resizeToLVGL(width(), height());
-      if (!newImg->getData() || newImg->width() == 0 || newImg->height() == 0) {
-        delete newImg;
+    if (filename) {
+      if (filename[0] == '\0') {
+        clearSource();
         return;
       }
 
-      lv_obj_t* newCanvas = lv_canvas_create(obj);
-      if (!newCanvas) {
-        delete newImg;
-        return;
+      BitmapBuffer* newImg = BitmapBuffer::loadBitmap(filename, BMP_ARGB4444);
+      if (newImg) {
+        newImg->resizeToLVGL(width(), height());
+        if (!newImg->getData() || newImg->width() == 0 || newImg->height() == 0) {
+          delete newImg;
+          return;
+        }
+
+        lv_obj_t* newCanvas = lv_canvas_create(obj);
+        if (!newCanvas) {
+          delete newImg;
+          return;
+        }
+
+        lv_obj_center(newCanvas);
+        lv_canvas_set_buffer(newCanvas, newImg->getData(), newImg->width(), newImg->height(),
+                            LV_IMG_CF_TRUE_COLOR_ALPHA);
+
+        auto oldCanvas = canvas;
+        auto oldImg = img;
+        canvas = newCanvas;
+        img = newImg;
+
+        if (oldCanvas) lv_obj_del(oldCanvas);
+        if (oldImg) delete oldImg;
       }
-
-      lv_obj_center(newCanvas);
-      lv_canvas_set_buffer(newCanvas, newImg->getData(), newImg->width(), newImg->height(),
-                          LV_IMG_CF_TRUE_COLOR_ALPHA);
-
-      auto oldCanvas = canvas;
-      auto oldImg = img;
-      canvas = newCanvas;
-      img = newImg;
-
-      if (oldCanvas) lv_obj_del(oldCanvas);
-      if (oldImg) delete oldImg;
     }
-  }
+  });
 }
 
 void StaticBitmap::clearSource()
@@ -421,34 +424,35 @@ StaticLZ4Image::StaticLZ4Image(Window* parent, coord_t x, coord_t y,
            lv_canvas_create)
 {
   setWindowFlag(NO_FOCUS | NO_CLICK);
-  if (!hasLvObj()) return;
 
-  // Convert ARGB4444 to LV_IMG_CF_TRUE_COLOR_ALPHA
-  uint16_t w = lz4Bitmap->width;
-  uint16_t h = lz4Bitmap->height;
+  withLvObj([&](lv_obj_t* obj) {
+    // Convert ARGB4444 to LV_IMG_CF_TRUE_COLOR_ALPHA
+    uint16_t w = lz4Bitmap->width;
+    uint16_t h = lz4Bitmap->height;
 
-  uint32_t pixels = w * h;
-  uint32_t size = (pixels + 1) & 0xFFFFFFFE;
-  imgData = allocStaticLZ4ImageBuffer(size * 3);
-  if (!imgData) return;
+    uint32_t pixels = w * h;
+    uint32_t size = (pixels + 1) & 0xFFFFFFFE;
+    imgData = allocStaticLZ4ImageBuffer(size * 3);
+    if (!imgData) return;
 
-  uint8_t* decompData = imgData + size;
+    uint8_t* decompData = imgData + size;
 
-  LZ4_decompress_safe((const char*)lz4Bitmap->data, (char*)decompData,
-                      lz4Bitmap->compressedSize, pixels * sizeof(uint16_t));
+    LZ4_decompress_safe((const char*)lz4Bitmap->data, (char*)decompData,
+                        lz4Bitmap->compressedSize, pixels * sizeof(uint16_t));
 
-  uint8_t* dest = imgData;
-  for (uint32_t i = 0; i < pixels; i += 1) {
-    uint16_t c = read_u16_le(decompData);
-    ARGB_SPLIT(c, a, r, g, b);
-    c = RGB_JOIN(r * 2, g * 4, b * 2);
-    *dest++ = c & 0xFF;
-    *dest++ = c >> 8;
-    *dest++ = (a * 255) / 15;
-    decompData += sizeof(uint16_t);
-  }
+    uint8_t* dest = imgData;
+    for (uint32_t i = 0; i < pixels; i += 1) {
+      uint16_t c = read_u16_le(decompData);
+      ARGB_SPLIT(c, a, r, g, b);
+      c = RGB_JOIN(r * 2, g * 4, b * 2);
+      *dest++ = c & 0xFF;
+      *dest++ = c >> 8;
+      *dest++ = (a * 255) / 15;
+      decompData += sizeof(uint16_t);
+    }
 
-  lv_canvas_set_buffer(lvobj, imgData, w, h, LV_IMG_CF_TRUE_COLOR_ALPHA);
+    lv_canvas_set_buffer(obj, imgData, w, h, LV_IMG_CF_TRUE_COLOR_ALPHA);
+  });
 }
 
 #if defined(SIMU)
@@ -513,13 +517,10 @@ bool staticImageObjectCreateFailureLeavesNoImageForTest()
 }
 #endif
 
-void StaticLZ4Image::deleteLater()
+void StaticLZ4Image::onDelete()
 {
-  if (!deleted()) {
-    if (imgData) lv_mem_free(imgData);
-    imgData = nullptr;
-    Window::deleteLater();
-  }
+  if (imgData) lv_mem_free(imgData);
+  imgData = nullptr;
 }
 
 //-----------------------------------------------------------------------------
@@ -529,11 +530,16 @@ QRCode::QRCode(Window *parent, coord_t x, coord_t y, coord_t sz, std::string dat
     Window(parent, {x, y, sz, sz})
 {
   setWindowFlag(NO_CLICK);
-  if (!hasLvObj()) return;
 
-  qr = lv_qrcode_create(lvobj, sz, makeLvColor(color), makeLvColor(bgColor));
-  if (!requireLvObj(qr)) return;
-  setData(data);
+  if (initRequiredLvObj(
+          qr,
+          [&](lv_obj_t* parent) {
+            return lv_qrcode_create(parent, sz, makeLvColor(color),
+                                    makeLvColor(bgColor));
+          },
+          [](lv_obj_t*) {})) {
+    setData(data);
+  }
 }
 
 void QRCode::setData(std::string data)

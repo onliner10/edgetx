@@ -129,14 +129,14 @@ class TrimEdit : public Window
     tr_value->show(checked && showValue);
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     const auto& fm = g_model.flightModeData[fmId];
     if (lastTrim != fm.trim[trimId].value) {
       lastTrim = fm.trim[trimId].value;
       tr_value->setValue(lastTrim);
     }
-    Window::checkEvents();
+    Window::onLiveCheckEvents(live);
   }
 };
 
@@ -266,9 +266,9 @@ class FlightModeBtn : public ListLineButton
       lv_label_set_text(fmTrimValue[t], "");
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
-    ListLineButton::checkEvents();
+    ListLineButton::onLiveCheckEvents(live);
     if (!refreshing && loaded) {
       refreshing = true;
       for (int t = 0; t < keysGetMaxTrims() && t < MAX_FMTRIMS; t += 1) {

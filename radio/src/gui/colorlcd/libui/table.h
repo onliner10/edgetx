@@ -62,9 +62,9 @@ class TableField : public Window
   lv_group_t* group = nullptr;
   lv_group_t* oldGroup = nullptr;
 
-  bool onLongPress() override;
+  bool onLiveLongPress(LiveWindow&) override;
 
-  void deleteLater() override;
+  void onDelete() override;
 
   static void force_editing(lv_group_t* g) { lv_group_set_editing(g, true); }
 };

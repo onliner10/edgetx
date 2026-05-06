@@ -40,5 +40,5 @@ public:
               std::function<void(uint32_t)> setValue = nullptr,
               COLOR_EDITOR_FMT fmt = ETX_RGB565);
 
-  void onClicked() override;
+  void onLiveClicked(LiveWindow&) override;
 };

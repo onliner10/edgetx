@@ -35,17 +35,14 @@ class ButtonBase : public FormField
   std::string getName() const override { return "ButtonBase"; }
 #endif
 
-  virtual void onPress();
-  bool onLongPress() override;
-
-  void onClicked() override;
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 
 #if defined(SIMU)
   std::string automationRole() const override { return "button"; }
   bool automationLongClickable() const override
   {
-    return isAvailable() && getLvObj() && static_cast<bool>(longPressHandler);
+    return static_cast<bool>(longPressHandler) &&
+           visitLive([](LiveWindow&) { return true; });
   }
 #endif
 
@@ -68,6 +65,10 @@ class ButtonBase : public FormField
   }
 
  protected:
+  virtual void onLivePress(LiveWindow& live);
+  void onLiveClicked(LiveWindow& live) override;
+  bool onLiveLongPress(LiveWindow& live) override;
+
   std::function<uint8_t(void)> pressHandler;
   std::function<uint8_t(void)> longPressHandler;
   std::function<void(void)> checkHandler;
@@ -172,5 +173,5 @@ class MomentaryButton : public FormField
   std::string text;
   lv_obj_t* label = nullptr;
 
-  bool customEventHandler(lv_event_code_t code) override;
+  bool onLiveCustomEvent(LiveWindow& live, lv_event_t* event) override;
 };

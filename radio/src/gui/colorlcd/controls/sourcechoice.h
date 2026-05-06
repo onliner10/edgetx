@@ -41,7 +41,7 @@ class SourceChoice : public Choice
 
   void setValue(int value) override;
   int getIntValue() const override;
-  bool onLongPress() override;
+  bool onLiveLongPress(LiveWindow&) override;
 
   void invertChoice();
 

@@ -65,9 +65,9 @@ void FileCarosell::setSelected(int n)
     message->setText(_fileNames.size() > 0 ? STR_LOADING : STR_NO_THEME_IMAGE);
 }
 
-void FileCarosell::checkEvents()
+void FileCarosell::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  Window::checkEvents();
+  Window::onLiveCheckEvents(live);
 
   uint32_t newTicks = getTicks();
 

@@ -200,9 +200,9 @@ void MainViewSlider::setPos()
   if (sliderIcon) lv_obj_set_pos(sliderIcon->getLvObj(), x, y);
 }
 
-void MainViewSlider::checkEvents()
+void MainViewSlider::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  Window::checkEvents();
+  Window::onLiveCheckEvents(live);
 
   int16_t newValue = calibratedAnalogs[potIdx];
   if (value != newValue) {
@@ -253,9 +253,9 @@ MainView6POS::MainView6POS(Window* parent, uint8_t idx) :
   checkEvents();
 }
 
-void MainView6POS::checkEvents()
+void MainView6POS::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  Window::checkEvents();
+  Window::onLiveCheckEvents(live);
   int16_t newValue = getXPotPosition(idx);
   if (value != newValue) {
     value = newValue;

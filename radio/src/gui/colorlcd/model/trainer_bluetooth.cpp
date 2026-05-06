@@ -36,7 +36,7 @@ class BTDiscoverMenu : public Menu
 {
   uint8_t devCount = 0;
 
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
   void selectAddr(const char* addr);
 
 public:
@@ -51,7 +51,7 @@ BTDiscoverMenu::BTDiscoverMenu() :
 
 }
 
-void BTDiscoverMenu::checkEvents()
+void BTDiscoverMenu::onLiveCheckEvents(Window::LiveWindow& live)
 {
   if (bluetooth.state == BLUETOOTH_STATE_DISCOVER_START ||
       bluetooth.state == BLUETOOTH_STATE_DISCOVER_END) {
@@ -104,14 +104,14 @@ void BluetoothTrainerWindow::setMaster(bool master)
 
 static const char _empty_addr[] = "---";
 
-void BluetoothTrainerWindow::checkEvents()
+void BluetoothTrainerWindow::onLiveCheckEvents(Window::LiveWindow& live)
 {
   if(bluetooth.state != lastbtstate ||
      reusableBuffer.moduleSetup.bt.devicesCount != devcount)
     refresh();
   lastbtstate = bluetooth.state;
   devcount = reusableBuffer.moduleSetup.bt.devicesCount;
-  Window::checkEvents();
+  Window::onLiveCheckEvents(live);
 }
 
 void BluetoothTrainerWindow::refresh()

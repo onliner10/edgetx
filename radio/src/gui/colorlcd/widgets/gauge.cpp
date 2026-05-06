@@ -81,10 +81,8 @@ class GaugeWidget : public TrackedWidget
     return divRoundClosest(100 * (value - min), (max - min));
   }
 
-  void update() override
+  void onUpdate() override
   {
-    if (!loaded || _deleted) return;
-
     auto widgetData = getPersistentData();
 
     mixsrc_t index = widgetData->options[0].value.unsignedValue;
@@ -126,8 +124,6 @@ class GaugeWidget : public TrackedWidget
 
   void refresh() override
   {
-    if (!loaded || _deleted) return;
-
     auto newValue = getGuageValue();
     if (lastValue != newValue) {
       lastValue = newValue;

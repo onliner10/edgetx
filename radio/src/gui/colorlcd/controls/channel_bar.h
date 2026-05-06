@@ -50,7 +50,7 @@ class ChannelBar : public Window
   lv_point_t divPoints[2];
   lv_obj_t* bar = nullptr;
 
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 };
 
 class MixerChannelBar : public ChannelBar
@@ -75,7 +75,7 @@ class OutputChannelBar : public ChannelBar
 
   void drawLimitLines(bool forced);
 
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 };
 
 class ComboChannelBar : public Window
@@ -91,6 +91,6 @@ class ComboChannelBar : public Window
 #if defined(OVERRIDE_CHANNEL_FUNCTION)
   StaticIcon* overrideIcon = nullptr;
 
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 #endif
 };

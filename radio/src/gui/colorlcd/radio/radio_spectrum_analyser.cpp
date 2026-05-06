@@ -153,7 +153,7 @@ class SpectrumScaleWindow : public Window
     }
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     if (lastFreq != reusableBuffer.spectrumAnalyser.freq ||
         lastSpan != reusableBuffer.spectrumAnalyser.span) {
@@ -216,7 +216,7 @@ class SpectrumWindow : public Window
     warning->show(TELEMETRY_STREAMING());
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     lv_coord_t SCALE_TOP = height();
     constexpr uint8_t step = 4;
@@ -304,7 +304,7 @@ class SpectrumWindow : public Window
       }
     }
 
-    Window::checkEvents();
+    Window::onLiveCheckEvents(live);
   }
 
  protected:
@@ -355,7 +355,7 @@ void RadioSpectrumAnalyser::buildBody(Window* window)
                            moduleIdx);
 }
 
-void RadioSpectrumAnalyser::checkEvents()
+void RadioSpectrumAnalyser::onLiveCheckEvents(Window::LiveWindow& live)
 {
   int32_t offset = reusableBuffer.spectrumAnalyser.track -
                    (reusableBuffer.spectrumAnalyser.freq -
@@ -370,7 +370,7 @@ void RadioSpectrumAnalyser::checkEvents()
                    (lv_coord_t)(height() - EdgeTxStyles::UI_ELEMENT_HEIGHT)};
     lv_line_set_points(trackLine, trackPts, 2);
   }
-  Page::checkEvents();
+  Page::onLiveCheckEvents(live);
 }
 
 void RadioSpectrumAnalyser::init()

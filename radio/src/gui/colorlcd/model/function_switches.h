@@ -133,7 +133,7 @@ class FunctionSwitchesBase : public Page
 #endif
 
   virtual void setState() = 0;
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 };
 
 //-----------------------------------------------------------------------------

@@ -40,7 +40,7 @@ CurveChoice::CurveChoice(Window* parent, std::function<int()> getRefValue,
     setTextHandler([](int value) { return getCurveString(value); });
   }
 
-bool CurveChoice::onLongPress()
+bool CurveChoice::onLiveLongPress(Window::LiveWindow&)
 {
   if (modelCurvesEnabled()) {
     if (_getValue()) {

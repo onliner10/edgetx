@@ -222,14 +222,14 @@ class FunctionSwitch : public FunctionSwitchBase
     setLEDState(typ);
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     setState();
     if (lastType != (int)g_model.cfsType(switchIndex)) {
       lastType = g_model.cfsType(switchIndex);
       typeChoice->setValue(lastType);
     }
-    Window::checkEvents();
+    Window::onLiveCheckEvents(live);
   }
 };
 
@@ -356,10 +356,10 @@ void FunctionSwitchesBase::addQRCode()
 #endif
 }
 
-void FunctionSwitchesBase::checkEvents()
+void FunctionSwitchesBase::onLiveCheckEvents(Window::LiveWindow& live)
 {
   setState();
-  Page::checkEvents();
+  Page::onLiveCheckEvents(live);
 }
 
 //-----------------------------------------------------------------------------

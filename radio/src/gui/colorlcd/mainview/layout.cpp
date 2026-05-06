@@ -19,18 +19,18 @@
  * GNU General Public License for more details.
  */
 
+#include <new>
+
 #include "edgetx.h"
 #include "mainwindow.h"
 #include "topbar.h"
 #include "view_main.h"
 #include "widget.h"
 
-#include <new>
-
 WidgetsContainer* customScreens[MAX_CUSTOM_SCREENS] = {};
 
 const LayoutOption defaultLayoutOptions[] = {LAYOUT_COMMON_OPTIONS,
-                                           LAYOUT_OPTIONS_END};
+                                             LAYOUT_OPTIONS_END};
 
 //-----------------------------------------------------------------------------
 
@@ -40,15 +40,11 @@ void ZonePersistentData::clear()
   widgetData.clear();
 }
 
-void LayoutPersistentData::clearZone(int idx)
-{
-  zones[idx].clear();
-}
+void LayoutPersistentData::clearZone(int idx) { zones[idx].clear(); }
 
 void LayoutPersistentData::clear()
 {
-  for (int i = 0; i < MAX_LAYOUT_ZONES; i += 1)
-    clearZone(i);
+  for (int i = 0; i < MAX_LAYOUT_ZONES; i += 1) clearZone(i);
   for (int i = 0; i < MAX_LAYOUT_OPTIONS; i += 1) {
     options[i].type = LOV_None;
     options[i].value.unsignedValue = 0;
@@ -97,10 +93,10 @@ const LayoutFactory* LayoutFactory::getLayoutFactory(const char* name)
 //
 // Loads a layout, but does not attach it to any window
 //
-WidgetsContainer* LayoutFactory::loadLayout(
-    Window* parent, int screenNum)
+WidgetsContainer* LayoutFactory::loadLayout(Window* parent, int screenNum)
 {
-  const LayoutFactory* factory = getLayoutFactory(g_model.getScreenLayoutId(screenNum));
+  const LayoutFactory* factory =
+      getLayoutFactory(g_model.getScreenLayoutId(screenNum));
   if (factory) {
     return factory->load(parent, screenNum);
   }
@@ -199,8 +195,7 @@ WidgetsContainer* LayoutFactory::createCustomScreen(
 
   auto& screen = customScreens[customScreenIndex];
 
-  if (screen != nullptr)
-    screen->deleteLater();
+  if (screen != nullptr) screen->deleteLater();
 
   auto viewMain = ViewMain::instance();
   screen = create(viewMain, customScreenIndex);
@@ -213,7 +208,9 @@ WidgetsContainer* LayoutFactory::createCustomScreen(
   return screen;
 }
 
-LayoutFactory::LayoutFactory(const char* id, const char* name, const LayoutOption * options, uint8_t zoneCount, uint8_t* zoneMap) :
+LayoutFactory::LayoutFactory(const char* id, const char* name,
+                             const LayoutOption* options, uint8_t zoneCount,
+                             uint8_t* zoneMap) :
     id(id), name(name), options(options), zoneCount(zoneCount), zoneMap(zoneMap)
 {
   getRegisteredLayouts().push_back(this);
@@ -227,24 +224,23 @@ LayoutFactory::LayoutFactory(const char* id, const char* name, const LayoutOptio
   memset(bm, 0, BM_W * BM_H);
 
   memset(bm, 0xFF, BM_W);
-  memset(bm+((BM_H-1)*BM_W), 0xFF, BM_W);
+  memset(bm + ((BM_H - 1) * BM_W), 0xFF, BM_W);
 
   for (int y = 1; y < BM_H - 1; y += 1) {
-    bm[y*BM_W] = 0xFF;
-    bm[y*BM_W+BM_W-1] = 0xFF;
+    bm[y * BM_W] = 0xFF;
+    bm[y * BM_W + BM_W - 1] = 0xFF;
   }
 
   for (int i = 0; i < zoneCount * 4; i += 4) {
     uint8_t xo = BM_W * zoneMap[i] / LAYOUT_MAP_DIV;
-    uint8_t yo = BM_H * zoneMap[i+1] / LAYOUT_MAP_DIV;
-    uint8_t w = BM_W * zoneMap[i+2] / LAYOUT_MAP_DIV;
-    uint8_t h = (BM_H * zoneMap[i+3] + LAYOUT_MAP_DIV/2) / LAYOUT_MAP_DIV;
+    uint8_t yo = BM_H * zoneMap[i + 1] / LAYOUT_MAP_DIV;
+    uint8_t w = BM_W * zoneMap[i + 2] / LAYOUT_MAP_DIV;
+    uint8_t h = (BM_H * zoneMap[i + 3] + LAYOUT_MAP_DIV / 2) / LAYOUT_MAP_DIV;
 
-    if (yo > 0)
-      memset(bm+(yo*BM_W+xo), 0xFF, w);
+    if (yo > 0) memset(bm + (yo * BM_W + xo), 0xFF, w);
     if (xo > 0) {
       for (int y = 0; y < h; y += 1) {
-        bm[(yo+y)*BM_W+xo] = 0xFF;
+        bm[(yo + y) * BM_W + xo] = 0xFF;
       }
     }
   }
@@ -260,15 +256,15 @@ LayoutFactory::~LayoutFactory()
 
 inline LayoutOptionValueEnum layoutValueEnumFromType(LayoutOption::Type type)
 {
-  switch(type) {
-  case LayoutOption::Bool:
-    return LOV_Bool;
+  switch (type) {
+    case LayoutOption::Bool:
+      return LOV_Bool;
 
-  case LayoutOption::Color:
-    return LOV_Color;
+    case LayoutOption::Color:
+      return LOV_Color;
 
-  default:
-    return LOV_None;
+    default:
+      return LOV_None;
   }
 }
 
@@ -285,8 +281,7 @@ void LayoutFactory::initPersistentData(int screenNum, bool setDefault) const
       // TODO compiler bug? The CPU freezes ... persistentData->options[i++]
       // = option->deflt;
       auto optVal = &layoutData->options[i];
-      if (setDefault)
-        optVal->value.unsignedValue = option->deflt.unsignedValue;
+      if (setDefault) optVal->value.unsignedValue = option->deflt.unsignedValue;
       optVal->type = layoutValueEnumFromType(option->type);
     }
   }
@@ -302,23 +297,23 @@ WidgetsContainer* LayoutFactory::load(Window* parent, int screenNum) const
 {
   initPersistentData(screenNum, false);
   Layout* layout = createNew(parent, screenNum);
-  if (layout)
-    layout->load();
+  if (layout) layout->load();
   return layout;
 }
 
 //-----------------------------------------------------------------------------
 
-Layout::Layout(Window* parent, const LayoutFactory* factory,
-               int screenNum, uint8_t zoneCount,
-               uint8_t* zoneMap) :
+Layout::Layout(Window* parent, const LayoutFactory* factory, int screenNum,
+               uint8_t zoneCount, uint8_t* zoneMap) :
     WidgetsContainer(parent, {0, 0, LCD_W, LCD_H}, zoneCount),
     factory(factory),
-    zoneMap(zoneMap), screenNum(screenNum)
+    zoneMap(zoneMap),
+    screenNum(screenNum)
 {
   decoration = new (std::nothrow) ViewMainDecoration(this);
   setWindowFlag(NO_FOCUS);
-  decorationUpdateMsg.subscribe(Messaging::DECORATION_UPDATE, [=](uint32_t param) { updateDecorations(); });
+  decorationUpdateMsg.subscribe(Messaging::DECORATION_UPDATE,
+                                [=](uint32_t param) { updateDecorations(); });
   updateDecorations();
   zoneUpdateRequired = false;
 }
@@ -333,7 +328,7 @@ void Layout::updateDecorations()
   zoneUpdateRequired = true;
 }
 
-void Layout::show(bool visible)
+void Layout::onLiveShow(Window::LiveWindow&, bool visible)
 {
   if (decoration) decoration->show(visible);
   if (visible && zoneUpdateRequired) {
@@ -347,8 +342,7 @@ bool Layout::hasFullScreenWidget() const
 {
   if (!widgets) return false;
   for (int i = 0; i < zoneCount; i += 1)
-    if (widgets[i] && widgets[i]->isFullscreen())
-      return true;
+    if (widgets[i] && widgets[i]->isFullscreen()) return true;
   return false;
 }
 
@@ -357,12 +351,12 @@ void widgetsContainerForceArrayAllocationFailureForTest(bool force);
 
 bool layoutWidgetsArrayAllocationFailureHasNoFullscreenWidgetForTest()
 {
-  static uint8_t zoneMap[] = {
-      LAYOUT_MAP_0, LAYOUT_MAP_0, LAYOUT_MAP_FULL, LAYOUT_MAP_FULL};
+  static uint8_t zoneMap[] = {LAYOUT_MAP_0, LAYOUT_MAP_0, LAYOUT_MAP_FULL,
+                              LAYOUT_MAP_FULL};
 
   widgetsContainerForceArrayAllocationFailureForTest(true);
-  auto layout = new (std::nothrow) Layout(MainWindow::instance(), nullptr, 0, 1,
-                                          zoneMap);
+  auto layout =
+      new (std::nothrow) Layout(MainWindow::instance(), nullptr, 0, 1, zoneMap);
   widgetsContainerForceArrayAllocationFailureForTest(false);
 
   if (!layout) return false;
@@ -374,8 +368,7 @@ bool layoutWidgetsArrayAllocationFailureHasNoFullscreenWidgetForTest()
 
 rect_t Layout::getWidgetsZone() const
 {
-  if (hasFullScreenWidget())
-    return {0, 0, LCD_W, LCD_H};
+  if (hasFullScreenWidget()) return {0, 0, LCD_W, LCD_H};
 
   if (decoration) return decoration->getWidgetsZone(hasTopbar());
   return {0, 0, LCD_W, LCD_H};
@@ -397,14 +390,14 @@ rect_t Layout::getZone(unsigned int index) const
   return {z.x + xo, z.y + yo, w, h};
 }
 
-void Layout::checkEvents()
+void Layout::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  Window::checkEvents();
+  Window::onLiveCheckEvents(live);
   rect_t z = getWidgetsZone();
-  if (z.x != lastMainZone.x || z.y != lastMainZone.y || z.w != lastMainZone.w || z.h != lastMainZone.h) {
+  if (z.x != lastMainZone.x || z.y != lastMainZone.y || z.w != lastMainZone.w ||
+      z.h != lastMainZone.h) {
     lastMainZone = z;
-    if (!hasFullScreenWidget())
-      updateZones();
+    if (!hasFullScreenWidget()) updateZones();
   }
 }
 
@@ -417,8 +410,7 @@ void Layout::removeWidget(unsigned int index)
   WidgetsContainer::removeWidget(index);
 }
 
-Widget* Layout::createWidget(unsigned int index,
-                      const WidgetFactory* factory)
+Widget* Layout::createWidget(unsigned int index, const WidgetFactory* factory)
 {
   if (!widgets || index >= zoneCount) return nullptr;
 
@@ -427,11 +419,12 @@ Widget* Layout::createWidget(unsigned int index,
 
   Widget* widget = nullptr;
   if (factory) {
-    g_model.getScreenLayoutData(screenNum)->setWidgetName(index, factory->getName());
+    g_model.getScreenLayoutData(screenNum)->setWidgetName(index,
+                                                          factory->getName());
     widget = factory->create(
         this, getZone(index),
-        WidgetLocation(MainViewWidgetLocation{
-            static_cast<uint8_t>(screenNum), static_cast<uint8_t>(index)}));
+        WidgetLocation(MainViewWidgetLocation{static_cast<uint8_t>(screenNum),
+                                              static_cast<uint8_t>(index)}));
   }
   widgets[index] = widget;
 
@@ -456,8 +449,8 @@ void Layout::load()
       widgets[i] = WidgetFactory::newWidget(
           g_model.getScreenLayoutData(screenNum)->getWidgetName(i), this,
           getZone(i),
-          WidgetLocation(MainViewWidgetLocation{
-              static_cast<uint8_t>(screenNum), static_cast<uint8_t>(i)}));
+          WidgetLocation(MainViewWidgetLocation{static_cast<uint8_t>(screenNum),
+                                                static_cast<uint8_t>(i)}));
     }
   }
 }
@@ -467,23 +460,28 @@ LayoutOptionValue* Layout::getOptionValue(unsigned int index) const
   return &g_model.getScreenLayoutData(screenNum)->options[index].value;
 }
 
-bool Layout::hasTopbar() const {
+bool Layout::hasTopbar() const
+{
   return getOptionValue(LAYOUT_OPTION_TOPBAR)->boolValue;
 }
 
-bool Layout::hasFlightMode() const {
+bool Layout::hasFlightMode() const
+{
   return getOptionValue(LAYOUT_OPTION_FM)->boolValue;
 }
 
-bool Layout::hasSliders() const {
+bool Layout::hasSliders() const
+{
   return getOptionValue(LAYOUT_OPTION_SLIDERS)->boolValue;
 }
 
-bool Layout::hasTrims() const {
+bool Layout::hasTrims() const
+{
   return getOptionValue(LAYOUT_OPTION_TRIMS)->boolValue;
 }
 
-bool Layout::isMirrored() const {
+bool Layout::isMirrored() const
+{
   return getOptionValue(LAYOUT_OPTION_MIRRORED)->boolValue;
 }
 

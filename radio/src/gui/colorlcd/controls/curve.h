@@ -21,8 +21,8 @@
 
 #pragma once
 
-#include "window.h"
 #include "messaging.h"
+#include "window.h"
 
 class StaticText;
 
@@ -31,11 +31,15 @@ class StaticText;
 class CurveRenderer
 {
  public:
+  CurveRenderer() = default;
   CurveRenderer(Window* parent, const rect_t& rect,
                 std::function<int(int)> function);
   ~CurveRenderer();
 
+  bool init(Window::LiveWindow& parent, const rect_t& rect,
+            std::function<int(int)> function);
   void update();
+  bool ready() const { return ptLine && lnPoints; }
 
  protected:
   // Drawing rectangle position & size
@@ -81,10 +85,11 @@ class Curve : public Window
   coord_t getPointX(int x) const;
   coord_t getPointY(int y) const;
 
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 
-  static LAYOUT_VAL_SCALED(POS_LBL_X, 10)
-  static LAYOUT_VAL_SCALED(POS_LBL_Y, 10)
-  static LAYOUT_VAL_SCALED(POS_LBL_H, 17)
-  static LAYOUT_VAL_SCALED_ODD(POS_PT_SZ, 9)
+  static LAYOUT_VAL_SCALED(POS_LBL_X, 10) static LAYOUT_VAL_SCALED(
+      POS_LBL_Y,
+      10) static LAYOUT_VAL_SCALED(POS_LBL_H,
+                                   17) static LAYOUT_VAL_SCALED_ODD(POS_PT_SZ,
+                                                                    9)
 };

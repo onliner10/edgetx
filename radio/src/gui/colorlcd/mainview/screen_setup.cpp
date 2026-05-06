@@ -83,7 +83,8 @@ class LayoutChoice : public Button
     update();
   }
 
-  void onPress() override
+ protected:
+  void onLivePress(LiveWindow&) override
   {
     auto menu = new (std::nothrow) Menu();
     if (!menu) return;
@@ -99,8 +100,7 @@ class LayoutChoice : public Button
         std::distance(LayoutFactory::getRegisteredLayouts().begin(), it));
 
     menu->setCloseHandler([=]() {
-      if (!menu->deleted())
-        update();
+      menu->visitLive([&](Window::LiveWindow&) { update(); });
     });
   }
 

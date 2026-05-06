@@ -31,7 +31,7 @@ class TextWidget : public Widget
              WidgetLocation location) :
       Widget(factory, parent, rect, location)
   {
-    delayLoad();
+    delayWidgetLoad();
   }
 
   void delayedInit() override
@@ -58,10 +58,8 @@ class TextWidget : public Widget
   lv_obj_t* shadow;
   lv_obj_t* label;
 
-  void update() override
+  void onUpdate() override
   {
-    if (!loaded || _deleted) return;
-
     auto widgetData = getPersistentData();
 
     // Set text value from options

@@ -21,11 +21,11 @@
 
 #include "channel_bar.h"
 
+#include <new>
+
 #include "bitmaps.h"
 #include "etx_lv_theme.h"
 #include "static.h"
-
-#include <new>
 
 #define VIEW_CHANNELS_LIMIT_PCT \
   (g_model.extendedLimits ? LIMIT_EXT_PERCENT : LIMIT_STD_PERCENT)
@@ -33,46 +33,55 @@
 #define CHANNELS_LIMIT (g_model.extendedLimits ? LIMIT_EXT_MAX : LIMIT_STD_MAX)
 
 ChannelBar::ChannelBar(Window* parent, const rect_t& rect, uint8_t channel,
-                       std::function<int16_t()> getValueFunc, LcdColorIndex barColorIndex,
+                       std::function<int16_t()> getValueFunc,
+                       LcdColorIndex barColorIndex,
                        LcdColorIndex txtColorIndex) :
-    Window(parent, rect), channel(channel),
-    getValue(std::move(getValueFunc))
+    Window(parent, rect), channel(channel), getValue(std::move(getValueFunc))
 {
   setWindowFlag(NO_CLICK);
 
-  etx_solid_bg(lvobj, COLOR_THEME_PRIMARY2_INDEX);
-  etx_obj_add_style(lvobj, styles->border_thin, LV_PART_MAIN);
-  etx_obj_add_style(lvobj, styles->border_color[COLOR_THEME_SECONDARY2_INDEX], LV_PART_MAIN);
+  if (dispatchLive([&](LiveWindow& live) {
+        auto obj = live.lvobj();
+        etx_solid_bg(obj, COLOR_THEME_PRIMARY2_INDEX);
+        etx_obj_add_style(obj, styles->border_thin, LV_PART_MAIN);
+        etx_obj_add_style(obj,
+                          styles->border_color[COLOR_THEME_SECONDARY2_INDEX],
+                          LV_PART_MAIN);
 
-  bar = lv_obj_create(lvobj);
-  etx_solid_bg(bar, barColorIndex);
-  lv_obj_set_pos(bar, width() / 2, 1);
-  lv_obj_set_size(bar, 0, height() - 2);
+        bar = lv_obj_create(obj);
+        if (!requireLvObj(bar)) return false;
+        etx_solid_bg(bar, barColorIndex);
+        lv_obj_set_pos(bar, width() / 2, 1);
+        lv_obj_set_size(bar, 0, height() - 2);
 
-  coord_t yo = (height() < 10) ? -1 : -PAD_TINY;
+        coord_t yo = (height() < 10) ? -1 : -PAD_TINY;
 
-  valText = etx_label_create(lvobj, FONT_XS_INDEX);
-  lv_obj_set_pos(valText, width() / 2 + VAL_XO, yo);
-  lv_obj_set_size(valText, VAL_W, VAL_H);
-  etx_obj_add_style(valText, styles->text_align_left, LV_PART_MAIN);
-  lv_obj_set_style_translate_x(valText, VAL_XT, LV_STATE_USER_1);
-  etx_obj_add_style(valText, styles->text_align_right, LV_STATE_USER_1);
-  etx_txt_color(valText, txtColorIndex);
-  lv_label_set_text(valText, "");
+        valText = etx_label_create(obj, FONT_XS_INDEX);
+        if (!requireLvObj(valText)) return false;
+        lv_obj_set_pos(valText, width() / 2 + VAL_XO, yo);
+        lv_obj_set_size(valText, VAL_W, VAL_H);
+        etx_obj_add_style(valText, styles->text_align_left, LV_PART_MAIN);
+        lv_obj_set_style_translate_x(valText, VAL_XT, LV_STATE_USER_1);
+        etx_obj_add_style(valText, styles->text_align_right, LV_STATE_USER_1);
+        etx_txt_color(valText, txtColorIndex);
+        lv_label_set_text(valText, "");
 
-  divPoints[0] = {(lv_coord_t)(width() / 2), 0};
-  divPoints[1] = {(lv_coord_t)(width() / 2), (lv_coord_t)height()};
+        divPoints[0] = {(lv_coord_t)(width() / 2), 0};
+        divPoints[1] = {(lv_coord_t)(width() / 2), (lv_coord_t)height()};
 
-  lv_obj_t* divLine = lv_line_create(lvobj);
-  etx_obj_add_style(divLine, styles->div_line, LV_PART_MAIN);
-  lv_line_set_points(divLine, divPoints, 2);
-
-  checkEvents();
+        lv_obj_t* divLine = lv_line_create(obj);
+        if (!requireLvObj(divLine)) return false;
+        etx_obj_add_style(divLine, styles->div_line, LV_PART_MAIN);
+        lv_line_set_points(divLine, divPoints, 2);
+        return true;
+      })) {
+    checkEvents();
+  }
 }
 
-void ChannelBar::checkEvents()
+void ChannelBar::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  Window::checkEvents();
+  Window::onLiveCheckEvents(live);
 
   int newValue = getValue();
 
@@ -81,7 +90,8 @@ void ChannelBar::checkEvents()
 
     std::string s;
     if (g_eeGeneral.ppmunit == PPM_US)
-      s = formatNumberAsString(PPM_CH_CENTER(channel) + value / 2, 0, 0, "", STR_US);
+      s = formatNumberAsString(PPM_CH_CENTER(channel) + value / 2, 0, 0, "",
+                               STR_US);
     else if (g_eeGeneral.ppmunit == PPM_PERCENT_PREC1)
       s = formatNumberAsString(calcRESXto1000(value), PREC1, 0, "", "%");
     else
@@ -96,7 +106,8 @@ void ChannelBar::checkEvents()
       else
         lv_obj_add_state(valText, LV_STATE_USER_1);
 
-      const int lim = (g_model.extendedLimits ? (1024 * LIMIT_EXT_PERCENT / 100) : 1024);
+      const int lim =
+          (g_model.extendedLimits ? (1024 * LIMIT_EXT_PERCENT / 100) : 1024);
       int chanVal = limit<int>(-lim, value, lim);
 
       uint16_t size = divRoundClosest(abs(chanVal) * width(), lim * 2);
@@ -127,23 +138,30 @@ OutputChannelBar::OutputChannelBar(Window* parent, const rect_t& rect,
                                    uint8_t channel, bool editColor,
                                    bool drawLimits) :
     ChannelBar(
-        parent, rect, channel,
-        [=] { return channelOutputs[channel]; },
+        parent, rect, channel, [=] { return channelOutputs[channel]; },
         COLOR_THEME_ACTIVE_INDEX),
     drawLimits(drawLimits)
 {
   if (drawLimits) {
-    leftLim = lv_line_create(lvobj);
-    if (editColor)
-      etx_obj_add_style(leftLim, styles->div_line_edit, LV_PART_MAIN);
-    else
-      etx_obj_add_style(leftLim, styles->div_line, LV_PART_MAIN);
-    rightLim = lv_line_create(lvobj);
-    if (editColor)
-      etx_obj_add_style(rightLim, styles->div_line_edit, LV_PART_MAIN);
-    else
-      etx_obj_add_style(rightLim, styles->div_line, LV_PART_MAIN);
-    drawLimitLines(true);
+    dispatchLive([&](LiveWindow& live) {
+      auto obj = live.lvobj();
+      leftLim = lv_line_create(obj);
+      if (!requireLvObj(leftLim)) return false;
+      if (editColor)
+        etx_obj_add_style(leftLim, styles->div_line_edit, LV_PART_MAIN);
+      else
+        etx_obj_add_style(leftLim, styles->div_line, LV_PART_MAIN);
+
+      rightLim = lv_line_create(obj);
+      if (!requireLvObj(rightLim)) return false;
+      if (editColor)
+        etx_obj_add_style(rightLim, styles->div_line_edit, LV_PART_MAIN);
+      else
+        etx_obj_add_style(rightLim, styles->div_line, LV_PART_MAIN);
+
+      drawLimitLines(true);
+      return true;
+    });
   }
 }
 
@@ -155,7 +173,7 @@ static inline unsigned posOnBar(coord_t width, int value_to100)
 
 void OutputChannelBar::drawLimitLines(bool forced)
 {
-  if (drawLimits) {
+  if (drawLimits && leftLim && rightLim) {
     // Draw output limits bars
     bool changed = forced;
     LimitData* ld = limitAddress(channel);
@@ -215,9 +233,9 @@ void OutputChannelBar::drawLimitLines(bool forced)
   }
 }
 
-void OutputChannelBar::checkEvents()
+void OutputChannelBar::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  ChannelBar::checkEvents();
+  ChannelBar::onLiveCheckEvents(live);
   drawLimitLines(false);
 }
 
@@ -227,40 +245,48 @@ ComboChannelBar::ComboChannelBar(Window* parent, const rect_t& rect,
                                  uint8_t _channel, bool isInHeader) :
     Window(parent, rect), channel(_channel)
 {
-  LcdColorIndex txtColIdx = isInHeader ? COLOR_THEME_PRIMARY2_INDEX : COLOR_THEME_SECONDARY1_INDEX;
+  LcdColorIndex txtColIdx =
+      isInHeader ? COLOR_THEME_PRIMARY2_INDEX : COLOR_THEME_SECONDARY1_INDEX;
 
   auto invMask = getBuiltinIcon(ICON_CHAN_MONITOR_INVERTED);
 
   coord_t barW = width() - invMask->width - PAD_TINY;
 
   outputChannelBar = new (std::nothrow) OutputChannelBar(
-      this, {PAD_TINY + invMask->width, ChannelBar::BAR_HEIGHT + PAD_TINY, barW, ChannelBar::BAR_HEIGHT},
+      this,
+      {PAD_TINY + invMask->width, ChannelBar::BAR_HEIGHT + PAD_TINY, barW,
+       ChannelBar::BAR_HEIGHT},
       channel, isInHeader);
 
   new (std::nothrow) MixerChannelBar(
       this,
-      {PAD_TINY + invMask->width, (2 * ChannelBar::BAR_HEIGHT) + PAD_TINY + 1, barW, ChannelBar::BAR_HEIGHT},
+      {PAD_TINY + invMask->width, (2 * ChannelBar::BAR_HEIGHT) + PAD_TINY + 1,
+       barW, ChannelBar::BAR_HEIGHT},
       channel);
 
   // Channel number
   char chanString[10];
   char* s = strAppend(chanString, STR_CH);
   strAppendSigned(s, channel + 1);
-  new (std::nothrow) StaticText(this, {PAD_TINY + invMask->width, 0, LV_SIZE_CONTENT, ChannelBar::VAL_H}, chanString,
-                 txtColIdx, FONT(XS) | LEFT);
+  new (std::nothrow) StaticText(
+      this, {PAD_TINY + invMask->width, 0, LV_SIZE_CONTENT, ChannelBar::VAL_H},
+      chanString, txtColIdx, FONT(XS) | LEFT);
 
   // Channel name
   if (g_model.limitData[channel].name[0]) {
     char nm[LEN_CHANNEL_NAME + 1];
     strAppend(nm, g_model.limitData[channel].name, LEN_CHANNEL_NAME);
-    new (std::nothrow) StaticText(this, {PAD_TINY + ChannelBar::VAL_W, 0, LV_SIZE_CONTENT, ChannelBar::VAL_H}, nm,
-                   txtColIdx, FONT(XS) | LEFT);
+    new (std::nothrow) StaticText(
+        this,
+        {PAD_TINY + ChannelBar::VAL_W, 0, LV_SIZE_CONTENT, ChannelBar::VAL_H},
+        nm, txtColIdx, FONT(XS) | LEFT);
   }
 
   // Channel value in µS
   const char* suffix = (g_eeGeneral.ppmunit == PPM_US) ? "%" : STR_US;
   new (std::nothrow) DynamicNumber<int16_t>(
-      this, {width() - ChannelBar::VAL_W, 0, ChannelBar::VAL_W, ChannelBar::VAL_H},
+      this,
+      {width() - ChannelBar::VAL_W, 0, ChannelBar::VAL_W, ChannelBar::VAL_H},
       [=] {
         if (g_eeGeneral.ppmunit == PPM_US)
           return calcRESXto100(channelOutputs[channel]);
@@ -270,24 +296,26 @@ ComboChannelBar::ComboChannelBar(Window* parent, const rect_t& rect,
 
   // Override icon
 #if defined(OVERRIDE_CHANNEL_FUNCTION)
-  overrideIcon = new (std::nothrow) StaticIcon(
-      this, 0, PAD_SMALL, ICON_CHAN_MONITOR_LOCKED, txtColIdx);
-  if (overrideIcon) overrideIcon->show(safetyCh[channel] != OVERRIDE_CHANNEL_UNDEFINED);
+  overrideIcon = new (std::nothrow)
+      StaticIcon(this, 0, PAD_SMALL, ICON_CHAN_MONITOR_LOCKED, txtColIdx);
+  if (overrideIcon)
+    overrideIcon->show(safetyCh[channel] != OVERRIDE_CHANNEL_UNDEFINED);
 #endif
 
   // Channel reverted icon
   LimitData* ld = limitAddress(channel);
   if (ld && ld->revert) {
-    new (std::nothrow) StaticIcon(this, 0, invMask->height + PAD_MEDIUM, ICON_CHAN_MONITOR_INVERTED,
-                   txtColIdx);
+    new (std::nothrow) StaticIcon(this, 0, invMask->height + PAD_MEDIUM,
+                                  ICON_CHAN_MONITOR_INVERTED, txtColIdx);
   }
 }
 
 #if defined(OVERRIDE_CHANNEL_FUNCTION)
-void ComboChannelBar::checkEvents()
+void ComboChannelBar::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  Window::checkEvents();
+  Window::onLiveCheckEvents(live);
 
-  if (overrideIcon) overrideIcon->show(safetyCh[channel] != OVERRIDE_CHANNEL_UNDEFINED);
+  if (overrideIcon)
+    overrideIcon->show(safetyCh[channel] != OVERRIDE_CHANNEL_UNDEFINED);
 }
 #endif

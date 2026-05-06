@@ -84,7 +84,7 @@ class BatCalEdit : public NumberEdit
  protected:
   uint16_t lastBatVolts = 0;
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     if (getBatteryVoltage() != lastBatVolts) {
       lastBatVolts = getBatteryVoltage();

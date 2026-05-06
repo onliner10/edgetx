@@ -86,9 +86,9 @@ class GVarButton : public ListLineButton
 
   int numFlightModes() { return modelFMEnabled() ? MAX_FLIGHT_MODES : 1; }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
-    ListLineButton::checkEvents();
+    ListLineButton::onLiveCheckEvents(live);
     if (loaded) {
       if (modelFMEnabled()) {
         uint8_t newFM = getFlightMode();
@@ -241,9 +241,9 @@ class GVarHeader : public Window
 
   int numFlightModes() { return modelFMEnabled() ? MAX_FLIGHT_MODES : 1; }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
-    Window::checkEvents();
+    Window::onLiveCheckEvents(live);
     if (loaded) {
       uint8_t newFM = getFlightMode();
       if (currentFlightMode != newFM) {
@@ -306,9 +306,9 @@ class GVarEditWindow : public Page
     gVarInHeader = header->setTitle2("");
   }
 
-  void checkEvents()
+  void onLiveCheckEvents(LiveWindow& live) override
   {
-    Page::checkEvents();
+    Page::onLiveCheckEvents(live);
 
     auto curFM = getFlightMode();
     auto fmData = &g_model.flightModeData[curFM];

@@ -40,7 +40,7 @@ void RfScanDialog::showProgress()
   updateProgress((int)(protos->getProgress() * 100.0));
 }
 
-void RfScanDialog::checkEvents()
+void RfScanDialog::onLiveCheckEvents(Window::LiveWindow& live)
 {
   if (!protos->isScanning()) {
     closeDialog();
@@ -49,6 +49,6 @@ void RfScanDialog::checkEvents()
     lastUpdate = lv_tick_get();
   }
 
-  ProgressDialog::checkEvents();
+  ProgressDialog::onLiveCheckEvents(live);
 }
 

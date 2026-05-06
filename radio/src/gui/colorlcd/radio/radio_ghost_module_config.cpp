@@ -61,7 +61,7 @@ class GhostModuleConfigWindow : public Window
  protected:
   StaticText* menuLines[GHST_MENU_LINES][2];
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     for (uint8_t i = 0; i < GHST_MENU_LINES; i += 1) {
       menuLines[i][1]->setText("");
@@ -96,34 +96,6 @@ class GhostModuleConfigWindow : public Window
   }
 };
 
-static void ghostmoduleconfig_cb(lv_event_t* e)
-{
-  RadioGhostModuleConfig* ghostmoduleconfig =
-      (RadioGhostModuleConfig*)lv_event_get_user_data(e);
-  if (!ghostmoduleconfig || ghostmoduleconfig->deleted()) return;
-
-  uint32_t key = lv_event_get_key(e);
-
-  switch (key) {
-    case LV_KEY_LEFT:
-      reusableBuffer.ghostMenu.buttonAction = GHST_BTN_JOYUP;
-      reusableBuffer.ghostMenu.menuAction = GHST_MENU_CTRL_NONE;
-      moduleState[EXTERNAL_MODULE].counter = GHST_MENU_CONTROL;
-      break;
-    case LV_KEY_RIGHT:
-      reusableBuffer.ghostMenu.buttonAction = GHST_BTN_JOYDOWN;
-      reusableBuffer.ghostMenu.menuAction = GHST_MENU_CTRL_NONE;
-      moduleState[EXTERNAL_MODULE].counter = GHST_MENU_CONTROL;
-      break;
-
-    case LV_KEY_ENTER:
-      reusableBuffer.ghostMenu.buttonAction = GHST_BTN_JOYPRESS;
-      reusableBuffer.ghostMenu.menuAction = GHST_MENU_CTRL_NONE;
-      moduleState[EXTERNAL_MODULE].counter = GHST_MENU_CONTROL;
-      break;
-  }
-}
-
 RadioGhostModuleConfig::RadioGhostModuleConfig(uint8_t moduleIdx) :
     Page(ICON_RADIO_TOOLS), moduleIdx(moduleIdx)
 {
@@ -134,7 +106,6 @@ RadioGhostModuleConfig::RadioGhostModuleConfig(uint8_t moduleIdx) :
   buildBody(body);
   lv_group_add_obj(lv_group_get_default(), lvobj);
   lv_group_set_editing(lv_group_get_default(), true);
-  lv_obj_add_event_cb(lvobj, ghostmoduleconfig_cb, LV_EVENT_KEY, this);
 #if defined(TRIMS_EMULATE_BUTTONS)
   setHatsAsKeys(true);  // Use trim joysticks to operate menu (e.g. on NV14)
 #endif
@@ -153,6 +124,33 @@ void RadioGhostModuleConfig::buildBody(Window* window)
 }
 
 #if defined(HARDWARE_KEYS) && !defined(PCBPL18)
+bool RadioGhostModuleConfig::onLiveCustomEvent(Window::LiveWindow& live,
+                                               lv_event_t* event)
+{
+  if (lv_event_get_code(event) != LV_EVENT_KEY) return false;
+
+  switch (lv_event_get_key(event)) {
+    case LV_KEY_LEFT:
+      reusableBuffer.ghostMenu.buttonAction = GHST_BTN_JOYUP;
+      reusableBuffer.ghostMenu.menuAction = GHST_MENU_CTRL_NONE;
+      moduleState[EXTERNAL_MODULE].counter = GHST_MENU_CONTROL;
+      return true;
+    case LV_KEY_RIGHT:
+      reusableBuffer.ghostMenu.buttonAction = GHST_BTN_JOYDOWN;
+      reusableBuffer.ghostMenu.menuAction = GHST_MENU_CTRL_NONE;
+      moduleState[EXTERNAL_MODULE].counter = GHST_MENU_CONTROL;
+      return true;
+
+    case LV_KEY_ENTER:
+      reusableBuffer.ghostMenu.buttonAction = GHST_BTN_JOYPRESS;
+      reusableBuffer.ghostMenu.menuAction = GHST_MENU_CTRL_NONE;
+      moduleState[EXTERNAL_MODULE].counter = GHST_MENU_CONTROL;
+      return true;
+  }
+
+  return false;
+}
+
 void RadioGhostModuleConfig::onCancel()
 {
   reusableBuffer.ghostMenu.buttonAction = GHST_BTN_JOYLEFT;
@@ -172,9 +170,9 @@ void RadioGhostModuleConfig::onLongPressRTN()
 #endif
 }
 
-void RadioGhostModuleConfig::checkEvents()
+void RadioGhostModuleConfig::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  Page::checkEvents();
+  Page::onLiveCheckEvents(live);
 
   if (reusableBuffer.ghostMenu.menuStatus ==
       GHST_MENU_STATUS_UNOPENED) {  // Handles situation where module is

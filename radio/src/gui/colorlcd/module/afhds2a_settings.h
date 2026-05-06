@@ -44,7 +44,7 @@ class AFHDS2ASettings : public Window, public ModuleOptions
   void hideAFHDS2Options();
   void showAFHDS2Options();
 
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
   void update() override;
 
 public:

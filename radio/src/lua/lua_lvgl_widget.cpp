@@ -2495,21 +2495,21 @@ class WidgetPage : public NavWindow, public LuaEventHandler
   IconButton* prevBtn = nullptr;
   IconButton* nextBtn = nullptr;
 
-  void onClicked() override { Keyboard::hide(false); LuaEventHandler::onClickedEvent(); }
+  void onLiveClicked(LiveWindow&) override { Keyboard::hide(false); LuaEventHandler::onClickedEvent(); }
 
   void onCancel() override { backAction(); }
 
-  void onEvent(event_t evt) override
+  void onLiveEvent(LiveWindow&, event_t evt) override
   {
     LuaEventHandler::onLuaEvent(evt);
     parent->onEvent(evt);
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     if (prevBtn) prevBtn->enable(prevActive());
     if (nextBtn) nextBtn->enable(nextActive());
-    NavWindow::checkEvents();
+    NavWindow::onLiveCheckEvents(live);
   }
 };
 

@@ -118,11 +118,6 @@ class LuaWidget : public Widget, public LuaScriptManager
 
   // Widget interface
   const char* getErrorMessage() const override;
-  void updateWithoutRefresh() override;
-  void update() override;
-  void background() override;
-  void foreground() override;
-
   void clear() override;
 
   LuaWidgetFactory* luaFactory() const { return (LuaWidgetFactory*)factory; }
@@ -150,11 +145,15 @@ class LuaWidget : public Widget, public LuaScriptManager
   char* errorMessage;
 
   // Window interface
-  void onClicked() override;
+  void onLiveClicked(LiveWindow&) override;
   void onCancel() override;
-  void onEvent(event_t event) override;
+  void onLiveEvent(LiveWindow& live, event_t event) override;
 
   // Widget interface
+  void onUpdateWithoutRefresh() override;
+  void onUpdate() override;
+  void onBackground() override;
+  void onForeground() override;
   void onFullscreen(bool enable) override;
 
   // Update 'zone' data

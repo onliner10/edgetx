@@ -232,10 +232,8 @@ void InputEditWindow::buildBody(Window* form)
   lv_obj_set_width(btn->getLvObj(), lv_pct(100));
 }
 
-void InputEditWindow::checkEvents()
+void InputEditWindow::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  if (_deleted) return;
-
   ExpoData* input = expoAddress(index);
 
   getvalue_t val;
@@ -294,5 +292,5 @@ void InputEditWindow::checkEvents()
     Messaging::send(Messaging::CURVE_UPDATE);
   }
 
-  Page::checkEvents();
+  Page::onLiveCheckEvents(live);
 }

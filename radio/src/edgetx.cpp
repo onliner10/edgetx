@@ -839,10 +839,8 @@ void checkAll(bool isBootCheck)
 
     if (dlg) {
       dlg->setMessage(strKeys.c_str());
-      MainWindow::instance()->blockUntilClose(true, [=]() {
-        if (dlg->deleted()) return true;
+      MainWindow::instance()->blockUntilClosed(*dlg, true, [=]() {
         if ((tgtime < get_tmr10ms()) || !keyDown()) {
-          dlg->deleteLater();
           return true;
         }
         return false;
@@ -926,9 +924,7 @@ void checkThrottleStick()
     LED_ERROR_BEGIN();
     auto dialog = new (std::nothrow) ThrottleWarnDialog(throttleNotIdle);
     if (dialog) {
-      MainWindow::instance()->blockUntilClose(true, [=]() {
-        return dialog->deleted();
-      });
+      MainWindow::instance()->blockUntilClosed(*dialog, true);
     } else {
       AUDIO_ERROR_MESSAGE(AU_THROTTLE_ALERT);
       while (isThrottleWarningAlertNeeded()) {

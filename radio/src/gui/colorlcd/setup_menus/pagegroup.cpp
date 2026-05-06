@@ -100,10 +100,10 @@ class PageGroupIconButton : public ButtonBase
   PageGroupItem* pageTab;
   int index;
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     show(isVisible());
-    ButtonBase::checkEvents();
+    ButtonBase::onLiveCheckEvents(live);
   }
 };
 #endif
@@ -240,25 +240,21 @@ bool PageGroupHeaderBase::hasSubMenu(QMPage qmPage)
   return false;
 }
 
-void PageGroupHeaderBase::deleteLater()
+void PageGroupHeaderBase::onDelete()
 {
-  if (deleted()) return;
-
   for (size_t i = 0; i < pages.size(); i += 1)
     delete pages[i];
   pages.clear();
-
-  Window::deleteLater();
 }
 
 #if VERSION_MAJOR == 2
-void PageGroupHeaderBase::checkEvents()
+void PageGroupHeaderBase::onLiveCheckEvents(Window::LiveWindow& live)
 {
   for (uint8_t i = 0; i < buttons.size(); i += 1) {
     buttons[i]->setPos(getX(i), 0);
   }
 
-  Window::checkEvents();
+  Window::onLiveCheckEvents(live);
 }
 #endif
 
@@ -317,23 +313,19 @@ PageGroupBase::PageGroupBase(coord_t bodyY, EdgeTxIcon icon) :
       });
 }
 
-void PageGroupBase::checkEvents()
+void PageGroupBase::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  if (deleted()) return;
-
-  NavWindow::checkEvents();
+  NavWindow::onLiveCheckEvents(live);
   if (currentTab) {
     currentTab->checkEvents();
   }
 }
 
-void PageGroupBase::onClicked() { Keyboard::hide(false); }
+void PageGroupBase::onLiveClicked(LiveWindow&) { Keyboard::hide(false); }
 
 void PageGroupBase::onCancel()
 {
-  if (!_deleted) {
-    deleteLater();
-  }
+  deleteLater();
 }
 
 uint8_t PageGroupBase::tabCount() const
@@ -353,54 +345,55 @@ void PageGroupBase::addTab(PageGroupItem* page)
 
 void PageGroupBase::setCurrentTab(unsigned index)
 {
-  if (deleted()) return;
-  if (!header || !body) return;
+  visitLive([&](LiveWindow&) {
+    if (!header || !body) return;
 
-  header->setCurrentIndex(index);
+    header->setCurrentIndex(index);
 
-  PageGroupItem* tab = header->pageTab(index);
-  if (!tab) return;
+    PageGroupItem* tab = header->pageTab(index);
+    if (!tab) return;
 
-  if (tab != currentTab && !deleted()) {
-    header->setTitle(tab->getTitle().c_str());
+    if (tab != currentTab) {
+      header->setTitle(tab->getTitle().c_str());
 #if VERSION_MAJOR > 2
-    header->setIcon(tab->getIcon());
+      header->setIcon(tab->getIcon());
 #endif
 
-    if (isPageGroup())
-      QuickMenu::setCurrentPage(tab->pageId(), icon);
+      if (isPageGroup())
+        QuickMenu::setCurrentPage(tab->pageId(), icon);
 
-    lv_obj_enable_style_refresh(false);
+      lv_obj_enable_style_refresh(false);
 
-    body->clear();
-    if (currentTab)
-      currentTab->cleanup();
-    currentTab = tab;
+      body->clear();
+      if (currentTab)
+        currentTab->cleanup();
+      currentTab = tab;
 
 #if defined(DEBUG)
-    start_ms = time_get_ms();
-    timepg = true;
+      start_ms = time_get_ms();
+      timepg = true;
 #endif
 
-    static lv_style_prop_t remStyles[] = {
-        LV_STYLE_FLEX_FLOW,  LV_STYLE_LAYOUT,    LV_STYLE_PAD_ROW,
-        LV_STYLE_PAD_COLUMN, LV_STYLE_PAD_LEFT,  LV_STYLE_PAD_RIGHT,
-        LV_STYLE_PAD_TOP,    LV_STYLE_PAD_BOTTOM};
-    for (uint8_t i = 0; i < DIM(remStyles); i += 1)
-      lv_obj_remove_local_style_prop(body->getLvObj(), remStyles[i],
-                                     LV_PART_MAIN);
+      static lv_style_prop_t remStyles[] = {
+          LV_STYLE_FLEX_FLOW,  LV_STYLE_LAYOUT,    LV_STYLE_PAD_ROW,
+          LV_STYLE_PAD_COLUMN, LV_STYLE_PAD_LEFT,  LV_STYLE_PAD_RIGHT,
+          LV_STYLE_PAD_TOP,    LV_STYLE_PAD_BOTTOM};
+      for (uint8_t i = 0; i < DIM(remStyles); i += 1)
+        lv_obj_remove_local_style_prop(body->getLvObj(), remStyles[i],
+                                       LV_PART_MAIN);
 
-    body->padAll(tab->getPadding());
+      body->padAll(tab->getPadding());
 
-    tab->build(body);
+      tab->build(body);
 
-    lv_obj_enable_style_refresh(true);
-    lv_obj_refresh_style(body->getLvObj(), LV_PART_ANY, LV_STYLE_PROP_ANY);
+      lv_obj_enable_style_refresh(true);
+      lv_obj_refresh_style(body->getLvObj(), LV_PART_ANY, LV_STYLE_PROP_ANY);
 
 #if defined(DEBUG)
-    end_ms = time_get_ms();
+      end_ms = time_get_ms();
 #endif
-  }
+    }
+  });
 }
 
 #if defined(HARDWARE_KEYS)

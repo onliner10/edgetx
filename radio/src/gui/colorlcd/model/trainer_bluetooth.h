@@ -44,6 +44,6 @@ public:
   BluetoothTrainerWindow(Window* parent);
 
   void setMaster(bool master);
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
   void refresh();
 };

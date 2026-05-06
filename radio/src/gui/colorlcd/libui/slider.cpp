@@ -47,7 +47,7 @@ void SliderBase::slider_changed_cb(lv_event_t* e)
 {
   if (lv_event_get_code(e) == LV_EVENT_VALUE_CHANGED) {
     SliderBase* sl = (SliderBase*)lv_event_get_user_data(e);
-    if (sl != nullptr && sl->isAvailable()) {
+    if (sl != nullptr) {
       lv_obj_t* target = lv_event_get_target(e);
       sl->setValue(lv_slider_get_value(target));
     }
@@ -67,52 +67,57 @@ SliderBase::SliderBase(Window* parent, coord_t width, coord_t height, int32_t vm
 
 void SliderBase::update()
 {
-  if (isAvailable() && slider && _getValue != nullptr) {
-    // Fix for lv_slider_set_value not working when using the rotary encoder to
-    // update value
-    auto bar = (lv_bar_t*)slider;
-    bar->cur_value_anim.anim_state = -1;
-    bar->cur_value_anim.anim_end = _getValue();
-
-    lv_slider_set_value(slider, _getValue(), LV_ANIM_OFF);
-  }
+  dispatchLive([&](LiveWindow& live) {
+    update(live);
+  });
 }
 
-void SliderBase::deleteLater()
+void SliderBase::update(Window::LiveWindow&)
 {
-  if (!deleted()) {
-    if (tickPts) delete[] tickPts;
-    Window::deleteLater();
-  }
+  if (!slider || _getValue == nullptr) return;
+
+  // Fix for lv_slider_set_value not working when using the rotary encoder to
+  // update value
+  auto bar = (lv_bar_t*)slider;
+  bar->cur_value_anim.anim_state = -1;
+  bar->cur_value_anim.anim_end = _getValue();
+
+  lv_slider_set_value(slider, _getValue(), LV_ANIM_OFF);
+}
+
+void SliderBase::onDelete()
+{
+  delete[] tickPts;
+  tickPts = nullptr;
 }
 
 void SliderBase::setValue(int value)
 {
-  if (isAvailable() && _setValue != nullptr)
-    _setValue(limit(vmin, value, vmax));
+  dispatchLive([&](LiveWindow&) {
+    if (_setValue != nullptr) _setValue(limit(vmin, value, vmax));
+  });
 }
 
-void SliderBase::checkEvents()
+void SliderBase::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  Window::checkEvents();
-  if (isAvailable() && slider && _getValue != nullptr) {
+  Window::onLiveCheckEvents(live);
+  if (slider && _getValue != nullptr) {
     int v = _getValue();
     if (v != lv_slider_get_value(slider))
-      update();
+      update(live);
   }
 }
 
 void SliderBase::enable(bool enabled)
 {
-  if (!isAvailable()) enabled = false;
-  if (!_deleted && slider) {
-    if (lv_obj_has_state(slider, LV_STATE_DISABLED) == enabled) {
+  dispatchLive([&](LiveWindow&) {
+    if (slider && lv_obj_has_state(slider, LV_STATE_DISABLED) == enabled) {
       if (enabled)
         lv_obj_clear_state(slider, LV_STATE_DISABLED);
       else
         lv_obj_add_state(slider, LV_STATE_DISABLED);
     }
-  }
+  });
 }
 
 void SliderBase::setColor(LcdFlags color)

@@ -30,7 +30,7 @@ class RadioCalibrationPage: public Page {
   public:
     explicit RadioCalibrationPage();
 
-    void checkEvents() override;
+    void onLiveCheckEvents(LiveWindow& live) override;
     void onCancel() override;
 
   protected:

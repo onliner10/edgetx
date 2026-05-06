@@ -47,7 +47,7 @@ class OutputEditWindow : public Page
   GVarNumberEdit* maxEdit;
   OutputEditStatusBar *statusBar = nullptr;
 
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
   void buildHeader(Window *window);
   void buildBody(Window *window);
 };

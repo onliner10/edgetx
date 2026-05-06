@@ -48,5 +48,5 @@ class InputEditWindow : public Page
   void setTitle();
   void buildBody(Window *window);
 
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 };

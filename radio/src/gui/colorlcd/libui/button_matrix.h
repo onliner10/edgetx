@@ -41,5 +41,5 @@ class ButtonMatrix : public FormField
     void setChecked(uint8_t btn_id);
     void update();
 
-    void onClicked() override;
+    void onLiveClicked(LiveWindow&) override;
 };

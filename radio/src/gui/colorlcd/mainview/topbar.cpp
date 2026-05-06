@@ -151,20 +151,15 @@ void SetupTopBarWidgetsPage::refreshSlots(const WidgetMoveResult& moveResult)
   }
 }
 
-void SetupTopBarWidgetsPage::onClicked()
+void SetupTopBarWidgetsPage::onLiveClicked(Window::LiveWindow&)
 {
   // block event forwarding (window is transparent)
 }
 
 void SetupTopBarWidgetsPage::onCancel() { deleteLater(); }
 
-void SetupTopBarWidgetsPage::deleteLater()
+void SetupTopBarWidgetsPage::onDeleted()
 {
-  if (_deleted) return;
-
-  // and continue async deletion...
-  Window::deleteLater();
-
   // restore screen setting tab on top
   QuickMenu::openPage(QM_UI_SETUP);
 

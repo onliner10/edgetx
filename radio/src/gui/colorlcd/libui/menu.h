@@ -38,18 +38,18 @@ class Menu : public ModalWindow
   void setWaitHandler(std::function<void()> handler);
   void setLongPressHandler(std::function<void()> handler);
 
-  void setToolbar(MenuToolbar *window);
+  void setToolbar(MenuToolbar* window);
 
   void setTitle(std::string text);
 
-  void addLine(const MaskBitmap *icon_mask, const std::string &text,
+  void addLine(const MaskBitmap* icon_mask, const std::string& text,
                std::function<void()> onPress,
                std::function<bool()> isChecked = nullptr);
 
-  void addLine(const std::string &text, std::function<void()> onPress,
+  void addLine(const std::string& text, std::function<void()> onPress,
                std::function<bool()> isChecked = nullptr);
 
-  void addLineBuffered(const std::string &text, std::function<void()> onPress,
+  void addLineBuffered(const std::string& text, std::function<void()> onPress,
                        std::function<bool()> isChecked = nullptr);
 
   void updateLines();
@@ -63,7 +63,7 @@ class Menu : public ModalWindow
   void select(int index);
 
   void onCancel() override;
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 
   void handleLongPress();
 
@@ -71,11 +71,12 @@ class Menu : public ModalWindow
 
  protected:
   bool multiple;
-  MenuContent *content = nullptr;
-  MenuToolbar *toolbar = nullptr;
+  MenuContent& content;
+  MenuToolbar* toolbar = nullptr;
   std::function<void()> waitHandler;
   std::function<void()> cancelHandler;
   std::function<void()> longPressHandler;
 
+  MenuContent& createContent(coord_t popupWidth);
   void updatePosition();
 };

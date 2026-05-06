@@ -88,7 +88,7 @@ class WidgetsContainer: public Window
   virtual bool isLayout() { return false; }
   virtual bool isAppMode() const { return false; }
 
-  void deleteLater() override;
+  void onDelete() override;
 
  protected:
   uint8_t zoneCount = 0;

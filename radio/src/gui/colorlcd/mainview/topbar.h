@@ -37,9 +37,9 @@ class SetupTopBarWidgetsPage : public NavWindow
   std::string getName() const override { return "SetupTopBarWidgetsPage"; }
 #endif
 
-  void onClicked() override;
+  void onLiveClicked(LiveWindow&) override;
   void onCancel() override;
-  void deleteLater() override;
+  void onDeleted() override;
   void refreshSlots();
   void refreshSlots(const WidgetMoveResult& moveResult);
 

@@ -74,7 +74,7 @@ class DateNumberEdit : public NumberEdit
  protected:
   int32_t lastValue;
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     if (lastValue != getValue())
       update();
@@ -91,9 +91,9 @@ class DateTimeWindow : public Window
     build();
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
-    Window::checkEvents();
+    Window::onLiveCheckEvents(live);
 
     if (get_tmr10ms() - lastRefresh >= 10) {
       lastRefresh = get_tmr10ms();
@@ -197,7 +197,7 @@ class ControlTextOverride : public StaticText
     hide();
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     show(isFunctionActive(func));
   }

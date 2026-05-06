@@ -18,13 +18,13 @@
 
 #include "textedit.h"
 
+#include <new>
+
+#include "etx_lv_theme.h"
 #include "keyboard_text.h"
 #include "mainwindow.h"
 #include "myeeprom.h"
 #include "storage/storage.h"
-#include "etx_lv_theme.h"
-
-#include <new>
 
 #if defined(HARDWARE_KEYS)
 #include "menu.h"
@@ -37,18 +37,21 @@ class TextArea : public FormField
       FormField(parent, rect, etx_textarea_create), value(value), length(length)
   {
     setWindowFlag(NO_FOCUS);
-    if (!hasLvObj()) return;
 
-    lv_textarea_set_max_length(lvobj, length);
-    lv_textarea_set_placeholder_text(lvobj, "---");
+    withLvObj([&](lv_obj_t* obj) {
+      lv_textarea_set_max_length(obj, length);
+      lv_textarea_set_placeholder_text(obj, "---");
+    });
 
     setFocusHandler([=](bool focus) {
       if (!focus && editMode) {
         setEditMode(false);
         hide();
-        if (auto parentObj = parent ? parent->getLvObj() : nullptr) {
-          lv_group_focus_obj(parentObj);
-          lv_obj_clear_state(parentObj, LV_STATE_FOCUSED);
+        if (parent) {
+          parent->visitLive([](Window::LiveWindow& liveParent) {
+            lv_group_focus_obj(liveParent.lvobj());
+            lv_obj_clear_state(liveParent.lvobj(), LV_STATE_FOCUSED);
+          });
         }
       }
     });
@@ -64,16 +67,14 @@ class TextArea : public FormField
   {
     // value may not be null-terminated
     std::string txt(value, length);
-    lv_textarea_set_text(lvobj, txt.c_str());
+    dispatchLive([&](LiveWindow& live) {
+      lv_textarea_set_text(live.lvobj(), txt.c_str());
+    });
   }
 
-  void onClicked() override {
-    setEditMode(true);
-  }
+  void onLiveClicked(LiveWindow&) override { setEditMode(true); }
 
-  void openKeyboard() {
-    TextKeyboard::open(this);
-  }
+  void openKeyboard() { TextKeyboard::open(this); }
 
   void setCancelHandler(std::function<void(void)> handler)
   {
@@ -98,14 +99,19 @@ class TextArea : public FormField
   void changeEnd(bool forceChanged = false) override
   {
     bool changed = false;
-    auto text = lv_textarea_get_text(lvobj);
+    std::string text;
+    if (!visitLive([&](LiveWindow& live) {
+          auto rawText = lv_textarea_get_text(live.lvobj());
+          text = rawText ? rawText : "";
+        }))
+      return;
 
-    if (strncmp(value, text, length) != 0) {
+    if (strncmp(value, text.c_str(), length) != 0) {
       changed = true;
     }
 
     if (changed || forceChanged) {
-      strncpy(value, text, length);
+      strncpy(value, text.c_str(), length);
       trim();
       FormField::changeEnd();
     } else if (cancelHandler) {
@@ -123,23 +129,25 @@ class TextArea : public FormField
 };
 
 /*
-  The lv_textarea object is slow. To avoid too much overhead on views with multiple
-  edit fields, the text area is initially displayed as a button. When the button
-  is pressed, a text area object is created over the top of the button in order
-  to edit the value.
+  The lv_textarea object is slow. To avoid too much overhead on views with
+  multiple edit fields, the text area is initially displayed as a button. When
+  the button is pressed, a text area object is created over the top of the
+  button in order to edit the value.
 */
 TextEdit::TextEdit(Window* parent, const rect_t& rect, char* text,
-                               uint8_t length,
-                               std::function<void(void)> updateHandler) :
-    TextButton(parent, rect, "", [=]() {
-      openEdit();
-      return 0;
-    }),
-    updateHandler(updateHandler), text(text), length(length)
+                   uint8_t length, std::function<void(void)> updateHandler) :
+    TextButton(parent, rect, "",
+               [=]() {
+                 openEdit();
+                 return 0;
+               }),
+    updateHandler(updateHandler),
+    text(text),
+    length(length)
 {
   if (rect.w == 0) setWidth(EdgeTxStyles::EDIT_FLD_WIDTH);
 
-  if (!isAvailable() || !label) return;
+  if (!label) return;
   update();
   lv_obj_align(label, LV_ALIGN_OUT_LEFT_MID, 0, PAD_TINY);
 }
@@ -175,8 +183,9 @@ void TextEdit::openEdit()
   if (!syncOverlay(edit)) return;
   edit->show();
   if (edit->focus()) {
-    auto editObj = edit->getLvObj();
-    lv_obj_add_state(editObj, LV_STATE_FOCUSED | LV_STATE_EDITED);
+    edit->visitLive([](Window::LiveWindow& liveEdit) {
+      lv_obj_add_state(liveEdit.lvobj(), LV_STATE_FOCUSED | LV_STATE_EDITED);
+    });
   }
   edit->openKeyboard();
 }
@@ -185,34 +194,35 @@ void TextEdit::preview(bool edited, char* text, uint8_t length)
 {
   setWindowFlag(NO_FOCUS | NO_CLICK);
 
-  edit = Window::makeLive<TextArea>(
-      this, rect_t{0, 0, width(), height()}, text, length);
+  edit = Window::makeLive<TextArea>(this, rect_t{0, 0, width(), height()}, text,
+                                    length);
   if (!edit) return;
   edit->setWindowFlag(NO_CLICK);
   if (edit->focus()) {
-    auto editObj = edit->getLvObj();
-    lv_obj_add_state(editObj, LV_STATE_FOCUSED);
-    if (edited) lv_obj_add_state(editObj, LV_STATE_EDITED);
+    edit->visitLive([&](Window::LiveWindow& liveEdit) {
+      lv_obj_add_state(liveEdit.lvobj(), LV_STATE_FOCUSED);
+      if (edited) lv_obj_add_state(liveEdit.lvobj(), LV_STATE_EDITED);
+    });
   }
 }
 
 ModelTextEdit::ModelTextEdit(Window* parent, const rect_t& rect, char* value,
-                             uint8_t length, std::function<void(void)> updateHandler) :
-    TextEdit(parent, rect, value, length,
-             [=]() {
-               if (updateHandler) updateHandler();
-               storageDirty(EE_MODEL);
-             })
+                             uint8_t length,
+                             std::function<void(void)> updateHandler) :
+    TextEdit(parent, rect, value, length, [=]() {
+      if (updateHandler) updateHandler();
+      storageDirty(EE_MODEL);
+    })
 {
 }
 
-ModelStringEdit::ModelStringEdit(Window* parent, const rect_t& rect, std::string value,
-                                 std::function<void(const char* s)> updateHandler) :
-    TextEdit(parent, rect, txt, MAX_STR_EDIT_LEN,
-             [=]() {
-               if (updateHandler) updateHandler(txt);
-               storageDirty(EE_MODEL);
-             })
+ModelStringEdit::ModelStringEdit(
+    Window* parent, const rect_t& rect, std::string value,
+    std::function<void(const char* s)> updateHandler) :
+    TextEdit(parent, rect, txt, MAX_STR_EDIT_LEN, [=]() {
+      if (updateHandler) updateHandler(txt);
+      storageDirty(EE_MODEL);
+    })
 {
   strncpy(txt, value.c_str(), length);
   update();
@@ -220,8 +230,7 @@ ModelStringEdit::ModelStringEdit(Window* parent, const rect_t& rect, std::string
 
 RadioTextEdit::RadioTextEdit(Window* parent, const rect_t& rect, char* value,
                              uint8_t length) :
-    TextEdit(parent, rect, value, length,
-             []() { storageDirty(EE_GENERAL); })
+    TextEdit(parent, rect, value, length, []() { storageDirty(EE_GENERAL); })
 {
 }
 
@@ -245,8 +254,8 @@ bool textEditTextAreaAllocationFailureDoesNotCacheDeadEditorForTest()
   };
 
   char value[8] = "Model";
-  auto textEdit =
-      new (std::nothrow) TestTextEdit(MainWindow::instance(), value, sizeof(value));
+  auto textEdit = new (std::nothrow)
+      TestTextEdit(MainWindow::instance(), value, sizeof(value));
   if (!textEdit || !textEdit->isAvailable()) {
     delete textEdit;
     return false;

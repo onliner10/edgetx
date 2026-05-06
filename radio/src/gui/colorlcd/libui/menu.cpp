@@ -18,6 +18,8 @@
 
 #include "menu.h"
 
+#include <new>
+
 #include "bitmaps.h"
 #include "edgetx.h"
 #include "etx_lv_theme.h"
@@ -26,8 +28,6 @@
 #include "menutoolbar.h"
 #include "static.h"
 #include "table.h"
-
-#include <new>
 
 #if defined(SIMU)
 static bool forceMenuIconCanvasCreateFailure = false;
@@ -68,8 +68,7 @@ class MenuBody : public TableField
 
     ~MenuLine()
     {
-      if (icon)
-        lv_obj_del(icon);
+      if (icon) lv_obj_del(icon);
     }
 
     lv_obj_t* getIcon() const { return icon; }
@@ -82,27 +81,20 @@ class MenuBody : public TableField
   };
 
  public:
-  MenuBody(Window* parent, const rect_t& rect) :
-      TableField(parent, rect)
+  MenuBody(Window* parent, const rect_t& rect) : TableField(parent, rect)
   {
-    if (!hasLvObj()) return;
-
     // Allow encoder acceleration
-    lv_obj_add_flag(lvobj, LV_OBJ_FLAG_ENCODER_ACCEL);
+    withLvObj(
+        [](lv_obj_t* obj) { lv_obj_add_flag(obj, LV_OBJ_FLAG_ENCODER_ACCEL); });
 
     setColumnWidth(0, rect.w);
 
     setAutoEdit();
 
-    setLongPressHandler([=]() {
-      getParentMenu()->handleLongPress();
-    });
+    setLongPressHandler([=]() { getParentMenu()->handleLongPress(); });
   }
 
-  ~MenuBody()
-  {
-    clearLines();
-  }
+  ~MenuBody() { clearLines(); }
 
 #if defined(DEBUG_WINDOWS)
   std::string getName() const override { return "MenuBody"; }
@@ -367,23 +359,26 @@ class MenuWindowContent : public NavWindow, public MenuContent
       NavWindow(parent, rect_t{}, menu_content_create)
   {
     setWindowFlag(OPAQUE);
-    if (!hasLvObj()) return;
 
     coord_t w = (popupWidth > 0) ? popupWidth : MENUS_WIDTH;
 
-    lv_obj_center(lvobj);
+    withLvObj(lv_obj_center);
     setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_ZERO, w, LV_SIZE_CONTENT);
 
     if (!initRequiredWindow(header, this, rect_t{0, 0, LV_PCT(100), 0}, "",
                             COLOR_THEME_PRIMARY2_INDEX))
       return;
-    etx_solid_bg(header->getLvObj(), COLOR_THEME_SECONDARY1_INDEX);
+    header->visitLive([](Window::LiveWindow& liveHeader) {
+      etx_solid_bg(liveHeader.lvobj(), COLOR_THEME_SECONDARY1_INDEX);
+    });
     header->padAll(PAD_SMALL);
     header->hide();
 
     if (!initRequiredWindow(body, this, rect_t{0, 0, w, LV_SIZE_CONTENT}))
       return;
-    lv_obj_set_style_max_height(body->getLvObj(), LCD_H * 0.8, LV_PART_MAIN);
+    body->visitLive([](Window::LiveWindow& liveBody) {
+      lv_obj_set_style_max_height(liveBody.lvobj(), LCD_H * 0.8, LV_PART_MAIN);
+    });
   }
 
   void setTitle(std::string text) override
@@ -392,7 +387,7 @@ class MenuWindowContent : public NavWindow, public MenuContent
     header->show();
   }
 
-  void onClicked() override { Keyboard::hide(false); }
+  void onLiveClicked(LiveWindow&) override { Keyboard::hide(false); }
 
 #if defined(DEBUG_WINDOWS)
   std::string getName() const override { return "MenuWindowContent"; }
@@ -415,19 +410,22 @@ class MenuWindowContent : public NavWindow, public MenuContent
   void updatePosition(MenuToolbar* toolbar) override
   {
     if (!toolbar) return;
-    auto toolbarObj = toolbar->getLvObj();
-    if (Window::fromAvailableLvObj(toolbarObj) != toolbar) return;
+    visitLive([&](Window::LiveWindow& liveContent) {
+      toolbar->visitLive([&](Window::LiveWindow& liveToolbar) {
+        auto contentObj = liveContent.lvobj();
+        auto toolbarObj = liveToolbar.lvobj();
+        coord_t cw = lv_obj_get_width(contentObj);
+        coord_t ch = lv_obj_get_height(contentObj);
+        coord_t tw = lv_obj_get_width(toolbarObj);
+        coord_t th = lv_obj_get_height(toolbarObj);
 
-    coord_t cw = lv_obj_get_width(getLvObj());
-    coord_t ch = lv_obj_get_height(getLvObj());
-    coord_t tw = lv_obj_get_width(toolbarObj);
-    coord_t th = lv_obj_get_height(toolbarObj);
+        lv_obj_align(toolbarObj, LV_ALIGN_CENTER, -cw / 2, 0);
+        lv_obj_align(contentObj, LV_ALIGN_CENTER, tw / 2, 0);
 
-    lv_obj_align(toolbarObj, LV_ALIGN_CENTER, -cw / 2, 0);
-    lv_obj_align(getLvObj(), LV_ALIGN_CENTER, tw / 2, 0);
-
-    toolbar->setHeight(max(ch, th));
-    setHeight(max(ch, th));
+        toolbar->setHeight(max(ch, th));
+        setHeight(max(ch, th));
+      });
+    });
   }
 
 #if defined(HARDWARE_KEYS)
@@ -442,10 +440,9 @@ class MenuWindowContent : public NavWindow, public MenuContent
   }
 #endif
 
-  static LAYOUT_VAL_SCALED(MENUS_WIDTH, 200)
+ static LAYOUT_VAL_SCALED(MENUS_WIDTH, 200)
 
- protected:
-  StaticText* header = nullptr;
+     protected : StaticText* header = nullptr;
   MenuBody* body = nullptr;
 };
 
@@ -463,8 +460,8 @@ bool menuWindowContentObjectAllocationFailureFailsClosedForTest()
   menu->removeLines();
   menu->select(0);
 
-  bool ok = !menu->isAvailable() && !menu->isVisible() &&
-            menu->count() == 0 && menu->selection() == -1;
+  bool ok = !menu->isAvailable() && !menu->isVisible() && menu->count() == 0 &&
+            menu->selection() == -1;
   delete menu;
   return ok;
 }
@@ -472,15 +469,17 @@ bool menuWindowContentObjectAllocationFailureFailsClosedForTest()
 
 //-----------------------------------------------------------------------------
 
-Menu::Menu(bool multiple, coord_t popupWidth) :
-    ModalWindow(true),
-    multiple(multiple)
+MenuContent& Menu::createContent(coord_t popupWidth)
 {
-  content = Window::makeLive<MenuWindowContent>(this, popupWidth);
-  if (!content) {
-    content = &missingMenuContent;
-    failClosed();
-  }
+  auto liveContent = Window::makeLive<MenuWindowContent>(this, popupWidth);
+  if (liveContent) return *liveContent;
+  failClosed();
+  return missingMenuContent;
+}
+
+Menu::Menu(bool multiple, coord_t popupWidth) :
+    ModalWindow(true), multiple(multiple), content(createContent(popupWidth))
+{
 }
 
 void Menu::setToolbar(MenuToolbar* window)
@@ -489,14 +488,11 @@ void Menu::setToolbar(MenuToolbar* window)
   updatePosition();
 }
 
-void Menu::updatePosition()
-{
-  content->updatePosition(toolbar);
-}
+void Menu::updatePosition() { content.updatePosition(toolbar); }
 
 void Menu::setTitle(std::string text)
 {
-  content->setTitle(std::move(text));
+  content.setTitle(std::move(text));
   updatePosition();
 }
 
@@ -504,33 +500,34 @@ void Menu::addLine(const MaskBitmap* icon_mask, const std::string& text,
                    std::function<void()> onPress,
                    std::function<bool()> isChecked)
 {
-  content->addLine(icon_mask, text, std::move(onPress), std::move(isChecked),
-                   true);
+  content.addLine(icon_mask, text, std::move(onPress), std::move(isChecked),
+                  true);
   updatePosition();
 }
 
-void Menu::addLine(const std::string &text, std::function<void()> onPress,
-                  std::function<bool()> isChecked)
+void Menu::addLine(const std::string& text, std::function<void()> onPress,
+                   std::function<bool()> isChecked)
 {
   addLine(nullptr, text, onPress, isChecked);
 }
 
-void Menu::addLineBuffered(const std::string &text, std::function<void()> onPress,
+void Menu::addLineBuffered(const std::string& text,
+                           std::function<void()> onPress,
                            std::function<bool()> isChecked)
 {
-  content->addLine(nullptr, text, std::move(onPress), std::move(isChecked),
-                   false);
+  content.addLine(nullptr, text, std::move(onPress), std::move(isChecked),
+                  false);
 }
 
 void Menu::updateLines()
 {
-  content->updateLines();
+  content.updateLines();
   updatePosition();
 }
 
 void Menu::removeLines()
 {
-  content->removeLines();
+  content.removeLines();
   updatePosition();
 }
 
@@ -557,29 +554,19 @@ void Menu::setLongPressHandler(std::function<void()> handler)
 
 void Menu::handleLongPress()
 {
-  if (longPressHandler)
-    longPressHandler();
+  if (longPressHandler) longPressHandler();
 }
 
-unsigned Menu::count() const
-{
-  return content->count();
-}
+unsigned Menu::count() const { return content.count(); }
 
-int Menu::selection() const
-{
-  return content->selection();
-}
+int Menu::selection() const { return content.selection(); }
 
-void Menu::select(int index)
-{
-  content->setIndex(index);
-}
+void Menu::select(int index) { content.setIndex(index); }
 
-void Menu::checkEvents()
+void Menu::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  ModalWindow::checkEvents();
-  if (liveLvObj() && waitHandler) waitHandler();
+  ModalWindow::onLiveCheckEvents(live);
+  if (waitHandler) waitHandler();
 }
 
 #if defined(SIMU)

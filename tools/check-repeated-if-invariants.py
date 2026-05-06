@@ -61,6 +61,53 @@ PREDICATE_CALL_PREFIXES = (
     "valid",
 )
 
+WINDOW_LIFETIME_RECEIVERS = {
+    "body",
+    "button",
+    "child",
+    "choice",
+    "content",
+    "dialog",
+    "field",
+    "form",
+    "header",
+    "keyboard",
+    "list",
+    "menu",
+    "numberedit",
+    "overlay",
+    "page",
+    "parent",
+    "quickmenu",
+    "self",
+    "slider",
+    "table",
+    "textedit",
+    "this",
+    "w",
+    "widget",
+    "window",
+}
+
+WINDOW_LIFETIME_BOUNDARY_SUFFIXES = (
+    "radio/src/gui/colorlcd/LvglWrapper.cpp",
+    "radio/src/gui/colorlcd/libui/etx_lv_theme.cpp",
+    "radio/src/gui/colorlcd/libui/mainwindow.cpp",
+    "radio/src/gui/colorlcd/libui/window.cpp",
+    "radio/src/gui/colorlcd/libui/window.h",
+)
+
+INVARIANT_BOUNDARY_CALLS = (
+    "dispatchLive",
+    "fromAvailableLvObj",
+    "initRequiredLvObj",
+    "initRequiredWindow",
+    "requireLvObj",
+    "visitLive",
+    "withAvailableLvObj",
+    "withLvObj",
+)
+
 KEYWORDS = {
     "alignof",
     "catch",
@@ -115,6 +162,7 @@ class IfRecord:
     family_keys: tuple[str, ...]
     body_action: str
     body_calls: tuple[str, ...]
+    function: str
     scope: str
 
 
@@ -433,6 +481,77 @@ def find_matching_paren(data: bytes, open_index: int) -> int | None:
     return None
 
 
+def find_matching_brace(data: bytes, open_index: int) -> int | None:
+    depth = 0
+    index = open_index
+    in_line_comment = False
+    in_block_comment = False
+    in_string = False
+    in_char = False
+    escaped = False
+
+    while index < len(data):
+        char = data[index]
+        next_char = data[index + 1] if index + 1 < len(data) else None
+
+        if in_line_comment:
+            if char == ord("\n"):
+                in_line_comment = False
+            index += 1
+            continue
+        if in_block_comment:
+            if char == ord("*") and next_char == ord("/"):
+                in_block_comment = False
+                index += 2
+            else:
+                index += 1
+            continue
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == ord("\\"):
+                escaped = True
+            elif char == ord('"'):
+                in_string = False
+            index += 1
+            continue
+        if in_char:
+            if escaped:
+                escaped = False
+            elif char == ord("\\"):
+                escaped = True
+            elif char == ord("'"):
+                in_char = False
+            index += 1
+            continue
+
+        if char == ord("/") and next_char == ord("/"):
+            in_line_comment = True
+            index += 2
+            continue
+        if char == ord("/") and next_char == ord("*"):
+            in_block_comment = True
+            index += 2
+            continue
+        if char == ord('"'):
+            in_string = True
+            index += 1
+            continue
+        if char == ord("'"):
+            in_char = True
+            index += 1
+            continue
+        if char == ord("{"):
+            depth += 1
+        elif char == ord("}"):
+            depth -= 1
+            if depth == 0:
+                return index
+        index += 1
+
+    return None
+
+
 def extract_if_condition(cursor, cache: dict[Path, bytes]) -> str | None:
     location_file = cursor.location.file
     if location_file is None:
@@ -607,6 +726,8 @@ def predicate_call_keys(atom: str) -> tuple[str, ...]:
     keys: list[str] = []
     for call in predicate_calls(atom):
         lower = call.lower()
+        if lower == "isavailable" and not is_window_liveness_atom(atom):
+            continue
         if lower.startswith(PREDICATE_CALL_PREFIXES) or lower in {"deleted", "liveLvObj".lower()}:
             keys.append(call)
     return tuple(sorted(set(keys)))
@@ -632,22 +753,47 @@ def canonical_variable_name(expr: str) -> str:
 def family_keys(atom: str) -> tuple[str, ...]:
     lower = atom.lower()
     keys: list[str] = []
+    if is_invariant_boundary_atom(atom):
+        return ()
     if any(part in lower for part in ("lvobj", "lv_obj", "haslvobj", "livelvobj", "getlvobj")):
         keys.append("LVGL object presence/lifetime")
-    if any(part in lower for part in ("acceptsevents", "isavailable", "deleted")):
+    if is_window_liveness_atom(atom):
         keys.append("Window availability/event liveness")
     if "content" in lower:
         keys.append("Content pointer presence")
-    if "nullptr" in lower or re.fullmatch(r"!\(?[A-Za-z_]\w*(?:(?:->|\.)[A-Za-z_]\w*)*\)?", atom):
-        keys.append("Null/boolean presence guard")
     return tuple(sorted(set(keys)))
+
+
+def is_invariant_boundary_atom(atom: str) -> bool:
+    return any(f"{name}(" in atom for name in INVARIANT_BOUNDARY_CALLS)
+
+
+def is_window_liveness_atom(atom: str) -> bool:
+    lower = atom.lower()
+    if any(part in lower for part in ("acceptsevents", "deleted", "_deleted")):
+        return True
+    if "isavailable" not in lower:
+        return False
+
+    if re.search(r"(?:^|[!(&|])(?:this->)?isavailable\s*\(", lower):
+        return True
+
+    receiver_match = re.search(
+        r"([a-z_]\w*)\s*(?:->|\.)\s*isavailable\s*\(",
+        lower,
+    )
+    return bool(receiver_match and receiver_match.group(1) in WINDOW_LIFETIME_RECEIVERS)
 
 
 def is_interesting_atom(atom: str) -> bool:
     lower = atom.lower()
+    if is_invariant_boundary_atom(atom):
+        return False
     if atom.startswith("!") or "nullptr" in atom:
         return True
-    if any(part in lower for part in INTERESTING_SUBSTRINGS):
+    if "isavailable" in lower and is_window_liveness_atom(atom):
+        return True
+    if any(part in lower for part in INTERESTING_SUBSTRINGS if part != "isavailable"):
         return True
     return bool(predicate_call_keys(atom))
 
@@ -802,6 +948,9 @@ def build_if_record(cursor, selected_files: set[Path], cache: dict[Path, bytes],
     families = tuple(sorted({key for atom in atoms for key in family_keys(atom)}))
     then_cursor = if_then_cursor(cursor)
     action, calls = body_summary(then_cursor, cache) if then_cursor is not None else ("unknown body", ())
+    function = enclosing_function_name(cursor)
+    if "ForTest" not in function:
+        function = enclosing_for_test_function_from_source(file, cursor.location.line, cache) or function
 
     return IfRecord(
         file=file,
@@ -815,13 +964,68 @@ def build_if_record(cursor, selected_files: set[Path], cache: dict[Path, bytes],
         family_keys=families,
         body_action=action,
         body_calls=calls,
-        scope=scope_for(file, root),
+        function=function,
+        scope=scope_for(file, root, function),
     )
 
 
-def scope_for(path: Path, root: Path) -> str:
+def enclosing_function_name(cursor) -> str:
+    function_kinds = {
+        "CXX_METHOD",
+        "CONSTRUCTOR",
+        "CONVERSION_FUNCTION",
+        "DESTRUCTOR",
+        "FUNCTION_DECL",
+        "FUNCTION_TEMPLATE",
+    }
+    stack = [cursor.lexical_parent, cursor.semantic_parent]
+    seen: set[int] = set()
+    while stack:
+        parent = stack.pop(0)
+        if parent is None:
+            continue
+        parent_hash = hash(parent)
+        if parent_hash in seen:
+            continue
+        seen.add(parent_hash)
+        if getattr(parent.kind, "name", "") in function_kinds:
+            spelling = getattr(parent, "spelling", "") or getattr(parent, "displayname", "")
+            if spelling:
+                return spelling
+        stack.append(parent.lexical_parent)
+        stack.append(parent.semantic_parent)
+    return ""
+
+
+def enclosing_for_test_function_from_source(path: Path, line: int, cache: dict[Path, bytes]) -> str:
+    data = source_bytes(path, cache)
+    source = data.decode("utf-8", errors="ignore")
+    line_offsets = [0]
+    for match in re.finditer(r"\n", source):
+        line_offsets.append(match.end())
+    if line <= 0 or line > len(line_offsets):
+        return ""
+
+    target_offset = line_offsets[line - 1]
+    pattern = (
+        rb"\b([A-Za-z_][A-Za-z0-9_]*ForTest)\s*\([^;{}]*\)"
+        rb"(?:\s*->\s*[A-Za-z_:][A-Za-z0-9_:<>]*)?\s*\{"
+    )
+    for match in re.finditer(pattern, data, re.MULTILINE):
+        open_brace = match.end() - 1
+        if open_brace > target_offset:
+            break
+        close_brace = find_matching_brace(data, open_brace)
+        if close_brace is not None and open_brace <= target_offset <= close_brace:
+            return match.group(1).decode("utf-8", errors="ignore")
+    return ""
+
+
+def scope_for(path: Path, root: Path, function: str = "") -> str:
     rel = relpath(path, root)
     if "/tests/" in f"/{rel}/" or rel.startswith("radio/src/tests/"):
+        return "tests"
+    if function.endswith("ForTest") or "ForTest" in function:
         return "tests"
     return "production"
 
@@ -862,8 +1066,20 @@ def groups_for_families(records: Iterable[IfRecord]) -> list[Group]:
     grouped: dict[str, list[IfRecord]] = collections.defaultdict(list)
     for record in records:
         for key in record.family_keys:
+            if is_allowed_family_boundary(record, key):
+                continue
             grouped[key].append(record)
     return [Group(key, tuple(values)) for key, values in grouped.items()]
+
+
+def is_allowed_family_boundary(record: IfRecord, family: str) -> bool:
+    if family not in {
+        "LVGL object presence/lifetime",
+        "Window availability/event liveness",
+    }:
+        return False
+    path = record.file.as_posix()
+    return any(path.endswith(suffix) for suffix in WINDOW_LIFETIME_BOUNDARY_SUFFIXES)
 
 
 def interesting_groups(
@@ -911,7 +1127,7 @@ def format_report(
     lines.append("")
 
     append_scope_report(lines, "Production", production_records, root, args)
-    if test_records:
+    if args.include_tests and test_records:
         lines.append("")
         append_scope_report(lines, "Tests", test_records, root, args)
 
@@ -1044,6 +1260,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--show-local",
         action="store_true",
         help="Also report repeats confined to one file.",
+    )
+    parser.add_argument(
+        "--include-tests",
+        action="store_true",
+        help="Also print repeats from test files and ForTest helpers.",
     )
     parser.add_argument(
         "--verbose",

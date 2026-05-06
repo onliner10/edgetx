@@ -191,7 +191,7 @@ class Widget : public ButtonBase
 
   // Window interface
 #if defined(HARDWARE_KEYS)
-  void onEvent(event_t event) override;
+  void onLiveEvent(LiveWindow& live, event_t event) override;
 #endif
 
   // Widget interface
@@ -205,13 +205,13 @@ class Widget : public ButtonBase
   virtual bool enableFullScreenRE() const { return true; }
 
   // Called when the widget options have changed
-  virtual void updateWithoutRefresh() { update(); }
-  virtual void update() {}
+  void updateWithoutRefresh();
+  void update();
 
   // Called at regular time interval if the widget is hidden or off screen
-  virtual void background() {}
+  void background();
   // Called at regular time interval if the widget is visible and on screen
-  virtual void foreground() {}
+  void foreground();
 
   // Update widget 'zone' data (for Lua widgets)
   virtual void updateZoneRect(rect_t rect, bool updateUI = true)
@@ -236,10 +236,28 @@ class Widget : public ButtonBase
                               coord_t yOffset = 0);
 
   void onCancel() override;
-  bool onLongPress() override;
+  bool onLiveLongPress(LiveWindow&) override;
 
+  virtual void onUpdateWithoutRefresh();
+  virtual void onUpdate() {}
+  virtual void onBackground() {}
+  virtual void onForeground() {}
   virtual void onFullscreen(bool enable) {}
   void openMenu();
+  void delayWidgetLoad();
+
+  template <typename Fn>
+  bool runWidgetTask(Fn&& fn)
+  {
+    return visitLive([&](LiveWindow&) {
+      if (taskRequiresLoaded && !loaded) return false;
+      fn();
+      return true;
+    });
+  }
+
+ protected:
+  bool taskRequiresLoaded = false;
 };
 
 //-----------------------------------------------------------------------------
@@ -256,13 +274,12 @@ class TrackedWidget : public Widget
                 const rect_t& rect, WidgetLocation location,
                 LoadMode loadMode);
 
-  void foreground() final;
-
  protected:
   void requireRefresh() { refreshPending = true; }
 
   virtual uint32_t refreshKey() = 0;
   virtual void refresh() = 0;
+  void onForeground() final;
 
  private:
   uint32_t lastRefreshKey = 0;

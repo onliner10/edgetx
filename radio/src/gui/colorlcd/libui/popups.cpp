@@ -38,9 +38,7 @@ static void _run_popup_dialog(const char* title, const char* msg,
   auto md = new (std::nothrow) MessageDialog(title, msg, info);
   if (!md) return;
 
-  MainWindow::instance()->blockUntilClose(true, [=]() {
-    return md->deleted();
-  });
+  MainWindow::instance()->blockUntilClosed(*md, true);
 }
 
 void POPUP_INFORMATION(const char* message)
@@ -138,7 +136,7 @@ class BubbleDialog : public Window
 
   bool isBubblePopup() override { return true; }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     if (lv_tick_elaps(startTime) >= timeout) {
       deleteLater();

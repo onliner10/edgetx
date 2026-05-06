@@ -21,6 +21,8 @@
 
 #include "curve.h"
 
+#include <new>
+
 #include "bitmaps.h"
 #include "edgetx.h"
 #include "static.h"
@@ -28,31 +30,46 @@
 
 //-----------------------------------------------------------------------------
 
-// Base curve rendering class to draw the background and curve.
 CurveRenderer::CurveRenderer(Window* parent, const rect_t& rect,
-                             std::function<int(int)> function) :
-    valueFunc(std::move(function))
+                             std::function<int(int)> function)
 {
+  if (!parent) return;
+  parent->visitLive(
+      [&](Window::LiveWindow& live) { init(live, rect, std::move(function)); });
+}
+
+bool CurveRenderer::init(Window::LiveWindow& parent, const rect_t& rect,
+                         std::function<int(int)> function)
+{
+  auto parentObj = parent.lvobj();
+  valueFunc = std::move(function);
   dx = rect.x;
   dy = rect.y;
   dw = rect.w;
   dh = rect.h;
 
-  lv_obj_t* bgBox = lv_line_create(parent->getLvObj());
+  lv_obj_t* bgBox = lv_line_create(parentObj);
+  if (!bgBox) return false;
   etx_obj_add_style(bgBox, styles->graph_border, LV_PART_MAIN);
 
-  lv_obj_t* axis1 = lv_line_create(parent->getLvObj());
+  lv_obj_t* axis1 = lv_line_create(parentObj);
+  if (!axis1) return false;
   etx_obj_add_style(axis1, styles->graph_border, LV_PART_MAIN);
-  lv_obj_t* axis2 = lv_line_create(parent->getLvObj());
+  lv_obj_t* axis2 = lv_line_create(parentObj);
+  if (!axis2) return false;
   etx_obj_add_style(axis2, styles->graph_border, LV_PART_MAIN);
 
-  lv_obj_t* extra1 = lv_line_create(parent->getLvObj());
+  lv_obj_t* extra1 = lv_line_create(parentObj);
+  if (!extra1) return false;
   etx_obj_add_style(extra1, styles->graph_dashed, LV_PART_MAIN);
-  lv_obj_t* extra2 = lv_line_create(parent->getLvObj());
+  lv_obj_t* extra2 = lv_line_create(parentObj);
+  if (!extra2) return false;
   etx_obj_add_style(extra2, styles->graph_dashed, LV_PART_MAIN);
-  lv_obj_t* extra3 = lv_line_create(parent->getLvObj());
+  lv_obj_t* extra3 = lv_line_create(parentObj);
+  if (!extra3) return false;
   etx_obj_add_style(extra3, styles->graph_dashed, LV_PART_MAIN);
-  lv_obj_t* extra4 = lv_line_create(parent->getLvObj());
+  lv_obj_t* extra4 = lv_line_create(parentObj);
+  if (!extra4) return false;
   etx_obj_add_style(extra4, styles->graph_dashed, LV_PART_MAIN);
 
   // Outer box
@@ -89,21 +106,23 @@ CurveRenderer::CurveRenderer(Window* parent, const rect_t& rect,
   lv_line_set_points(extra4, &bgPoints[15], 2);
 
   // Curve points
-  lnPoints = new lv_point_t[dw];
+  lnPoints = new (std::nothrow) lv_point_t[dw];
+  if (!lnPoints) return false;
 
-  ptLine = lv_line_create(parent->getLvObj());
+  ptLine = lv_line_create(parentObj);
+  if (!ptLine) return false;
   etx_obj_add_style(ptLine, styles->graph_line, LV_PART_MAIN);
 
   update();
+  return true;
 }
 
-CurveRenderer::~CurveRenderer()
-{
-  if (lnPoints) delete lnPoints;
-}
+CurveRenderer::~CurveRenderer() { delete[] lnPoints; }
 
 void CurveRenderer::update()
 {
+  if (!ready()) return;
+
   for (lv_coord_t x = 0; x < dw; x += 1) {
     lv_coord_t y =
         getPointY(valueFunc(divRoundClosest((x - dw / 2) * RESX, dw / 2)));
@@ -124,51 +143,80 @@ coord_t CurveRenderer::getPointY(int y) const
 Curve::Curve(Window* parent, const rect_t& rect,
              std::function<int(int)> function, std::function<int()> position) :
     Window(parent, rect),
-    base(this,
-         rect_t{(position ? POS_PT_SZ / 2 : PAD_BORDER), (position ? POS_PT_SZ / 2 : PAD_BORDER),
-                rect.w - (position ? POS_PT_SZ & 0xFE : PAD_BORDER * 2), rect.h - (position ? POS_PT_SZ & 0xFE : PAD_BORDER * 2)},
-         function),
     valueFunc(std::move(function)),
     positionFunc(std::move(position))
 {
   setWindowFlag(NO_FOCUS | NO_CLICK);
 
-  etx_solid_bg(lvobj, COLOR_THEME_PRIMARY2_INDEX);
+  if (!dispatchLive([&](LiveWindow& live) {
+        auto obj = live.lvobj();
+        auto renderRect =
+            rect_t{(positionFunc ? POS_PT_SZ / 2 : PAD_BORDER),
+                   (positionFunc ? POS_PT_SZ / 2 : PAD_BORDER),
+                   rect.w - (positionFunc ? POS_PT_SZ & 0xFE : PAD_BORDER * 2),
+                   rect.h - (positionFunc ? POS_PT_SZ & 0xFE : PAD_BORDER * 2)};
+        if (!base.init(live, renderRect, valueFunc)) {
+          failClosed();
+          return false;
+        }
 
-  // Adjust border - if drawing points leave more space to prevent clipping of
-  // end points.
-  if (positionFunc) {
-    dx = POS_PT_SZ / 2;
-    dy = POS_PT_SZ / 2;
-  } else {
-    dx = PAD_BORDER;
-    dy = PAD_BORDER;
+        etx_solid_bg(obj, COLOR_THEME_PRIMARY2_INDEX);
+
+        // Adjust border - if drawing points leave more space to prevent
+        // clipping of end points.
+        if (positionFunc) {
+          dx = POS_PT_SZ / 2;
+          dy = POS_PT_SZ / 2;
+        } else {
+          dx = PAD_BORDER;
+          dy = PAD_BORDER;
+        }
+        dw = rect.w - dx * 2;
+        dh = rect.h - dy * 2;
+
+        if (positionFunc) {
+          posVLine = lv_line_create(obj);
+          if (!requireLvObj(posVLine)) return false;
+          etx_obj_add_style(posVLine, styles->graph_position_line,
+                            LV_PART_MAIN);
+          posHLine = lv_line_create(obj);
+          if (!requireLvObj(posHLine)) return false;
+          etx_obj_add_style(posHLine, styles->graph_position_line,
+                            LV_PART_MAIN);
+
+          positionValue = Window::makeLive<StaticText>(
+              this, rect_t{POS_LBL_X, POS_LBL_Y, LV_SIZE_CONTENT, POS_LBL_H},
+              "", COLOR_THEME_PRIMARY1_INDEX, FONT(XS));
+          if (!positionValue) {
+            failClosed();
+            return false;
+          }
+          positionValue->padLeft(PAD_TINY);
+          positionValue->padRight(PAD_TINY);
+          positionValue->visitLive([](Window::LiveWindow& livePosition) {
+            etx_solid_bg(livePosition.lvobj(), COLOR_THEME_ACTIVE_INDEX);
+          });
+
+          posPoint = lv_obj_create(obj);
+          if (!requireLvObj(posPoint)) return false;
+          etx_solid_bg(posPoint, COLOR_THEME_PRIMARY2_INDEX);
+          etx_obj_add_style(posPoint, styles->circle, LV_PART_MAIN);
+          etx_obj_add_style(posPoint, styles->border, LV_PART_MAIN);
+          etx_obj_add_style(posPoint,
+                            styles->border_color[COLOR_THEME_ACTIVE_INDEX],
+                            LV_PART_MAIN);
+          lv_obj_set_size(posPoint, POS_PT_SZ, POS_PT_SZ);
+
+          updatePosition();
+        }
+
+        return true;
+      })) {
+    return;
   }
-  dw = rect.w - dx * 2;
-  dh = rect.h - dy * 2;
 
-  if (positionFunc) {
-    posVLine = lv_line_create(lvobj);
-    etx_obj_add_style(posVLine, styles->graph_position_line, LV_PART_MAIN);
-    posHLine = lv_line_create(lvobj);
-    etx_obj_add_style(posHLine, styles->graph_position_line, LV_PART_MAIN);
-
-    positionValue = new StaticText(this, {POS_LBL_X, POS_LBL_Y, LV_SIZE_CONTENT, POS_LBL_H}, "", COLOR_THEME_PRIMARY1_INDEX, FONT(XS));
-    positionValue->padLeft(PAD_TINY);
-    positionValue->padRight(PAD_TINY);
-    etx_solid_bg(positionValue->getLvObj(), COLOR_THEME_ACTIVE_INDEX);
-
-    posPoint = lv_obj_create(lvobj);
-    etx_solid_bg(posPoint, COLOR_THEME_PRIMARY2_INDEX);
-    etx_obj_add_style(posPoint, styles->circle, LV_PART_MAIN);
-    etx_obj_add_style(posPoint, styles->border, LV_PART_MAIN);
-    etx_obj_add_style(posPoint, styles->border_color[COLOR_THEME_ACTIVE_INDEX], LV_PART_MAIN);
-    lv_obj_set_size(posPoint, POS_PT_SZ, POS_PT_SZ);
-
-    updatePosition();
-  }
-
-  curveUpdateMsg.subscribe(Messaging::CURVE_UPDATE, [=](uint32_t param) { update(); });
+  curveUpdateMsg.subscribe(Messaging::CURVE_UPDATE,
+                           [=](uint32_t param) { update(); });
 }
 
 coord_t Curve::getPointX(int x) const
@@ -185,7 +233,7 @@ coord_t Curve::getPointY(int y) const
 
 void Curve::updatePosition()
 {
-  if (positionFunc) {
+  if (positionFunc && positionValue && posPoint && posVLine && posHLine) {
     int valueX = positionFunc();
     int valueY = valueFunc(valueX);
 
@@ -213,11 +261,12 @@ void Curve::updatePosition()
 
 void Curve::update()
 {
+  if (!visitLive([](LiveWindow&) { return true; })) return;
   base.update();
   updatePosition();
 }
 
-void Curve::checkEvents()
+void Curve::onLiveCheckEvents(Window::LiveWindow& live)
 {
   // Redraw if crosshair position has changed
   if (positionFunc) {
@@ -228,5 +277,5 @@ void Curve::checkEvents()
     }
   }
 
-  Window::checkEvents();
+  Window::onLiveCheckEvents(live);
 }

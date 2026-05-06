@@ -122,7 +122,7 @@ class PageGroupHeaderBase : public Window
   bool isCurrent(uint8_t idx) const { return currentIndex == idx; }
   uint8_t tabCount() const { return pages.size(); }
 
-  void deleteLater() override;
+  void onDelete() override;
 
 #if VERSION_MAJOR == 2
   static LAYOUT_VAL_SCALED(ICON_EXTRA_H, 10)
@@ -142,7 +142,7 @@ class PageGroupHeaderBase : public Window
   std::vector<PageGroupIconButton*> buttons;
 
   coord_t getX(uint8_t idx);
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 #endif
 };
 
@@ -155,7 +155,7 @@ class PageGroupBase : public NavWindow
 
   void setCurrentTab(unsigned index);
 
-  void onClicked() override;
+  void onLiveClicked(LiveWindow&) override;
   void onCancel() override;
 
   uint8_t tabCount() const;
@@ -176,7 +176,7 @@ class PageGroupBase : public NavWindow
   EdgeTxIcon icon;
   Messaging quickMenuMsg;
 
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 
 #if defined(HARDWARE_KEYS)
   void doKeyShortcut(event_t event);

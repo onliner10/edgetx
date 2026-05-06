@@ -251,54 +251,54 @@ void NumberKeyboard::changeSign()
 
 #if defined(HARDWARE_KEYS)
 
-void NumberKeyboard::onPressSYS() { if (hasTwoPageKeys) decLarge(); else decSmall(); }
+void NumberKeyboard::onPressSYS() { runPageKey(*this, &NumberKeyboard::decSmall, &NumberKeyboard::decLarge); }
 void NumberKeyboard::onLongPressSYS() { setMIN(); }
 void NumberKeyboard::onPressMDL() { incLarge(); }
-void NumberKeyboard::onLongPressMDL() { if (hasTwoPageKeys) setMAX(); else changeSign(); }
-void NumberKeyboard::onPressTELE() { if (hasTwoPageKeys) changeSign(); else incSmall(); }
-void NumberKeyboard::onLongPressTELE() { if (hasTwoPageKeys) setDEF(); else setMAX(); }
-void NumberKeyboard::onPressPGUP() { if (hasTwoPageKeys) decSmall(); else setDEF(); }
-void NumberKeyboard::onPressPGDN() { if (hasTwoPageKeys) incSmall(); else decLarge(); }
+void NumberKeyboard::onLongPressMDL() { runPageKey(*this, &NumberKeyboard::changeSign, &NumberKeyboard::setMAX); }
+void NumberKeyboard::onPressTELE() { runPageKey(*this, &NumberKeyboard::incSmall, &NumberKeyboard::changeSign); }
+void NumberKeyboard::onLongPressTELE() { runPageKey(*this, &NumberKeyboard::setMAX, &NumberKeyboard::setDEF); }
+void NumberKeyboard::onPressPGUP() { runPageKey(*this, &NumberKeyboard::setDEF, &NumberKeyboard::decSmall); }
+void NumberKeyboard::onPressPGDN() { runPageKey(*this, &NumberKeyboard::decLarge, &NumberKeyboard::incSmall); }
 
 #endif
 
 NumberKeyboard::NumberKeyboard() : Keyboard(KEYBOARD_HEIGHT, true)
 {
-  if (!acceptsKeyboardInput()) return;
+  dispatchLive([&](LiveWindow& live) {
+    etx_solid_bg(live.lvobj(), COLOR_THEME_SECONDARY3_INDEX);
 
-  etx_solid_bg(lvobj, COLOR_THEME_SECONDARY3_INDEX);
+    if (!initRequiredLvObj(titleLabel,
+                           [](lv_obj_t* parent) {
+                             return etx_label_create(parent);
+                           },
+                           [&](lv_obj_t* obj) {
+          lv_obj_set_pos(obj, 0, TITLE_Y);
+          lv_obj_set_size(obj, LCD_W, TITLE_H);
+          lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+          lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
+          etx_font(obj, FONT_XS_INDEX);
+          etx_txt_color(obj, COLOR_THEME_PRIMARY3_INDEX);
+        }))
+      return;
 
-  if (!initRequiredLvObj(titleLabel,
-                         [](lv_obj_t* parent) {
-                           return etx_label_create(parent);
-                         },
-                         [&](lv_obj_t* obj) {
-        lv_obj_set_pos(obj, 0, TITLE_Y);
-        lv_obj_set_size(obj, LCD_W, TITLE_H);
-        lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-        lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
-        etx_font(obj, FONT_XS_INDEX);
-        etx_txt_color(obj, COLOR_THEME_PRIMARY3_INDEX);
-      }))
-    return;
+    if (!initRequiredLvObj(valueLabel,
+                           [](lv_obj_t* parent) {
+                             return etx_label_create(parent);
+                           },
+                           [&](lv_obj_t* obj) {
+          lv_obj_set_pos(obj, 0, VALUE_Y);
+          lv_obj_set_size(obj, LCD_W, VALUE_H);
+          lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+          lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
+          etx_font(obj, FONT_L_INDEX);
+          etx_txt_color(obj, COLOR_THEME_PRIMARY1_INDEX);
+        }))
+      return;
 
-  if (!initRequiredLvObj(valueLabel,
-                         [](lv_obj_t* parent) {
-                           return etx_label_create(parent);
-                         },
-                         [&](lv_obj_t* obj) {
-        lv_obj_set_pos(obj, 0, VALUE_Y);
-        lv_obj_set_size(obj, LCD_W, VALUE_H);
-        lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-        lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
-        etx_font(obj, FONT_L_INDEX);
-        etx_txt_color(obj, COLOR_THEME_PRIMARY1_INDEX);
-      }))
-    return;
-
-  lv_obj_set_size(keyboard, LCD_W, LCD_H - HEADER_HEIGHT);
-  lv_obj_align(keyboard, LV_ALIGN_TOP_LEFT, 0, HEADER_HEIGHT);
-  lv_obj_add_event_cb(keyboard, on_keyboard_event, LV_EVENT_VALUE_CHANGED, this);
+    lv_obj_set_size(keyboard, LCD_W, LCD_H - HEADER_HEIGHT);
+    lv_obj_align(keyboard, LV_ALIGN_TOP_LEFT, 0, HEADER_HEIGHT);
+    lv_obj_add_event_cb(keyboard, on_keyboard_event, LV_EVENT_VALUE_CHANGED, this);
+  });
 }
 
 NumberKeyboard::~NumberKeyboard() { _instance = nullptr; }

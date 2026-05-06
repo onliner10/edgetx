@@ -108,46 +108,48 @@ class ChannelValue : public Window
 
   void refresh()
   {
-    if (!loaded || _deleted) return;
+    visitLive([&](LiveWindow&) {
+      if (!loaded) return;
 
-    int16_t value = channelOutputs[channel];
+      int16_t value = channelOutputs[channel];
 
-    if (value != lastValue) {
-      lastValue = value;
+      if (value != lastValue) {
+        lastValue = value;
 
-      std::string s;
-      if (g_eeGeneral.ppmunit == PPM_US)
-        s = formatNumberAsString(PPM_CH_CENTER(channel) + value / 2, 0, 0, "", STR_US);
-      else if (g_eeGeneral.ppmunit == PPM_PERCENT_PREC1)
-        s = formatNumberAsString(calcRESXto1000(value), PREC1, 0, "", "%");
-      else
-        s = formatNumberAsString(calcRESXto100(value), 0, 0, "", "%");
+        std::string s;
+        if (g_eeGeneral.ppmunit == PPM_US)
+          s = formatNumberAsString(PPM_CH_CENTER(channel) + value / 2, 0, 0, "", STR_US);
+        else if (g_eeGeneral.ppmunit == PPM_PERCENT_PREC1)
+          s = formatNumberAsString(calcRESXto1000(value), PREC1, 0, "", "%");
+        else
+          s = formatNumberAsString(calcRESXto100(value), 0, 0, "", "%");
 
-      if (s != lastText) {
-        lastText = s;
-        lv_label_set_text(valueLabel, s.c_str());
+        if (s != lastText) {
+          lastText = s;
+          lv_label_set_text(valueLabel, s.c_str());
+        }
+
+        const int lim = (g_model.extendedLimits ? (1024 * LIMIT_EXT_PERCENT / 100) : 1024);
+        uint16_t w = width() - PAD_TINY;
+        int16_t scaledValue = divRoundClosest(w * limit<int16_t>(-lim, value, lim), lim * 2);
+
+        if (scaledValue != lastScaledValue) {
+          lastScaledValue = scaledValue;
+
+          uint16_t fillW = abs(scaledValue);
+          uint16_t x = value > 0 ? w / 2 : w / 2 - fillW + 1;
+
+          lv_obj_set_pos(bar, x, 0);
+          lv_obj_set_size(bar, fillW, ROW_HEIGHT - 1);
+        }
       }
 
-      const int lim = (g_model.extendedLimits ? (1024 * LIMIT_EXT_PERCENT / 100) : 1024);
-      uint16_t w = width() - PAD_TINY;
-      int16_t scaledValue = divRoundClosest(w * limit<int16_t>(-lim, value, lim), lim * 2);
-
-      if (scaledValue != lastScaledValue) {
-        lastScaledValue = scaledValue;
-
-        uint16_t fillW = abs(scaledValue);
-        uint16_t x = value > 0 ? w / 2 : w / 2 - fillW + 1;
-
-        lv_obj_set_pos(bar, x, 0);
-        lv_obj_set_size(bar, fillW, ROW_HEIGHT - 1);
+      bool hasName = g_model.limitData[channel].name[0] != 0;
+      if (hasName != chanHasName) {
+        chanHasName = hasName;
+        setChannel();
       }
-    }
-
-    bool hasName = g_model.limitData[channel].name[0] != 0;
-    if (hasName != chanHasName) {
-      chanHasName = hasName;
-      setChannel();
-    }
+    });
   }
 
   static LAYOUT_VAL_SCALED(ROW_HEIGHT, 16)
@@ -188,7 +190,7 @@ class OutputsWidget : public TrackedWidget
     update();
   }
 
-  void update() override
+  void onUpdate() override
   {
     auto widgetData = getPersistentData();
 

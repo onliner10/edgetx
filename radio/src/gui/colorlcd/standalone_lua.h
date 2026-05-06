@@ -39,7 +39,7 @@ public:
   static StandaloneLuaWindow* instance();
   static void setup(bool useLvgl, int initFn, int runFn);
 
-  void deleteLater() override;
+  void onDelete() override;
 
 #if defined(DEBUG_WINDOWS)
   std::string getName() const override { return "StandaloneLuaWindow"; }
@@ -90,9 +90,9 @@ protected:
   void popupPaint(BitmapBuffer* dc, coord_t x, coord_t y, coord_t w, coord_t h,
                   const char* text, const char* info);
 
-  void onEvent(event_t evt) override;
-  void checkEvents() override;
-  void onClicked() override;
+  void onLiveEvent(LiveWindow& live, event_t evt) override;
+  void onLiveCheckEvents(LiveWindow& live) override;
+  void onLiveClicked(LiveWindow&) override;
   void onCancel() override;
 };
 #endif

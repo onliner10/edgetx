@@ -221,10 +221,9 @@ class ColorEditPage : public Page
   ColorSwatch *_colorSquare = nullptr;
   StaticText *_hexBox = nullptr;
 
-  void deleteLater() override
+  void onDelete() override
   {
     if (_updateHandler != nullptr) _updateHandler();
-    Page::deleteLater();
   }
 
   void setHexStr(uint32_t rgb)
@@ -356,13 +355,13 @@ class ThemeEditPage : public Page
     }
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     if (!started && _themeName) {
       started = true;
       _themeName->setText(_theme.getName());
     }
-    Page::checkEvents();
+    Page::onLiveCheckEvents(live);
   }
 
   void editColorPage()

@@ -66,7 +66,7 @@ class MainViewSlider : public Window
 
   void setPos();
 
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 
   MaskBitmap* getTicksMask();
 };
@@ -88,7 +88,7 @@ class MainView6POS : public Window
  public:
   MainView6POS(Window* parent, uint8_t idx);
 
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 
   static LAYOUT_VAL_SCALED(MULTIPOS_W_SPACING, 12)
   static LAYOUT_VAL_SCALED(MULTIPOS_SZ, 12)

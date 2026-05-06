@@ -191,7 +191,7 @@ class SwitchDynamicLabel : public StaticText
       return 1;
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     uint8_t newpos = position();
     if (newpos != lastpos) {

@@ -86,7 +86,7 @@ class ListBox : public TableField
 
   void onPress(uint16_t row, uint16_t col) override;
 
-  void onClicked() override;
+  void onLiveClicked(LiveWindow&) override;
   void onCancel() override;
 
   void onDrawEnd(uint16_t row, uint16_t col,

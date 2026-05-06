@@ -21,12 +21,12 @@
 
 #include "quick_menu_group.h"
 
+#include <new>
+
 #include "bitmaps.h"
 #include "button.h"
-#include "static.h"
 #include "quick_menu_def.h"
-
-#include <new>
+#include "static.h"
 
 static void etx_quick_button_constructor(const lv_obj_class_t* class_p,
                                          lv_obj_t* obj)
@@ -70,36 +70,66 @@ class QuickMenuButton : public ButtonBase
     setAutomationText(title ? title : "");
 #endif
 
-    iconPtr = new (std::nothrow) StaticIcon(this, (QuickMenuGroup::QM_BUTTON_WIDTH - QuickMenuGroup::QM_ICON_SIZE) / 2, PAD_SMALL, icon, COLOR_THEME_QM_FG_INDEX);
+    iconPtr = Window::makeLive<StaticIcon>(
+        this,
+        (QuickMenuGroup::QM_BUTTON_WIDTH - QuickMenuGroup::QM_ICON_SIZE) / 2,
+        PAD_SMALL, icon, COLOR_THEME_QM_FG_INDEX);
+    if (!iconPtr) {
+      failClosed();
+      return;
+    }
 #if VERSION_MAJOR > 2
-    if (iconPtr) etx_obj_add_style(iconPtr->getLvObj(), styles->qmdisabled, LV_PART_MAIN | LV_STATE_DISABLED);
+    iconPtr->visitLive([](Window::LiveWindow& liveIcon) {
+      etx_obj_add_style(liveIcon.lvobj(), styles->qmdisabled,
+                        LV_PART_MAIN | LV_STATE_DISABLED);
+    });
 #endif
-    if (iconPtr) etx_img_color(iconPtr->getLvObj(), COLOR_THEME_QM_BG_INDEX, LV_STATE_USER_1);
+    iconPtr->visitLive([](Window::LiveWindow& liveIcon) {
+      etx_img_color(liveIcon.lvobj(), COLOR_THEME_QM_BG_INDEX, LV_STATE_USER_1);
+    });
 
-    textPtr = new (std::nothrow) StaticText(this, {0, QuickMenuGroup::QM_ICON_SIZE + PAD_TINY * 2, QuickMenuGroup::QM_BUTTON_WIDTH - 1, 0},
-                   title, COLOR_THEME_QM_FG_INDEX, CENTERED | FONT(XS));
+    textPtr = Window::makeLive<StaticText>(
+        this,
+        rect_t{0, QuickMenuGroup::QM_ICON_SIZE + PAD_TINY * 2,
+               QuickMenuGroup::QM_BUTTON_WIDTH - 1, 0},
+        title, COLOR_THEME_QM_FG_INDEX, CENTERED | FONT(XS));
+    if (!textPtr) {
+      failClosed();
+      return;
+    }
 #if VERSION_MAJOR > 2
-    if (textPtr) etx_obj_add_style(textPtr->getLvObj(), styles->qmdisabled, LV_PART_MAIN | LV_STATE_DISABLED);
+    textPtr->visitLive([](Window::LiveWindow& liveText) {
+      etx_obj_add_style(liveText.lvobj(), styles->qmdisabled,
+                        LV_PART_MAIN | LV_STATE_DISABLED);
+    });
 #endif
-    if (textPtr) etx_txt_color(textPtr->getLvObj(), COLOR_THEME_QM_BG_INDEX, LV_STATE_USER_1);
+    textPtr->visitLive([](Window::LiveWindow& liveText) {
+      etx_txt_color(liveText.lvobj(), COLOR_THEME_QM_BG_INDEX, LV_STATE_USER_1);
+    });
 
-    lv_obj_add_event_cb(lvobj, QuickMenuButton::focused_cb, LV_EVENT_FOCUSED, nullptr);
-    lv_obj_add_event_cb(lvobj, QuickMenuButton::defocused_cb, LV_EVENT_DEFOCUSED, nullptr);
+    dispatchLive([](LiveWindow& live) {
+      lv_obj_add_event_cb(live.lvobj(), QuickMenuButton::focused_cb,
+                          LV_EVENT_FOCUSED, nullptr);
+      lv_obj_add_event_cb(live.lvobj(), QuickMenuButton::defocused_cb,
+                          LV_EVENT_DEFOCUSED, nullptr);
+    });
   }
 
 #if defined(DEBUG_WINDOWS)
   std::string getName() const override { return "QuickMenuButton"; }
 #endif
 
-  static void focused_cb(lv_event_t *e)
+  static void focused_cb(lv_event_t* e)
   {
-    QuickMenuButton *b = (QuickMenuButton *)lv_obj_get_user_data(lv_event_get_target(e));
+    QuickMenuButton* b =
+        (QuickMenuButton*)lv_obj_get_user_data(lv_event_get_target(e));
     if (b) b->setFocused();
   }
 
-  static void defocused_cb(lv_event_t *e)
+  static void defocused_cb(lv_event_t* e)
   {
-    QuickMenuButton *b = (QuickMenuButton *)lv_obj_get_user_data(lv_event_get_target(e));
+    QuickMenuButton* b =
+        (QuickMenuButton*)lv_obj_get_user_data(lv_event_get_target(e));
     if (b) b->setDeFocused();
   }
 
@@ -117,25 +147,37 @@ class QuickMenuButton : public ButtonBase
 
   void setFocused()
   {
-    if (textPtr) lv_obj_add_state(textPtr->getLvObj(), LV_STATE_USER_1);
-    if (iconPtr) lv_obj_add_state(iconPtr->getLvObj(), LV_STATE_USER_1);
+    if (textPtr)
+      textPtr->visitLive([](Window::LiveWindow& live) {
+        lv_obj_add_state(live.lvobj(), LV_STATE_USER_1);
+      });
+    if (iconPtr)
+      iconPtr->visitLive([](Window::LiveWindow& live) {
+        lv_obj_add_state(live.lvobj(), LV_STATE_USER_1);
+      });
   }
 
   void setDeFocused()
   {
-    if (textPtr) lv_obj_clear_state(textPtr->getLvObj(), LV_STATE_USER_1);
-    if (iconPtr) lv_obj_clear_state(iconPtr->getLvObj(), LV_STATE_USER_1);
+    if (textPtr)
+      textPtr->visitLive([](Window::LiveWindow& live) {
+        lv_obj_clear_state(live.lvobj(), LV_STATE_USER_1);
+      });
+    if (iconPtr)
+      iconPtr->visitLive([](Window::LiveWindow& live) {
+        lv_obj_clear_state(live.lvobj(), LV_STATE_USER_1);
+      });
   }
 
-  bool isVisible() {
-    if (visibleHandler)
-      return visibleHandler();
+  bool isVisible()
+  {
+    if (visibleHandler) return visibleHandler();
     return true;
   }
 
-  void show(bool vis) override
+  void onLiveShow(LiveWindow& live, bool vis) override
   {
-    ButtonBase::show(vis && isVisible());
+    ButtonBase::onLiveShow(live, vis && isVisible());
   }
 
  protected:
@@ -145,30 +187,39 @@ class QuickMenuButton : public ButtonBase
 };
 
 QuickMenuGroup::QuickMenuGroup(Window* parent) :
-        Window(parent, {0, 0, parent->width(), parent->height()})
+    Window(parent, {0, 0, parent->width(), parent->height()})
 {
   padAll(PAD_OUTLINE);
   group = lv_group_create();
 }
 
 ButtonBase* QuickMenuGroup::addButton(EdgeTxIcon icon, const char* title,
-                                  std::function<void(void)> pressHandler,
-                                  std::function<bool(void)> visibleHandler,
-                                  std::function<void(bool)> focusHandler)
+                                      std::function<void(void)> pressHandler,
+                                      std::function<bool(void)> visibleHandler,
+                                      std::function<void(bool)> focusHandler)
 {
-  ButtonBase* b = new (std::nothrow) QuickMenuButton(this, icon, title, [=]() { pressHandler(); return 0; }, visibleHandler);
+  ButtonBase* b = Window::makeLive<QuickMenuButton>(
+      this, icon, title,
+      [=]() {
+        pressHandler();
+        return 0;
+      },
+      visibleHandler);
   if (!b) return nullptr;
-  b->setLongPressHandler([=]() { pressHandler(); return 0; });
-  btns.push_back(b);
-  if (group) lv_group_add_obj(group, b->getLvObj());
-  b->setFocusHandler([=](bool focus) {
-    if (focus)
-      curBtn = b;
-    if (focusHandler)
-      focusHandler(focus);
+  b->setLongPressHandler([=]() {
+    pressHandler();
+    return 0;
   });
-  if (curBtn == nullptr)
-    curBtn = b;
+  btns.push_back(b);
+  if (group)
+    b->visitLive([&](Window::LiveWindow& live) {
+      lv_group_add_obj(group, live.lvobj());
+    });
+  b->setFocusHandler([=](bool focus) {
+    if (focus) curBtn = b;
+    if (focusHandler) focusHandler(focus);
+  });
+  if (curBtn == nullptr) curBtn = b;
   return b;
 }
 
@@ -185,22 +236,19 @@ void QuickMenuGroup::setGroup()
   }
 }
 
-void QuickMenuGroup::deleteLater()
+void QuickMenuGroup::onDelete()
 {
-  if (_deleted) return;
-
   if (group) lv_group_del(group);
-  Window::deleteLater();
+  group = nullptr;
 }
 
 void QuickMenuGroup::setFocus()
 {
-  if (!curBtn && btns.size() > 0)
-    curBtn = btns[0];
+  if (!curBtn && btns.size() > 0) curBtn = btns[0];
 
   if (curBtn) {
     curBtn->sendLvEvent(LV_EVENT_FOCUSED);
-    lv_group_focus_obj(curBtn->getLvObj());
+    curBtn->focus();
   }
 }
 
@@ -250,7 +298,7 @@ void QuickMenuGroup::doLayout(int cols)
     if (((QuickMenuButton*)btns[i])->isVisible()) {
       coord_t x = (n % cols) * (QM_BUTTON_WIDTH + PAD_MEDIUM);
       coord_t y = (n / cols) * (QM_BUTTON_HEIGHT + PAD_MEDIUM);
-      lv_obj_set_pos(btns[i]->getLvObj(), x, y);
+      btns[i]->setPos(x, y);
       n += 1;
     }
     btns[i]->show();
@@ -259,14 +307,12 @@ void QuickMenuGroup::doLayout(int cols)
 
 void QuickMenuGroup::nextEntry()
 {
-  if (group)
-    lv_group_focus_next(group);
+  if (group) lv_group_focus_next(group);
 }
 
 void QuickMenuGroup::prevEntry()
 {
-  if (group)
-    lv_group_focus_prev(group);
+  if (group) lv_group_focus_prev(group);
 }
 
 ButtonBase* QuickMenuGroup::getFocusedButton()
@@ -275,7 +321,8 @@ ButtonBase* QuickMenuGroup::getFocusedButton()
     lv_obj_t* b = lv_group_get_focused(group);
     if (b) {
       for (size_t i = 0; i < btns.size(); i += 1)
-        if (btns[i]->getLvObj() == b)
+        if (btns[i]->visitLive(
+                [&](Window::LiveWindow& live) { return live.lvobj() == b; }))
           return btns[i];
     }
   }

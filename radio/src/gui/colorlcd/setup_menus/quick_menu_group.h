@@ -55,7 +55,7 @@ class QuickMenuGroup : public Window
   void prevEntry();
   ButtonBase* getFocusedButton();
 
-  void deleteLater() override;
+  void onDelete() override;
 
 #if PORTRAIT
   static LAYOUT_VAL_SCALED(QM_BUTTON_WIDTH, 72)

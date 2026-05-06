@@ -104,9 +104,9 @@ class ThrottleCurveWindow : public Window
     etx_obj_add_style(line, styles->graph_line, LV_PART_MAIN);
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
-    Window::checkEvents();
+    Window::onLiveCheckEvents(live);
     if (previousTraceWr != s_traceWr) {
       previousTraceWr = s_traceWr;
 

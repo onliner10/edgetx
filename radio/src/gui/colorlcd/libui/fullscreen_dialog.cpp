@@ -138,7 +138,7 @@ void FullScreenDialog::closeDialog()
   deleteLater();
 }
 
-bool FullScreenDialog::onLongPress()
+bool FullScreenDialog::onLiveLongPress(Window::LiveWindow&)
 {
   closeDialog();
   lv_indev_wait_release(lv_indev_get_act());
@@ -175,9 +175,7 @@ void raiseAlert(const char* title, const char* msg, const char* action,
   auto dialog = new (std::nothrow) FullScreenDialog(WARNING_TYPE_ALERT, title ? title : "",
                                                     msg ? msg : "", action ? action : "");
   if (dialog) {
-    MainWindow::instance()->blockUntilClose(true, [=]() {
-      return dialog->deleted();
-    });
+    MainWindow::instance()->blockUntilClosed(*dialog, true);
   } else {
     while (true) {
       sleep_ms(10);
@@ -208,11 +206,10 @@ bool confirmationDialog(const char* title, const char* msg, bool checkPwr,
                                                     [&confirmed]() { confirmed = true; });
   if (!dialog) return false;
 
-  MainWindow::instance()->blockUntilClose(checkPwr, [&]() {
-    if (dialog->deleted()) return true;
+  MainWindow::instance()->blockUntilClosed(*dialog, checkPwr, [&]() {
     if (closeCondition && closeCondition()) {
       confirmed = true;
-      dialog->deleteLater();
+      return true;
     }
     return confirmed;
   });

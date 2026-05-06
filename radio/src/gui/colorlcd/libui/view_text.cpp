@@ -522,9 +522,7 @@ void readChecklist()
   auto dialog = _readModelNotes(false);
   if (dialog) {
     LED_ERROR_BEGIN();
-    MainWindow::instance()->blockUntilClose(true, [=]() {
-      return dialog->deleted();
-    });
+    MainWindow::instance()->blockUntilClosed(*dialog, true);
     LED_ERROR_END();
   }
 }

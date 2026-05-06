@@ -31,16 +31,18 @@ class ToggleSwitch : public FormField
   std::string getName() const override { return "ToggleSwitch"; }
 #endif
 
-  void onClicked() override;
+  void onLiveClicked(LiveWindow&) override;
 
   uint8_t getValue() const
   {
-    return isAvailable() && _getValue ? _getValue() : 0;
+    return _getValue ? _getValue() : 0;
   }
 
   void setValue(uint8_t value)
   {
-    if (isAvailable() && _setValue) _setValue(value);
+    dispatchLive([&](LiveWindow&) {
+      if (_setValue) _setValue(value);
+    });
   }
 
   void setSetValueHandler(std::function<void(uint8_t)> handler)
@@ -61,7 +63,7 @@ class ToggleSwitch : public FormField
   std::function<uint8_t()> _getValue;
   std::function<void(uint8_t)> _setValue;
 
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 
   static void toggleswitch_event_handler(lv_event_t* e);
 };

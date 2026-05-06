@@ -77,7 +77,7 @@ class CurveButton : public Button
   StaticText *title;
   CurveRenderer *preview;
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     if (hasFocus()) {
       lv_obj_add_state(title->getLvObj(), LV_STATE_USER_1);

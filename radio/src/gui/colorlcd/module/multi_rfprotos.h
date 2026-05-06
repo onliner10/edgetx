@@ -38,6 +38,6 @@ class RfScanDialog : public ProgressDialog
 
   void showProgress();
 
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 };
 

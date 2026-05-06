@@ -45,16 +45,14 @@ WidgetsContainer::WidgetsContainer(Window* parent, const rect_t& rect, uint8_t z
 #endif
 }
 
-void WidgetsContainer::deleteLater()
+void WidgetsContainer::onDelete()
 {
-  if (deleted()) return;
   if (widgets) {
     for (int i = 0; i < zoneCount; i += 1)
       if (widgets[i]) widgets[i]->deleteLater();
   }
   if (widgets) delete[] widgets;
   widgets = nullptr;
-  Window::deleteLater();
 }
 
 Widget* WidgetsContainer::getWidget(unsigned int index)
@@ -103,7 +101,7 @@ void WidgetsContainer::showWidgets(bool visible)
 
 void WidgetsContainer::refreshWidgets(bool inForeground, bool refreshBackground)
 {
-  if (!_deleted) {
+  visitLive([&](LiveWindow&) {
     for (int i = 0; i < zoneCount; i++) {
       if (widgets && widgets[i]) {
         if ((inForeground && widgets[i]->isOnScreen()) || widgets[i]->isFullscreen())
@@ -112,5 +110,5 @@ void WidgetsContainer::refreshWidgets(bool inForeground, bool refreshBackground)
           widgets[i]->background();
       }
     }
-  }
+  });
 }

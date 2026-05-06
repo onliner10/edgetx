@@ -72,8 +72,7 @@ void ToggleSwitch::toggleswitch_event_handler(lv_event_t* e)
   lv_obj_t* target = lv_event_get_target(e);
   ToggleSwitch* cb = (ToggleSwitch*)lv_obj_get_user_data(target);
 
-  if (cb && cb->isAvailable())
-    cb->setValue(lv_obj_get_state(target) & LV_STATE_CHECKED);
+  if (cb) cb->setValue(lv_obj_get_state(target) & LV_STATE_CHECKED);
 }
 
 ToggleSwitch::ToggleSwitch(Window* parent, const rect_t& rect,
@@ -83,12 +82,12 @@ ToggleSwitch::ToggleSwitch(Window* parent, const rect_t& rect,
     _getValue(std::move(getValue)),
     _setValue(std::move(setValue))
 {
-  if (!hasLvObj()) return;
-
   update();
 
-  lv_obj_add_event_cb(lvobj, ToggleSwitch::toggleswitch_event_handler, LV_EVENT_VALUE_CHANGED,
-                      this);
+  withLvObj([&](lv_obj_t* obj) {
+    lv_obj_add_event_cb(obj, ToggleSwitch::toggleswitch_event_handler,
+                        LV_EVENT_VALUE_CHANGED, this);
+  });
 }
 
 void ToggleSwitch::update() const
@@ -102,14 +101,14 @@ void ToggleSwitch::update() const
   });
 }
 
-void ToggleSwitch::onClicked()
+void ToggleSwitch::onLiveClicked(Window::LiveWindow&)
 {
   // prevent FormField::onClicked()
 }
 
-void ToggleSwitch::checkEvents()
+void ToggleSwitch::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  Window::checkEvents();
+  Window::onLiveCheckEvents(live);
   withAvailableLvObj([&](lv_obj_t* obj) {
     if (!_getValue) return;
     bool v = _getValue() != 0;

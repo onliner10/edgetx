@@ -27,10 +27,10 @@
 static void btnmatrix_constructor(const lv_obj_class_t* class_p, lv_obj_t* obj)
 {
   etx_obj_add_style(obj, styles->rounded, LV_PART_MAIN);
-  etx_obj_add_style(obj, styles->bg_opacity_20,
-                    LV_PART_MAIN | LV_STATE_EDITED);
+  etx_obj_add_style(obj, styles->bg_opacity_20, LV_PART_MAIN | LV_STATE_EDITED);
 
-  etx_solid_bg(obj, COLOR_THEME_PRIMARY2_INDEX, LV_PART_MAIN | LV_STATE_FOCUSED);
+  etx_solid_bg(obj, COLOR_THEME_PRIMARY2_INDEX,
+               LV_PART_MAIN | LV_STATE_FOCUSED);
   etx_obj_add_style(obj, styles->border_color[COLOR_THEME_PRIMARY1_INDEX],
                     LV_PART_MAIN | LV_STATE_FOCUSED);
   etx_obj_add_style(obj, styles->state_focus_frame,
@@ -74,7 +74,7 @@ static void btn_matrix_event(lv_event_t* e)
     lv_obj_t* obj = lv_event_get_target(e);
     auto btn_id = *((uint8_t*)lv_event_get_param(e));
     auto btnm = (ButtonMatrix*)lv_event_get_user_data(e);
-    if (!btnm || !btnm->isAvailable()) return;
+    if (!btnm) return;
 
     bool edited = lv_obj_has_state(obj, LV_STATE_EDITED);
     bool is_pointer =
@@ -88,12 +88,13 @@ static void btn_matrix_event(lv_event_t* e)
 ButtonMatrix::ButtonMatrix(Window* parent, const rect_t& r) :
     FormField(parent, r, btnmatrix_create)
 {
-  if (!hasLvObj()) return;
-
-  lv_obj_add_flag(lvobj, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+  withLvObj(
+      [](lv_obj_t* obj) { lv_obj_add_flag(obj, LV_OBJ_FLAG_SCROLL_ON_FOCUS); });
   setWindowFlag(NO_FOCUS);
 
-  lv_obj_add_event_cb(lvobj, btn_matrix_event, LV_EVENT_VALUE_CHANGED, this);
+  withLvObj([&](lv_obj_t* obj) {
+    lv_obj_add_event_cb(obj, btn_matrix_event, LV_EVENT_VALUE_CHANGED, this);
+  });
 }
 
 ButtonMatrix::~ButtonMatrix() { deallocate(); }
@@ -117,103 +118,106 @@ void ButtonMatrix::deallocate()
 void ButtonMatrix::initBtnMap(uint8_t cols, uint8_t btns)
 {
   deallocate();
-  auto obj = liveLvObj();
-  if (!obj) return;
+  dispatchLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
 
-  if (cols == 0 || btns == 0) {
-    lv_btnmatrix_set_map(obj, _empty_map);
-    return;
-  }
-
-  uint8_t rows = ((btns - 1) / cols) + 1;
-  if (rows == 1) cols = btns;
-  uint16_t btnCount = uint16_t(cols) * rows;
-  uint16_t txtCount = uint16_t(cols + 1) * rows;
-  if (btnCount > UINT8_MAX || txtCount > UINT8_MAX) {
-    lv_btnmatrix_set_map(obj, _empty_map);
-    return;
-  }
-
-  lv_btnm_map = (char**)malloc(sizeof(char*) * txtCount);
-  txt_index = (uint8_t*)malloc(sizeof(uint8_t) * cols * rows);
-  if (!lv_btnm_map || !txt_index) {
-    free(lv_btnm_map);
-    free(txt_index);
-    lv_btnm_map = nullptr;
-    txt_index = nullptr;
-    lv_btnmatrix_set_map(obj, _empty_map);
-    return;
-  }
-
-  txt_cnt = uint8_t(txtCount);
-  btn_cnt = btns;
-
-  uint8_t col = 0;
-  uint8_t btn = 0;
-  uint8_t txt_i = 0;
-
-  while (btn < btnCount) {
-    if (col == cols) {
-      lv_btnm_map[txt_i++] = (char*)_newline;
-      col = 0;
+    if (cols == 0 || btns == 0) {
+      lv_btnmatrix_set_map(obj, _empty_map);
+      return;
     }
 
-    txt_index[btn] = txt_i;
-    lv_btnm_map[txt_i++] = (char*)_filler;
-    btn++;
-    col++;
-  }
-  lv_btnm_map[txt_i] = (char*)_map_end;
-  update();
+    uint8_t rows = ((btns - 1) / cols) + 1;
+    if (rows == 1) cols = btns;
+    uint16_t btnCount = uint16_t(cols) * rows;
+    uint16_t txtCount = uint16_t(cols + 1) * rows;
+    if (btnCount > UINT8_MAX || txtCount > UINT8_MAX) {
+      lv_btnmatrix_set_map(obj, _empty_map);
+      return;
+    }
+
+    lv_btnm_map = (char**)malloc(sizeof(char*) * txtCount);
+    txt_index = (uint8_t*)malloc(sizeof(uint8_t) * cols * rows);
+    if (!lv_btnm_map || !txt_index) {
+      free(lv_btnm_map);
+      free(txt_index);
+      lv_btnm_map = nullptr;
+      txt_index = nullptr;
+      lv_btnmatrix_set_map(obj, _empty_map);
+      return;
+    }
+
+    txt_cnt = uint8_t(txtCount);
+    btn_cnt = btns;
+
+    uint8_t col = 0;
+    uint8_t btn = 0;
+    uint8_t txt_i = 0;
+
+    while (btn < btnCount) {
+      if (col == cols) {
+        lv_btnm_map[txt_i++] = (char*)_newline;
+        col = 0;
+      }
+
+      txt_index[btn] = txt_i;
+      lv_btnm_map[txt_i++] = (char*)_filler;
+      btn++;
+      col++;
+    }
+    lv_btnm_map[txt_i] = (char*)_map_end;
+    update();
+  });
 }
 
 void ButtonMatrix::setText(uint8_t btn_id, const char* txt)
 {
-  if (isAvailable() && btn_id < btn_cnt && lv_btnm_map && txt_index) {
+  dispatchLive([&](LiveWindow&) {
+    if (btn_id >= btn_cnt || !lv_btnm_map || !txt_index) return;
+
     char* copy = strdup(txt);
     if (copy) lv_btnm_map[txt_index[btn_id]] = copy;
-  }
+  });
 }
 
 void ButtonMatrix::update()
 {
-  auto obj = liveLvObj();
-  if (!obj) return;
+  dispatchLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
 
-  if (!lv_btnm_map) {
-    lv_btnmatrix_set_map(obj, _empty_map);
-    return;
-  }
-  lv_btnmatrix_set_map(obj, (const char**)lv_btnm_map);
-  lv_btnmatrix_set_btn_ctrl_all(
-      obj, LV_BTNMATRIX_CTRL_CLICK_TRIG | LV_BTNMATRIX_CTRL_NO_REPEAT);
-  int btn = 0;
-  for (int i = 0; lv_btnm_map[i] != _map_end; i += 1) {
-    if (lv_btnm_map[i] == _filler)
-      lv_btnmatrix_set_btn_ctrl(obj, btn, LV_BTNMATRIX_CTRL_HIDDEN);
-    else
-      lv_btnmatrix_clear_btn_ctrl(obj, btn, LV_BTNMATRIX_CTRL_HIDDEN);
-    if (lv_btnm_map[i] != _newline) btn += 1;
-  }
+    if (!lv_btnm_map) {
+      lv_btnmatrix_set_map(obj, _empty_map);
+      return;
+    }
+    lv_btnmatrix_set_map(obj, (const char**)lv_btnm_map);
+    lv_btnmatrix_set_btn_ctrl_all(
+        obj, LV_BTNMATRIX_CTRL_CLICK_TRIG | LV_BTNMATRIX_CTRL_NO_REPEAT);
+    int btn = 0;
+    for (int i = 0; lv_btnm_map[i] != _map_end; i += 1) {
+      if (lv_btnm_map[i] == _filler)
+        lv_btnmatrix_set_btn_ctrl(obj, btn, LV_BTNMATRIX_CTRL_HIDDEN);
+      else
+        lv_btnmatrix_clear_btn_ctrl(obj, btn, LV_BTNMATRIX_CTRL_HIDDEN);
+      if (lv_btnm_map[i] != _newline) btn += 1;
+    }
+  });
 }
 
-void ButtonMatrix::onClicked()
+void ButtonMatrix::onLiveClicked(Window::LiveWindow& live)
 {
-  withAvailableLvObj([&](lv_obj_t* obj) {
-    lv_group_focus_obj(obj);
-    setEditMode(true);
-  });
+  lv_group_focus_obj(live.lvobj());
+  setEditMode(true);
 }
 
 void ButtonMatrix::setChecked(uint8_t btn_id)
 {
-  auto obj = liveLvObj();
-  if (!obj) return;
+  dispatchLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
 
-  if (isActive(btn_id))
-    lv_btnmatrix_set_btn_ctrl(obj, btn_id, LV_BTNMATRIX_CTRL_CHECKED);
-  else
-    lv_btnmatrix_clear_btn_ctrl(obj, btn_id, LV_BTNMATRIX_CTRL_CHECKED);
+    if (isActive(btn_id))
+      lv_btnmatrix_set_btn_ctrl(obj, btn_id, LV_BTNMATRIX_CTRL_CHECKED);
+    else
+      lv_btnmatrix_clear_btn_ctrl(obj, btn_id, LV_BTNMATRIX_CTRL_CHECKED);
+  });
 }
 
 #if defined(SIMU)
@@ -224,7 +228,10 @@ bool buttonMatrixObjectAllocationFailureFailsClosedForTest()
   class TestButtonMatrix : public ButtonMatrix
   {
    public:
-    explicit TestButtonMatrix(Window* parent) : ButtonMatrix(parent, {0, 0, 100, 40}) {}
+    explicit TestButtonMatrix(Window* parent) :
+        ButtonMatrix(parent, {0, 0, 100, 40})
+    {
+    }
 
     void exercise()
     {

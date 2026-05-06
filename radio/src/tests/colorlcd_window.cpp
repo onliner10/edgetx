@@ -22,11 +22,12 @@
 
 #if defined(COLORLCD) && !GTEST_OS_WINDOWS
 
-#include "mainwindow.h"
-
-#include <new>
 #include <sys/wait.h>
 #include <unistd.h>
+
+#include <new>
+
+#include "mainwindow.h"
 
 bool etxCreateObjectAllocationFailureReturnsNullForTest();
 bool etxLabelAllocationFailureReturnsNullForTest();
@@ -34,6 +35,8 @@ bool etxStyleHelpersIgnoreNullObjectForTest();
 bool windowObjectAllocationFailureLeavesNoLvObjForTest();
 bool formFieldObjectAllocationFailureFailsClosedForTest();
 bool childOfUnavailableParentFailsClosedForTest();
+bool adoptLiveFailedChildDetachesFromParentForTest();
+bool unavailableWindowDirectClickDoesNotBubbleForTest();
 bool buttonMatrixObjectAllocationFailureFailsClosedForTest();
 bool tableFieldObjectAllocationFailureFailsClosedForTest();
 bool tableFieldInvalidSelectionClearsWithoutScrollForTest();
@@ -145,6 +148,38 @@ TEST(ColorWindow, ChildOfUnavailableParentFailsClosed)
   EXPECT_EQ(WEXITSTATUS(status), 0);
 }
 
+TEST(ColorWindow, AdoptLiveFailedChildDetachesFromParent)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(adoptLiveFailedChildDetachesFromParentForTest() ? 0 : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorWindow, UnavailableWindowDirectClickDoesNotBubble)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(unavailableWindowDirectClickDoesNotBubbleForTest() ? 0 : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
 TEST(ColorWindow, ButtonMatrixObjectAllocationFailureFailsClosed)
 {
   const pid_t pid = fork();
@@ -232,7 +267,8 @@ TEST(ColorWindow, TextEditTextAreaAllocationFailureDoesNotCacheDeadEditor)
 
   if (pid == 0) {
     alarm(2);
-    _exit(textEditTextAreaAllocationFailureDoesNotCacheDeadEditorForTest() ? 0 : 1);
+    _exit(textEditTextAreaAllocationFailureDoesNotCacheDeadEditorForTest() ? 0
+                                                                           : 1);
   }
 
   int status = 0;

@@ -55,6 +55,10 @@ class MainWindow: public Window
   void enableWidgetRefresh(bool state) { widgetRefreshEnable = state; }
 
   void blockUntilClose(bool checkPwr, std::function<bool(void)> closeCondition, bool isError = false);
+  void blockUntilClosed(Window& window, bool checkPwr, bool isError = false);
+  void blockUntilClosed(Window& window, bool checkPwr,
+                        const std::function<bool(void)>& closeCondition,
+                        bool isError = false);
 
  protected:
   lv_obj_t* background = nullptr;

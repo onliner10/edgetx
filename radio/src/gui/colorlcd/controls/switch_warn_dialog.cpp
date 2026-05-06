@@ -32,9 +32,9 @@ SwitchWarnDialog::SwitchWarnDialog() :
   AUDIO_ERROR_MESSAGE(AU_SWITCH_ALERT);
 }
 
-void SwitchWarnDialog::checkEvents()
+void SwitchWarnDialog::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  FullScreenDialog::checkEvents();
+  FullScreenDialog::onLiveCheckEvents(live);
 
   uint16_t bad_pots;
   if (!isSwitchWarningRequired(bad_pots)) {
@@ -86,9 +86,9 @@ ThrottleWarnDialog::ThrottleWarnDialog(const char* msg) :
   AUDIO_ERROR_MESSAGE(AU_THROTTLE_ALERT);
 }
 
-void ThrottleWarnDialog::checkEvents()
+void ThrottleWarnDialog::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  FullScreenDialog::checkEvents();
+  FullScreenDialog::onLiveCheckEvents(live);
 
   extern bool isThrottleWarningAlertNeeded();
   if (!isThrottleWarningAlertNeeded())

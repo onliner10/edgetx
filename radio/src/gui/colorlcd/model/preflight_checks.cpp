@@ -120,7 +120,7 @@ class SwitchWarnMatrix : public ButtonMatrix
     }
   }
 
-  bool onLongPress() override
+  bool onLiveLongPress(LiveWindow&) override
   {
     longPress = true;
     setAllPreflightSwitchStates();

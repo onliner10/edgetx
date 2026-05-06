@@ -182,9 +182,10 @@ TableField::TableField(Window* parent, const rect_t& rect) :
     Window(parent, rect, table_create)
 {
   setWindowFlag(OPAQUE);
-  if (!hasLvObj()) return;
 
-  lv_table_set_col_cnt(lvobj, 1);
+  withLvObj([](lv_obj_t* obj) {
+    lv_table_set_col_cnt(obj, 1);
+  });
 }
 
 void TableField::setRowCount(uint16_t rows)
@@ -277,10 +278,8 @@ int TableField::getSelected() const
   return -1;
 }
 
-bool TableField::onLongPress()
+bool TableField::onLiveLongPress(Window::LiveWindow&)
 {
-  if (!liveLvObj()) return false;
-
   TRACE("LONG_PRESS");
   if (longPressHandler) {
     longPressHandler();
@@ -292,42 +291,44 @@ bool TableField::onLongPress()
 
 void TableField::setAutoEdit()
 {
-  auto obj = liveLvObj();
-  if (autoedit || !obj) return;
+  if (autoedit) return;
 
-  autoedit = true;
+  dispatchLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
+    autoedit = true;
 
-  oldGroup = lv_group_get_default();
-  group = lv_group_create();
-  if (!group) {
-    autoedit = false;
-    return;
-  }
-  lv_group_add_obj(group, obj);
-  assignLvGroup(group, true);
-
-  lv_group_set_editing(group, true);
-
-  setFocusHandler([=](bool focus) {
-    if (focus) {
-      lv_group_set_focus_cb(group, TableField::force_editing);
-    } else {
-      lv_group_set_focus_cb(group, nullptr);
+    oldGroup = lv_group_get_default();
+    group = lv_group_create();
+    if (!group) {
+      autoedit = false;
+      return;
     }
+    lv_group_add_obj(group, obj);
+    assignLvGroup(group, true);
+
+    lv_group_set_editing(group, true);
+
+    setFocusHandler([=](bool focus) {
+      if (focus) {
+        lv_group_set_focus_cb(group, TableField::force_editing);
+      } else {
+        lv_group_set_focus_cb(group, nullptr);
+      }
+    });
   });
 }
 
-void TableField::deleteLater()
+void TableField::onDelete()
 {
-  if (!deleted()) {
-    if (autoedit) {
-      if (group) lv_group_del(group);
-      if (oldGroup)
-        assignLvGroup(oldGroup, true);
-      else
-        lv_group_set_default(nullptr);
-    }
-    Window::deleteLater();
+  if (autoedit) {
+    if (group) lv_group_del(group);
+    if (oldGroup)
+      assignLvGroup(oldGroup, true);
+    else
+      lv_group_set_default(nullptr);
+    group = nullptr;
+    oldGroup = nullptr;
+    autoedit = false;
   }
 }
 

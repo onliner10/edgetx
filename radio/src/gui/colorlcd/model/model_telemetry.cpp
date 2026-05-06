@@ -264,9 +264,9 @@ class SensorButton : public ListLineButton
     }
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
-    ListLineButton::checkEvents();
+    ListLineButton::onLiveCheckEvents(live);
     refresh();
   }
 
@@ -465,7 +465,7 @@ class SensorEditWindow : public SubPage
                   ETX_STATE_VALUE_STALE_WARN);
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     uint32_t now = lv_tick_get();
     TelemetryItem& telemetryItem = telemetryItems[index];

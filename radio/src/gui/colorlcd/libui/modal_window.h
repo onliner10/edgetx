@@ -34,7 +34,7 @@ class ModalWindow : public Window
     closeWhenClickOutside = value;
   }
 
-  void onClicked() override;
+  void onLiveClicked(LiveWindow&) override;
 
 #if defined(SIMU)
   std::string automationRole() const override { return "dialog"; }

@@ -36,16 +36,14 @@ class BaseDialogForm : public Window
  public:
   BaseDialogForm(Window* parent, lv_coord_t width, bool flexLayout) : Window(parent, rect_t{})
   {
-    if (!hasLvObj()) return;
-
-    etx_scrollbar(lvobj);
+    withLvObj(etx_scrollbar);
     padAll(PAD_TINY);
     if (flexLayout)
       setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_ZERO, width, LV_SIZE_CONTENT);
   }
 
  protected:
-  void onClicked() override { Keyboard::hide(false); }
+  void onLiveClicked(LiveWindow&) override { Keyboard::hide(false); }
 };
 
 BaseDialog::BaseDialog(const char* title,
@@ -59,16 +57,15 @@ BaseDialog::BaseDialog(const char* title,
 
   form = this;
 
-  auto content = Window::makeLive<Window>(this, rect_t{});
-  if (!content) {
-    failClosed();
-    return;
-  }
+  Window* content = nullptr;
+  if (!initRequiredWindow(content, this, rect_t{})) return;
   content->setWindowFlag(OPAQUE);
   content->padAll(PAD_ZERO);
   content->setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_ZERO, width, LV_SIZE_CONTENT);
-  etx_solid_bg(content->getLvObj());
-  lv_obj_center(content->getLvObj());
+  content->visitLive([](Window::LiveWindow& live) {
+    etx_solid_bg(live.lvobj());
+    lv_obj_center(live.lvobj());
+  });
 
   header = Window::makeLive<StaticText>(
       content, rect_t{0, 0, LV_PCT(100), 0}, title ? title : "",
@@ -81,8 +78,13 @@ BaseDialog::BaseDialog(const char* title,
 
   form = Window::makeLive<BaseDialogForm>(content, width, flexLayout);
   if (!form) form = content;
-  if (form && maxHeight != LV_SIZE_CONTENT)
-    lv_obj_set_style_max_height(form->getLvObj(), maxHeight - EdgeTxStyles::UI_ELEMENT_HEIGHT, LV_PART_MAIN);
+  if (form && maxHeight != LV_SIZE_CONTENT) {
+    form->visitLive([&](Window::LiveWindow& live) {
+      lv_obj_set_style_max_height(
+          live.lvobj(), maxHeight - EdgeTxStyles::UI_ELEMENT_HEIGHT,
+          LV_PART_MAIN);
+    });
+  }
 }
 
 void BaseDialog::setTitle(const char* title)
@@ -144,7 +146,7 @@ MessageDialog::MessageDialog(const char* title,
   }
 }
 
-void MessageDialog::onClicked() { deleteLater(); }
+void MessageDialog::onLiveClicked(LiveWindow&) { deleteLater(); }
 
 //-----------------------------------------------------------------------------
 
@@ -163,7 +165,7 @@ DynamicMessageDialog::DynamicMessageDialog(
       textFlags);
 }
 
-void DynamicMessageDialog::onClicked() { deleteLater(); }
+void DynamicMessageDialog::onLiveClicked(LiveWindow&) { deleteLater(); }
 
 //-----------------------------------------------------------------------------
 

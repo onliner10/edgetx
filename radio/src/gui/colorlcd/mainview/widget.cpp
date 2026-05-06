@@ -246,6 +246,37 @@ void Widget::layoutTextLabel(lv_obj_t* label, const rect_t& rect,
   lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
 }
 
+void Widget::delayWidgetLoad()
+{
+  taskRequiresLoaded = true;
+  delayLoad();
+}
+
+void Widget::updateWithoutRefresh()
+{
+  runWidgetTask([&]() { onUpdateWithoutRefresh(); });
+}
+
+void Widget::update()
+{
+  runWidgetTask([&]() { onUpdate(); });
+}
+
+void Widget::background()
+{
+  runWidgetTask([&]() { onBackground(); });
+}
+
+void Widget::foreground()
+{
+  runWidgetTask([&]() { onForeground(); });
+}
+
+void Widget::onUpdateWithoutRefresh()
+{
+  onUpdate();
+}
+
 void Widget::openMenu()
 {
   auto viewMain = ViewMain::instance();
@@ -270,7 +301,7 @@ void Widget::openMenu()
 }
 
 #if defined(HARDWARE_KEYS)
-void Widget::onEvent(event_t event)
+void Widget::onLiveEvent(Window::LiveWindow& live, event_t event)
 {
   if (fullscreen) {
     if (EVT_KEY_LONG(KEY_EXIT) == event) {
@@ -279,7 +310,7 @@ void Widget::onEvent(event_t event)
     return;
   }
 
-  ButtonBase::onEvent(event);
+  ButtonBase::onLiveEvent(live, event);
 }
 #endif
 
@@ -340,7 +371,7 @@ void Widget::setFullscreen(bool enable)
     updateWithoutRefresh();
 }
 
-bool Widget::onLongPress()
+bool Widget::onLiveLongPress(Window::LiveWindow&)
 {
   if (!fullscreen) {
     openMenu();
@@ -412,6 +443,8 @@ TrackedWidget::TrackedWidget(const WidgetFactory* factory, Window* parent,
                              LoadMode loadMode) :
     Widget(factory, parent, rect, location)
 {
+  taskRequiresLoaded = true;
+
   switch (loadMode) {
     case LoadMode::Immediate:
       loaded = true;
@@ -422,10 +455,8 @@ TrackedWidget::TrackedWidget(const WidgetFactory* factory, Window* parent,
   }
 }
 
-void TrackedWidget::foreground()
+void TrackedWidget::onForeground()
 {
-  if (!loaded || _deleted) return;
-
   WidgetRefreshKey key;
   key.add(getPersistentDataRevision())
      .add((int32_t)width())

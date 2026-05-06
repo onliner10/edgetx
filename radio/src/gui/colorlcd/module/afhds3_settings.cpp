@@ -150,12 +150,12 @@ void AFHDS3Settings::showAFHDS3Options()
   }
 }
 
-void AFHDS3Settings::checkEvents()
+void AFHDS3Settings::onLiveCheckEvents(Window::LiveWindow& live)
 {
   if (afhds3::getConfig(moduleIdx)->others.lastUpdated > lastRefresh) {
     update();
   }
-  Window::checkEvents();
+  Window::onLiveCheckEvents(live);
 }
 
 void AFHDS3Settings::update()

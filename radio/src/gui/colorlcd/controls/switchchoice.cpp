@@ -97,7 +97,7 @@ class SwitchChoiceMenuToolbar : public MenuToolbar
   MenuToolbarButton* invertBtn = nullptr;
 };
 
-bool SwitchChoice::onLongPress()
+bool SwitchChoice::onLiveLongPress(Window::LiveWindow&)
 {
   int16_t val = _getValue();
   if (isValueAvailable && isValueAvailable(-val))

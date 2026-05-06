@@ -21,11 +21,11 @@
 
 #include "color_picker.h"
 
+#include <new>
+
 #include "color_list.h"
 #include "dialog.h"
 #include "etx_lv_theme.h"
-
-#include <new>
 
 #if LANDSCAPE
 static const lv_coord_t col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(1),
@@ -54,19 +54,21 @@ class ColorEditorPopup : public BaseDialog
 
     if (format == ETX_RGB565) {
       auto rgb = COLOR_VAL(colorToRGB(m_color));
-      r = GET_RED(rgb); g = GET_GREEN(rgb); b = GET_BLUE(rgb);
+      r = GET_RED(rgb);
+      g = GET_GREEN(rgb);
+      b = GET_BLUE(rgb);
     } else {
       auto rgb = color32ToRGB(m_color);
-      r = GET_RED32(rgb); g = GET_GREEN32(rgb); b = GET_BLUE32(rgb);
+      r = GET_RED32(rgb);
+      g = GET_GREEN32(rgb);
+      b = GET_BLUE32(rgb);
     }
 
-    if (colorPad)
-      colorPad->setColor(r, g, b);
+    if (colorPad) colorPad->setColor(r, g, b);
 
     char s[10];
     sprintf(s, "%02X%02X%02X", r, g, b);
-    if (hexStr)
-      hexStr->setText(s);
+    if (hexStr) hexStr->setText(s);
   }
 
   void onCancel() override
@@ -76,54 +78,87 @@ class ColorEditorPopup : public BaseDialog
   }
 
  public:
-  ColorEditorPopup(uint32_t color,
-                   std::function<void(uint32_t)> _setValue,
+  ColorEditorPopup(uint32_t color, std::function<void(uint32_t)> _setValue,
                    COLOR_EDITOR_FMT fmt) :
       BaseDialog(STR_COLOR_PICKER, false, COLOR_EDIT_WIDTH, COLOR_EDIT_HEIGHT),
-      origColor(color), setValue(std::move(_setValue)), format(fmt)
+      origColor(color),
+      setValue(std::move(_setValue)),
+      format(fmt)
   {
     FlexGridLayout grid(col_dsc, row_dsc);
     auto line = form->newLine(grid);
 
     rect_t r{0, 0, CE_SZ, CE_SZ};
-    auto cedit = new (std::nothrow) ColorEditor(
+    auto cedit = Window::makeLive<ColorEditor>(
         line, r, color, [=](uint32_t c) { updateColor(c); }, format,
         THM_COLOR_EDITOR);
-    if (cedit)
-      lv_obj_set_style_grid_cell_x_align(cedit->getLvObj(),
-                                         LV_GRID_ALIGN_CENTER, 0);
+    if (!cedit) {
+      failClosed();
+      return;
+    }
+    cedit->visitLive([](Window::LiveWindow& live) {
+      lv_obj_set_style_grid_cell_x_align(live.lvobj(), LV_GRID_ALIGN_CENTER, 0);
+    });
 
-    auto vbox = new (std::nothrow) Window(line, rect_t{});
-    if (!vbox) return;
-    lv_obj_set_style_grid_cell_x_align(vbox->getLvObj(), LV_GRID_ALIGN_CENTER, 0);
+    auto vbox = Window::makeLive<Window>(line, rect_t{});
+    if (!vbox) {
+      failClosed();
+      return;
+    }
+    vbox->visitLive([](Window::LiveWindow& live) {
+      lv_obj_set_style_grid_cell_x_align(live.lvobj(), LV_GRID_ALIGN_CENTER, 0);
+    });
     vbox->setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_MEDIUM, r.w, r.h);
 
-    auto hbox = new (std::nothrow) Window(vbox, rect_t{});
-    if (!hbox) return;
+    auto hbox = Window::makeLive<Window>(vbox, rect_t{});
+    if (!hbox) {
+      failClosed();
+      return;
+    }
     hbox->setFlexLayout(LV_FLEX_FLOW_ROW, PAD_MEDIUM);
-    auto hbox_obj = hbox->getLvObj();
-    lv_obj_set_flex_align(hbox_obj, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START,
-                          LV_FLEX_ALIGN_SPACE_AROUND);
+    hbox->visitLive([](Window::LiveWindow& live) {
+      lv_obj_set_flex_align(live.lvobj(), LV_FLEX_ALIGN_CENTER,
+                            LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_SPACE_AROUND);
+    });
 
-    colorPad = new (std::nothrow) ColorSwatch(hbox, {0, 0, COLOR_PAD_WIDTH, EdgeTxStyles::UI_ELEMENT_HEIGHT},
-                               COLOR_THEME_PRIMARY1);
+    colorPad = Window::makeLive<ColorSwatch>(
+        hbox, rect_t{0, 0, COLOR_PAD_WIDTH, EdgeTxStyles::UI_ELEMENT_HEIGHT},
+        COLOR_THEME_PRIMARY1);
 
-    hexStr = new (std::nothrow) StaticText(hbox, {0, 0, EdgeTxStyles::EDIT_FLD_WIDTH, 0}, "", COLOR_THEME_PRIMARY1_INDEX, FONT(L));
+    hexStr = Window::makeLive<StaticText>(
+        hbox, rect_t{0, 0, EdgeTxStyles::EDIT_FLD_WIDTH, 0}, "",
+        COLOR_THEME_PRIMARY1_INDEX, FONT(L));
+    if (!colorPad || !hexStr) {
+      failClosed();
+      return;
+    }
 
     updateColor(color);
 
-    hbox = new (std::nothrow) Window(vbox, rect_t{});
-    if (!hbox) return;
+    hbox = Window::makeLive<Window>(vbox, rect_t{});
+    if (!hbox) {
+      failClosed();
+      return;
+    }
     hbox->padAll(PAD_TINY);
     hbox->setFlexLayout(LV_FLEX_FLOW_ROW_WRAP, PAD_MEDIUM);
-    lv_obj_set_flex_align(hbox->getLvObj(), LV_FLEX_ALIGN_CENTER,
-                          LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_AROUND);
+    hbox->visitLive([](Window::LiveWindow& live) {
+      lv_obj_set_flex_align(live.lvobj(), LV_FLEX_ALIGN_CENTER,
+                            LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_AROUND);
+    });
 
-    auto thmBtn = new (std::nothrow) TextButton(hbox, {0, 0, BTN_W, 0}, STR_THEME);
-    auto fxdBtn = new (std::nothrow) TextButton(hbox, {0, 0, BTN_W, 0}, STR_FIXED);
-    auto hsvBtn = new (std::nothrow) TextButton(hbox, {0, 0, BTN_W, 0}, "HSV");
-    auto rgbBtn = new (std::nothrow) TextButton(hbox, {0, 0, BTN_W, 0}, "RGB");
-    if (!thmBtn || !fxdBtn || !hsvBtn || !rgbBtn || !cedit) return;
+    auto thmBtn =
+        Window::makeLive<TextButton>(hbox, rect_t{0, 0, BTN_W, 0}, STR_THEME);
+    auto fxdBtn =
+        Window::makeLive<TextButton>(hbox, rect_t{0, 0, BTN_W, 0}, STR_FIXED);
+    auto hsvBtn =
+        Window::makeLive<TextButton>(hbox, rect_t{0, 0, BTN_W, 0}, "HSV");
+    auto rgbBtn =
+        Window::makeLive<TextButton>(hbox, rect_t{0, 0, BTN_W, 0}, "RGB");
+    if (!thmBtn || !fxdBtn || !hsvBtn || !rgbBtn) {
+      failClosed();
+      return;
+    }
 
     rgbBtn->setPressHandler([=]() {
       cedit->setColorEditorType(RGB_COLOR_EDITOR);
@@ -159,54 +194,79 @@ class ColorEditorPopup : public BaseDialog
 
     // color editor defaults to HSV
     thmBtn->check(true);
-    lv_group_focus_obj(thmBtn->getLvObj());
+    thmBtn->focus();
 
-    hbox = new (std::nothrow) Window(vbox, {0, height() - EdgeTxStyles::UI_ELEMENT_HEIGHT - PAD_SMALL, 0, 0});
-    if (!hbox) return;
+    hbox = Window::makeLive<Window>(
+        vbox, rect_t{0, height() - EdgeTxStyles::UI_ELEMENT_HEIGHT - PAD_SMALL,
+                     0, 0});
+    if (!hbox) {
+      failClosed();
+      return;
+    }
     hbox->setFlexLayout(LV_FLEX_FLOW_ROW, PAD_MEDIUM);
-    lv_obj_set_flex_align(hbox->getLvObj(), LV_FLEX_ALIGN_CENTER,
-                          LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_SPACE_BETWEEN);
-    lv_obj_set_flex_grow(hbox->getLvObj(), 1);
-
-    new (std::nothrow) TextButton(hbox, rect_t{0, 0, BTN_W, 0}, STR_CANCEL, [=]() -> int8_t {
-      onCancel();
-      return 0;
+    hbox->visitLive([](Window::LiveWindow& live) {
+      lv_obj_set_flex_align(live.lvobj(), LV_FLEX_ALIGN_CENTER,
+                            LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_SPACE_BETWEEN);
+      lv_obj_set_flex_grow(live.lvobj(), 1);
     });
 
-    new (std::nothrow) TextButton(hbox, rect_t{0, 0, BTN_W, 0}, STR_SAVE, [=]() -> int8_t {
-      if (setValue) setValue(m_color);
-      this->deleteLater();
-      return 0;
-    });
+    if (!Window::makeLive<TextButton>(hbox, rect_t{0, 0, BTN_W, 0}, STR_CANCEL,
+                                      [=]() -> int8_t {
+                                        onCancel();
+                                        return 0;
+                                      })) {
+      failClosed();
+      return;
+    }
+
+    if (!Window::makeLive<TextButton>(hbox, rect_t{0, 0, BTN_W, 0}, STR_SAVE,
+                                      [=]() -> int8_t {
+                                        if (setValue) setValue(m_color);
+                                        this->deleteLater();
+                                        return 0;
+                                      })) {
+      failClosed();
+      return;
+    }
   }
 
   static LAYOUT_VAL_SCALED(CE_SZ, 182)
 #if NARROW_LAYOUT
-  static LAYOUT_ORIENTATION(COLOR_EDIT_WIDTH, LCD_W * 0.95, LCD_W * 0.7)
+      static LAYOUT_ORIENTATION(COLOR_EDIT_WIDTH, LCD_W * 0.95, LCD_W * 0.7)
 #else
-  static LAYOUT_ORIENTATION(COLOR_EDIT_WIDTH, LCD_W * 0.8, LCD_W * 0.7)
+      static LAYOUT_ORIENTATION(COLOR_EDIT_WIDTH, LCD_W * 0.8, LCD_W * 0.7)
 #endif
-  static LAYOUT_ORIENTATION(COLOR_EDIT_HEIGHT, LCD_H * 0.9, LV_SIZE_CONTENT)
-  static LAYOUT_VAL_SCALED(COLOR_PAD_WIDTH, 52)
-  static LAYOUT_VAL_SCALED(BTN_W, 80)
-  static LAYOUT_VAL_SCALED(BTN_PAD_TOP, 60)
+          static LAYOUT_ORIENTATION(COLOR_EDIT_HEIGHT, LCD_H * 0.9, LV_SIZE_CONTENT) static LAYOUT_VAL_SCALED(
+              COLOR_PAD_WIDTH,
+              52) static LAYOUT_VAL_SCALED(BTN_W,
+                                           80) static LAYOUT_VAL_SCALED(BTN_PAD_TOP,
+                                                                        60)
 };
 
 ColorPicker::ColorPicker(Window* parent, const rect_t& rect,
                          std::function<uint32_t()> _getValue,
                          std::function<void(uint32_t)> _setValue,
                          COLOR_EDITOR_FMT fmt) :
-    Button(parent, {rect.x, rect.y, rect.w == 0 ? ColorEditorPopup::COLOR_PAD_WIDTH : rect.w, EdgeTxStyles::UI_ELEMENT_HEIGHT}),
-    getValue(std::move(_getValue)), setValue(std::move(_setValue)), format(fmt)
+    Button(parent, {rect.x, rect.y,
+                    rect.w == 0 ? ColorEditorPopup::COLOR_PAD_WIDTH : rect.w,
+                    EdgeTxStyles::UI_ELEMENT_HEIGHT}),
+    getValue(std::move(_getValue)),
+    setValue(std::move(_setValue)),
+    format(fmt)
 {
   updateColor(getValue());
 }
 
-void ColorPicker::onClicked()
+void ColorPicker::onLiveClicked(Window::LiveWindow&)
 {
   updateColor(getValue());
   new (std::nothrow) ColorEditorPopup(
-      color, [=](uint32_t c) { setValue(c); updateColor(c); }, format);
+      color,
+      [=](uint32_t c) {
+        setValue(c);
+        updateColor(c);
+      },
+      format);
 }
 
 void ColorPicker::updateColor(uint32_t c)
@@ -217,12 +277,18 @@ void ColorPicker::updateColor(uint32_t c)
 
   if (format == ETX_RGB565) {
     auto rgb = COLOR_VAL(colorToRGB(color));
-    r = GET_RED(rgb); g = GET_GREEN(rgb); b = GET_BLUE(rgb);
+    r = GET_RED(rgb);
+    g = GET_GREEN(rgb);
+    b = GET_BLUE(rgb);
   } else {
     auto rgb = color32ToRGB(color);
-    r = GET_RED32(rgb); g = GET_GREEN32(rgb); b = GET_BLUE32(rgb);
+    r = GET_RED32(rgb);
+    g = GET_GREEN32(rgb);
+    b = GET_BLUE32(rgb);
   }
 
   auto lvcolor = lv_color_make(r, g, b);
-  lv_obj_set_style_bg_color(lvobj, lvcolor, LV_PART_MAIN);
+  dispatchLive([&](Window::LiveWindow& live) {
+    lv_obj_set_style_bg_color(live.lvobj(), lvcolor, LV_PART_MAIN);
+  });
 }

@@ -173,8 +173,9 @@ StandaloneLuaWindow::StandaloneLuaWindow(bool useLvgl, int initFn, int runFn) :
     useLvgl(useLvgl), initFunction(initFn), runFunction(runFn)
 {
   setWindowFlag(OPAQUE);
-  auto obj = liveLvObj();
-  if (!obj) return;
+
+  dispatchLive([&](LiveWindow& live) {
+  auto obj = live.lvobj();
 
   etx_solid_bg(obj);
 
@@ -261,6 +262,7 @@ StandaloneLuaWindow::StandaloneLuaWindow(bool useLvgl, int initFn, int runFn) :
 #if defined(USE_HATS_AS_KEYS)
   setTransposeHatsForLUA(true);
 #endif
+  });
 }
 
 void StandaloneLuaWindow::setup(bool useLvgl, int initFn, int runFn)
@@ -279,10 +281,8 @@ StandaloneLuaWindow* StandaloneLuaWindow::instance()
   return _instance;
 }
 
-void StandaloneLuaWindow::deleteLater()
+void StandaloneLuaWindow::onDelete()
 {
-  if (_deleted) return;
-
   luaL_unref(lsStandalone, LUA_REGISTRYINDEX, initFunction);
   luaL_unref(lsStandalone, LUA_REGISTRYINDEX, runFunction);
   luaLcdBuffer = nullptr;
@@ -305,8 +305,6 @@ void StandaloneLuaWindow::deleteLater()
   luaEmptyEventBuffer();
 
   MainWindow::instance()->enableWidgetRefresh(true);
-
-  Window::deleteLater();
 }
 
 #if defined(SIMU)
@@ -387,9 +385,9 @@ bool standaloneLuaLoadingLabelFailureDoesNotCacheDeadWindowForTest()
 }
 #endif
 
-void StandaloneLuaWindow::checkEvents()
+void StandaloneLuaWindow::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  Window::checkEvents();
+  Window::onLiveCheckEvents(live);
 
   if (initFunction != LUA_REFNIL) {
     lua_rawgeti(lsStandalone, LUA_REGISTRYINDEX, initFunction);
@@ -465,11 +463,11 @@ void StandaloneLuaWindow::checkEvents()
   luaLcdAllowed = false;
 }
 
-void StandaloneLuaWindow::onClicked() { Keyboard::hide(false); LuaScriptManager::onClickedEvent(); }
+void StandaloneLuaWindow::onLiveClicked(LiveWindow&) { Keyboard::hide(false); LuaScriptManager::onClickedEvent(); }
 
 void StandaloneLuaWindow::onCancel() { LuaScriptManager::onCancelEvent(); }
 
-void StandaloneLuaWindow::onEvent(event_t evt)
+void StandaloneLuaWindow::onLiveEvent(Window::LiveWindow&, event_t evt)
 {
   LuaScriptManager::onLuaEvent(evt);
 }

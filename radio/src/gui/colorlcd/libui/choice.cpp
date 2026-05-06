@@ -78,18 +78,18 @@ ChoiceBase::ChoiceBase(Window* parent, const rect_t& rect,
     _getValue(std::move(_getValue)),
     _setValue(std::move(_setValue))
 {
-  if (!hasLvObj()) return;
-
   padLeft(PAD_TINY);
   padRight(PAD_SMALL);
 
   // Add image
-  lv_obj_t* img = choice_img_create(lvobj);
-  if (img) {
-    lv_img_set_src(
-        img, type == CHOICE_TYPE_DROPOWN ? LV_SYMBOL_DOWN : LV_SYMBOL_DIRECTORY);
-    lv_obj_set_pos(img, 0, PAD_TINY);
-  }
+  withLvObj([&](lv_obj_t* obj) {
+    lv_obj_t* img = choice_img_create(obj);
+    if (img) {
+      lv_img_set_src(
+          img, type == CHOICE_TYPE_DROPOWN ? LV_SYMBOL_DOWN : LV_SYMBOL_DIRECTORY);
+      lv_obj_set_pos(img, 0, PAD_TINY);
+    }
+  });
 
   // Add label
   initRequiredLvObj(label, choice_label_create, [&](lv_obj_t* obj) {
@@ -99,10 +99,10 @@ ChoiceBase::ChoiceBase(Window* parent, const rect_t& rect,
   });
 }
 
-void ChoiceBase::checkEvents()
+void ChoiceBase::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  update();
-  Window::checkEvents();
+  update(live);
+  Window::onLiveCheckEvents(live);
 }
 
 std::string Choice::getLabelText()
@@ -128,21 +128,29 @@ std::string Choice::getLabelText()
 
 void ChoiceBase::update()
 {
-  if (!deleted() && isAvailable() && _getValue) {
-    int v = _getValue();
-    if (v != currentValue) {
-      currentValue = v;
-      if (!label) return;
-      std::string s = getLabelText();
-      if (width() > 0) {
-        int w = width() - (type == CHOICE_TYPE_DROPOWN ? ICON_W - 2 : ICON_W) - PAD_TINY * 3;
-        if (getTextWidth(s.c_str(), 0, FONT(STD)) > w)
-          lv_obj_add_state(label, LV_STATE_USER_1);
-        else
-          lv_obj_clear_state(label, LV_STATE_USER_1);
-      }
-      lv_label_set_text(label, s.c_str());
+  dispatchLive([&](LiveWindow& live) {
+    update(live);
+  });
+}
+
+void ChoiceBase::update(Window::LiveWindow&)
+{
+  if (!_getValue) return;
+
+  int v = _getValue();
+  if (v != currentValue) {
+    currentValue = v;
+    if (!label) return;
+    std::string s = getLabelText();
+    if (width() > 0) {
+      int w = width() - (type == CHOICE_TYPE_DROPOWN ? ICON_W - 2 : ICON_W) -
+              PAD_TINY * 3;
+      if (getTextWidth(s.c_str(), 0, FONT(STD)) > w)
+        lv_obj_add_state(label, LV_STATE_USER_1);
+      else
+        lv_obj_clear_state(label, LV_STATE_USER_1);
     }
+    lv_label_set_text(label, s.c_str());
   }
 }
 
@@ -206,10 +214,9 @@ void Choice::setValue(int val)
   }
 }
 
-void Choice::onClicked()
+void Choice::onLiveClicked(Window::LiveWindow&)
 {
-  if (!deleted() && isAvailable())
-    openMenu();
+  openMenu();
 }
 
 void Choice::fillMenu(Menu* menu, const FilterFct& filter)

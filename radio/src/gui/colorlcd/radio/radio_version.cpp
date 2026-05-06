@@ -309,7 +309,7 @@ class VersionDialog : public BaseDialog
   }
 
 #if defined(PXX2)
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     if (get_tmr10ms() >= reusableBuffer.hardwareAndSettings.updateTime) {
       // Query modules
@@ -329,7 +329,7 @@ class VersionDialog : public BaseDialog
           get_tmr10ms() + 500 /* 5s*/;
     }
     update();
-    BaseDialog::checkEvents();
+    BaseDialog::onLiveCheckEvents(live);
   }
 #endif
 };

@@ -48,9 +48,9 @@ class ChannelFailsafeBargraph : public Window
     failsafeBar->hide();
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
-    Window::checkEvents();
+    Window::onLiveCheckEvents(live);
 
     outputsBar->show(
         g_model.failsafeChannels[channel] != FAILSAFE_CHANNEL_HOLD &&

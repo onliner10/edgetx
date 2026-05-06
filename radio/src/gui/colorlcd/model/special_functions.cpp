@@ -304,9 +304,9 @@ void FunctionEditPage::delayedInit()
   buildBody(body);
 }
 
-void FunctionEditPage::checkEvents()
+void FunctionEditPage::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  Page::checkEvents();
+  Page::onLiveCheckEvents(live);
   if (active != isActive()) {
     if (isActive()) {
       lv_obj_add_state(headerSF->getLvObj(), ETX_STATE_SF_ACTIVE);

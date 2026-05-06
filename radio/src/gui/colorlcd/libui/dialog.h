@@ -45,7 +45,7 @@ class BaseDialog : public ModalWindow
   StaticText* header = nullptr;
 
   void onCancel() override { deleteLater(); }
-  void onEvent(event_t event) override {}
+  void onLiveEvent(LiveWindow& live, event_t event) override {}
 };
 
 //-----------------------------------------------------------------------------
@@ -66,7 +66,7 @@ class ProgressDialog : public BaseDialog
   std::function<void()> onClose;
 
   // disable keys
-  void onEvent(event_t) override {}
+  void onLiveEvent(LiveWindow&, event_t) override {}
 };
 
 //-----------------------------------------------------------------------------
@@ -86,7 +86,7 @@ class MessageDialog : public BaseDialog
   std::string getName() const override { return "MessageDialog"; }
 #endif
 
-  void onClicked() override;
+  void onLiveClicked(LiveWindow&) override;
 };
 
 //-----------------------------------------------------------------------------
@@ -109,7 +109,7 @@ class DynamicMessageDialog : public BaseDialog
   std::string getName() const override { return "DynamicMessageDialog"; }
 #endif
 
-  void onClicked() override;
+  void onLiveClicked(LiveWindow&) override;
 };
 
 //-----------------------------------------------------------------------------

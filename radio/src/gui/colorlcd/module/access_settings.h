@@ -37,7 +37,7 @@ class ReceiverButton : public TextButton
 
   uint8_t pressBind();
   void startBind();
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 
  protected:
   uint8_t moduleIdx;
@@ -50,7 +50,7 @@ class RegisterDialog : public BaseDialog
   RegisterDialog(uint8_t moduleIdx);
 
   void start();
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 
  protected:
   uint8_t moduleIdx;
@@ -66,7 +66,7 @@ class ModuleOptions : public BaseDialog
 {
  public:
   ModuleOptions(uint8_t moduleIdx);
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 
  protected:
 

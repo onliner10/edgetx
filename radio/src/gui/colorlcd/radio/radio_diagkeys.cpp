@@ -216,7 +216,7 @@ class RadioKeyDiagsWindow : public Window
     }
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     setKeyState();
     setSwitchState();

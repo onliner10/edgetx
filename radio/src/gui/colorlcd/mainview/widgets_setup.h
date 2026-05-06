@@ -39,7 +39,7 @@ class SetupWidgetsPage : public NavWindow
   }
 #endif
 
-  void onClicked() override;
+  void onLiveClicked(LiveWindow&) override;
   void onCancel() override;
 
 #if defined(HARDWARE_KEYS)
@@ -57,7 +57,7 @@ class SetupWidgetsPage : public NavWindow
   uint8_t customScreenIdx;
   unsigned savedView = 0;
 
-  void deleteLater() override;
+  void onDeleted() override;
 };
 
 class SetupWidgetsPageSlot : public ButtonBase

@@ -99,7 +99,7 @@ class FunctionEditPage : public Page
   virtual bool isAssignableFunctionAvailable(int function) const = 0;
   virtual void setDirty() const = 0;
 
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 
   void buildHeader(Window *window, const char *title, const char *prefix);
 

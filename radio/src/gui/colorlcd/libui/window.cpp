@@ -18,6 +18,8 @@
 
 #include "window.h"
 
+#include <new>
+
 #include "button.h"
 #include "debug.h"
 #include "etx_lv_theme.h"
@@ -26,15 +28,13 @@
 #include "pagegroup.h"
 #include "static.h"
 
-#include <new>
-
 //-----------------------------------------------------------------------------
 
 class Layer
 {
   static std::list<Layer> stack;
 
-  Window*     window;
+  Window* window;
   lv_group_t* group;
   lv_group_t* prevGroup;
 
@@ -44,7 +44,10 @@ class Layer
   {
   }
 
-  ~Layer() { if (group) lv_group_del(group); }
+  ~Layer()
+  {
+    if (group) lv_group_del(group);
+  }
 
   static void push(Window* window);
   static void pop(Window* window);
@@ -119,8 +122,7 @@ Window* Layer::back()
 Window* Layer::walk(std::function<bool(Window* w)> check)
 {
   for (auto layer = stack.crbegin(); layer != stack.crend(); layer++) {
-    if (layer->window && check(layer->window))
-      return layer->window;
+    if (layer->window && check(layer->window)) return layer->window;
   }
 
   return nullptr;
@@ -128,23 +130,21 @@ Window* Layer::walk(std::function<bool(Window* w)> check)
 
 //-----------------------------------------------------------------------------
 
-std::list<Window *> Window::trash;
+std::list<Window*> Window::trash;
 
 Window* Window::topWindow() { return Layer::back(); }
 
 Window* Window::firstOpaque()
 {
-  Window* w = Layer::walk([=](Window *w) mutable -> bool {
-    return w->hasWindowFlag(OPAQUE);
-  });
+  Window* w = Layer::walk(
+      [=](Window* w) mutable -> bool { return w->hasWindowFlag(OPAQUE); });
   return w;
 }
 
 PageGroup* Window::pageGroup()
 {
-  Window* w = Layer::walk([=](Window *w) mutable -> bool {
-    return w->isPageGroup();
-  });
+  Window* w =
+      Layer::walk([=](Window* w) mutable -> bool { return w->isPageGroup(); });
   return (PageGroup*)w;
 }
 
@@ -162,98 +162,102 @@ const lv_obj_class_t window_base_class = {
     .group_def = LV_OBJ_CLASS_GROUP_DEF_FALSE,
     .instance_size = sizeof(lv_obj_t)};
 
-lv_obj_t *window_create(lv_obj_t *parent)
+lv_obj_t* window_create(lv_obj_t* parent)
 {
   return etx_create(&window_base_class, parent);
 }
 
-void Window::window_event_cb(lv_event_t *e)
+void Window::window_event_cb(lv_event_t* e)
 {
-  Window *window = (Window *)lv_obj_get_user_data(lv_event_get_target(e));
-  if (window)
-    window->eventHandler(e);
+  Window* window = (Window*)lv_obj_get_user_data(lv_event_get_target(e));
+  if (window) window->eventHandler(e);
 }
 
-void Window::eventHandler(lv_event_t *e)
+void Window::eventHandler(lv_event_t* e)
 {
-  lv_obj_t *target = lv_event_get_target(e);
+  lv_obj_t* target = lv_event_get_target(e);
   lv_event_code_t code = lv_event_get_code(e);
 
-  if (code == LV_EVENT_DELETE || deleted()) return;
-  if (!acceptsEvents()) return;
+  if (code == LV_EVENT_DELETE) return;
+  if (!dispatchLive([&](LiveWindow& live) {
+        if (onLiveCustomEvent(live, e)) return;
 
-  if (customEventHandler(code)) return;
+        switch (code) {
+          case LV_EVENT_SCROLL: {
+            // exclude pointer based scrolling (only focus scrolling)
+            if (!lv_obj_is_scrolling(target) &&
+                ((windowFlags & NO_FORCED_SCROLL) == 0)) {
+              lv_point_t* p = (lv_point_t*)lv_event_get_param(e);
+              lv_coord_t scroll_y = lv_obj_get_scroll_y(target);
+              lv_coord_t scroll_bottom = lv_obj_get_scroll_bottom(target);
 
-  switch (code) {
-    case LV_EVENT_SCROLL: {
-      // exclude pointer based scrolling (only focus scrolling)
-      if (!lv_obj_is_scrolling(target) && ((windowFlags & NO_FORCED_SCROLL) == 0)) {
-        lv_point_t *p = (lv_point_t *)lv_event_get_param(e);
-        lv_coord_t scroll_y = lv_obj_get_scroll_y(target);
-        lv_coord_t scroll_bottom = lv_obj_get_scroll_bottom(target);
+              TRACE("SCROLL[x=%d;y=%d;top=%d;bottom=%d]", p->x, p->y, scroll_y,
+                    scroll_bottom);
 
-        TRACE("SCROLL[x=%d;y=%d;top=%d;bottom=%d]", p->x, p->y, scroll_y,
-              scroll_bottom);
+              // Force scroll to top or bottom when near either edge.
+              // Only applies when using rotary encoder or keys.
+              if (scroll_y <= EdgeTxStyles::UI_ELEMENT_HEIGHT * 2 && p->y > 0) {
+                lv_obj_scroll_by(target, 0, scroll_y, LV_ANIM_OFF);
+              } else if (scroll_bottom <= EdgeTxStyles::UI_ELEMENT_HEIGHT * 2 &&
+                         p->y < 0) {
+                lv_obj_scroll_by(target, 0, -scroll_bottom, LV_ANIM_OFF);
+              }
+            }
 
-        // Force scroll to top or bottom when near either edge.
-        // Only applies when using rotary encoder or keys.
-        if (scroll_y <= EdgeTxStyles::UI_ELEMENT_HEIGHT * 2 && p->y > 0) {
-          lv_obj_scroll_by(target, 0, scroll_y, LV_ANIM_OFF);
-        } else if (scroll_bottom <= EdgeTxStyles::UI_ELEMENT_HEIGHT * 2 && p->y < 0) {
-          lv_obj_scroll_by(target, 0, -scroll_bottom, LV_ANIM_OFF);
+            lv_coord_t scroll_x = lv_obj_get_scroll_x(target);
+            lv_coord_t scroll_y = lv_obj_get_scroll_y(target);
+            if (scrollHandler) scrollHandler(scroll_x, scroll_y);
+
+          } break;
+          case LV_EVENT_CLICKED:
+            if (!longPressHandled) {
+              TRACE("CLICKED[%p]", this);
+              onLiveClicked(live);
+            }
+            longPressHandled = false;
+            break;
+          case LV_EVENT_CANCEL:
+            TRACE("CANCEL[%p]", this);
+            onCancel();
+            break;
+          case LV_EVENT_FOCUSED:
+            if (focusHandler) focusHandler(true);
+            break;
+          case LV_EVENT_DEFOCUSED:
+            if (focusHandler) focusHandler(false);
+            break;
+          case LV_EVENT_LONG_PRESSED:
+            TRACE("LONG PRESS[%p]", this);
+            longPressHandled = onLiveLongPress(live);
+            break;
+          default:
+            break;
         }
-      }
-
-      lv_coord_t scroll_x = lv_obj_get_scroll_x(target);
-      lv_coord_t scroll_y = lv_obj_get_scroll_y(target);
-      if (scrollHandler) scrollHandler(scroll_x, scroll_y);
-
-    } break;
-    case LV_EVENT_CLICKED:
-      if (!longPressHandled) {
-        TRACE("CLICKED[%p]", this);
-        onClicked();
-      }
-      longPressHandled = false;
-      break;
-    case LV_EVENT_CANCEL:
-      TRACE("CANCEL[%p]", this);
-      onCancel();
-      break;
-    case LV_EVENT_FOCUSED:
-      if (focusHandler) focusHandler(true);
-      break;
-    case LV_EVENT_DEFOCUSED:
-      if (focusHandler) focusHandler(false);
-      break;
-    case LV_EVENT_LONG_PRESSED:
-      TRACE("LONG PRESS[%p]", this);
-      longPressHandled = onLongPress();
-      break;
-    default:
-      break;
-  }
+      }))
+    return;
 }
 
 //-----------------------------------------------------------------------------
 
 // Constructor to allow lvobj to be created separately - used by NumberEdit and
 // TextEdit
-Window::Window(const rect_t &rect) : rect(rect), parent(nullptr)
+Window::Window(const rect_t& rect) : rect(rect), parent(nullptr)
 {
   lvobj = nullptr;
 }
 
-Window::Window(Window *parent, const rect_t &rect, LvglCreate objConstruct) :
+Window::Window(Window* parent, const rect_t& rect, LvglCreate objConstruct) :
     rect(rect), parent(parent)
 {
-  if (parent && !parent->acceptsEvents()) {
-    this->parent = nullptr;
-    availability = Availability::Unavailable;
-    return;
+  lv_obj_t* lv_parent = nullptr;
+  if (parent) {
+    parent->dispatchLive([&](LiveWindow& live) { lv_parent = live.lvobj(); });
+    if (!lv_parent) {
+      this->parent = nullptr;
+      availability = Availability::Unavailable;
+      return;
+    }
   }
-
-  lv_obj_t *lv_parent = parent ? parent->lvobj : nullptr;
 
   if (objConstruct == nullptr) objConstruct = window_create;
   lvobj = objConstruct(lv_parent);
@@ -322,9 +326,8 @@ bool formFieldObjectAllocationFailureFailsClosedForTest()
   auto button = new (std::nothrow) Button(nullptr, {0, 0, 10, 10});
   etxCreateForceObjectAllocationFailureForTest(false);
 
-  bool ok = button && button->getLvObj() == nullptr &&
-            !button->isAvailable() && !button->isVisible() &&
-            !button->automationClickable();
+  bool ok = button && button->getLvObj() == nullptr && !button->isAvailable() &&
+            !button->isVisible() && !button->automationClickable();
   delete button;
   return ok;
 }
@@ -332,10 +335,7 @@ bool formFieldObjectAllocationFailureFailsClosedForTest()
 class UnavailableParentForTest : public Window
 {
  public:
-  UnavailableParentForTest() : Window(nullptr, {0, 0, 10, 10})
-  {
-    failClosed();
-  }
+  UnavailableParentForTest() : Window(nullptr, {0, 0, 10, 10}) { failClosed(); }
 };
 
 bool childOfUnavailableParentFailsClosedForTest()
@@ -346,13 +346,79 @@ bool childOfUnavailableParentFailsClosedForTest()
   if (detached) detached->attach(parent);
 
   bool ok = parent && child && detached && !parent->isAvailable() &&
-            !parent->isVisible() &&
-            child->getLvObj() == nullptr && !child->isAvailable() &&
-            !child->isVisible() && !child->automationClickable() &&
-            detached->getParent() == nullptr && detached->isAvailable();
+            !parent->isVisible() && child->getLvObj() == nullptr &&
+            !child->isAvailable() && !child->isVisible() &&
+            !child->automationClickable() && detached->getParent() == nullptr &&
+            detached->isAvailable();
   delete detached;
   delete child;
   delete parent;
+  return ok;
+}
+
+class ChildCountingParentForTest : public Window
+{
+ public:
+  ChildCountingParentForTest() : Window(nullptr, {0, 0, 10, 10}) {}
+  size_t childCount() const { return children.size(); }
+};
+
+class ChildFailsAfterAttachForTest : public Window
+{
+ public:
+  explicit ChildFailsAfterAttachForTest(Window* parent) :
+      Window(parent, {0, 0, 10, 10})
+  {
+    failClosed();
+  }
+};
+
+bool adoptLiveFailedChildDetachesFromParentForTest()
+{
+  auto parent = new (std::nothrow) ChildCountingParentForTest();
+  if (!parent) return false;
+
+  auto child = Window::makeLive<ChildFailsAfterAttachForTest>(parent);
+  bool ok = child == nullptr && parent->childCount() == 0;
+
+  delete parent;
+  return ok;
+}
+
+bool unavailableWindowDirectClickDoesNotBubbleForTest()
+{
+  class ClickCountingParent : public Window
+  {
+   public:
+    ClickCountingParent(int& clicks) :
+        Window(nullptr, {0, 0, 10, 10}), clicks(clicks)
+    {
+    }
+
+   protected:
+    void onLiveClicked(LiveWindow&) override { clicks += 1; }
+
+   private:
+    int& clicks;
+  };
+
+  class UnavailableChild : public Window
+  {
+   public:
+    explicit UnavailableChild(Window* parent) : Window(parent, {0, 0, 10, 10})
+    {
+      failClosed();
+    }
+  };
+
+  int clicks = 0;
+  auto parent = new (std::nothrow) ClickCountingParent(clicks);
+  auto child = new (std::nothrow) UnavailableChild(parent);
+  if (!parent || !child) return false;
+
+  child->onClicked();
+  bool ok = clicks == 0;
+  parent->deleteLater();
   return ok;
 }
 #endif
@@ -360,16 +426,20 @@ bool childOfUnavailableParentFailsClosedForTest()
 void Window::delayLoader(lv_event_t* e)
 {
   auto w = (Window*)lv_obj_get_user_data(lv_event_get_target(e));
-  if (w && w->acceptsEvents() && !w->loaded) {
-    w->loaded = true;
-    w->delayedInit();
-  }
+  if (!w) return;
+  w->dispatchLive([&](LiveWindow&) {
+    if (!w->loaded) {
+      w->loaded = true;
+      w->delayedInit();
+    }
+  });
 }
 
 void Window::delayLoad()
 {
   if (!lvobj) return;
-  lv_obj_add_event_cb(lvobj, Window::delayLoader, LV_EVENT_DRAW_MAIN_BEGIN, nullptr);
+  lv_obj_add_event_cb(lvobj, Window::delayLoader, LV_EVENT_DRAW_MAIN_BEGIN,
+                      nullptr);
 }
 
 #if defined(DEBUG_WINDOWS)
@@ -393,7 +463,7 @@ std::string Window::getIndentString() const
   return result;
 }
 
-std::string Window::getWindowDebugString(const char *name) const
+std::string Window::getWindowDebugString(const char* name) const
 {
   return getName() + (name ? std::string(" [") + name + "] " : " ") +
          getRectString();
@@ -424,8 +494,7 @@ void Window::popLayer()
 
 void Window::assignLvGroup(lv_group_t* g, bool setDefault)
 {
-  if (setDefault)
-    lv_group_set_default(g);
+  if (setDefault) lv_group_set_default(g);
 
   // associate it with all input devices
   lv_indev_t* indev = lv_indev_get_next(NULL);
@@ -435,7 +504,7 @@ void Window::assignLvGroup(lv_group_t* g, bool setDefault)
   }
 }
 
-Window *Window::getFullScreenWindow()
+Window* Window::getFullScreenWindow()
 {
   if (width() == LCD_W && height() == LCD_H) return this;
   if (parent) return parent->getFullScreenWindow();
@@ -451,11 +520,9 @@ void Window::setWindowFlag(WindowFlags flag)
   if (windowFlags & NO_FOCUS)
     lv_obj_clear_flag(lvobj, LV_OBJ_FLAG_CLICK_FOCUSABLE);
 
-  if (windowFlags & NO_SCROLL)
-    lv_obj_clear_flag(lvobj, LV_OBJ_FLAG_SCROLLABLE);
+  if (windowFlags & NO_SCROLL) lv_obj_clear_flag(lvobj, LV_OBJ_FLAG_SCROLLABLE);
 
-  if (windowFlags & NO_CLICK)
-    lv_obj_clear_flag(lvobj, LV_OBJ_FLAG_CLICKABLE);
+  if (windowFlags & NO_CLICK) lv_obj_clear_flag(lvobj, LV_OBJ_FLAG_CLICKABLE);
 }
 
 void Window::clearWindowFlag(WindowFlags flag) { windowFlags &= ~flag; }
@@ -463,15 +530,17 @@ void Window::clearWindowFlag(WindowFlags flag) { windowFlags &= ~flag; }
 void Window::setTextFlag(LcdFlags flag) { textFlags |= flag; }
 void Window::clearTextFlag(LcdFlags flag) { textFlags &= ~flag; }
 
-void Window::attach(Window *newParent)
+void Window::attach(Window* newParent)
 {
   if (parent) detach();
-  if (!acceptsEvents() || !newParent || !newParent->acceptsEvents()) {
-    parent = nullptr;
-    return;
-  }
-  parent = newParent;
-  newParent->addChild(this);
+  parent = nullptr;
+  dispatchLive([&](LiveWindow&) {
+    if (!newParent) return;
+    newParent->dispatchLive([&](LiveWindow&) {
+      parent = newParent;
+      newParent->addChild(this);
+    });
+  });
 }
 
 void Window::detach()
@@ -484,36 +553,43 @@ void Window::detach()
 
 bool Window::syncOverlay(Window* overlay)
 {
-  if (!acceptsEvents() || !overlay || !overlay->acceptsEvents()) return false;
+  bool synced = false;
+  dispatchLive([&](LiveWindow& field) {
+    if (!overlay) return;
+    overlay->dispatchLive([&](LiveWindow& liveOverlay) {
+      lv_obj_t* fieldParent = lv_obj_get_parent(field.lvobj());
+      if (!fieldParent) return;
 
-  lv_obj_t* fieldParent = lv_obj_get_parent(lvobj);
-  if (!fieldParent) return false;
-
-  lv_obj_update_layout(fieldParent);
-  lv_obj_add_flag(overlay->lvobj, LV_OBJ_FLAG_IGNORE_LAYOUT);
-  if (lv_obj_get_parent(overlay->lvobj) != fieldParent) {
-    lv_obj_set_parent(overlay->lvobj, fieldParent);
-  }
-  overlay->setRect({
-      lv_obj_get_x(lvobj),
-      lv_obj_get_y(lvobj),
-      lv_obj_get_width(lvobj),
-      lv_obj_get_height(lvobj),
+      lv_obj_update_layout(fieldParent);
+      lv_obj_add_flag(liveOverlay.lvobj(), LV_OBJ_FLAG_IGNORE_LAYOUT);
+      if (lv_obj_get_parent(liveOverlay.lvobj()) != fieldParent) {
+        lv_obj_set_parent(liveOverlay.lvobj(), fieldParent);
+      }
+      overlay->setRect({
+          lv_obj_get_x(field.lvobj()),
+          lv_obj_get_y(field.lvobj()),
+          lv_obj_get_width(field.lvobj()),
+          lv_obj_get_height(field.lvobj()),
+      });
+      lv_obj_move_foreground(liveOverlay.lvobj());
+      synced = true;
+    });
   });
-  lv_obj_move_foreground(overlay->lvobj);
-  return true;
+
+  return synced;
 }
 
 bool Window::loadLvglScreen()
 {
-  if (!acceptsEvents()) return false;
-  lv_scr_load(lvobj);
-  return true;
+  return dispatchLive([&](LiveWindow& live) { lv_scr_load(live.lvobj()); });
 }
 
 void Window::deleteLater()
 {
   if (_deleted) return;
+
+  onDelete();
+
   _deleted = true;
 
   TRACE_WINDOWS("Delete %p %s", this, getWindowDebugString().c_str());
@@ -523,8 +599,7 @@ void Window::deleteLater()
 
   popLayer();
 
-  if (closeHandler)
-    closeHandler();
+  if (closeHandler) closeHandler();
 
   Window::trash.push_back(this);
 
@@ -533,6 +608,8 @@ void Window::deleteLater()
     lvobj = nullptr;
     lv_obj_del(obj);
   }
+
+  onDeleted();
 }
 
 void Window::clear()
@@ -546,20 +623,20 @@ void Window::clear()
 
 void Window::deleteChildren()
 {
-  while (!children.empty())
-    children.back()->deleteLater();
+  while (!children.empty()) children.back()->deleteLater();
 }
 
 bool Window::hasFocus() const
 {
-  return isAvailable() && lvobj && lv_obj_has_state(lvobj, LV_STATE_FOCUSED);
+  return dispatchLive([&](LiveWindow& live) {
+    return lv_obj_has_state(live.lvobj(), LV_STATE_FOCUSED);
+  });
 }
 
 bool Window::focus()
 {
-  if (!acceptsEvents()) return false;
-  lv_group_focus_obj(lvobj);
-  return true;
+  return dispatchLive(
+      [&](LiveWindow& live) { lv_group_focus_obj(live.lvobj()); });
 }
 
 void Window::padLeft(coord_t pad)
@@ -589,60 +666,73 @@ void Window::padAll(PaddingSize pad)
 
 void Window::checkEvents()
 {
+  dispatchLive([&](LiveWindow& live) { onLiveCheckEvents(live); });
+}
+
+void Window::onLiveCheckEvents(Window::LiveWindow&)
+{
   auto copy = children;
   for (auto child : copy) {
-    if (child && !child->deleted() && child->isAvailable()) {
-      child->checkEvents();
-    }
+    if (child) child->checkEvents();
   }
 }
 
 void Window::onEvent(event_t event)
 {
+  dispatchLive([&](LiveWindow& live) { onLiveEvent(live, event); });
+}
+
+void Window::onLiveEvent(Window::LiveWindow&, event_t event)
+{
   TRACE_WINDOWS("%s received event 0x%X",
                 Window::getWindowDebugString("Window").c_str(), event);
-  if (parent)
-    parent->onEvent(event);
+  if (parent) parent->onEvent(event);
 }
 
 void Window::onClicked()
 {
-  if (parent && !(windowFlags & OPAQUE))
-    parent->onClicked();
+  dispatchLive([&](LiveWindow& live) { onLiveClicked(live); });
+}
+
+void Window::onLiveClicked(Window::LiveWindow&)
+{
+  if (parent && !(windowFlags & OPAQUE)) parent->onClicked();
 }
 
 void Window::onCancel()
 {
-  if (parent)
-    parent->onCancel();
+  if (parent) parent->onCancel();
 }
 
 bool Window::onLongPress()
 {
-  return true;
+  bool handled = true;
+  dispatchLive([&](LiveWindow& live) { handled = onLiveLongPress(live); });
+  return handled;
 }
+
+bool Window::onLiveLongPress(Window::LiveWindow&) { return true; }
 
 void Window::dispatchKeyboardEvent(event_t event)
 {
-  if (!acceptsEvents()) return;
-
-  event_t key = EVT_KEY_MASK(event);
-  if (event == EVT_KEY_BREAK(KEY_ENTER)) {
-    onClicked();
-  } else if (event == EVT_KEY_BREAK(KEY_EXIT)) {
-    onCancel();
-  } else if (key != KEY_ENTER) {
-    onEvent(event);
-  } else if (event == EVT_KEY_LONG(KEY_ENTER)) {
-    sendLvEvent(LV_EVENT_LONG_PRESSED);
-  }
+  dispatchLive([&](LiveWindow& live) {
+    event_t key = EVT_KEY_MASK(event);
+    if (event == EVT_KEY_BREAK(KEY_ENTER)) {
+      onLiveClicked(live);
+    } else if (event == EVT_KEY_BREAK(KEY_EXIT)) {
+      onCancel();
+    } else if (key != KEY_ENTER) {
+      onLiveEvent(live, event);
+    } else if (event == EVT_KEY_LONG(KEY_ENTER)) {
+      lv_event_send(live.lvobj(), LV_EVENT_LONG_PRESSED, nullptr);
+    }
+  });
 }
 
 bool Window::sendLvEvent(lv_event_code_t code, void* param)
 {
-  if (!acceptsEvents()) return false;
-  lv_event_send(lvobj, code, param);
-  return true;
+  return dispatchLive(
+      [&](LiveWindow& live) { lv_event_send(live.lvobj(), code, param); });
 }
 
 #if defined(SIMU)
@@ -666,36 +756,38 @@ std::string Window::automationRole() const
   return automationRole_.empty() ? "window" : automationRole_;
 }
 
-std::string Window::automationText() const
-{
-  return automationText_;
-}
+std::string Window::automationText() const { return automationText_; }
 
 bool Window::automationClickable() const
 {
-  if (!isAvailable() || !lvobj || hasWindowFlag(NO_CLICK) ||
-      !lv_obj_has_flag(lvobj, LV_OBJ_FLAG_CLICKABLE)) {
+  if (hasWindowFlag(NO_CLICK)) return false;
+  if (!dispatchLive([&](LiveWindow& live) {
+        return lv_obj_has_flag(live.lvobj(), LV_OBJ_FLAG_CLICKABLE);
+      }))
     return false;
-  }
 
   auto role = automationRole();
   return role == "button" || role == "model_button";
 }
 #endif
 
-void Window::addChild(Window *window)
+bool Window::addChild(Window* window)
 {
-  if (!isAvailable() || !lvobj || !window || !window->isAvailable() ||
-      !window->lvobj) {
-    return;
-  }
+  bool added = false;
+  dispatchLive([&](LiveWindow& parentLive) {
+    if (!window) return;
+    window->dispatchLive([&](LiveWindow& childLive) {
+      auto lv_parent = lv_obj_get_parent(childLive.lvobj());
+      if (lv_parent && (lv_parent != parentLive.lvobj())) {
+        lv_obj_set_parent(childLive.lvobj(), parentLive.lvobj());
+      }
 
-  auto lv_parent = lv_obj_get_parent(window->lvobj);
-  if (lv_parent && (lv_parent != lvobj)) {
-    lv_obj_set_parent(window->lvobj, lvobj);
-  }
+      children.push_back(window);
+      added = true;
+    });
+  });
 
-  children.push_back(window);
+  return added;
 }
 
 void Window::invalidate()
@@ -719,28 +811,32 @@ void Window::setFlexLayout(lv_flex_flow_t flow, lv_coord_t padding,
   lv_obj_set_height(lvobj, height);
 }
 
-FormLine *Window::newLine(FlexGridLayout &layout)
+FormLine* Window::newLine(FlexGridLayout& layout)
 {
   return new FormLine(this, layout);
 }
 
 void Window::show(bool visible)
 {
-  if (!isAvailable()) visible = false;
-  if (!_deleted && lvobj) {
-    if (lv_obj_has_flag(lvobj, LV_OBJ_FLAG_HIDDEN) == visible) {
-      if (visible)
-        lv_obj_clear_flag(lvobj, LV_OBJ_FLAG_HIDDEN);
-      else
-        lv_obj_add_flag(lvobj, LV_OBJ_FLAG_HIDDEN);
-    }
+  dispatchLive([&](LiveWindow& live) { onLiveShow(live, visible); });
+}
+
+void Window::onLiveShow(Window::LiveWindow& live, bool visible)
+{
+  auto obj = live.lvobj();
+  if (lv_obj_has_flag(obj, LV_OBJ_FLAG_HIDDEN) == visible) {
+    if (visible)
+      lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
+    else
+      lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
   }
 }
 
 bool Window::isVisible()
 {
-  return isAvailable() && !_deleted && lvobj &&
-         !lv_obj_has_flag(lvobj, LV_OBJ_FLAG_HIDDEN);
+  return dispatchLive([&](LiveWindow& live) {
+    return !lv_obj_has_flag(live.lvobj(), LV_OBJ_FLAG_HIDDEN);
+  });
 }
 
 bool Window::isOnScreen()
@@ -754,15 +850,19 @@ bool Window::isOnScreen()
 
 void Window::enable(bool enabled)
 {
-  if (!isAvailable()) enabled = false;
-  if (!_deleted && lvobj) {
-    if (lv_obj_has_state(lvobj, LV_STATE_DISABLED) == enabled) {
+  auto apply = [&](lv_obj_t* obj) {
+    if (lv_obj_has_state(obj, LV_STATE_DISABLED) == enabled) {
       if (enabled)
-        lv_obj_clear_state(lvobj, LV_STATE_DISABLED);
+        lv_obj_clear_state(obj, LV_STATE_DISABLED);
       else
-        lv_obj_add_state(lvobj, LV_STATE_DISABLED);
+        lv_obj_add_state(obj, LV_STATE_DISABLED);
     }
-  }
+  };
+
+  if (enabled)
+    dispatchLive([&](LiveWindow& live) { apply(live.lvobj()); });
+  else
+    withLvObj(apply);
 }
 
 bool Window::requireLvObj(lv_obj_t* obj)
@@ -787,7 +887,9 @@ void Window::failClosed()
 void Window::addBackButton()
 {
   auto button = new (std::nothrow) ButtonBase(
-      this, {0, 0, EdgeTxStyles::MENU_HEADER_HEIGHT, EdgeTxStyles::MENU_HEADER_HEIGHT},
+      this,
+      {0, 0, EdgeTxStyles::MENU_HEADER_HEIGHT,
+       EdgeTxStyles::MENU_HEADER_HEIGHT},
       [=]() -> uint8_t {
         onCancel();
         return 0;
@@ -804,12 +906,14 @@ void Window::addCustomButton(coord_t x, coord_t y, std::function<void()> action,
                              const char* automationText)
 {
   auto button = new (std::nothrow) ButtonBase(
-    this, {x, y, EdgeTxStyles::MENU_HEADER_HEIGHT, EdgeTxStyles::MENU_HEADER_HEIGHT},
-    [=]() -> uint8_t {
-      action();
-      return 0;
-    },
-    window_create);
+      this,
+      {x, y, EdgeTxStyles::MENU_HEADER_HEIGHT,
+       EdgeTxStyles::MENU_HEADER_HEIGHT},
+      [=]() -> uint8_t {
+        action();
+        return 0;
+      },
+      window_create);
   if (button) {
     if (automationId) button->setAutomationId(automationId);
     if (automationText) button->setAutomationText(automationText);
@@ -819,7 +923,7 @@ void Window::addCustomButton(coord_t x, coord_t y, std::function<void()> action,
 
 //-----------------------------------------------------------------------------
 
-void NavWindow::onEvent(event_t event)
+void NavWindow::onLiveEvent(Window::LiveWindow& live, event_t event)
 {
   switch (event) {
 #if defined(HARDWARE_KEYS)
@@ -869,11 +973,11 @@ void NavWindow::onEvent(event_t event)
 #endif
 
     default:
-      if (bubbleEvents()) Window::onEvent(event);
+      if (bubbleEvents()) Window::onLiveEvent(live, event);
   }
 }
 
-NavWindow::NavWindow(Window *parent, const rect_t &rect,
+NavWindow::NavWindow(Window* parent, const rect_t& rect,
                      LvglCreate objConstruct) :
     Window(parent, rect, objConstruct)
 {
@@ -885,7 +989,8 @@ NavWindow::NavWindow(Window *parent, const rect_t &rect,
 class SetupTextButton : public TextButton
 {
  public:
-  SetupTextButton(Window* parent, const rect_t& rect, const PageButtonDef& entry) :
+  SetupTextButton(Window* parent, const rect_t& rect,
+                  const PageButtonDef& entry) :
       TextButton(parent, rect, STR_VAL(entry.title))
   {
     setPressHandler([=] {
@@ -902,13 +1007,17 @@ class SetupTextButton : public TextButton
  protected:
 };
 
-SetupButtonGroup::SetupButtonGroup(Window* parent, const rect_t& rect, const char* title, int cols,
-                                   PaddingSize padding, const PageButtonDef* pages, coord_t btnHeight) :
+SetupButtonGroup::SetupButtonGroup(Window* parent, const rect_t& rect,
+                                   const char* title, int cols,
+                                   PaddingSize padding,
+                                   const PageButtonDef* pages,
+                                   coord_t btnHeight) :
     Window(parent, rect)
 {
   padAll(padding);
 
-  coord_t buttonWidth = (width() - PAD_SMALL * (cols + 1) - PAD_TINY * 2) / cols;
+  coord_t buttonWidth =
+      (width() - PAD_SMALL * (cols + 1) - PAD_TINY * 2) / cols;
 
   int size = 0;
   for (; pages[size].title; size += 1);
@@ -920,8 +1029,7 @@ SetupButtonGroup::SetupButtonGroup(Window* parent, const rect_t& rect, const cha
   }
   setHeight(height);
 
-  if (title)
-    new Subtitle(this, title);
+  if (title) new Subtitle(this, title);
 
   int n = 0;
   int remaining = size;
@@ -938,14 +1046,18 @@ SetupButtonGroup::SetupButtonGroup(Window* parent, const rect_t& rect, const cha
     x = xo + (n % cols) * xw;
     y = yo + (n / cols) * (btnHeight + PAD_MEDIUM);
 
-    new (std::nothrow) SetupTextButton(this, {x, y, buttonWidth, btnHeight}, pages[p]);
+    new (std::nothrow)
+        SetupTextButton(this, {x, y, buttonWidth, btnHeight}, pages[p]);
     n += 1;
     remaining -= 1;
   }
 }
 
-SetupLine::SetupLine(Window* parent, coord_t y, coord_t col2, PaddingSize padding, const char* title,
-                    std::function<void(SetupLine*, coord_t, coord_t)> createEdit, coord_t lblYOffset) :
+SetupLine::SetupLine(
+    Window* parent, coord_t y, coord_t col2, PaddingSize padding,
+    const char* title,
+    std::function<void(SetupLine*, coord_t, coord_t)> createEdit,
+    coord_t lblYOffset) :
     Window(parent, {0, y, LCD_W - padding * 2, 0}),
     titleText(title ? title : "")
 {
@@ -963,25 +1075,34 @@ SetupLine::SetupLine(Window* parent, coord_t y, coord_t col2, PaddingSize paddin
         titleH = EdgeTxStyles::UI_ELEMENT_HEIGHT + PAD_TINY + PAD_LARGE;
         editY = PAD_SMALL + 1;
       }
-      new (std::nothrow) StaticText(this, {PAD_TINY, titleY, lblWidth, titleH}, title);
+      new (std::nothrow)
+          StaticText(this, {PAD_TINY, titleY, lblWidth, titleH}, title);
     }
     setHeight(h);
     createEdit(this, col2, editY);
   } else {
     setHeight(h);
-    new (std::nothrow) StaticText(this, {0, titleY, 0, titleH}, title, COLOR_THEME_PRIMARY1_INDEX, FONT(BOLD));
+    new (std::nothrow) StaticText(this, {0, titleY, 0, titleH}, title,
+                                  COLOR_THEME_PRIMARY1_INDEX, FONT(BOLD));
   }
 }
 
-coord_t SetupLine::showLines(Window* parent, coord_t y, coord_t col2, PaddingSize padding, const SetupLineDef* setupLines)
+coord_t SetupLine::showLines(Window* parent, coord_t y, coord_t col2,
+                             PaddingSize padding,
+                             const SetupLineDef* setupLines)
 {
   Window* w;
 
   for (int i = 0; setupLines[i].title || setupLines[i].createEdit; i += 1) {
 #if !defined(ALL_LANGS)
-    w = new (std::nothrow) SetupLine(parent, y, col2, padding, setupLines[i].title, setupLines[i].createEdit);
+    w = new (std::nothrow)
+        SetupLine(parent, y, col2, padding, setupLines[i].title,
+                  setupLines[i].createEdit);
 #else
-    w = new (std::nothrow) SetupLine(parent, y, col2, padding, setupLines[i].title ? setupLines[i].title() : nullptr, setupLines[i].createEdit);
+    w = new (std::nothrow)
+        SetupLine(parent, y, col2, padding,
+                  setupLines[i].title ? setupLines[i].title() : nullptr,
+                  setupLines[i].createEdit);
 #endif
     if (!w) break;
     y += w->height() + padding;

@@ -175,7 +175,7 @@ class ModelButton : public Button
                   COLOR_THEME_SECONDARY1_INDEX, CENTERED | font);
   }
 
-  void onClicked() override
+  void onLiveClicked(LiveWindow&) override
   {
     setFocused();
     ButtonBase::onClicked();
@@ -344,7 +344,7 @@ class ModelsPageBody : public Window
   std::vector<ModelButton*> modelButtons;
   std::function<void()> refreshLabels = nullptr;
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     for (auto c : children) {
       if (((ModelButton*)c)->loadImage()) {

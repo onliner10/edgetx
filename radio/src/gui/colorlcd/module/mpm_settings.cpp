@@ -181,8 +181,10 @@ struct MPMSubtype : public FormLine {
     show();
   }
 
-  void checkEvents()
+  void onLiveCheckEvents(LiveWindow& live) override
   {
+    FormLine::onLiveCheckEvents(live);
+
     //
     // DSM2: successful bind in auto mode changes DSM2 subType
     //

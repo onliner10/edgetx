@@ -35,7 +35,7 @@ class FileCarosell : public Window
 
   inline void setSelected(int n);
   void setFileNames(std::vector<std::string> fileNames);
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
   inline void pause(bool pause)
   {
     _paused = pause;

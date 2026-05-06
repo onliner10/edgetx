@@ -72,7 +72,8 @@ class ChoiceBase : public FormField
 
   virtual std::string getLabelText() = 0;
 
-  void checkEvents() override;
+  void update(LiveWindow& live);
+  void onLiveCheckEvents(LiveWindow& live) override;
 };
 
 class Choice : public ChoiceBase
@@ -100,7 +101,7 @@ class Choice : public ChoiceBase
   void setValues(std::vector<std::string> values);
   void setValues(const char *const values[]);
 
-  void onClicked() override;
+  void onLiveClicked(LiveWindow&) override;
 
   void setFillMenuHandler(std::function<void(Menu *, int, int &)> handler)
   {

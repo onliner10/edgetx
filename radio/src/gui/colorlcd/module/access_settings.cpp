@@ -58,7 +58,7 @@ class BindWaitDialog : public BaseDialog
     setCloseHandler([=]() { moduleState[moduleIdx].mode = MODULE_MODE_NORMAL; });
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     auto& bindInfo = getPXX2BindInformationBuffer();
 
@@ -111,7 +111,7 @@ class BindWaitDialog : public BaseDialog
       return;
     }
 
-    BaseDialog::checkEvents();
+    BaseDialog::onLiveCheckEvents(live);
   }
 
  protected:
@@ -123,7 +123,7 @@ class RxOptions : public BaseDialog
 {
  public:
   RxOptions(uint8_t moduleIdx, uint8_t rxIdx);
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 
  protected:
   enum {
@@ -315,7 +315,7 @@ void ReceiverButton::startBind()
   new BindWaitDialog(moduleIdx, receiverIdx);
 }
 
-void ReceiverButton::checkEvents()
+void ReceiverButton::onLiveCheckEvents(Window::LiveWindow& live)
 {
   if (g_model.moduleData[moduleIdx].pxx2.receiverName[receiverIdx][0] != '\0') {
     char receiverName[PXX2_LEN_RX_NAME + 1];
@@ -330,7 +330,7 @@ void ReceiverButton::checkEvents()
     setText(STR_BIND);
   }
 
-  TextButton::checkEvents();
+  TextButton::onLiveCheckEvents(live);
 }
 
 RegisterDialog::RegisterDialog(uint8_t moduleIdx) :
@@ -396,7 +396,7 @@ void RegisterDialog::start()
   old_registerStep = REGISTER_INIT;
 }
 
-void RegisterDialog::checkEvents()
+void RegisterDialog::onLiveCheckEvents(Window::LiveWindow& live)
 {
   auto& modSetup = getPXX2ModuleSetupBuffer();
 
@@ -427,7 +427,7 @@ void RegisterDialog::checkEvents()
     }
   }
 
-  BaseDialog::checkEvents();
+  BaseDialog::onLiveCheckEvents(live);
 }
 
 ModuleOptions::ModuleOptions(uint8_t moduleIdx) :
@@ -445,7 +445,7 @@ ModuleOptions::ModuleOptions(uint8_t moduleIdx) :
   setCloseHandler([=]() { moduleState[moduleIdx].mode = MODULE_MODE_NORMAL; });
 }
 
-void ModuleOptions::checkEvents()
+void ModuleOptions::onLiveCheckEvents(Window::LiveWindow& live)
 {
   auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
   switch (state) {
@@ -495,7 +495,7 @@ void ModuleOptions::checkEvents()
       break;
   }
 
-  BaseDialog::checkEvents();
+  BaseDialog::onLiveCheckEvents(live);
 }
 
 uint8_t ModuleOptions::getModuleSettingsState()
@@ -648,7 +648,7 @@ RxOptions::RxOptions(uint8_t moduleIdx, uint8_t rxIdx) :
   setCloseHandler([=]() { moduleState[moduleIdx].mode = MODULE_MODE_NORMAL; });
 }
 
-void RxOptions::checkEvents()
+void RxOptions::onLiveCheckEvents(Window::LiveWindow& live)
 {
   auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
   auto& module = hwSettings.modules[moduleIdx];
@@ -719,7 +719,7 @@ void RxOptions::checkEvents()
       break;
   }
 
-  BaseDialog::checkEvents();
+  BaseDialog::onLiveCheckEvents(live);
 }
 
 static uint8_t getShiftedChannel(int8_t moduleIdx, int ch)

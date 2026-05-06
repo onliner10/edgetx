@@ -65,7 +65,7 @@ class ScriptEditWindow : public Page
   const uint8_t idx;
   bool update = false;
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     if ((update) && (luaState == INTERPRETER_RUNNING)) {
       TRACE("rebuilding ScriptEditWindow...");
@@ -73,7 +73,7 @@ class ScriptEditWindow : public Page
       update = false;
     }
     // note: 'update' is set from Page::checkEvents()
-    Page::checkEvents();
+    Page::onLiveCheckEvents(live);
   }
 
   void buildHeader(Window* window)

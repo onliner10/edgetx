@@ -93,9 +93,9 @@ class FormField : public Window
   inline bool isEditMode() const { return editMode; }
   virtual void setEditMode(bool newEditMode);
 
-  void onClicked() override;
+  void onLiveClicked(LiveWindow&) override;
   void onCancel() override;
-  void deleteLater() override;
+  void onDelete() override;
 
  protected:
   bool editMode = false;
@@ -111,5 +111,5 @@ class FormLine : public Window
  protected:
   FlexGridLayout& layout;
 
-  void addChild(Window* window) override;
+  bool addChild(Window* window) override;
 };

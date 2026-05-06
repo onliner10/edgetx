@@ -64,12 +64,13 @@ MainWindow* MainWindow::instance()
 MainWindow::MainWindow() : Window(nullptr, {0, 0, LCD_W, LCD_H})
 {
   setWindowFlag(OPAQUE);
-  if (!hasLvObj()) return;
 
-  etx_solid_bg(lvobj);
+  withLvObj([&](lv_obj_t* obj) {
+    etx_solid_bg(obj);
 
-  background = createBackgroundCanvas(lvobj);
-  if (background) lv_obj_center(background);
+    background = createBackgroundCanvas(obj);
+    if (background) lv_obj_center(background);
+  });
 }
 
 void MainWindow::emptyTrash()
@@ -136,7 +137,7 @@ uint32_t MainWindow::runUiTick(TickMode mode)
   for (auto it = copy.begin(); it != copy.end();) {
     auto child = *it;
     ++it;
-    if (child && !child->deleted() && child->isBubblePopup()) {
+    if (child && child->isBubblePopup()) {
       child->checkEvents();
     }
   }
@@ -172,12 +173,11 @@ void MainWindow::shutdown()
   emptyTrash();
 
   // Re-add background canvas
-  if (!hasLvObj()) {
-    background = nullptr;
-    return;
-  }
-  background = createBackgroundCanvas(lvobj);
-  if (background) lv_obj_center(background);
+  background = nullptr;
+  withLvObj([&](lv_obj_t* obj) {
+    background = createBackgroundCanvas(obj);
+    if (background) lv_obj_center(background);
+  });
 }
 
 bool MainWindow::setBackgroundImage(std::string& fileName)
@@ -284,4 +284,23 @@ void MainWindow::blockUntilClose(bool checkPwr, std::function<bool(void)> closeC
     run(ModalUiTick{});
     sleep_ms(10);
   }
+}
+
+void MainWindow::blockUntilClosed(Window& window, bool checkPwr, bool isError)
+{
+  blockUntilClosed(window, checkPwr, nullptr, isError);
+}
+
+void MainWindow::blockUntilClosed(
+    Window& window, bool checkPwr,
+    const std::function<bool(void)>& closeCondition, bool isError)
+{
+  blockUntilClose(checkPwr, [&]() {
+    if (window.deleted()) return true;
+    if (closeCondition && closeCondition()) {
+      window.deleteLater();
+      return true;
+    }
+    return false;
+  }, isError);
 }

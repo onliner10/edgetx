@@ -21,21 +21,20 @@
 
 #pragma once
 
-#include "definitions.h"
-#include "dataconstants.h"
-#include "widget.h"
-#include "view_main_decoration.h"
-#include "messaging.h"
-
 #include <memory>
 #include <new>
+
+#include "dataconstants.h"
+#include "definitions.h"
+#include "messaging.h"
+#include "view_main_decoration.h"
+#include "widget.h"
 
 class LayoutFactory;
 
 //-----------------------------------------------------------------------------
 
-struct LayoutOption
-{
+struct LayoutOption {
   enum Type {
     Integer,
     Bool,
@@ -55,51 +54,49 @@ enum {
   LAYOUT_OPTION_TRIMS,
   LAYOUT_OPTION_MIRRORED,
 
-  LAYOUT_OPTION_LAST_DEFAULT=LAYOUT_OPTION_MIRRORED
+  LAYOUT_OPTION_LAST_DEFAULT = LAYOUT_OPTION_MIRRORED
 };
 
-#define LAYOUT_COMMON_OPTIONS                           \
-  {STR_DEF(STR_TOP_BAR), LayoutOption::Bool, true},     \
-  {STR_DEF(STR_FLIGHT_MODE), LayoutOption::Bool, true}, \
-  {STR_DEF(STR_SLIDERS), LayoutOption::Bool, true},     \
-  {STR_DEF(STR_TRIMS), LayoutOption::Bool, true},       \
-  {STR_DEF(STR_MIRROR), LayoutOption::Bool, false}
+#define LAYOUT_COMMON_OPTIONS                               \
+  {STR_DEF(STR_TOP_BAR), LayoutOption::Bool, true},         \
+      {STR_DEF(STR_FLIGHT_MODE), LayoutOption::Bool, true}, \
+      {STR_DEF(STR_SLIDERS), LayoutOption::Bool, true},     \
+      {STR_DEF(STR_TRIMS), LayoutOption::Bool, true},       \
+  {                                                         \
+    STR_DEF(STR_MIRROR), LayoutOption::Bool, false          \
+  }
 
-#define LAYOUT_OPTIONS_END \
-  { nullptr, LayoutOption::Bool }
+#define LAYOUT_OPTIONS_END {nullptr, LayoutOption::Bool}
 
 extern const LayoutOption defaultLayoutOptions[];
 
 //-----------------------------------------------------------------------------
 
-#define LAYOUT_MAP_DIV      60
-#define LAYOUT_MAP_0        0
-#define LAYOUT_MAP_1SIXTH   10  // 1/6
-#define LAYOUT_MAP_1FIFTH   12  // 1/5
-#define LAYOUT_MAP_1QTR     15  // 1/4
-#define LAYOUT_MAP_2FIFTH   24  // 2/5
-#define LAYOUT_MAP_1THIRD   20  // 1/3
-#define LAYOUT_MAP_HALF     30  // 1/2
-#define LAYOUT_MAP_3FIFTH   36  // 3/5
-#define LAYOUT_MAP_2THIRD   40  // 2/3
-#define LAYOUT_MAP_3QTR     45  // 3/4
-#define LAYOUT_MAP_4FIFTH   48  // 4/5
-#define LAYOUT_MAP_5SIXTH   50  // 5/6
-#define LAYOUT_MAP_FULL     60
+#define LAYOUT_MAP_DIV 60
+#define LAYOUT_MAP_0 0
+#define LAYOUT_MAP_1SIXTH 10  // 1/6
+#define LAYOUT_MAP_1FIFTH 12  // 1/5
+#define LAYOUT_MAP_1QTR 15    // 1/4
+#define LAYOUT_MAP_2FIFTH 24  // 2/5
+#define LAYOUT_MAP_1THIRD 20  // 1/3
+#define LAYOUT_MAP_HALF 30    // 1/2
+#define LAYOUT_MAP_3FIFTH 36  // 3/5
+#define LAYOUT_MAP_2THIRD 40  // 2/3
+#define LAYOUT_MAP_3QTR 45    // 3/4
+#define LAYOUT_MAP_4FIFTH 48  // 4/5
+#define LAYOUT_MAP_5SIXTH 50  // 5/6
+#define LAYOUT_MAP_FULL 60
 
 //-----------------------------------------------------------------------------
 
-class Layout: public WidgetsContainer
+class Layout : public WidgetsContainer
 {
  public:
-  Layout(Window* parent, const LayoutFactory * factory,
-          int screenNum, uint8_t zoneCount, uint8_t* zoneMap);
+  Layout(Window* parent, const LayoutFactory* factory, int screenNum,
+         uint8_t zoneCount, uint8_t* zoneMap);
 
 #if defined(DEBUG_WINDOWS)
-  std::string getName() const override
-  {
-    return "Layout";
-  }
+  std::string getName() const override { return "Layout"; }
 #endif
 
   Widget* createWidget(unsigned int index,
@@ -109,10 +106,7 @@ class Layout: public WidgetsContainer
 
   LayoutOptionValue* getOptionValue(unsigned int index) const;
 
-  const LayoutFactory * getFactory() const
-  {
-    return factory;
-  }
+  const LayoutFactory* getFactory() const { return factory; }
 
   virtual bool hasTopbar() const;
   virtual bool hasFlightMode() const;
@@ -122,7 +116,6 @@ class Layout: public WidgetsContainer
 
   // Updates settings for trims, sliders, pots, etc...
   virtual void updateDecorations();
-  void show(bool visible = true) override;
 
   bool isLayout() override { return true; }
 
@@ -135,7 +128,7 @@ class Layout: public WidgetsContainer
   ViewMainDecoration* decoration = nullptr;
   uint8_t* zoneMap = nullptr;
   int screenNum;
-  rect_t lastMainZone = {0,0,0,0};
+  rect_t lastMainZone = {0, 0, 0, 0};
   Messaging decorationUpdateMsg;
   bool zoneUpdateRequired = false;
 
@@ -148,7 +141,8 @@ class Layout: public WidgetsContainer
   unsigned int getZonesCount() const override { return zoneCount; }
   rect_t getZone(unsigned int index) const override;
 
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
+  void onLiveShow(LiveWindow& live, bool visible) override;
 };
 
 //-----------------------------------------------------------------------------
@@ -156,7 +150,8 @@ class Layout: public WidgetsContainer
 class LayoutFactory
 {
  public:
-  LayoutFactory(const char* id, const char* name, const LayoutOption * options, uint8_t zoneCount, uint8_t* zoneMap);
+  LayoutFactory(const char* id, const char* name, const LayoutOption* options,
+                uint8_t zoneCount, uint8_t* zoneMap);
   ~LayoutFactory();
 
   const char* getId() const { return id; }
@@ -164,10 +159,7 @@ class LayoutFactory
 
   const MaskBitmap* getBitmap() const { return bitmap; }
 
-  const LayoutOption * getLayoutOptions() const
-  {
-    return options;
-  }
+  const LayoutOption* getLayoutOptions() const { return options; }
 
   virtual Layout* createNew(Window* parent, int screenNum) const = 0;
 
@@ -192,16 +184,16 @@ class LayoutFactory
 
   WidgetsContainer* createCustomScreen(unsigned customScreenIndex) const;
 
-  static LAYOUT_ORIENTATION_SCALED(BM_W, 51, 22)
-  static LAYOUT_ORIENTATION_SCALED(BM_H, 25, 34)
+ static LAYOUT_ORIENTATION_SCALED(BM_W, 51,
+                                  22) static LAYOUT_ORIENTATION_SCALED(BM_H, 25,
+                                                                       34)
 
- protected:
-  const char* id;
+     protected : const char* id;
   const char* name;
-  const LayoutOption * options;
+  const LayoutOption* options;
   uint8_t zoneCount;
   uint8_t* zoneMap;
-  MaskBitmap * bitmap = nullptr;
+  MaskBitmap* bitmap = nullptr;
 
   static WidgetsContainer* loadLayout(Window* parent, int screenNum);
   static const LayoutFactory* getLayoutFactory(const char* name);
@@ -209,13 +201,14 @@ class LayoutFactory
 
 //-----------------------------------------------------------------------------
 
-template<class T>
-class BaseLayoutFactory: public LayoutFactory
+template <class T>
+class BaseLayoutFactory : public LayoutFactory
 {
  public:
-  BaseLayoutFactory(const char * id, const char * name,
-                    const LayoutOption * options, uint8_t zoneCount, uint8_t* zoneMap) :
-    LayoutFactory(id, name, options, zoneCount, zoneMap)
+  BaseLayoutFactory(const char* id, const char* name,
+                    const LayoutOption* options, uint8_t zoneCount,
+                    uint8_t* zoneMap) :
+      LayoutFactory(id, name, options, zoneCount, zoneMap)
   {
   }
 

@@ -218,10 +218,8 @@ class LinkStatusWidget : public Widget
     foreground();
   }
 
-  void update() override
+  void onUpdate() override
   {
-    if (_deleted) return;
-
     const bool topbar = isCompactTopBarWidget();
     const coord_t pad = topbar ? TOPBAR_CONTENT_PAD : PAD_SMALL;
     const coord_t labelW = width() > 2 * pad ? width() - 2 * pad : width();
@@ -289,10 +287,8 @@ class LinkStatusWidget : public Widget
     lastRSSI = 255;
   }
 
-  void foreground() override
+  void onForeground() override
   {
-    if (_deleted) return;
-
     uint8_t rssi = TELEMETRY_RSSI();
     if (rssi == lastRSSI) return;
     lastRSSI = rssi;
@@ -358,10 +354,8 @@ class TxBatteryStatusWidget : public Widget
     foreground();
   }
 
-  void update() override
+  void onUpdate() override
   {
-    if (_deleted) return;
-
     const bool topbar = isCompactTopBarWidget();
     const coord_t pad = topbar ? TOPBAR_CONTENT_PAD : PAD_SMALL;
 
@@ -439,10 +433,8 @@ class TxBatteryStatusWidget : public Widget
     lastVoltage = 255;
   }
 
-  void foreground() override
+  void onForeground() override
   {
-    if (_deleted) return;
-
     bool topbar = isCompactTopBarWidget();
     bool warning = IS_TXBATT_WARNING();
     uint8_t bars = GET_TXBATT_BARS(fillMaxW);
@@ -517,10 +509,8 @@ class VolumeStatusWidget : public Widget
     foreground();
   }
 
-  void update() override
+  void onUpdate() override
   {
-    if (_deleted) return;
-
     const bool topbar = isCompactTopBarWidget();
     const coord_t pad = topbar ? TOPBAR_CONTENT_PAD : PAD_SMALL;
 
@@ -617,10 +607,8 @@ class VolumeStatusWidget : public Widget
     lastPercent = 255;
   }
 
-  void foreground() override
+  void onForeground() override
   {
-    if (_deleted) return;
-
     bool topbar = isCompactTopBarWidget();
     uint8_t level = speakerVolumeLevel();
     uint8_t percent = speakerVolumePercent();
@@ -779,10 +767,8 @@ class RadioInfoWidget : public Widget
     foreground();
   }
 
-  void update() override
+  void onUpdate() override
   {
-    if (_deleted) return;
-
     auto widgetData = getPersistentData();
     if (!batteryFill) return;
 
@@ -794,10 +780,8 @@ class RadioInfoWidget : public Widget
     etx_bg_color_from_flags(batteryFill, widgetData->options[0].value.unsignedValue, LV_STATE_USER_2);
   }
 
-  void foreground() override
+  void onForeground() override
   {
-    if (_deleted) return;
-
     bool compact = isCompactTopBarWidget();
 
     if (usbIcon) usbIcon->show(!compact && usbPlugged());
@@ -1053,17 +1037,13 @@ class DateTimeWidget : public Widget
     update();
   }
 
-  void foreground() override
+  void onForeground() override
   {
-    if (_deleted) return;
-
     Widget::checkEvents();
   }
 
-  void update() override
+  void onUpdate() override
   {
-    if (_deleted) return;
-
     auto widgetData = getPersistentData();
 
     // get color from options
@@ -1121,9 +1101,9 @@ class DateTextWidget : public Widget
   }
 
  public:
-  void foreground() override
+  void onForeground() override
   {
-    if (_deleted || !label) return;
+    if (!label) return;
 
     struct gtm time;
     gettime(&time);
@@ -1137,9 +1117,9 @@ class DateTextWidget : public Widget
     textValid = true;
   }
 
-  void update() override
+  void onUpdate() override
   {
-    if (_deleted || !label) return;
+    if (!label) return;
 
     auto widgetData = getPersistentData();
 
@@ -1262,10 +1242,8 @@ class InternalGPSWidget : public Widget
         COLOR_THEME_PRIMARY2_INDEX, CENTERED | FONT(XS));
   }
 
-  void foreground() override
+  void onForeground() override
   {
-    if (_deleted) return;
-
     bool hasGPS = serialGetModePort(UART_MODE_GPS) >= 0;
 
     if (numSats) numSats->show(hasGPS && (gpsData.numSat > 0));

@@ -123,8 +123,6 @@ class TimerWidget : public TrackedWidget
 
   void refresh() override
   {
-    if (!loaded || _deleted) return;
-
     auto widgetData = getPersistentData();
 
     uint32_t index = widgetData->options[0].value.unsignedValue;
@@ -251,10 +249,8 @@ class TimerWidget : public TrackedWidget
   StaticIcon* timerBg = nullptr;
   StaticIcon* timerIcon = nullptr;
 
-  void update() override
+  void onUpdate() override
   {
-    if (!loaded || _deleted) return;
-
     auto widgetData = getPersistentData();
 
     // Set up widget from options.

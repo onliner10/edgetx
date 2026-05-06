@@ -22,54 +22,54 @@
 
 void FlexGridLayout::apply(Window* w)
 {
-  if (!w || !w->getLvObj()) return;
+  if (!w) return;
 
   w->padAll(padding);
 
-  // layout
-  lv_obj_set_layout(w->getLvObj(), LV_LAYOUT_GRID);
-  if (col_dsc && row_dsc) {
-    lv_obj_set_grid_dsc_array(w->getLvObj(), col_dsc, row_dsc);
-  }
+  w->visitLive([&](Window::LiveWindow& live) {
+    // layout
+    lv_obj_set_layout(live.lvobj(), LV_LAYOUT_GRID);
+    if (col_dsc && row_dsc) {
+      lv_obj_set_grid_dsc_array(live.lvobj(), col_dsc, row_dsc);
+    }
+  });
 }
 
 void FlexGridLayout::add(Window* w)
 {
-  if (!w || !w->getLvObj()) return;
+  if (!w) return;
 
-  if (col_dsc && row_dsc) {
-    lv_obj_set_grid_cell(w->getLvObj(), LV_GRID_ALIGN_START, col_pos, col_span,
-                         LV_GRID_ALIGN_CENTER, row_pos, row_span);
-  }
+  w->visitLive([&](Window::LiveWindow& live) {
+    if (col_dsc && row_dsc) {
+      lv_obj_set_grid_cell(live.lvobj(), LV_GRID_ALIGN_START, col_pos, col_span,
+                           LV_GRID_ALIGN_CENTER, row_pos, row_span);
+    }
+  });
 }
 
 FormField::FormField(Window* parent, const rect_t& rect, LvglCreate objConstruct) :
     Window(parent, rect, objConstruct)
 {
   setTextFlag(textFlags);
-  if (!lvobj) return;
-  lv_obj_add_flag(lvobj, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+  withLvObj([](lv_obj_t* obj) {
+    lv_obj_add_flag(obj, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+  });
 }
 
 void FormField::setEditMode(bool newEditMode)
 {
-  if (!isAvailable()) {
+  if (!dispatchLive([&](LiveWindow& live) {
+        editMode = newEditMode;
+
+        lv_group_t* grp = (lv_group_t*)lv_obj_get_group(live.lvobj());
+        if (grp != nullptr) lv_group_set_editing(grp, editMode);
+      })) {
     editMode = false;
-    return;
-  }
-
-  editMode = newEditMode;
-
-  if (lvobj != nullptr) {
-    lv_group_t* grp = (lv_group_t*)lv_obj_get_group(lvobj);
-    if (grp != nullptr) lv_group_set_editing(grp, editMode);
   }
 }
 
-void FormField::onClicked()
+void FormField::onLiveClicked(Window::LiveWindow&)
 {
-  if (!isAvailable()) return;
-
   lv_indev_type_t indev_type = lv_indev_get_type(lv_indev_get_act());
   if (indev_type != LV_INDEV_TYPE_POINTER) {
     setEditMode(!editMode);
@@ -85,32 +85,29 @@ void FormField::onCancel()
   }
 }
 
-void FormField::deleteLater()
+void FormField::onDelete()
 {
-  if (_deleted) return;
-
   if (isEditMode()) setEditMode(false);
-  Window::deleteLater();
 }
 
 FormLine::FormLine(Window* parent, FlexGridLayout& layout) :
     Window(parent, rect_t{}), layout(layout)
 {
   setWindowFlag(NO_FOCUS);
-  if (!lvobj) return;
 
   layout.resetPos();
   layout.apply(this);
 
-  lv_obj_set_width(lvobj, lv_pct(100));
-  lv_obj_set_height(lvobj, LV_SIZE_CONTENT);
+  withLvObj([](lv_obj_t* obj) {
+    lv_obj_set_width(obj, lv_pct(100));
+    lv_obj_set_height(obj, LV_SIZE_CONTENT);
+  });
 }
 
-void FormLine::addChild(Window* window)
+bool FormLine::addChild(Window* window)
 {
-  if (!window || !window->isAvailable() || !window->getLvObj()) return;
-
-  Window::addChild(window);
+  if (!Window::addChild(window)) return false;
   layout.add(window);
   layout.nextCell();
+  return true;
 }

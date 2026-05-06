@@ -549,7 +549,7 @@ class ModuleWindow : public Window
     idUnique->setText(idStr);
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     if (bindButton != nullptr) {
       if (TELEMETRY_STREAMING() && isModuleELRS(moduleIdx))
@@ -559,7 +559,7 @@ class ModuleWindow : public Window
 
       bindButton->show(isModuleBindRangeAvailable(moduleIdx));
     }
-    Window::checkEvents();
+    Window::onLiveCheckEvents(live);
   }
 
   static void mw_refresh_cb(lv_event_t* e)

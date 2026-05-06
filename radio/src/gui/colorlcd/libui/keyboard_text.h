@@ -57,6 +57,7 @@ class TextKeyboard : public Keyboard
   void toggleCase();
   void deleteChar();
   void backspace();
+  void noop();
 
   void onPressSYS() override;
   void onLongPressSYS() override;

@@ -55,7 +55,7 @@ class StickCalibrationWindow : public Window
     checkEvents();
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     int32_t x = calibratedAnalogs[stickX];
     int32_t y = calibratedAnalogs[stickY];
@@ -163,9 +163,9 @@ void RadioCalibrationPage::setState()
   }
 }
 
-void RadioCalibrationPage::checkEvents()
+void RadioCalibrationPage::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  Page::checkEvents();
+  Page::onLiveCheckEvents(live);
 
   if (menuCalibrationState == CALIB_SET_MIDPOINT) {
     adcCalibSetMidPoint();

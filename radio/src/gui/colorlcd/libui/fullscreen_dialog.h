@@ -48,7 +48,7 @@ class FullScreenDialog : public NavWindow
   std::string automationText() const override { return title; }
 #endif
 
-  bool onLongPress() override;
+  bool onLiveLongPress(LiveWindow&) override;
   void onCancel() override { deleteLater(); }
 
   void closeDialog();

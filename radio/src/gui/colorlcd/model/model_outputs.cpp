@@ -194,11 +194,11 @@ class OutputLineButton : public ListLineButton
 
   bool isActive() const override { return false; }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     if (!loaded) return;
 
-    ListLineButton::checkEvents();
+    ListLineButton::onLiveCheckEvents(live);
 
     int newValue = channelOutputs[index];
     if (value != newValue) {

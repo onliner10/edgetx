@@ -543,7 +543,7 @@ HeaderDateTime::HeaderDateTime(Window* parent, coord_t x, coord_t y) :
   checkEvents();
 }
 
-void HeaderDateTime::checkEvents()
+void HeaderDateTime::onLiveCheckEvents(Window::LiveWindow& live)
 {
   const TimerOptions timerOptions = {.options = SHOW_TIME};
   struct gtm t;

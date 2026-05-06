@@ -99,8 +99,6 @@ class ValueWidget : public TrackedWidget
 
   void refresh() override
   {
-    if (!loaded || _deleted) return;
-
     bool changed = false;
 
     auto widgetData = getPersistentData();
@@ -208,10 +206,8 @@ class ValueWidget : public TrackedWidget
   static LAYOUT_VAL_SCALED(H_CHK, 50)
   static LAYOUT_VAL_SCALED(W_CHK, 120)
 
-  void update() override
+  void onUpdate() override
   {
-    if (!loaded || _deleted) return;
-
     auto widgetData = getPersistentData();
 
     // get source from options[0]

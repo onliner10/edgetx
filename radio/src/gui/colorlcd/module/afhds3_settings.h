@@ -44,7 +44,7 @@ class AFHDS3Settings : public Window, public ModuleOptions
   void hideAFHDS3Options();
   void showAFHDS3Options();
 
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
   void update() override;
 
 public:

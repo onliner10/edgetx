@@ -105,14 +105,14 @@ class CurveEdit : public Curve
   lv_obj_t* pointDots[17] = { nullptr };
   Messaging previewUpdateMsg;
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     if (!lockSource) {
       int16_t val = getMovedSource(MIXSRC_FIRST_STICK);
       if (val > 0)
         currentSource = val;
     }
-    Curve::checkEvents();
+    Curve::onLiveCheckEvents(live);
   }
 };
 

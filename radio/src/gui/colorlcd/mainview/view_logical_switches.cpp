@@ -21,14 +21,14 @@
 
 #include "view_logical_switches.h"
 
+#include <new>
+
 #include "button.h"
 #include "edgetx.h"
 #include "etx_lv_theme.h"
 #include "quick_menu.h"
 #include "static.h"
 #include "switches.h"
-
-#include <new>
 
 #if PORTRAIT
 
@@ -44,7 +44,8 @@ LAYOUT_VAL_SCALED(LS_C1, 60)
 LAYOUT_VAL_SCALED(LS_C3, 112)
 LAYOUT_VAL_SCALED(LS_C5, 50)
 static const lv_coord_t f_col_dsc[] = {
-    LS_C1, LV_GRID_FR(1), LS_C3, LV_GRID_FR(1), LS_C5, LS_C5, LV_GRID_TEMPLATE_LAST};
+    LS_C1, LV_GRID_FR(1),        LS_C3, LV_GRID_FR(1), LS_C5,
+    LS_C5, LV_GRID_TEMPLATE_LAST};
 
 #endif
 
@@ -64,130 +65,125 @@ class LogicalSwitchDisplayFooter : public Window
     padAll(PAD_ZERO);
     padLeft(PAD_SMALL);
     padRight(PAD_SMALL);
-    etx_solid_bg(lvobj, COLOR_THEME_SECONDARY1_INDEX);
 
-    lv_obj_set_layout(lvobj, LV_LAYOUT_GRID);
-    lv_obj_set_grid_dsc_array(lvobj, f_col_dsc, row_dsc);
-    lv_obj_set_style_pad_row(lvobj, 0, 0);
-    lv_obj_set_style_pad_column(lvobj, PAD_TINY, 0);
+    if (dispatchLive([&](LiveWindow& live) {
+          auto obj = live.lvobj();
+          etx_solid_bg(obj, COLOR_THEME_SECONDARY1_INDEX);
 
-    lsFunc = etx_label_create(lvobj);
-    etx_obj_add_style(lsFunc, styles->text_align_left, LV_PART_MAIN);
-    etx_txt_color(lsFunc, COLOR_THEME_PRIMARY2_INDEX);
-    lv_obj_set_grid_cell(lsFunc, LV_GRID_ALIGN_STRETCH, 0, 1,
-                         LV_GRID_ALIGN_CENTER, 0, 1);
+          lv_obj_set_layout(obj, LV_LAYOUT_GRID);
+          lv_obj_set_grid_dsc_array(obj, f_col_dsc, row_dsc);
+          lv_obj_set_style_pad_row(obj, 0, 0);
+          lv_obj_set_style_pad_column(obj, PAD_TINY, 0);
 
-    lsV1 = etx_label_create(lvobj);
-    etx_obj_add_style(lsV1, styles->text_align_left, LV_PART_MAIN);
-    etx_txt_color(lsV1, COLOR_THEME_PRIMARY2_INDEX);
-    lv_obj_set_grid_cell(lsV1, LV_GRID_ALIGN_STRETCH, 1, 1,
-                         LV_GRID_ALIGN_CENTER, 0, 1);
+          auto createLabel = [&](uint8_t col, uint8_t colCnt, uint8_t row,
+                                 lv_obj_t*& label) {
+            label = etx_label_create(obj);
+            if (!requireLvObj(label)) return false;
+            etx_obj_add_style(label, styles->text_align_left, LV_PART_MAIN);
+            etx_txt_color(label, COLOR_THEME_PRIMARY2_INDEX);
+            lv_obj_set_grid_cell(label, LV_GRID_ALIGN_STRETCH, col, colCnt,
+                                 LV_GRID_ALIGN_CENTER, row, 1);
+            return true;
+          };
 
-    lsV2 = etx_label_create(lvobj);
-    etx_obj_add_style(lsV2, styles->text_align_left, LV_PART_MAIN);
-    etx_txt_color(lsV2, COLOR_THEME_PRIMARY2_INDEX);
-    lv_obj_set_grid_cell(lsV2, LV_GRID_ALIGN_STRETCH, 2, V2_COL_CNT,
-                         LV_GRID_ALIGN_CENTER, 0, 1);
+          if (!createLabel(0, 1, 0, lsFunc)) return false;
+          if (!createLabel(1, 1, 0, lsV1)) return false;
+          if (!createLabel(2, V2_COL_CNT, 0, lsV2)) return false;
+          if (!createLabel(ANDSW_COL, 1, ANDSW_ROW, lsAnd)) return false;
+          if (!createLabel(ANDSW_COL + 1, 1, ANDSW_ROW, lsDuration))
+            return false;
+          if (!createLabel(ANDSW_COL + 2, 1, ANDSW_ROW, lsDelay)) return false;
 
-    lsAnd = etx_label_create(lvobj);
-    etx_obj_add_style(lsAnd, styles->text_align_left, LV_PART_MAIN);
-    etx_txt_color(lsAnd, COLOR_THEME_PRIMARY2_INDEX);
-    lv_obj_set_grid_cell(lsAnd, LV_GRID_ALIGN_STRETCH, ANDSW_COL, 1,
-                         LV_GRID_ALIGN_CENTER, ANDSW_ROW, 1);
-
-    lsDuration = etx_label_create(lvobj);
-    etx_obj_add_style(lsDuration, styles->text_align_left, LV_PART_MAIN);
-    etx_txt_color(lsDuration, COLOR_THEME_PRIMARY2_INDEX);
-    lv_obj_set_grid_cell(lsDuration, LV_GRID_ALIGN_STRETCH, ANDSW_COL + 1, 1,
-                         LV_GRID_ALIGN_CENTER, ANDSW_ROW, 1);
-
-    lsDelay = etx_label_create(lvobj);
-    etx_obj_add_style(lsDelay, styles->text_align_left, LV_PART_MAIN);
-    etx_txt_color(lsDelay, COLOR_THEME_PRIMARY2_INDEX);
-    lv_obj_set_grid_cell(lsDelay, LV_GRID_ALIGN_STRETCH, ANDSW_COL + 2, 1,
-                         LV_GRID_ALIGN_CENTER, ANDSW_ROW, 1);
-
-    lv_obj_update_layout(parent->getLvObj());
-
-    refresh();
+          if (parent) {
+            parent->visitLive([](Window::LiveWindow& liveParent) {
+              lv_obj_update_layout(liveParent.lvobj());
+            });
+          }
+          return true;
+        })) {
+      refresh();
+    }
   }
 
   void refresh()
   {
-    if (deleted()) return;
+    visitLive([&](LiveWindow&) {
+      if (!lsFunc || !lsV1 || !lsV2 || !lsAnd || !lsDuration || !lsDelay)
+        return;
 
-    LogicalSwitchData* ls = lswAddress(lsIndex);
-    uint8_t lsFamily = lswFamily(ls->func);
+      LogicalSwitchData* ls = lswAddress(lsIndex);
+      uint8_t lsFamily = lswFamily(ls->func);
 
-    char s[20] = "";
+      char s[20] = "";
 
-    lv_label_set_text(lsFunc, STR_VCSWFUNC[ls->func]);
+      lv_label_set_text(lsFunc, STR_VCSWFUNC[ls->func]);
 
-    // CSW params - V1
-    switch (lsFamily) {
-      case LS_FAMILY_BOOL:
-      case LS_FAMILY_STICKY:
-      case LS_FAMILY_EDGE:
-        lv_label_set_text(lsV1, getSwitchPositionName(ls->v1));
-        break;
-      case LS_FAMILY_TIMER:
-        lv_label_set_text(lsV1, formatNumberAsString(lswTimerValue(ls->v1),
-                                                     PREC1, 0, nullptr, "s")
-                                    .c_str());
-        break;
-      default:
-        lv_label_set_text(lsV1, getSourceString(ls->v1));
-        break;
-    }
+      // CSW params - V1
+      switch (lsFamily) {
+        case LS_FAMILY_BOOL:
+        case LS_FAMILY_STICKY:
+        case LS_FAMILY_EDGE:
+          lv_label_set_text(lsV1, getSwitchPositionName(ls->v1));
+          break;
+        case LS_FAMILY_TIMER:
+          lv_label_set_text(lsV1, formatNumberAsString(lswTimerValue(ls->v1),
+                                                       PREC1, 0, nullptr, "s")
+                                      .c_str());
+          break;
+        default:
+          lv_label_set_text(lsV1, getSourceString(ls->v1));
+          break;
+      }
 
-    // CSW params - V2
-    switch (lsFamily) {
-      case LS_FAMILY_BOOL:
-      case LS_FAMILY_STICKY:
-        lv_label_set_text(lsV2, getSwitchPositionName(ls->v2));
-        break;
-      case LS_FAMILY_EDGE:
-        getsEdgeDelayParam(s, ls);
-        lv_label_set_text(lsV2, s);
-        break;
-      case LS_FAMILY_TIMER:
-        lv_label_set_text(lsV2, formatNumberAsString(lswTimerValue(ls->v2),
-                                                     PREC1, 0, nullptr, "s")
-                                    .c_str());
-        break;
-      case LS_FAMILY_COMP:
-        lv_label_set_text(lsV2, getSourceString(ls->v2));
-        break;
-      default:
+      // CSW params - V2
+      switch (lsFamily) {
+        case LS_FAMILY_BOOL:
+        case LS_FAMILY_STICKY:
+          lv_label_set_text(lsV2, getSwitchPositionName(ls->v2));
+          break;
+        case LS_FAMILY_EDGE:
+          getsEdgeDelayParam(s, ls);
+          lv_label_set_text(lsV2, s);
+          break;
+        case LS_FAMILY_TIMER:
+          lv_label_set_text(lsV2, formatNumberAsString(lswTimerValue(ls->v2),
+                                                       PREC1, 0, nullptr, "s")
+                                      .c_str());
+          break;
+        case LS_FAMILY_COMP:
+          lv_label_set_text(lsV2, getSourceString(ls->v2));
+          break;
+        default:
+          lv_label_set_text(
+              lsV2,
+              getSourceCustomValueString(
+                  ls->v1,
+                  (ls->v1 <= MIXSRC_LAST_CH ? calc100toRESX(ls->v2) : ls->v2),
+                  0));
+          break;
+      }
+
+      // AND switch
+      lv_label_set_text(lsAnd, getSwitchPositionName(ls->andsw));
+
+      // CSW duration
+      if (ls->duration > 0) {
         lv_label_set_text(
-            lsV2,
-            getSourceCustomValueString(
-                ls->v1,
-                (ls->v1 <= MIXSRC_LAST_CH ? calc100toRESX(ls->v2) : ls->v2),
-                0));
-        break;
-    }
+            lsDuration,
+            formatNumberAsString(ls->duration, PREC1, 0, nullptr, "s").c_str());
+      } else {
+        lv_label_set_text(lsDuration, "");
+      }
 
-    // AND switch
-    lv_label_set_text(lsAnd, getSwitchPositionName(ls->andsw));
-
-    // CSW duration
-    if (ls->duration > 0) {
-      lv_label_set_text(
-          lsDuration,
-          formatNumberAsString(ls->duration, PREC1, 0, nullptr, "s").c_str());
-    } else {
-      lv_label_set_text(lsDuration, "");
-    }
-
-    // CSW delay
-    if (lsFamily != LS_FAMILY_EDGE && ls->delay > 0) {
-      lv_label_set_text(
-          lsDelay,
-          formatNumberAsString(ls->delay, PREC1, 0, nullptr, "s").c_str());
-    } else {
-      lv_label_set_text(lsDelay, "");
-    }
+      // CSW delay
+      if (lsFamily != LS_FAMILY_EDGE && ls->delay > 0) {
+        lv_label_set_text(
+            lsDelay,
+            formatNumberAsString(ls->delay, PREC1, 0, nullptr, "s").c_str());
+      } else {
+        lv_label_set_text(lsDelay, "");
+      }
+    });
   }
 
   void setIndex(unsigned value)
@@ -196,12 +192,10 @@ class LogicalSwitchDisplayFooter : public Window
     refresh();
   }
 
-  static LAYOUT_ORIENTATION(V2_COL_CNT, 1, 2)
-  static LAYOUT_ORIENTATION(ANDSW_ROW, 0, 1)
-  static LAYOUT_ORIENTATION(ANDSW_COL, 3, 1)
+ static LAYOUT_ORIENTATION(V2_COL_CNT, 1, 2) static LAYOUT_ORIENTATION(
+     ANDSW_ROW, 0, 1) static LAYOUT_ORIENTATION(ANDSW_COL, 3, 1)
 
- protected:
-  unsigned lsIndex = 0;
+     protected : unsigned lsIndex = 0;
   lv_obj_t* lsFunc = nullptr;
   lv_obj_t* lsV1 = nullptr;
   lv_obj_t* lsV2 = nullptr;
@@ -225,7 +219,8 @@ void LogicalSwitchesViewPage::build(Window* window)
 {
   window->padAll(PAD_ZERO);
 
-  coord_t xo = (LCD_W - (BTN_MATRIX_COL * (BTN_WIDTH + PAD_TINY) - PAD_TINY)) / 2;
+  coord_t xo =
+      (LCD_W - (BTN_MATRIX_COL * (BTN_WIDTH + PAD_TINY) - PAD_TINY)) / 2;
   coord_t yo = PAD_TINY;
 
   // Footer
@@ -234,7 +229,10 @@ void LogicalSwitchesViewPage::build(Window* window)
       {0, window->height() - FOOTER_HEIGHT, window->width(), FOOTER_HEIGHT});
   if (!footer) return;
 
-  int btnHeight = (window->height() - FOOTER_HEIGHT) / ((MAX_LOGICAL_SWITCHES + BTN_MATRIX_COL - 1) / BTN_MATRIX_COL) - PAD_TINY;
+  int btnHeight =
+      (window->height() - FOOTER_HEIGHT) /
+          ((MAX_LOGICAL_SWITCHES + BTN_MATRIX_COL - 1) / BTN_MATRIX_COL) -
+      PAD_TINY;
 
   // LSW table
   std::string lsString("L64");
@@ -248,14 +246,22 @@ void LogicalSwitchesViewPage::build(Window* window)
     strAppendSigned(&lsString[1], i + 1, 2);
 
     if (isActive) {
-      auto button = new (std::nothrow) TextButton(window, {x, y, BTN_WIDTH, btnHeight}, lsString);
+      auto button = new (std::nothrow)
+          TextButton(window, {x, y, BTN_WIDTH, btnHeight}, lsString);
       if (!button) continue;
-      button->setCheckHandler([=]() { button->check(getSwitch(SWSRC_FIRST_LOGICAL_SWITCH + i)); });
-      button->setFocusHandler([=](bool focus) { if (focus) { footer->setIndex(i); } });
+      button->setCheckHandler(
+          [=]() { button->check(getSwitch(SWSRC_FIRST_LOGICAL_SWITCH + i)); });
+      button->setFocusHandler([=](bool focus) {
+        if (focus) {
+          footer->setIndex(i);
+        }
+      });
     } else {
       if (btnHeight > EdgeTxStyles::STD_FONT_HEIGHT)
         y += (btnHeight - EdgeTxStyles::STD_FONT_HEIGHT) / 2;
-      new (std::nothrow) StaticText(window, {x, y, BTN_WIDTH, btnHeight}, lsString, COLOR_THEME_DISABLED_INDEX, CENTERED);
+      new (std::nothrow)
+          StaticText(window, {x, y, BTN_WIDTH, btnHeight}, lsString,
+                     COLOR_THEME_DISABLED_INDEX, CENTERED);
     }
   }
 }

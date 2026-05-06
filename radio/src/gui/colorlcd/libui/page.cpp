@@ -122,11 +122,10 @@ Page::Page(EdgeTxIcon icon, PaddingSize padding, bool pauseRefresh) :
 
 void Page::onCancel()
 {
-  if (!_deleted)
-    deleteLater();
+  deleteLater();
 }
 
-void Page::onClicked() { Keyboard::hide(false); }
+void Page::onLiveClicked(LiveWindow&) { Keyboard::hide(false); }
 
 void Page::enableRefresh()
 {

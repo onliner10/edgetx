@@ -180,7 +180,7 @@ class HeaderDateTime : public Window
   lv_obj_t *time = nullptr;
   struct gtm lastTime = { 0 };
 
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 };
 
 class HeaderIcon : public StaticIcon
@@ -195,7 +195,7 @@ class HeaderIcon : public StaticIcon
   std::function<void()> action;
   StaticIcon* icon = nullptr;
 
-  void onClicked() override
+  void onLiveClicked(LiveWindow&) override
   {
     if (action) action();
   }
@@ -209,7 +209,7 @@ class HeaderBackIcon : public StaticIcon
  protected:
   std::function<void()> action;
 
-  void onClicked() override
+  void onLiveClicked(LiveWindow&) override
   {
     if (action) action();
   }

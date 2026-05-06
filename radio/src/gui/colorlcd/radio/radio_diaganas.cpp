@@ -243,9 +243,9 @@ class AnaCalibratedViewWindow : public AnaViewWindow
   }
 
 #if defined(HARDWARE_TOUCH)
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
-    AnaViewWindow::checkEvents();
+    AnaViewWindow::onLiveCheckEvents(live);
 
     TouchState rawTouchState = getInternalTouchState();
     if (rawTouchState.event != TE_NONE && rawTouchState.event != TE_SLIDE_END) {
@@ -264,14 +264,11 @@ class AnaCalibratedViewWindow : public AnaViewWindow
     }
   }
 
-  void deleteLater() override
+  void onDelete() override
   {
-    if (!deleted()) {
-      // Attached to parent->parent window
-      lv_obj_del(touchLines[0]);
-      lv_obj_del(touchLines[1]);
-      AnaViewWindow::deleteLater();
-    }
+    // Attached to parent->parent window
+    lv_obj_del(touchLines[0]);
+    lv_obj_del(touchLines[1]);
   }
 #endif
 
@@ -378,7 +375,7 @@ class AnaFilteredDevViewWindow : public AnaViewWindow
     for (int i = 0; i < max_inputs; i++) stats[i].clear();
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     auto max_inputs =
         adcGetMaxInputs(ADC_INPUT_MAIN) + adcGetMaxInputs(ADC_INPUT_FLEX);
@@ -386,7 +383,7 @@ class AnaFilteredDevViewWindow : public AnaViewWindow
     for (int i = 0; i < max_inputs; i++) {
       stats[i].write(getAnalogValue(i));
     }
-    AnaViewWindow::checkEvents();
+    AnaViewWindow::onLiveCheckEvents(live);
   }
 };
 
@@ -471,7 +468,7 @@ class AnaMinMaxViewWindow : public AnaViewWindow
     AnaViewWindow::build();
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     auto max_inputs =
         adcGetMaxInputs(ADC_INPUT_MAIN) + adcGetMaxInputs(ADC_INPUT_FLEX);
@@ -479,7 +476,7 @@ class AnaMinMaxViewWindow : public AnaViewWindow
     for (int i = 0; i < max_inputs; i++) {
       minmax[i].write(getAnalogValue(i));
     }
-    AnaViewWindow::checkEvents();
+    AnaViewWindow::onLiveCheckEvents(live);
   }
 
   static LAYOUT_SIZE(GRIDCOLS, 10, 5)

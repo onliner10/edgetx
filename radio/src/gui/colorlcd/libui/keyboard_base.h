@@ -34,7 +34,7 @@ class Keyboard : public NavWindow
   static Keyboard* keyboardWindow() { return activeKeyboard; }
 
  protected:
-  static Keyboard *activeKeyboard;
+  static Keyboard* activeKeyboard;
 
   bool hasTwoPageKeys;
   lv_group_t* group = nullptr;
@@ -52,23 +52,37 @@ class Keyboard : public NavWindow
     Window* container;
   };
 
-  bool acceptsKeyboardInput() const
+  template <typename T>
+  void runPageKey(T& keyboard, void (T::*singlePageAction)(),
+                  void (T::*twoPageAction)()) const
   {
-    return acceptsEvents() && keyboard != nullptr;
+    (keyboard.*(hasTwoPageKeys ? twoPageAction : singlePageAction))();
   }
 
   void showKeyboard();
+  bool isKeyboardReady() const { return keyboard && group && acceptsEvents(); }
   bool bindField(FormField* newField, FieldBinding& binding) const;
+
+  template <typename T>
+  static void discardKeyboard(T*& instance)
+  {
+    auto keyboard = instance;
+    instance = nullptr;
+    if (!keyboard) return;
+    if (activeKeyboard == keyboard) {
+      activeKeyboard = nullptr;
+      keyboard->clearField(true);
+    }
+    keyboard->deleteLater();
+  }
 
   template <typename T>
   static T* liveKeyboard(T*& instance)
   {
+    if (instance && !instance->isKeyboardReady()) discardKeyboard(instance);
     if (!instance) instance = Window::makeLive<T>();
-    if (instance && instance->acceptsKeyboardInput()) return instance;
-
-    delete instance;
-    instance = nullptr;
-    return nullptr;
+    if (instance && !instance->isKeyboardReady()) discardKeyboard(instance);
+    return instance;
   }
 
   template <typename T, typename Configure>
@@ -80,7 +94,10 @@ class Keyboard : public NavWindow
     FieldBinding binding{};
     if (!keyboard || !keyboard->bindField(newField, binding)) return nullptr;
 
-    if (!keyboard->setField(binding)) return nullptr;
+    if (!keyboard->setField(binding)) {
+      if (!keyboard->isKeyboardReady()) discardKeyboard(instance);
+      return nullptr;
+    }
     configure(*keyboard);
     keyboard->showKeyboard();
     return keyboard;
@@ -88,5 +105,5 @@ class Keyboard : public NavWindow
 
   bool setField(const FieldBinding& binding);
   bool attachKeyboard();
-  void deleteLater() override;
+  void onDelete() override;
 };

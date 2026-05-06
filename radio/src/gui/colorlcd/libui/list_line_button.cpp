@@ -79,10 +79,10 @@ ListLineButton::ListLineButton(Window* parent, uint8_t index) :
 {
 }
 
-void ListLineButton::checkEvents()
+void ListLineButton::onLiveCheckEvents(Window::LiveWindow& live)
 {
   check(isActive());
-  ButtonBase::checkEvents();
+  ButtonBase::onLiveCheckEvents(live);
 }
 
 InputMixButtonBase::InputMixButtonBase(Window* parent, uint8_t index) :
@@ -101,7 +101,6 @@ InputMixButtonBase::~InputMixButtonBase()
 bool InputMixButtonBase::ensureLineLabel(lv_obj_t*& label, coord_t x, coord_t y,
                                          coord_t w, coord_t h)
 {
-  if (!liveLvObj()) return false;
   if (label) return true;
 
   return initRequiredLvObj(label, list_line_label_create, [&](lv_obj_t* obj) {
@@ -152,94 +151,96 @@ void InputMixButtonBase::setOpts(const char* s)
 
 void InputMixButtonBase::setFlightModes(uint16_t modes)
 {
-  auto obj = liveLvObj();
-  if (!obj) {
+  bool handled = dispatchLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
+
+    if (!modelFMEnabled()) return;
+    if (modes == fm_modes) return;
+    fm_modes = modes;
+
+    if (!fm_modes) {
+      if (!fm_canvas) return;
+      lv_obj_del(fm_canvas);
+      free(fm_buffer);
+      fm_canvas = nullptr;
+      fm_buffer = nullptr;
+      updateHeight();
+      return;
+    }
+
+    if (!fm_canvas) {
+      auto newCanvas = lv_canvas_create(obj);
+      if (!newCanvas) {
+        fm_modes = 0;
+        updateHeight();
+        return;
+      }
+
+#if defined(SIMU)
+      auto newBuffer = forceFmBufferMallocFailure
+                           ? nullptr
+                           : malloc(FM_CANVAS_WIDTH * FM_CANVAS_HEIGHT);
+#else
+      auto newBuffer = malloc(FM_CANVAS_WIDTH * FM_CANVAS_HEIGHT);
+#endif
+      if (!newBuffer) {
+        lv_obj_del(newCanvas);
+        fm_modes = 0;
+        updateHeight();
+        return;
+      }
+
+      fm_canvas = newCanvas;
+      fm_buffer = newBuffer;
+      lv_canvas_set_buffer(fm_canvas, fm_buffer, FM_CANVAS_WIDTH,
+                           FM_CANVAS_HEIGHT, LV_IMG_CF_ALPHA_8BIT);
+      lv_obj_set_pos(fm_canvas, FM_X, FM_Y);
+
+      lv_obj_set_style_img_recolor(fm_canvas, makeLvColor(COLOR_THEME_SECONDARY1), LV_PART_MAIN);
+      lv_obj_set_style_img_recolor_opa(fm_canvas, LV_OPA_COVER, LV_PART_MAIN);
+      lv_obj_set_style_img_recolor(fm_canvas, makeLvColor(COLOR_THEME_PRIMARY1), LV_PART_MAIN | LV_STATE_CHECKED);
+      lv_obj_set_style_img_recolor_opa(fm_canvas, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_CHECKED);
+    }
+
+    lv_canvas_fill_bg(fm_canvas, lv_color_black(), LV_OPA_TRANSP);
+
+    const MaskBitmap* mask = getBuiltinIcon(ICON_TEXTLINE_FM);
+    lv_coord_t w = mask->width;
+    lv_coord_t h = mask->height;
+
+    coord_t x = 0;
+    lv_canvas_copy_buf(fm_canvas, mask->data, x, 0, w, h);
+    x += (w + PAD_TINY);
+
+    lv_draw_label_dsc_t label_dsc;
+    lv_draw_label_dsc_init(&label_dsc);
+
+    lv_draw_rect_dsc_t rect_dsc;
+    lv_draw_rect_dsc_init(&rect_dsc);
+    rect_dsc.bg_opa = LV_OPA_COVER;
+
+    const lv_font_t* font = getFont(FONT(XS));
+    label_dsc.font = font;
+
+    for (int i = 0; i < MAX_FLIGHT_MODES; i++) {
+      char s[] = " ";
+      s[0] = '0' + i;
+      if (fm_modes & (1 << i)) {
+        label_dsc.color = lv_color_make(0x7f, 0x7f, 0x7f);
+      } else {
+        lv_canvas_draw_rect(fm_canvas, x, 0, FM_W, PAD_THREE, &rect_dsc);
+        label_dsc.color = lv_color_white();
+      }
+      lv_canvas_draw_text(fm_canvas, x, 0, FM_W, &label_dsc, s);
+      x += FM_W;
+    }
+
+    updateHeight();
+  });
+  if (!handled) {
     fm_modes = 0;
     return;
   }
-
-  if (!modelFMEnabled()) return;
-  if (modes == fm_modes) return;
-  fm_modes = modes;
-
-  if (!fm_modes) {
-    if (!fm_canvas) return;
-    lv_obj_del(fm_canvas);
-    free(fm_buffer);
-    fm_canvas = nullptr;
-    fm_buffer = nullptr;
-    updateHeight();
-    return;
-  }
-
-  if (!fm_canvas) {
-    auto newCanvas = lv_canvas_create(obj);
-    if (!newCanvas) {
-      fm_modes = 0;
-      updateHeight();
-      return;
-    }
-
-#if defined(SIMU)
-    auto newBuffer = forceFmBufferMallocFailure
-                         ? nullptr
-                         : malloc(FM_CANVAS_WIDTH * FM_CANVAS_HEIGHT);
-#else
-    auto newBuffer = malloc(FM_CANVAS_WIDTH * FM_CANVAS_HEIGHT);
-#endif
-    if (!newBuffer) {
-      lv_obj_del(newCanvas);
-      fm_modes = 0;
-      updateHeight();
-      return;
-    }
-
-    fm_canvas = newCanvas;
-    fm_buffer = newBuffer;
-    lv_canvas_set_buffer(fm_canvas, fm_buffer, FM_CANVAS_WIDTH,
-                         FM_CANVAS_HEIGHT, LV_IMG_CF_ALPHA_8BIT);
-    lv_obj_set_pos(fm_canvas, FM_X, FM_Y);
-
-    lv_obj_set_style_img_recolor(fm_canvas, makeLvColor(COLOR_THEME_SECONDARY1), LV_PART_MAIN);
-    lv_obj_set_style_img_recolor_opa(fm_canvas, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_img_recolor(fm_canvas, makeLvColor(COLOR_THEME_PRIMARY1), LV_PART_MAIN | LV_STATE_CHECKED);
-    lv_obj_set_style_img_recolor_opa(fm_canvas, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_CHECKED);
-  }
-
-  lv_canvas_fill_bg(fm_canvas, lv_color_black(), LV_OPA_TRANSP);
-
-  const MaskBitmap* mask = getBuiltinIcon(ICON_TEXTLINE_FM);
-  lv_coord_t w = mask->width;
-  lv_coord_t h = mask->height;
-
-  coord_t x = 0;
-  lv_canvas_copy_buf(fm_canvas, mask->data, x, 0, w, h);
-  x += (w + PAD_TINY);
-
-  lv_draw_label_dsc_t label_dsc;
-  lv_draw_label_dsc_init(&label_dsc);
-
-  lv_draw_rect_dsc_t rect_dsc;
-  lv_draw_rect_dsc_init(&rect_dsc);
-  rect_dsc.bg_opa = LV_OPA_COVER;
-
-  const lv_font_t* font = getFont(FONT(XS));
-  label_dsc.font = font;
-
-  for (int i = 0; i < MAX_FLIGHT_MODES; i++) {
-    char s[] = " ";
-    s[0] = '0' + i;
-    if (fm_modes & (1 << i)) {
-      label_dsc.color = lv_color_make(0x7f, 0x7f, 0x7f);
-    } else {
-      lv_canvas_draw_rect(fm_canvas, x, 0, FM_W, PAD_THREE, &rect_dsc);
-      label_dsc.color = lv_color_white();
-    }
-    lv_canvas_draw_text(fm_canvas, x, 0, FM_W, &label_dsc, s);
-    x += FM_W;
-  }
-
-  updateHeight();
 }
 
 #if defined(SIMU)
@@ -333,10 +334,10 @@ bool listLineGroupLabelAllocationFailureFailsClosedForTest()
 }
 #endif
 
-void InputMixButtonBase::checkEvents()
+void InputMixButtonBase::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  ListLineButton::checkEvents();
-  if (liveLvObj() && fm_canvas) {
+  ListLineButton::onLiveCheckEvents(live);
+  if (fm_canvas) {
     bool chkd = lv_obj_get_state(fm_canvas) & LV_STATE_CHECKED;
     if (chkd != this->checked()) {
       if (chkd)
@@ -391,8 +392,6 @@ InputMixGroupBase::InputMixGroupBase(Window* parent, mixsrc_t idx) :
 
 void InputMixGroupBase::_adjustHeight(coord_t y)
 {
-  if (!liveLvObj()) return;
-
   if (getLineCount() == 0) setHeight(ListLineButton::BTN_H + PAD_SMALL * 2);
 
   for (auto it = lines.cbegin(); it != lines.cend(); ++it) {
@@ -411,7 +410,8 @@ void InputMixGroupBase::adjustHeight()
 
 void InputMixGroupBase::addLine(InputMixButtonBase* line)
 {
-  if (!line || Window::fromAvailableLvObj(line->getLvObj()) != line) return;
+  if (!line || !line->visitLive([](Window::LiveWindow&) { return true; }))
+    return;
 
   auto l = std::find_if(lines.begin(), lines.end(),
                         [=](const InputMixButtonBase* l) -> bool {
@@ -443,7 +443,7 @@ bool InputMixGroupBase::removeLine(InputMixButtonBase* line)
 
 void InputMixGroupBase::refresh()
 {
-  if (!liveLvObj() || !label) return;
+  if (!label) return;
 
   char* s = getSourceString(idx);
   if (getTextWidth(s, 0, FONT(STD)) > InputMixButtonBase::LN_X - PAD_TINY)

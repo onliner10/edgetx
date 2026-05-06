@@ -274,7 +274,7 @@ LuaWidget::~LuaWidget()
     free(errorMessage);
 }
 
-void LuaWidget::onClicked()
+void LuaWidget::onLiveClicked(Window::LiveWindow&)
 {
   if (!fullscreen) {
     ButtonBase::onClicked();
@@ -294,7 +294,7 @@ void LuaWidget::onCancel()
   LuaScriptManager::onCancelEvent();
 }
 
-void LuaWidget::foreground()
+void LuaWidget::onForeground()
 {
   if (closeFS) {
     closeFS = false;
@@ -330,7 +330,7 @@ void LuaWidget::foreground()
 #endif
 }
 
-void LuaWidget::updateWithoutRefresh()
+void LuaWidget::onUpdateWithoutRefresh()
 {
   if (lsWidgets == 0 || errorMessage || luaFactory()->updateFunction == LUA_REFNIL) return;
 
@@ -369,11 +369,9 @@ void LuaWidget::updateWithoutRefresh()
   luaScriptManager = save;
 }
 
-void LuaWidget::update()
+void LuaWidget::onUpdate()
 {
-  updateWithoutRefresh();
-
-  Widget::update();
+  onUpdateWithoutRefresh();
 
   auto save = luaScriptManager;
   luaScriptManager = this;
@@ -540,7 +538,7 @@ void LuaWidget::refresh(BitmapBuffer* dc)
   luaLcdBuffer = nullptr;
 }
 
-void LuaWidget::background()
+void LuaWidget::onBackground()
 {
   if (lsWidgets == 0 || errorMessage) return;
 
@@ -557,12 +555,12 @@ void LuaWidget::background()
   }
 }
 
-void LuaWidget::onEvent(event_t event)
+void LuaWidget::onLiveEvent(Window::LiveWindow& live, event_t event)
 {
   if (fullscreen) {
     LuaScriptManager::onLuaEvent(event);
   }
-  Widget::onEvent(event);
+  Widget::onLiveEvent(live, event);
 }
 
 void LuaWidget::clear()

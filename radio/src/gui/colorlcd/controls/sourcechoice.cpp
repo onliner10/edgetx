@@ -136,7 +136,7 @@ class SourceChoiceMenuToolbar : public MenuToolbar
   MenuToolbarButton* invertBtn = nullptr;
 };
 
-bool SourceChoice::onLongPress()
+bool SourceChoice::onLiveLongPress(Window::LiveWindow&)
 {
   if (canInvert) {
     int16_t val = _getValue();

@@ -22,6 +22,7 @@
 #include <list>
 #include <new>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 #include "definitions.h"
@@ -31,11 +32,12 @@
 
 class FlexGridLayout;
 class FormLine;
+class MainWindow;
 class PageGroup;
 
 typedef uint32_t WindowFlags;
 
-typedef lv_obj_t *(*LvglCreate)(lv_obj_t *);
+typedef lv_obj_t* (*LvglCreate)(lv_obj_t*);
 
 #if !defined(_GNUC_)
 #undef OPAQUE
@@ -58,8 +60,25 @@ class Window
   };
 
  public:
-  Window(const rect_t &rect);
-  Window(Window *parent, const rect_t &rect, LvglCreate objConstruct = nullptr);
+  class LiveWindow
+  {
+   public:
+    Window& window() const { return window_; }
+    lv_obj_t* lvobj() const { return lvobj_; }
+
+   private:
+    friend class Window;
+
+    LiveWindow(Window& window, lv_obj_t* lvobj) : window_(window), lvobj_(lvobj)
+    {
+    }
+
+    Window& window_;
+    lv_obj_t* lvobj_;
+  };
+
+  Window(const rect_t& rect);
+  Window(Window* parent, const rect_t& rect, LvglCreate objConstruct = nullptr);
 
   virtual ~Window();
 
@@ -69,7 +88,8 @@ class Window
   template <typename T>
   static T* adoptLive(T* window)
   {
-    if (window && !window->acceptsEvents()) {
+    if (window && !window->dispatchLive([](LiveWindow&) {})) {
+      window->detach();
       delete window;
       return nullptr;
     }
@@ -86,12 +106,12 @@ class Window
   virtual std::string getName() const;
   std::string getRectString() const;
   std::string getIndentString() const;
-  std::string getWindowDebugString(const char *name = nullptr) const;
+  std::string getWindowDebugString(const char* name = nullptr) const;
 #endif
 
-  Window *getParent() const { return parent; }
+  Window* getParent() const { return parent; }
 
-  Window *getFullScreenWindow();
+  Window* getFullScreenWindow();
 
   void setWindowFlag(WindowFlags flag);
   void clearWindowFlag(WindowFlags flag);
@@ -111,7 +131,7 @@ class Window
   void setScrollHandler(ScrollHandler h) { scrollHandler = std::move(h); }
 
   virtual void clear();
-  virtual void deleteLater();
+  void deleteLater();
 
   bool hasFocus() const;
   bool focus();
@@ -177,13 +197,13 @@ class Window
   void padBottom(coord_t pad);
   void padAll(PaddingSize pad);
 
-  virtual void onEvent(event_t event);
-  virtual void onClicked();
+  void onEvent(event_t event);
+  void onClicked();
   virtual void onCancel();
-  virtual bool onLongPress();
+  bool onLongPress();
   void dispatchKeyboardEvent(event_t event);
   bool sendLvEvent(lv_event_code_t code, void* param = nullptr);
-  virtual void checkEvents();
+  void checkEvents();
 
 #if defined(SIMU)
   void setAutomationId(std::string value);
@@ -206,15 +226,26 @@ class Window
 
   void invalidate();
 
-  void attach(Window *window);
+  void attach(Window* window);
 
   void detach();
 
-  bool deleted() const { return _deleted; }
   bool isAvailable() const { return availability == Availability::Available; }
   bool hasLiveLvObj() const { return !_deleted && lvobj; }
   bool acceptsEvents() const { return isAvailable() && hasLiveLvObj(); }
   bool loadLvglScreen();
+
+  template <typename Fn>
+  bool visitLive(Fn&& handler)
+  {
+    return dispatchLiveImpl(*this, std::forward<Fn>(handler));
+  }
+
+  template <typename Fn>
+  bool visitLive(Fn&& handler) const
+  {
+    return dispatchLiveImpl(*this, std::forward<Fn>(handler));
+  }
 
 #if defined(HARDWARE_TOUCH)
   void addBackButton();
@@ -223,7 +254,7 @@ class Window
                        const char* automationText = nullptr);
 #endif
 
-  inline lv_obj_t *getLvObj() const { return lvobj; }
+  inline lv_obj_t* getLvObj() const { return lvobj; }
 
   virtual bool isTopBar() { return false; }
   virtual bool isNavWindow() { return false; }
@@ -234,9 +265,9 @@ class Window
   void setFlexLayout(lv_flex_flow_t flow = LV_FLEX_FLOW_COLUMN,
                      lv_coord_t padding = PAD_TINY, coord_t width = LV_PCT(100),
                      coord_t height = LV_SIZE_CONTENT);
-  FormLine *newLine(FlexGridLayout &layout);
+  FormLine* newLine(FlexGridLayout& layout);
 
-  virtual void show(bool visible = true);
+  void show(bool visible = true);
   void hide() { show(false); }
   bool isVisible();
   bool isOnScreen();
@@ -252,26 +283,28 @@ class Window
   void assignLvGroup(lv_group_t* g, bool setDefault);
 
  protected:
-  static std::list<Window *> trash;
+  static std::list<Window*> trash;
 
   rect_t rect;
 
-  Window *parent = nullptr;
-  lv_obj_t *lvobj = nullptr;
+  Window* parent = nullptr;
+  lv_obj_t* lvobj = nullptr;
 
-  std::list<Window *> children;
+  std::list<Window*> children;
 
   WindowFlags windowFlags = 0;
   LcdFlags textFlags = 0;
 
-  bool _deleted = false;
-
  private:
+  friend class MainWindow;
+
+  bool deleted() const { return _deleted; }
+
+  bool _deleted = false;
   Availability availability = Availability::Available;
   bool longPressHandled = false;
 
  protected:
-
   bool loaded = false;
   bool layerCreated = false;
   bool parentHidden = false;
@@ -288,10 +321,15 @@ class Window
 
   void deleteChildren();
 
-  virtual void addChild(Window *window);
+  virtual bool addChild(Window* window);
+  virtual void onDelete() {}
+  virtual void onDeleted() {}
+  virtual void onLiveShow(LiveWindow& live, bool visible);
+  virtual void onLiveEvent(LiveWindow& live, event_t event);
+  virtual void onLiveClicked(LiveWindow& live);
+  virtual bool onLiveLongPress(LiveWindow& live);
+  virtual void onLiveCheckEvents(LiveWindow& live);
 
-  bool hasLvObj() const { return lvobj != nullptr; }
-  lv_obj_t* liveLvObj() const { return acceptsEvents() ? lvobj : nullptr; }
   bool requireLvObj(lv_obj_t* obj);
   void failClosed();
   bool syncOverlay(Window* overlay);
@@ -307,19 +345,18 @@ class Window
   template <typename Fn>
   bool withAvailableLvObj(Fn&& fn) const
   {
-    if (!acceptsEvents()) return false;
-    fn(lvobj);
-    return true;
+    return dispatchLive([&](LiveWindow& live) { fn(live.lvobj()); });
   }
 
   template <typename Create, typename Init>
   bool initRequiredLvObj(lv_obj_t*& target, Create&& create, Init&& init)
   {
-    if (!acceptsEvents()) return false;
-    target = create(lvobj);
-    if (!requireLvObj(target)) return false;
-    init(target);
-    return true;
+    return dispatchLive([&](LiveWindow& live) {
+      target = create(live.lvobj());
+      if (!requireLvObj(target)) return false;
+      init(target);
+      return true;
+    });
   }
 
   template <typename T, typename... Args>
@@ -331,9 +368,44 @@ class Window
     return false;
   }
 
-  void eventHandler(lv_event_t *e);
-  static void window_event_cb(lv_event_t *e);
-  virtual bool customEventHandler(lv_event_code_t code) { return false; }
+  void eventHandler(lv_event_t* e);
+  static void window_event_cb(lv_event_t* e);
+
+  template <typename Fn>
+  static bool invokeLiveHandler(LiveWindow& live, Fn&& handler)
+  {
+    using Result = std::invoke_result_t<Fn, LiveWindow&>;
+    if constexpr (std::is_void_v<Result>) {
+      handler(live);
+      return true;
+    } else {
+      return static_cast<bool>(handler(live));
+    }
+  }
+
+  template <typename Self, typename Fn>
+  static bool dispatchLiveImpl(Self& self, Fn&& handler)
+  {
+    if (!self.acceptsEvents()) return false;
+    LiveWindow live(const_cast<Window&>(self), self.lvobj);
+    return invokeLiveHandler(live, std::forward<Fn>(handler));
+  }
+
+  template <typename Fn>
+  bool dispatchLive(Fn&& handler)
+  {
+    return visitLive(std::forward<Fn>(handler));
+  }
+
+  template <typename Fn>
+  bool dispatchLive(Fn&& handler) const
+  {
+    return visitLive(std::forward<Fn>(handler));
+  }
+  virtual bool onLiveCustomEvent(LiveWindow& live, lv_event_t* event)
+  {
+    return false;
+  }
 
   static void delayLoader(lv_event_t* e);
   void delayLoad();
@@ -345,7 +417,7 @@ class Window
 class NavWindow : public Window
 {
  public:
-  NavWindow(Window *parent, const rect_t &rect,
+  NavWindow(Window* parent, const rect_t& rect,
             LvglCreate objConstruct = nullptr);
 
   bool isNavWindow() override { return true; }
@@ -366,7 +438,7 @@ class NavWindow : public Window
 
  protected:
   virtual bool bubbleEvents() { return true; }
-  void onEvent(event_t event) override;
+  void onLiveEvent(LiveWindow& live, event_t event) override;
 };
 
 struct PageButtonDef {
@@ -381,8 +453,9 @@ struct PageButtonDef {
 class SetupButtonGroup : public Window
 {
  public:
-  SetupButtonGroup(Window* parent, const rect_t& rect, const char* title, int cols,
-                   PaddingSize padding, const PageButtonDef* pages, coord_t btnHeight = EdgeTxStyles::UI_ELEMENT_HEIGHT);
+  SetupButtonGroup(Window* parent, const rect_t& rect, const char* title,
+                   int cols, PaddingSize padding, const PageButtonDef* pages,
+                   coord_t btnHeight = EdgeTxStyles::UI_ELEMENT_HEIGHT);
 
  protected:
 };
@@ -399,12 +472,15 @@ struct SetupLineDef {
 class SetupLine : public Window
 {
  public:
-  SetupLine(Window* parent, coord_t y, coord_t col2, PaddingSize padding, const char* title,
-    std::function<void(SetupLine*, coord_t, coord_t)> createEdit, coord_t lblYOffset = 0);
+  SetupLine(Window* parent, coord_t y, coord_t col2, PaddingSize padding,
+            const char* title,
+            std::function<void(SetupLine*, coord_t, coord_t)> createEdit,
+            coord_t lblYOffset = 0);
   const std::string& getTitle() const { return titleText; }
   const char* getFormFieldTitle() const override { return titleText.c_str(); }
 
-  static coord_t showLines(Window* parent, coord_t y, coord_t col2, PaddingSize padding, const SetupLineDef* setupLines);
+  static coord_t showLines(Window* parent, coord_t y, coord_t col2,
+                           PaddingSize padding, const SetupLineDef* setupLines);
 
   Messaging setupMsg;
 

@@ -85,10 +85,9 @@ class MixLineButton : public InputMixButtonBase
     delayLoad();
   }
 
-  void deleteLater() override
+  void onDelete() override
   {
     if (mplex) mplex->deleteLater();
-    InputMixButtonBase::deleteLater();
   }
 
   void delayedInit() override

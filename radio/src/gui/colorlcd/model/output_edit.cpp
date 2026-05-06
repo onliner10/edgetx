@@ -67,7 +67,7 @@ OutputEditWindow::OutputEditWindow(uint8_t channel) :
   buildBody(body);
 }
 
-void OutputEditWindow::checkEvents()
+void OutputEditWindow::onLiveCheckEvents(Window::LiveWindow& live)
 {
   int newValue = channelOutputs[channel];
   if (value != newValue) {
@@ -92,7 +92,7 @@ void OutputEditWindow::checkEvents()
     }
   }
 
-  Window::checkEvents();
+  Window::onLiveCheckEvents(live);
 }
 
 void OutputEditWindow::buildHeader(Window *window)

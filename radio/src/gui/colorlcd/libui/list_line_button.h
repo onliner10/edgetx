@@ -33,7 +33,7 @@ class ListLineButton : public ButtonBase
   uint8_t getIndex() const { return index; }
   virtual void setIndex(uint8_t i) { index = i; }
 
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 
   virtual void refresh() = 0;
 
@@ -61,7 +61,7 @@ class InputMixButtonBase : public ListLineButton
   virtual void updatePos(coord_t x, coord_t y) = 0;
   virtual void swapLvglGroup(InputMixButtonBase* line2) = 0;
 
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 
   // total: 90 x 17
   static LAYOUT_VAL_SCALED(FM_CANVAS_HEIGHT, 17)

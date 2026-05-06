@@ -40,5 +40,5 @@ class RadioSpectrumAnalyser : public Page
   void start();
   void stop();
 
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 };

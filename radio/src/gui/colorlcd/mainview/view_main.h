@@ -55,11 +55,10 @@ class ViewMain : public NavWindow
 
   TopBar* getTopbar();
 
-  void onClicked() override;
+  void onLiveClicked(LiveWindow&) override;
   void onCancel() override;
-  bool onLongPress() override;
+  bool onLiveLongPress(LiveWindow&) override;
 
-  void show(bool visible = true) override;
   void showTopBarEdgeTxButton();
   void hideTopBarEdgeTxButton();
 
@@ -94,10 +93,12 @@ class ViewMain : public NavWindow
 
   void _refreshWidgets();
 
+  void onLiveShow(LiveWindow& live, bool visible) override;
+
   static void ws_timer(lv_timer_t* t);
 
 #if defined(HARDWARE_KEYS)
-  void onEvent(event_t event) override;
+  void onLiveEvent(LiveWindow& live, event_t event) override;
   void doKeyShortcut(event_t event);
   void onPressSYS() override;
   void onLongPressSYS() override;

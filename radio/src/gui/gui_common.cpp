@@ -748,9 +748,7 @@ static void runAntennaSelectionMenu()
   auto menu = new (std::nothrow) AntennaSelectionMenu();
   if (!menu) return;
 
-  MainWindow::instance()->blockUntilClose(true, [=]() {
-    return menu->deleted();
-  });
+  MainWindow::instance()->blockUntilClosed(*menu, true);
 }
 #else
 void onAntennaSelection(const char* result)

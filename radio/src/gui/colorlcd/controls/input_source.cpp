@@ -46,7 +46,7 @@ class SensorValue : public StaticText
            input->srcRaw <= MIXSRC_LAST_TELEM;
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     if (lv_obj_has_flag(lvobj, LV_OBJ_FLAG_HIDDEN)) return;
 

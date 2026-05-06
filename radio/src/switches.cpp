@@ -928,9 +928,7 @@ void checkSwitches()
 
   LED_ERROR_BEGIN();
   auto dialog = new SwitchWarnDialog();
-  MainWindow::instance()->blockUntilClose(true, [=]() {
-    return dialog->deleted();
-  });
+  MainWindow::instance()->blockUntilClosed(*dialog, true);
   LED_ERROR_END();
 }
 #elif defined(GUI)

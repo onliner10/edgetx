@@ -53,7 +53,7 @@ ModalWindow::ModalWindow(bool closeWhenClickOutside) :
   pushLayer();
 }
 
-void ModalWindow::onClicked()
+void ModalWindow::onLiveClicked(Window::LiveWindow&)
 {
   if (closeWhenClickOutside) {
     // Call onCancel of first child (if one exists)

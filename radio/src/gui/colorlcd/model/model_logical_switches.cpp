@@ -66,9 +66,9 @@ class LogicalSwitchEditPage : public Page
     return getSwitch(SWSRC_FIRST_LOGICAL_SWITCH + index);
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
-    Page::checkEvents();
+    Page::onLiveCheckEvents(live);
     if (active != isActive()) {
       if (isActive()) {
         lv_obj_add_state(headerSwitchName->getLvObj(), ETX_STATE_LS_ACTIVE);
@@ -367,11 +367,11 @@ class LogicalSwitchButton : public ListLineButton
     return getSwitch(SWSRC_FIRST_LOGICAL_SWITCH + index);
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     if (!loaded) return;
 
-    ListLineButton::checkEvents();
+    ListLineButton::onLiveCheckEvents(live);
     check(isActive());
 
     LogicalSwitchData* ls = lswAddress(index);

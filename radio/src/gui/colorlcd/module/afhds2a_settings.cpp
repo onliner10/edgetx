@@ -124,9 +124,9 @@ void AFHDS2ASettings::showAFHDS2Options()
 #endif
 }
 
-void AFHDS2ASettings::checkEvents()
+void AFHDS2ASettings::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  Window::checkEvents();
+  Window::onLiveCheckEvents(live);
   update();
 }
 

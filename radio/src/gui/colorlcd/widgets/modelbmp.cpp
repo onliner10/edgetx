@@ -62,8 +62,6 @@ class ModelBitmapWidget : public TrackedWidget
 
   void refresh() override
   {
-    if (!loaded || _deleted) return;
-
     char s[LEN_MODEL_NAME + 1];
     strAppend(s, g_model.header.name, LEN_MODEL_NAME);
     bool textChanged = label->getText() != s;
@@ -74,10 +72,8 @@ class ModelBitmapWidget : public TrackedWidget
     }
   }
 
-  void update() override
+  void onUpdate() override
   {
-    if (!loaded || _deleted) return;
-
     auto widgetData = getPersistentData();
 
     bool hasBitmap = g_model.header.bitmap[0] != '\0';

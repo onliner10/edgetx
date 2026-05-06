@@ -96,19 +96,19 @@ class QuickSubMenu
                           activate();
                           return 0;
                         }, 
-                        mainDef->enabled,
-                        [=](bool focus) {
-                          if (!quickMenu->deleted()) {
-                            if (focus) {
-                              if (!subMenu) buildSubMenu();
-                              quickMenu->getTopMenu()->setCurrent(menuButton);
-                            }
-                            if (subMenu)
-                              subMenu->show(focus);
-                            if (!focus && quickMenu->getTopMenu())
-                              quickMenu->getTopMenu()->setGroup();
-                          }
-                        });
+	                        mainDef->enabled,
+	                        [=](bool focus) {
+	                          quickMenu->visitLive([&](Window::LiveWindow&) {
+	                            if (focus) {
+	                              if (!subMenu) buildSubMenu();
+	                              quickMenu->getTopMenu()->setCurrent(menuButton);
+	                            }
+	                            if (subMenu)
+	                              subMenu->show(focus);
+	                            if (!focus && quickMenu->getTopMenu())
+	                              quickMenu->getTopMenu()->setGroup();
+	                          });
+	                        });
 
     return menuButton;
   }
@@ -308,12 +308,9 @@ QuickMenu::QuickMenu() :
   }
 }
 
-void QuickMenu::deleteLater()
+void QuickMenu::onDelete()
 {
-  if (!_deleted) {
-    instance = nullptr;
-    NavWindow::deleteLater();
-  }
+  instance = nullptr;
 }
 
 void QuickMenu::openQM(PageGroupBase* newPageGroup, QMPage newCurPage)

@@ -93,8 +93,8 @@ class RadioCustSwitchesDiagsWindow : public Window
   }
 
 #if defined(FUNCTION_SWITCHES_RGB_LEDS)
-  void checkEvents() override {
-    Window::checkEvents();
+  void onLiveCheckEvents(LiveWindow& live) override {
+    Window::onLiveCheckEvents(live);
     for (uint8_t i = 0; i < NUM_FUNCTIONS_SWITCHES; i += 1) {
       if (colorBox[i])
         colorBox[i]->setColor(getLedColor(i));

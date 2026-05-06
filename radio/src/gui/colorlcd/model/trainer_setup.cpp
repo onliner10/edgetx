@@ -49,7 +49,7 @@ class TrainerModuleWindow : public Window
  public:
   TrainerModuleWindow(Window* parent);
 
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
   void update();
 
  protected:
@@ -80,7 +80,7 @@ TrainerModuleWindow::TrainerModuleWindow(Window* parent) :
   update();
 }
 
-void TrainerModuleWindow::checkEvents()
+void TrainerModuleWindow::onLiveCheckEvents(Window::LiveWindow& live)
 {
 // #if defined(BLUETOOTH)
 //   if (popupopen) {
@@ -103,7 +103,7 @@ void TrainerModuleWindow::checkEvents()
 //     lastbluetoothstate = bluetooth.state;
 //   }
 // #endif
-  Window::checkEvents();
+  Window::onLiveCheckEvents(live);
 }
 
 void TrainerModuleWindow::update()

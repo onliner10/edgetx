@@ -51,7 +51,7 @@ class Page : public NavWindow
 #endif
 
   void onCancel() override;
-  void onClicked() override;
+  void onLiveClicked(LiveWindow&) override;
 
 #if defined(SIMU)
   std::string automationRole() const override { return "page"; }

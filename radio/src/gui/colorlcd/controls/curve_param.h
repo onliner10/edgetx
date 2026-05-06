@@ -34,7 +34,7 @@ class CurveChoice : public Choice
               std::function<void(int32_t)> setRefValue,
               mixsrc_t source);
 
-  bool onLongPress() override;
+  bool onLiveLongPress(LiveWindow&) override;
 
  protected:
   mixsrc_t source;

@@ -97,8 +97,8 @@ void CrossfireSettings::update() {
     }
 }
 
-void CrossfireSettings::checkEvents() {
+void CrossfireSettings::onLiveCheckEvents(Window::LiveWindow& live) {
   update();
 
-  Window::checkEvents();
+  Window::onLiveCheckEvents(live);
 }

@@ -21,9 +21,12 @@
 
 #include "view_main.h"
 
+#include <new>
+
 #include "edgetx.h"
 #include "mainwindow.h"
 #include "model_select.h"
+#include "os/time.h"
 #include "quick_menu.h"
 #include "radio_tools.h"
 #include "screen_setup.h"
@@ -31,11 +34,8 @@
 #include "view_channels.h"
 #include "widget.h"
 
-#include "os/time.h"
-
-#include <new>
-
-namespace {
+namespace
+{
 
 constexpr uint32_t BACKGROUND_WIDGET_REFRESH_PERIOD_MS = 250;
 
@@ -68,10 +68,10 @@ static void saveViewId(unsigned view)
   }
 }
 
-static void tile_view_scroll_begin(lv_event_t * e)
+static void tile_view_scroll_begin(lv_event_t* e)
 {
-	lv_anim_t* a = (lv_anim_t*)lv_event_get_param(e);
-	if (a) a->time = 0;
+  lv_anim_t* a = (lv_anim_t*)lv_event_get_param(e);
+  if (a) a->time = 0;
 }
 
 static void tile_view_scroll(lv_event_t* e)
@@ -95,8 +95,7 @@ ViewMain* ViewMain::_instance = nullptr;
 
 ViewMain* ViewMain::instance()
 {
-  if (!_instance)
-    _instance = new (std::nothrow) ViewMain();
+  if (!_instance) _instance = Window::adoptLive(new (std::nothrow) ViewMain());
   return _instance;
 }
 
@@ -105,21 +104,30 @@ ViewMain::ViewMain() :
 {
   pushLayer();
 
-  tile_view = lv_tileview_create(lvobj);
-  lv_obj_set_pos(tile_view, rect.x, rect.y);
-  lv_obj_set_size(tile_view, rect.w, rect.h);
-  lv_obj_set_scrollbar_mode(tile_view, LV_SCROLLBAR_MODE_OFF);
-  lv_obj_clear_flag(tile_view, LV_OBJ_FLAG_SCROLL_ELASTIC);
+  dispatchLive([&](LiveWindow& live) {
+    tile_view = lv_tileview_create(live.lvobj());
+    if (!requireLvObj(tile_view)) return false;
+    lv_obj_set_pos(tile_view, rect.x, rect.y);
+    lv_obj_set_size(tile_view, rect.w, rect.h);
+    lv_obj_set_scrollbar_mode(tile_view, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_clear_flag(tile_view, LV_OBJ_FLAG_SCROLL_ELASTIC);
 
-  lv_obj_add_flag(tile_view, LV_OBJ_FLAG_EVENT_BUBBLE);
-  lv_obj_set_user_data(tile_view, this);
-  lv_obj_add_event_cb(tile_view, tile_view_scroll_begin, LV_EVENT_SCROLL_BEGIN, NULL);
-  lv_obj_add_event_cb(tile_view, tile_view_scroll, LV_EVENT_SCROLL, nullptr);
-  lv_obj_add_event_cb(tile_view, tile_view_scroll_end, LV_EVENT_SCROLL_END,
-                      nullptr);
+    lv_obj_add_flag(tile_view, LV_OBJ_FLAG_EVENT_BUBBLE);
+    lv_obj_set_user_data(tile_view, this);
+    lv_obj_add_event_cb(tile_view, tile_view_scroll_begin,
+                        LV_EVENT_SCROLL_BEGIN, NULL);
+    lv_obj_add_event_cb(tile_view, tile_view_scroll, LV_EVENT_SCROLL, nullptr);
+    lv_obj_add_event_cb(tile_view, tile_view_scroll_end, LV_EVENT_SCROLL_END,
+                        nullptr);
 
-  // create last to be on top
-  topbar = new (std::nothrow) TopBar(this);
+    // create last to be on top
+    topbar = Window::makeLive<TopBar>(this);
+    if (!topbar) {
+      failClosed();
+      return false;
+    }
+    return true;
+  });
 }
 
 ViewMain::~ViewMain() { _instance = nullptr; }
@@ -133,9 +141,10 @@ void ViewMain::addMainView(WidgetsContainer* view, uint32_t viewId)
       lv_tileview_add_tile(tile_view, viewId, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
   if (!tile) return;
 
-  auto view_obj = view->getLvObj();
-  if (!view_obj) return;
-  lv_obj_set_parent(view_obj, tile);
+  if (!view->visitLive([&](Window::LiveWindow& liveView) {
+        lv_obj_set_parent(liveView.lvobj(), tile);
+      }))
+    return;
 
   auto user_data = (void*)(intptr_t)viewId;
   lv_obj_add_event_cb(tile, tile_view_deleted_cb, LV_EVENT_CHILD_DELETED,
@@ -256,7 +265,7 @@ void ViewMain::updateTopbarVisibility()
 }
 
 #if defined(HARDWARE_KEYS)
-void ViewMain::onEvent(event_t event)
+void ViewMain::onLiveEvent(Window::LiveWindow& live, event_t event)
 {
   switch (event) {
     case EVT_KEY_BREAK(KEY_LEFT):
@@ -268,7 +277,7 @@ void ViewMain::onEvent(event_t event)
       break;
 
     default:
-      NavWindow::onEvent(event);
+      NavWindow::onLiveEvent(live, event);
       break;
   }
 }
@@ -304,7 +313,7 @@ void ViewMain::onPressPGDN()
 }
 #endif
 
-void ViewMain::onClicked() { QuickMenu::openQuickMenu(); }
+void ViewMain::onLiveClicked(LiveWindow&) { QuickMenu::openQuickMenu(); }
 
 void ViewMain::onCancel()
 {
@@ -341,8 +350,7 @@ bool ViewMain::enableWidgetSelect(bool enable)
 
   for (uint32_t i = 0; i < cont->getZonesCount(); i++) {
     Widget* widget = cont->getWidget(i);
-    if (widget)
-      widget->enableFocus(enable);
+    if (widget) widget->enableFocus(enable);
   }
 
   if (enable) {
@@ -370,7 +378,7 @@ void ViewMain::ws_timer(lv_timer_t* t)
   view->enableWidgetSelect(false);
 }
 
-bool ViewMain::onLongPress()
+bool ViewMain::onLiveLongPress(Window::LiveWindow&)
 {
   if (isAppMode()) {
     int view = getCurrentMainView();
@@ -384,9 +392,8 @@ bool ViewMain::onLongPress()
   return false;
 }
 
-void ViewMain::show(bool visible)
+void ViewMain::onLiveShow(Window::LiveWindow&, bool visible)
 {
-  if (deleted()) return;
   isVisible = visible;
   int view = getCurrentMainView();
   setTopbarVisible(visible && hasTopbar(view));
@@ -399,10 +406,7 @@ void ViewMain::show(bool visible)
   }
 }
 
-bool ViewMain::isAppMode()
-{
-  return isAppMode(getCurrentMainView());
-}
+bool ViewMain::isAppMode() { return isAppMode(getCurrentMainView()); }
 
 bool ViewMain::isAppMode(unsigned view)
 {
@@ -411,15 +415,14 @@ bool ViewMain::isAppMode(unsigned view)
   return false;
 }
 
-bool ViewMain::hasTopbar()
-{
-  return hasTopbar(getCurrentMainView());
-}
+bool ViewMain::hasTopbar() { return hasTopbar(getCurrentMainView()); }
 
 bool ViewMain::hasTopbar(unsigned view)
 {
   if (view < MAX_CUSTOM_SCREENS)
-    return g_model.getScreenLayoutData(view)->options[LAYOUT_OPTION_TOPBAR].value.boolValue;
+    return g_model.getScreenLayoutData(view)
+        ->options[LAYOUT_OPTION_TOPBAR]
+        .value.boolValue;
   return false;
 }
 
@@ -435,7 +438,7 @@ void ViewMain::hideTopBarEdgeTxButton()
 
 void ViewMain::_refreshWidgets()
 {
-  if (!_deleted) {
+  visitLive([&](LiveWindow&) {
     uint32_t now = time_get_ms();
     bool refreshBackground = timeReached(now, nextBackgroundWidgetRefresh);
     if (refreshBackground) {
@@ -447,10 +450,10 @@ void ViewMain::_refreshWidgets()
                              refreshBackground);
     for (int i = 0; i < MAX_CUSTOM_SCREENS; i += 1) {
       if (customScreens[i])
-        customScreens[i]->refreshWidgets(isVisible && customScreens[i]->isOnScreen(),
-                                         refreshBackground);
+        customScreens[i]->refreshWidgets(
+            isVisible && customScreens[i]->isOnScreen(), refreshBackground);
     }
-  }
+  });
 }
 
 void ViewMain::refreshWidgets(WidgetRefreshToken)

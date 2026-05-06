@@ -35,7 +35,7 @@ class SwitchWarnDialog : public FullScreenDialog
 #endif
 
  protected:
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 };
 
 class ThrottleWarnDialog : public FullScreenDialog
@@ -48,5 +48,5 @@ class ThrottleWarnDialog : public FullScreenDialog
 #endif
 
  protected:
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 };

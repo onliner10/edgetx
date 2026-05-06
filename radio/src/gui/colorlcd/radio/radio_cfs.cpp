@@ -142,14 +142,14 @@ class RadioFunctionSwitch : public FunctionSwitchBase
     setLEDState(typ);
   }
 
-  void checkEvents() override
+  void onLiveCheckEvents(LiveWindow& live) override
   {
     setState();
     if (lastType != (int)g_eeGeneral.switchType(switchIndex)) {
       lastType = g_eeGeneral.switchType(switchIndex);
       typeChoice->setValue(lastType);
     }
-    Window::checkEvents();
+    Window::onLiveCheckEvents(live);
   }
 };
 

@@ -50,7 +50,7 @@ class MainViewTrim : public Window
 
   bool setDisplayState();
 
-  void checkEvents() override;
+  void onLiveCheckEvents(LiveWindow& live) override;
 
   coord_t sx();
   coord_t sy();

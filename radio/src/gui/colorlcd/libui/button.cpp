@@ -99,32 +99,28 @@ bool ButtonBase::checked() const
   return result;
 }
 
-void ButtonBase::onPress()
+void ButtonBase::onLivePress(Window::LiveWindow&)
 {
-  if (!isAvailable() || deleted()) return;
   check(pressHandler && pressHandler());
 }
 
-bool ButtonBase::onLongPress()
+bool ButtonBase::onLiveLongPress(Window::LiveWindow& live)
 {
-  if (!isAvailable() || deleted()) return false;
   if (longPressHandler) {
     check(longPressHandler());
-    withLvObj([](lv_obj_t* obj) {
-      lv_obj_clear_state(obj, LV_STATE_PRESSED);
-    });
+    lv_obj_clear_state(live.lvobj(), LV_STATE_PRESSED);
     lv_indev_wait_release(lv_indev_get_act());
     return false;
   }
   return true;
 }
 
-void ButtonBase::onClicked() { onPress(); }
+void ButtonBase::onLiveClicked(Window::LiveWindow& live) { onLivePress(live); }
 
-void ButtonBase::checkEvents()
+void ButtonBase::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  Window::checkEvents();
-  if (isAvailable() && checkHandler) checkHandler();
+  Window::onLiveCheckEvents(live);
+  if (checkHandler) checkHandler();
 }
 
 //-----------------------------------------------------------------------------
@@ -232,8 +228,6 @@ IconButton::IconButton(Window* parent, EdgeTxIcon icon, coord_t x, coord_t y,
                        std::function<uint8_t(void)> pressHandler) :
     ButtonBase(parent, {x, y, EdgeTxStyles::UI_ELEMENT_HEIGHT, EdgeTxStyles::UI_ELEMENT_HEIGHT}, pressHandler, button_create)
 {
-  if (!hasLvObj()) return;
-
   padAll(PAD_ZERO);
   iconImage = new (std::nothrow) StaticIcon(this, 0, 0, icon, COLOR_THEME_SECONDARY1_INDEX);
   if (iconImage) {
@@ -256,8 +250,6 @@ MomentaryButton::MomentaryButton(Window* parent, const rect_t& rect, std::string
     releaseHandler(std::move(releaseHandler)),
     text(std::move(text))
 {
-  if (!hasLvObj()) return;
-
   initRequiredLvObj(
       label, [](lv_obj_t* parent) { return etx_label_create(parent); },
       [&](lv_obj_t* obj) {
@@ -266,21 +258,21 @@ MomentaryButton::MomentaryButton(Window* parent, const rect_t& rect, std::string
       });
 }
 
-bool MomentaryButton::customEventHandler(lv_event_code_t code)
+bool MomentaryButton::onLiveCustomEvent(Window::LiveWindow& live,
+                                        lv_event_t* event)
 {
-  if (!isAvailable() || !lvobj) return false;
-
-  switch (code) {
+  auto obj = live.lvobj();
+  switch (lv_event_get_code(event)) {
     case LV_EVENT_PRESSED:
       if (pressHandler)
         pressHandler();
-      lv_obj_add_state(lvobj, LV_STATE_CHECKED);
-      lv_obj_clear_state(lvobj, LV_STATE_PRESSED);
+      lv_obj_add_state(obj, LV_STATE_CHECKED);
+      lv_obj_clear_state(obj, LV_STATE_PRESSED);
       return true;
     case LV_EVENT_RELEASED:
       if (releaseHandler)
         releaseHandler();
-      lv_obj_clear_state(lvobj, LV_STATE_CHECKED);
+      lv_obj_clear_state(obj, LV_STATE_CHECKED);
       return true;
     default:
       return false;

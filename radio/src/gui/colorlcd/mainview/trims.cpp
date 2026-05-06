@@ -198,9 +198,9 @@ bool MainViewTrim::setDisplayState()
   return true;
 }
 
-void MainViewTrim::checkEvents()
+void MainViewTrim::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  Window::checkEvents();
+  Window::onLiveCheckEvents(live);
 
   // Do nothing if trims turned off
   if (hidden) return;
