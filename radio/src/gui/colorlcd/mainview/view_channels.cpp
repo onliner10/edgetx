@@ -113,9 +113,9 @@ class ChannelsViewPage : public PageGroupItem
                                  : ((j & 1) ? w + (PAD_SMALL * 2) : PAD_SMALL);
         coord_t yPos = (j / cols) * ((window->height() - ChannelsViewFooter::FOOTER_H) / rows);
 #endif
-        new ComboChannelBar(window, {xPos, yPos, w, CHANS_H}, uint8_t(chan));
-
-        j += 1;
+        auto channelBar = new (std::nothrow)
+            ComboChannelBar(window, {xPos, yPos, w, CHANS_H}, uint8_t(chan));
+        if (channelBar) j += 1;
       }
     }
 

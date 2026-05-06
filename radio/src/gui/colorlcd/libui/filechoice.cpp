@@ -19,6 +19,7 @@
 #include "filechoice.h"
 
 #include <algorithm>
+#include <new>
 
 #include "dialog.h"
 #include "edgetx.h"
@@ -194,6 +195,7 @@ void FileChoice::openMenu()
       menu.setCloseHandler([=]() { setEditMode(false); });
     }, [&]() { setEditMode(false); });
   } else {
-    new MessageDialog(STR_SDCARD, STR_NO_FILES_ON_SD);
+    auto md = new (std::nothrow) MessageDialog(STR_SDCARD, STR_NO_FILES_ON_SD);
+    if (!md) return;
   }
 }
