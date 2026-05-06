@@ -246,15 +246,19 @@ void LogicalSwitchesViewPage::build(Window* window)
     strAppendSigned(&lsString[1], i + 1, 2);
 
     if (isActive) {
-      auto button = new (std::nothrow)
-          TextButton(window, {x, y, BTN_WIDTH, btnHeight}, lsString);
-      if (!button) continue;
-      button->setCheckHandler(
-          [=]() { button->check(getSwitch(SWSRC_FIRST_LOGICAL_SWITCH + i)); });
-      button->setFocusHandler([=](bool focus) {
-        if (focus) {
-          footer->setIndex(i);
-        }
+      OptionalWindow<TextButton> button;
+      button.reset(Window::makeLive<TextButton>(
+          window, rect_t{x, y, BTN_WIDTH, btnHeight}, lsString));
+      button.with([&](TextButton& button) {
+        auto buttonPtr = &button;
+        button.setCheckHandler([=]() {
+          buttonPtr->check(getSwitch(SWSRC_FIRST_LOGICAL_SWITCH + i));
+        });
+        button.setFocusHandler([=](bool focus) {
+          if (focus) {
+            footer->setIndex(i);
+          }
+        });
       });
     } else {
       if (btnHeight > EdgeTxStyles::STD_FONT_HEIGHT)

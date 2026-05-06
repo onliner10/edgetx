@@ -233,20 +233,22 @@ void MenuToolbar::addButton(const char* picto, int16_t filtermin,
     }
 
     rect_t r = getButtonRect(wideButton);
-    auto button = Window::makeLive<MenuToolbarButton>(this, r, picto);
-    if (!button) return;
+    buildRequiredWindow<MenuToolbarButton>(
+        [&](MenuToolbarButton& button) {
+          button.setPressHandler(std::bind(&MenuToolbar::filterMenu, this,
+                                           &button, filtermin, filtermax,
+                                           filterFunc, title));
 
-    button->setPressHandler(std::bind(&MenuToolbar::filterMenu, this, button,
-                                      filtermin, filtermax, filterFunc, title));
+          button.withLive([&](Window::LiveWindow& liveButton) {
+            lv_group_add_obj(group, liveButton.lvobj());
+          });
 
-    button->withLive([&](Window::LiveWindow& liveButton) {
-      lv_group_add_obj(group, liveButton.lvobj());
-    });
-
-    if (children.size() == 1) {
-      allBtn = button;
-      allBtn->sendLvEvent(LV_EVENT_CLICKED);
-    }
+          if (children.size() == 1) {
+            allBtn = &button;
+            allBtn->sendLvEvent(LV_EVENT_CLICKED);
+          }
+        },
+        this, r, picto);
   });
 }
 

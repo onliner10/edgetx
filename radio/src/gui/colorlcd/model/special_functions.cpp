@@ -724,9 +724,9 @@ void FunctionsPage::newSF(Window *window, bool pasteSF)
     if (cfn->swtch == 0) {
       menu->addLineBuffered(prefix + std::to_string(i + 1), [=]() {
         if (pasteSF) {
-          pasteSpecialFunction(window, i, nullptr);
+          pasteSpecialFunction(window, i);
         } else {
-          editSpecialFunction(window, i, nullptr);
+          editSpecialFunction(window, i);
         }
       });
     }
@@ -734,31 +734,50 @@ void FunctionsPage::newSF(Window *window, bool pasteSF)
   menu->updateLines();
 }
 
-void FunctionsPage::pasteSpecialFunction(Window *window, uint8_t index,
-                                         ButtonBase *button)
+void FunctionsPage::pasteSpecialFunctionData(uint8_t index)
 {
   CustomFunctionData *cfn = customFunctionData(index);
   if (CFN_FUNC(cfn) == FUNC_PLAY_SCRIPT) LUA_LOAD_MODEL_SCRIPTS();
   *cfn = clipboard.data.cfn;
   if (CFN_FUNC(cfn) == FUNC_PLAY_SCRIPT) LUA_LOAD_MODEL_SCRIPTS();
   storageDirty(EE_MODEL);
-  focusIndex = index;
-  if (!button)
-    rebuild(window);
 }
 
-void FunctionsPage::editSpecialFunction(Window *window, uint8_t index,
-                                        FunctionLineButton *button)
+void FunctionsPage::pasteSpecialFunction(Window *window, uint8_t index)
+{
+  pasteSpecialFunctionData(index);
+  focusIndex = index;
+  rebuild(window);
+}
+
+void FunctionsPage::pasteSpecialFunction(Window *window, uint8_t index,
+                                         FunctionLineButton&)
+{
+  pasteSpecialFunctionData(index);
+  focusIndex = index;
+}
+
+void FunctionsPage::editSpecialFunction(Window *window, uint8_t index)
 {
   auto edit = editPage(index);
   edit->setCloseHandler([=]() {
     CustomFunctionData *cfn = customFunctionData(index);
+    if (cfn->swtch != 0) focusIndex = index;
+    rebuild(window);
+  });
+}
+
+void FunctionsPage::editSpecialFunction(Window *window, uint8_t index,
+                                        FunctionLineButton& button)
+{
+  auto edit = editPage(index);
+  auto buttonPtr = &button;
+  edit->setCloseHandler([=]() {
+    CustomFunctionData *cfn = customFunctionData(index);
     if (cfn->swtch != 0) {
       focusIndex = index;
-      if (button) {
-        button->refresh();
-        return; // Skip full rebuild
-      }
+      buttonPtr->refresh();
+      return; // Skip full rebuild
     }
     rebuild(window);
   });
@@ -810,7 +829,7 @@ void FunctionsPage::build(Window *window)
       button->setPressHandler([=]() {
         Menu *menu = new Menu();
         menu->addLine(STR_EDIT,
-                      [=]() { editSpecialFunction(window, i, button); });
+                      [=]() { editSpecialFunction(window, i, *button); });
         if (isActive) {
           menu->addLine(STR_COPY, [=]() {
             clipboard.type = CLIPBOARD_TYPE_CUSTOM_FUNCTION;
@@ -819,7 +838,7 @@ void FunctionsPage::build(Window *window)
         }
         if (clipboard.type == CLIPBOARD_TYPE_CUSTOM_FUNCTION) {
           menu->addLine(STR_PASTE,
-                        [=]() { pasteSpecialFunction(window, i, button); });
+                        [=]() { pasteSpecialFunction(window, i, *button); });
         }
         CustomFunctionData *cfn = customFunctionData(i);
         if (CFN_ACTIVE(cfn)) {
@@ -845,7 +864,7 @@ void FunctionsPage::build(Window *window)
                         (MAX_SPECIAL_FUNCTIONS - i - 1) *
                             sizeof(CustomFunctionData));
                 memset(cfn, 0, sizeof(CustomFunctionData));
-                editSpecialFunction(window, i, nullptr);
+                editSpecialFunction(window, i);
               });
               break;
             }
