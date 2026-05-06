@@ -10,8 +10,12 @@
 #include <cstring>
 
 #include "edgetx.h"
+#include "curves.h"
 #include "hal/adc_driver.h"
 #include "hal/switch_driver.h"
+#if defined(COLORLCD)
+#include "lcd.h"
+#endif
 #include "model_init.h"
 #include "simulib.h"
 #include "switches.h"
@@ -104,6 +108,7 @@ void resetRadioState()
   logicalSwitchesReset();
 
   setModelDefaults();
+  loadCurves();
   for (int i = 0; i < switchGetMaxAllSwitches(); i++) {
     g_eeGeneral.switchSetType(i, i == 5 ? SWITCH_2POS : SWITCH_3POS);
   }
@@ -137,6 +142,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
   static bool initialized = false;
   if (!initialized) {
     simuInit();
+#if defined(COLORLCD)
+    lcdInitDisplayDriver();
+#endif
     initialized = true;
   }
 

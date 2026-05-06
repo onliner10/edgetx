@@ -92,7 +92,7 @@ static void yaml_set_attr(void* user, uint8_t* ptr, uint32_t bit_ofs,
             node->u._cust_attr.read(user, ptr, bit_ofs, val, val_len);
         return;
     default:
-        break;
+        return;
     }
 
     yaml_put_bits(ptr, i, bit_ofs, node->size);
