@@ -28,6 +28,7 @@
 
 bool textButtonLabelCreateFailureFailsClosedForTest();
 bool touchLongPressStateIsPerWindowForTest();
+bool textButtonLongPressHandlerMayDeleteButtonForTest();
 
 TEST(ColorButton, TextButtonLabelCreateFailureFailsClosed)
 {
@@ -53,6 +54,22 @@ TEST(ColorButton, TouchLongPressStateIsPerWindow)
   if (pid == 0) {
     alarm(2);
     _exit(touchLongPressStateIsPerWindowForTest() ? 0 : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorButton, LongPressHandlerMayDeleteButton)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(textButtonLongPressHandlerMayDeleteButtonForTest() ? 0 : 1);
   }
 
   int status = 0;

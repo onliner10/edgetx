@@ -249,8 +249,7 @@ bool Keyboard::setField(const FieldBinding& binding)
             return false;
 
           fieldContainer = binding.container;
-          attach(fieldContainer);
-          if (getParent() != fieldContainer) return false;
+          if (!attachTo(*fieldContainer)) return false;
 
           lv_area_t coords;
           lv_obj_get_coords(binding.obj, &coords);

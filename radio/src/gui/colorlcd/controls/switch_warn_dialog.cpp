@@ -28,7 +28,7 @@ SwitchWarnDialog::SwitchWarnDialog() :
     FullScreenDialog(WARNING_TYPE_ALERT, STR_SWITCHWARN, "",
                      STR_PRESS_ANY_KEY_TO_SKIP)
 {
-  lv_label_set_long_mode(messageLabel->getLvObj(), LV_LABEL_LONG_WRAP);
+  setMessageLongMode(LV_LABEL_LONG_WRAP);
   AUDIO_ERROR_MESSAGE(AU_SWITCH_ALERT);
 }
 
@@ -75,14 +75,14 @@ void SwitchWarnDialog::onLiveCheckEvents(Window::LiveWindow& live)
     }
   }
 
-  messageLabel->setText(warn_txt);
+  setMessage(warn_txt.c_str());
 }
 
 ThrottleWarnDialog::ThrottleWarnDialog(const char* msg) :
     FullScreenDialog(WARNING_TYPE_ALERT, STR_THROTTLE_UPPERCASE, msg,
                      STR_PRESS_ANY_KEY_TO_SKIP)
 {
-  lv_label_set_long_mode(messageLabel->getLvObj(), LV_LABEL_LONG_WRAP);
+  setMessageLongMode(LV_LABEL_LONG_WRAP);
   AUDIO_ERROR_MESSAGE(AU_THROTTLE_ALERT);
 }
 
@@ -91,6 +91,5 @@ void ThrottleWarnDialog::onLiveCheckEvents(Window::LiveWindow& live)
   FullScreenDialog::onLiveCheckEvents(live);
 
   extern bool isThrottleWarningAlertNeeded();
-  if (!isThrottleWarningAlertNeeded())
-    deleteLater();
+  if (!isThrottleWarningAlertNeeded()) deleteLater();
 }

@@ -20,10 +20,10 @@
 
 #include "bitmaps.h"
 #include "debug.h"
-#include "mainwindow.h"
-#include "lz4/lz4.h"
-#include "sdcard.h"
 #include "etx_lv_theme.h"
+#include "lz4/lz4.h"
+#include "mainwindow.h"
+#include "sdcard.h"
 #include "stb/stb_image.h"
 
 //-----------------------------------------------------------------------------
@@ -40,6 +40,11 @@ static bool forceStaticTextCreateFailure = false;
 void staticLZ4ImageForceBufferAllocationFailureForTest(bool force)
 {
   forceStaticLZ4ImageBufferAllocationFailure = force;
+}
+
+void staticTextForceCreateFailureForTest(bool force)
+{
+  forceStaticTextCreateFailure = force;
 }
 #endif
 
@@ -112,9 +117,7 @@ void StaticText::setText(std::string value)
 {
   if (text != value) {
     text = std::move(value);
-    withLvObj([&](lv_obj_t* obj) {
-      lv_label_set_text(obj, text.c_str());
-    });
+    withLvObj([&](lv_obj_t* obj) { lv_label_set_text(obj, text.c_str()); });
   }
 }
 
@@ -141,8 +144,8 @@ void DynamicNumber<uint32_t>::updateText()
       lv_label_set_text_fmt(obj, "%s%" PRIu32 ".%02" PRIu32 "%s", p,
                             value / 100, value % 100, s);
     } else if (textFlags & PREC1) {
-      lv_label_set_text_fmt(obj, "%s%" PRIu32 ".%01" PRIu32 "%s", p,
-                            value / 10, value % 10, s);
+      lv_label_set_text_fmt(obj, "%s%" PRIu32 ".%01" PRIu32 "%s", p, value / 10,
+                            value % 10, s);
     } else {
       lv_label_set_text_fmt(obj, "%s%" PRIu32 "%s", p, value, s);
     }
@@ -159,8 +162,8 @@ void DynamicNumber<int32_t>::updateText()
       lv_label_set_text_fmt(obj, "%s%" PRId32 ".%02" PRIu32 "%s", p,
                             value / 100, (uint32_t)abs(value % 100), s);
     } else if (textFlags & PREC1) {
-      lv_label_set_text_fmt(obj, "%s%" PRId32 ".%01" PRIu32 "%s", p,
-                            value / 10, (uint32_t)abs(value % 10), s);
+      lv_label_set_text_fmt(obj, "%s%" PRId32 ".%01" PRIu32 "%s", p, value / 10,
+                            (uint32_t)abs(value % 10), s);
     } else {
       lv_label_set_text_fmt(obj, "%s%" PRId32 "%s", p, value, s);
     }
@@ -210,22 +213,19 @@ void DynamicNumber<int16_t>::updateText()
 
 StaticIcon::StaticIcon(Window* parent, coord_t x, coord_t y, EdgeTxIcon icon,
                        LcdColorIndex color) :
-    Window(parent, rect_t{x, y, 0, 0}, lv_canvas_create),
-    currentColor(color)
+    Window(parent, rect_t{x, y, 0, 0}, lv_canvas_create), currentColor(color)
 {
   setWindowFlag(NO_FOCUS | NO_CLICK);
 
   setIcon(icon);
 
-  withLvObj([&](lv_obj_t* obj) {
-    etx_img_color(obj, currentColor, LV_PART_MAIN);
-  });
+  withLvObj(
+      [&](lv_obj_t* obj) { etx_img_color(obj, currentColor, LV_PART_MAIN); });
 }
 
-StaticIcon::StaticIcon(Window* parent, coord_t x, coord_t y, const char* filename,
-                       LcdColorIndex color) :
-    Window(parent, rect_t{x, y, 0, 0}, lv_canvas_create),
-    currentColor(color)
+StaticIcon::StaticIcon(Window* parent, coord_t x, coord_t y,
+                       const char* filename, LcdColorIndex color) :
+    Window(parent, rect_t{x, y, 0, 0}, lv_canvas_create), currentColor(color)
 {
   setWindowFlag(NO_FOCUS | NO_CLICK);
 
@@ -255,9 +255,7 @@ void StaticIcon::onDelete()
 void StaticIcon::setColor(LcdColorIndex color)
 {
   if (currentColor != color) {
-    withLvObj([&](lv_obj_t* obj) {
-      etx_img_color(obj, color, LV_PART_MAIN);
-    });
+    withLvObj([&](lv_obj_t* obj) { etx_img_color(obj, color, LV_PART_MAIN); });
     currentColor = color;
   }
 }
@@ -282,7 +280,8 @@ void StaticIcon::center(coord_t w, coord_t h)
 // Display image from file system using LVGL with LVGL scaling
 //  - LVGL scaling is slow so don't use this if there are many images
 StaticImage::StaticImage(Window* parent, const rect_t& rect,
-                         const char* filename, bool fillFrame, bool dontEnlarge) :
+                         const char* filename, bool fillFrame,
+                         bool dontEnlarge) :
     Window(parent, rect), fillFrame(fillFrame), dontEnlarge(dontEnlarge)
 {
   setWindowFlag(NO_FOCUS | NO_CLICK);
@@ -310,7 +309,8 @@ void StaticImage::setSource(std::string filename)
       lv_img_set_src(image, fullpath.c_str());
       if (!hasImage()) {
         // Failed to load
-        TRACE_ERROR("could not load image '%s' - %s\n", filename.c_str(), stbi_failure_reason());
+        TRACE_ERROR("could not load image '%s' - %s\n", filename.c_str(),
+                    stbi_failure_reason());
         clearSource();
       }
       setZoom();
@@ -357,7 +357,7 @@ StaticBitmap::StaticBitmap(Window* parent, const rect_t& rect,
   setSource(filename);
 }
 
-void StaticBitmap::setSource(const char *filename)
+void StaticBitmap::setSource(const char* filename)
 {
   dispatchLive([&](LiveWindow& live) {
     auto obj = live.lvobj();
@@ -371,7 +371,8 @@ void StaticBitmap::setSource(const char *filename)
       BitmapBuffer* newImg = BitmapBuffer::loadBitmap(filename, BMP_ARGB4444);
       if (newImg) {
         newImg->resizeToLVGL(width(), height());
-        if (!newImg->getData() || newImg->width() == 0 || newImg->height() == 0) {
+        if (!newImg->getData() || newImg->width() == 0 ||
+            newImg->height() == 0) {
           delete newImg;
           return;
         }
@@ -383,8 +384,8 @@ void StaticBitmap::setSource(const char *filename)
         }
 
         lv_obj_center(newCanvas);
-        lv_canvas_set_buffer(newCanvas, newImg->getData(), newImg->width(), newImg->height(),
-                            LV_IMG_CF_TRUE_COLOR_ALPHA);
+        lv_canvas_set_buffer(newCanvas, newImg->getData(), newImg->width(),
+                             newImg->height(), LV_IMG_CF_TRUE_COLOR_ALPHA);
 
         auto oldCanvas = canvas;
         auto oldImg = img;
@@ -411,10 +412,7 @@ StaticBitmap::~StaticBitmap()
   if (img) delete img;
 }
 
-bool StaticBitmap::hasImage() const
-{
-  return img && canvas;
-}
+bool StaticBitmap::hasImage() const { return img && canvas; }
 
 //-----------------------------------------------------------------------------
 
@@ -459,8 +457,8 @@ StaticLZ4Image::StaticLZ4Image(Window* parent, coord_t x, coord_t y,
 bool staticTextObjectCreateFailureFailsClosedForTest()
 {
   forceStaticTextCreateFailure = true;
-  auto text = new (std::nothrow) StaticText(MainWindow::instance(),
-                                           {0, 0, 100, 20}, "Title");
+  auto text = new (std::nothrow)
+      StaticText(MainWindow::instance(), {0, 0, 100, 20}, "Title");
   forceStaticTextCreateFailure = false;
 
   if (!text) return false;
@@ -484,13 +482,12 @@ bool staticLZ4ImageBufferAllocationFailureLeavesNoImageDataForTest()
     bool hasImageData() const { return imgData != nullptr; }
   };
 
-  alignas(LZ4Bitmap) static const uint8_t lz4Bitmap[] = {
-      1, 0, 1, 0, 0, 0, 0, 0};
+  alignas(LZ4Bitmap) static const uint8_t lz4Bitmap[] = {1, 0, 1, 0,
+                                                         0, 0, 0, 0};
 
   staticLZ4ImageForceBufferAllocationFailureForTest(true);
-  auto image = new (std::nothrow)
-      TestStaticLZ4Image(MainWindow::instance(),
-                         reinterpret_cast<const LZ4Bitmap*>(lz4Bitmap));
+  auto image = new (std::nothrow) TestStaticLZ4Image(
+      MainWindow::instance(), reinterpret_cast<const LZ4Bitmap*>(lz4Bitmap));
   staticLZ4ImageForceBufferAllocationFailureForTest(false);
 
   return image && !image->hasImageData();
@@ -525,8 +522,8 @@ void StaticLZ4Image::onDelete()
 
 //-----------------------------------------------------------------------------
 
-QRCode::QRCode(Window *parent, coord_t x, coord_t y, coord_t sz, std::string data,
-               LcdFlags color, LcdFlags bgColor) :
+QRCode::QRCode(Window* parent, coord_t x, coord_t y, coord_t sz,
+               std::string data, LcdFlags color, LcdFlags bgColor) :
     Window(parent, {x, y, sz, sz})
 {
   setWindowFlag(NO_CLICK);
@@ -544,6 +541,5 @@ QRCode::QRCode(Window *parent, coord_t x, coord_t y, coord_t sz, std::string dat
 
 void QRCode::setData(std::string data)
 {
-  if (qr)
-    lv_qrcode_update(qr, data.c_str(), data.length());
+  if (qr) lv_qrcode_update(qr, data.c_str(), data.length());
 }

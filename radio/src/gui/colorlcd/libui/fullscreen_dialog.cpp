@@ -21,18 +21,18 @@
 
 #include "fullscreen_dialog.h"
 
+#include <new>
+
 #include "edgetx.h"
 #include "etx_lv_theme.h"
 #include "hal/usb_driver.h"
 #include "hal/watchdog_driver.h"
 #include "mainwindow.h"
 #include "os/sleep.h"
-#include "static.h"
 #include "startup_shutdown.h"
+#include "static.h"
 #include "theme_manager.h"
 #include "view_main.h"
-
-#include <new>
 
 //-----------------------------------------------------------------------------
 
@@ -47,25 +47,32 @@ FullScreenDialog::FullScreenDialog(
     confirmHandler(confirmHandler)
 {
   setWindowFlag(OPAQUE);
-  etx_solid_bg(lvobj, (type == WARNING_TYPE_ALERT) ? COLOR_THEME_WARNING_INDEX : COLOR_THEME_SECONDARY1_INDEX);
+  dispatchLive([&](LiveWindow& live) {
+    etx_solid_bg(live.lvobj(), (type == WARNING_TYPE_ALERT)
+                                   ? COLOR_THEME_WARNING_INDEX
+                                   : COLOR_THEME_SECONDARY1_INDEX);
+  });
 
   // In case alert raised while splash screen is showing.
   cancelSplash();
 
-  pushLayer();
-
-  build();
+  if (build()) {
+    pushLayer();
+  }
 }
 
-void FullScreenDialog::build()
+bool FullScreenDialog::build()
 {
-  auto div = new (std::nothrow) Window(this, {0, ALERT_FRAME_TOP, LCD_W, ALERT_FRAME_HEIGHT});
+  auto div = Window::makeLive<Window>(
+      this, rect_t{0, ALERT_FRAME_TOP, LCD_W, ALERT_FRAME_HEIGHT});
   if (div) {
     div->setWindowFlag(NO_FOCUS);
-    etx_solid_bg(div->getLvObj(), COLOR_THEME_PRIMARY2_INDEX);
+    div->visitLive([](Window::LiveWindow& live) {
+      etx_solid_bg(live.lvobj(), COLOR_THEME_PRIMARY2_INDEX);
+    });
   }
 
-  new (std::nothrow) StaticIcon(
+  Window::makeLive<StaticIcon>(
       this, ALERT_BITMAP_LEFT, ALERT_BITMAP_TOP,
       (type == WARNING_TYPE_INFO) ? ICON_BUSY : ICON_ERROR,
       COLOR_THEME_WARNING_INDEX);
@@ -81,55 +88,76 @@ void FullScreenDialog::build()
   } else if (!title.empty()) {
     t = title;
   }
-  new (std::nothrow) StaticText(this,
-                                rect_t{ALERT_TITLE_LEFT, ALERT_TITLE_TOP,
-                                       LCD_W - ALERT_TITLE_LEFT - PAD_MEDIUM,
-                                       LCD_H - ALERT_TITLE_TOP - PAD_MEDIUM},
-                                t.c_str(), COLOR_THEME_WARNING_INDEX, FONT(XL));
+  Window::makeLive<StaticText>(this,
+                               rect_t{ALERT_TITLE_LEFT, ALERT_TITLE_TOP,
+                                      LCD_W - ALERT_TITLE_LEFT - PAD_MEDIUM,
+                                      LCD_H - ALERT_TITLE_TOP - PAD_MEDIUM},
+                               t.c_str(), COLOR_THEME_WARNING_INDEX, FONT(XL));
 
-  messageLabel =
-      new (std::nothrow) StaticText(this,
-                                    rect_t{ALERT_MESSAGE_LEFT, ALERT_MESSAGE_TOP,
-                                           LCD_W - ALERT_MESSAGE_LEFT - PAD_MEDIUM,
-                                           LCD_H - ALERT_MESSAGE_TOP - PAD_MEDIUM},
-                                    message.c_str(), COLOR_THEME_PRIMARY1_INDEX, FONT(BOLD));
+  if (!initRequiredWindow(messageLabel, this,
+                          rect_t{ALERT_MESSAGE_LEFT, ALERT_MESSAGE_TOP,
+                                 LCD_W - ALERT_MESSAGE_LEFT - PAD_MEDIUM,
+                                 LCD_H - ALERT_MESSAGE_TOP - PAD_MEDIUM},
+                          message.c_str(), COLOR_THEME_PRIMARY1_INDEX,
+                          FONT(BOLD)))
+    return false;
 
   if (!action.empty()) {
-    auto btn = new (std::nothrow) TextButton(
-        this, {(LCD_W - ONEBTN_W) / 2, LCD_H - ONEBTN_H - PAD_LARGE, ONEBTN_W, ONEBTN_H}, action.c_str(),
-        [=]() {
+    auto btn = Window::makeLive<TextButton>(
+        this,
+        rect_t{(LCD_W - ONEBTN_W) / 2, LCD_H - ONEBTN_H - PAD_LARGE, ONEBTN_W,
+               ONEBTN_H},
+        action.c_str(), [=]() {
           closeDialog();
           return 0;
         });
-    if (btn) {
-      btn->setAutomationId("dialog.action");
-      etx_bg_color(btn->getLvObj(), COLOR_THEME_SECONDARY3_INDEX);
-      etx_txt_color(btn->getLvObj(), COLOR_THEME_PRIMARY1_INDEX);
+    if (!btn) {
+      failClosed();
+      return false;
     }
+    btn->setAutomationId("dialog.action");
+    btn->visitLive([](Window::LiveWindow& live) {
+      etx_bg_color(live.lvobj(), COLOR_THEME_SECONDARY3_INDEX);
+      etx_txt_color(live.lvobj(), COLOR_THEME_PRIMARY1_INDEX);
+    });
   } else {
     if (type == WARNING_TYPE_CONFIRM) {
-      auto btn = new (std::nothrow) TextButton(
-          this, {LCD_W / 3 - TWOBTN_W / 2, LCD_H - TWOBTN_H - PAD_LARGE, TWOBTN_W, TWOBTN_H}, STR_CANCEL,
-          [=]() {
+      auto btn = Window::makeLive<TextButton>(
+          this,
+          rect_t{LCD_W / 3 - TWOBTN_W / 2, LCD_H - TWOBTN_H - PAD_LARGE,
+                 TWOBTN_W, TWOBTN_H},
+          STR_CANCEL, [=]() {
             deleteLater();
             return 0;
           });
-      if (btn) {
-        etx_bg_color(btn->getLvObj(), COLOR_THEME_SECONDARY3_INDEX);
-        etx_txt_color(btn->getLvObj(), COLOR_THEME_PRIMARY1_INDEX);
+      if (!btn) {
+        failClosed();
+        return false;
       }
-      btn = new (std::nothrow) TextButton(
-          this, {LCD_W * 2 / 3 - TWOBTN_W / 2, LCD_H - TWOBTN_H - PAD_LARGE, TWOBTN_W, TWOBTN_H}, STR_OK,
-          [=]() {
+      btn->visitLive([](Window::LiveWindow& live) {
+        etx_bg_color(live.lvobj(), COLOR_THEME_SECONDARY3_INDEX);
+        etx_txt_color(live.lvobj(), COLOR_THEME_PRIMARY1_INDEX);
+      });
+      btn = Window::makeLive<TextButton>(
+          this,
+          rect_t{LCD_W * 2 / 3 - TWOBTN_W / 2, LCD_H - TWOBTN_H - PAD_LARGE,
+                 TWOBTN_W, TWOBTN_H},
+          STR_OK, [=]() {
             closeDialog();
             return 0;
           });
-      if (btn) {
-        etx_bg_color(btn->getLvObj(), COLOR_THEME_SECONDARY3_INDEX);
-        etx_txt_color(btn->getLvObj(), COLOR_THEME_PRIMARY1_INDEX);
+      if (!btn) {
+        failClosed();
+        return false;
       }
+      btn->visitLive([](Window::LiveWindow& live) {
+        etx_bg_color(live.lvobj(), COLOR_THEME_SECONDARY3_INDEX);
+        etx_txt_color(live.lvobj(), COLOR_THEME_PRIMARY1_INDEX);
+      });
     }
   }
+
+  return true;
 }
 
 void FullScreenDialog::closeDialog()
@@ -149,8 +177,7 @@ bool FullScreenDialog::onLiveLongPress(Window::LiveWindow&)
 void FullScreenDialog::alertCancel()
 {
   // Buttons other than RTN or ENTER
-  if (type == WARNING_TYPE_ALERT)
-    closeDialog();
+  if (type == WARNING_TYPE_ALERT) closeDialog();
 }
 void FullScreenDialog::onPressSYS() { alertCancel(); }
 void FullScreenDialog::onPressMDL() { alertCancel(); }
@@ -164,6 +191,35 @@ void FullScreenDialog::setMessage(const char* text)
   if (messageLabel) messageLabel->setText(text);
 }
 
+void FullScreenDialog::setMessageLongMode(lv_label_long_mode_t mode)
+{
+  if (messageLabel)
+    messageLabel->visitLive([&](Window::LiveWindow& live) {
+      lv_label_set_long_mode(live.lvobj(), mode);
+    });
+}
+
+#if defined(SIMU)
+void staticTextForceCreateFailureForTest(bool force);
+
+bool fullScreenDialogMessageLabelCreateFailureFailsClosedForTest()
+{
+  staticTextForceCreateFailureForTest(true);
+  auto dialog = new (std::nothrow)
+      FullScreenDialog(WARNING_TYPE_ALERT, "Warning", "Message", STR_OK);
+  staticTextForceCreateFailureForTest(false);
+
+  if (!dialog) return false;
+  dialog->setMessage("Updated");
+  dialog->onLongPress();
+
+  bool ok = !dialog->isAvailable() && !dialog->isVisible() &&
+            !dialog->automationClickable();
+  delete dialog;
+  return ok;
+}
+#endif
+
 //-----------------------------------------------------------------------------
 
 void raiseAlert(const char* title, const char* msg, const char* action,
@@ -172,16 +228,16 @@ void raiseAlert(const char* title, const char* msg, const char* action,
   TRACE("raiseAlert('%s')", msg);
   AUDIO_ERROR_MESSAGE(sound);
   LED_ERROR_BEGIN();
-  auto dialog = new (std::nothrow) FullScreenDialog(WARNING_TYPE_ALERT, title ? title : "",
-                                                    msg ? msg : "", action ? action : "");
+  auto dialog = new (std::nothrow)
+      FullScreenDialog(WARNING_TYPE_ALERT, title ? title : "", msg ? msg : "",
+                       action ? action : "");
   if (dialog) {
     MainWindow::instance()->blockUntilClosed(*dialog, true);
   } else {
     while (true) {
       sleep_ms(10);
 
-      if (getEvent())
-        break;
+      if (getEvent()) break;
 
       checkBacklight();
       WDG_RESET();
@@ -201,9 +257,9 @@ bool confirmationDialog(const char* title, const char* msg, bool checkPwr,
                         const std::function<bool(void)>& closeCondition)
 {
   bool confirmed = false;
-  auto dialog = new (std::nothrow) FullScreenDialog(WARNING_TYPE_CONFIRM, title ? title : "",
-                                                    msg ? msg : "", "",
-                                                    [&confirmed]() { confirmed = true; });
+  auto dialog = new (std::nothrow)
+      FullScreenDialog(WARNING_TYPE_CONFIRM, title ? title : "", msg ? msg : "",
+                       "", [&confirmed]() { confirmed = true; });
   if (!dialog) return false;
 
   MainWindow::instance()->blockUntilClosed(*dialog, checkPwr, [&]() {

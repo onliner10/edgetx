@@ -343,13 +343,13 @@ bool childOfUnavailableParentFailsClosedForTest()
   auto parent = new (std::nothrow) UnavailableParentForTest();
   auto child = new (std::nothrow) Window(parent, {0, 0, 10, 10});
   auto detached = new (std::nothrow) Window(nullptr, {0, 0, 10, 10});
-  if (detached) detached->attach(parent);
+  bool detachedAttachFailed = detached && !detached->attachTo(*parent);
 
   bool ok = parent && child && detached && !parent->isAvailable() &&
             !parent->isVisible() && child->getLvObj() == nullptr &&
             !child->isAvailable() && !child->isVisible() &&
-            !child->automationClickable() && detached->getParent() == nullptr &&
-            detached->isAvailable();
+            !child->automationClickable() && detachedAttachFailed &&
+            detached->getParent() == nullptr && detached->isAvailable();
   delete detached;
   delete child;
   delete parent;
@@ -382,6 +382,35 @@ bool adoptLiveFailedChildDetachesFromParentForTest()
   bool ok = child == nullptr && parent->childCount() == 0;
 
   delete parent;
+  return ok;
+}
+
+bool attachToUnavailableParentPreservesExistingParentForTest()
+{
+  auto firstParent = new (std::nothrow) Window(nullptr, {0, 0, 10, 10});
+  auto secondParent = new (std::nothrow) UnavailableParentForTest();
+  auto child = new (std::nothrow) Window(firstParent, {0, 0, 10, 10});
+  if (!firstParent || !secondParent || !child) {
+    if (child) child->detach();
+    delete child;
+    delete secondParent;
+    delete firstParent;
+    return false;
+  }
+
+  auto originalParent = child->getParent();
+  auto originalLvParent =
+      child->getLvObj() ? lv_obj_get_parent(child->getLvObj()) : nullptr;
+
+  bool attached = child->attachTo(*secondParent);
+  bool ok = !attached && child->getParent() == originalParent &&
+            child->getParent() == firstParent && child->getLvObj() &&
+            lv_obj_get_parent(child->getLvObj()) == originalLvParent;
+
+  child->detach();
+  delete child;
+  delete secondParent;
+  delete firstParent;
   return ok;
 }
 
@@ -530,17 +559,24 @@ void Window::clearWindowFlag(WindowFlags flag) { windowFlags &= ~flag; }
 void Window::setTextFlag(LcdFlags flag) { textFlags |= flag; }
 void Window::clearTextFlag(LcdFlags flag) { textFlags &= ~flag; }
 
-void Window::attach(Window* newParent)
+bool Window::attachTo(Window& newParent)
 {
-  if (parent) detach();
-  parent = nullptr;
-  dispatchLive([&](LiveWindow&) {
-    if (!newParent) return;
-    newParent->dispatchLive([&](LiveWindow&) {
-      parent = newParent;
-      newParent->addChild(this);
+  bool attached = false;
+  dispatchLive([&](LiveWindow& childLive) {
+    newParent.dispatchLive([&](LiveWindow& parentLive) {
+      if (parent && parent != &newParent) parent->children.remove(this);
+      parent = &newParent;
+
+      if (lv_obj_get_parent(childLive.lvobj()) != parentLive.lvobj()) {
+        lv_obj_set_parent(childLive.lvobj(), parentLive.lvobj());
+      }
+
+      newParent.children.remove(this);
+      newParent.children.push_back(this);
+      attached = true;
     });
   });
+  return attached;
 }
 
 void Window::detach()
@@ -841,11 +877,14 @@ bool Window::isVisible()
 
 bool Window::isOnScreen()
 {
-  // Check window is at least partially visible
-  if (!isVisible()) return false;
-  lv_area_t a;
-  lv_obj_get_coords(lvobj, &a);
-  return a.x2 >= 0 && a.x1 < LCD_W && a.y2 >= 0 && a.y1 < LCD_H;
+  return dispatchLive([&](LiveWindow& live) {
+    if (lv_obj_has_flag(live.lvobj(), LV_OBJ_FLAG_HIDDEN)) return false;
+
+    // Check window is at least partially visible
+    lv_area_t a;
+    lv_obj_get_coords(live.lvobj(), &a);
+    return a.x2 >= 0 && a.x1 < LCD_W && a.y2 >= 0 && a.y1 < LCD_H;
+  });
 }
 
 void Window::enable(bool enabled)

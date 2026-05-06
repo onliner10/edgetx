@@ -226,7 +226,7 @@ class Window
 
   void invalidate();
 
-  void attach(Window* window);
+  [[nodiscard]] bool attachTo(Window& window);
 
   void detach();
 

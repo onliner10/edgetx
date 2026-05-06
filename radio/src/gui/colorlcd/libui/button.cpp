@@ -18,11 +18,11 @@
 
 #include "button.h"
 
-#include "static.h"
+#include <new>
+
 #include "etx_lv_theme.h"
 #include "mainwindow.h"
-
-#include <new>
+#include "static.h"
 
 //-----------------------------------------------------------------------------
 
@@ -108,7 +108,9 @@ bool ButtonBase::onLiveLongPress(Window::LiveWindow& live)
 {
   if (longPressHandler) {
     check(longPressHandler());
-    lv_obj_clear_state(live.lvobj(), LV_STATE_PRESSED);
+    visitLive([](Window::LiveWindow& live) {
+      lv_obj_clear_state(live.lvobj(), LV_STATE_PRESSED);
+    });
     lv_indev_wait_release(lv_indev_get_act());
     return false;
   }
@@ -127,8 +129,7 @@ void ButtonBase::onLiveCheckEvents(Window::LiveWindow& live)
 
 TextButton::TextButton(Window* parent, const rect_t& rect, std::string text,
                        std::function<uint8_t(void)> pressHandler) :
-    ButtonBase(parent, rect, pressHandler, button_create),
-    text(std::move(text))
+    ButtonBase(parent, rect, pressHandler, button_create), text(std::move(text))
 {
   initRequiredLvObj(label, text_button_label_create, [&](lv_obj_t* obj) {
     lv_label_set_text(obj, this->text.c_str());
@@ -157,12 +158,12 @@ bool textButtonLabelCreateFailureFailsClosedForTest()
   bool pressed = false;
   bool longPressed = false;
   forceTextButtonLabelCreateFailureForTest = true;
-  auto button = new (std::nothrow) TextButton(
-      MainWindow::instance(), {0, 0, 100, EdgeTxStyles::UI_ELEMENT_HEIGHT},
-      "Start", [&]() {
-        pressed = true;
-        return 0;
-      });
+  auto button = new (std::nothrow)
+      TextButton(MainWindow::instance(),
+                 {0, 0, 100, EdgeTxStyles::UI_ELEMENT_HEIGHT}, "Start", [&]() {
+                   pressed = true;
+                   return 0;
+                 });
   forceTextButtonLabelCreateFailureForTest = false;
 
   if (!button || !button->getLvObj() || button->isAvailable() ||
@@ -193,12 +194,12 @@ bool touchLongPressStateIsPerWindowForTest()
   bool firstPressed = false;
   bool secondPressed = false;
 
-  auto first = new (std::nothrow) TextButton(
-      MainWindow::instance(), {0, 0, 100, EdgeTxStyles::UI_ELEMENT_HEIGHT},
-      "First", [&]() {
-        firstPressed = true;
-        return 0;
-      });
+  auto first = new (std::nothrow)
+      TextButton(MainWindow::instance(),
+                 {0, 0, 100, EdgeTxStyles::UI_ELEMENT_HEIGHT}, "First", [&]() {
+                   firstPressed = true;
+                   return 0;
+                 });
   auto second = new (std::nothrow) TextButton(
       MainWindow::instance(), {0, 24, 100, EdgeTxStyles::UI_ELEMENT_HEIGHT},
       "Second", [&]() {
@@ -220,18 +221,44 @@ bool touchLongPressStateIsPerWindowForTest()
   delete first;
   return ok;
 }
+
+bool textButtonLongPressHandlerMayDeleteButtonForTest()
+{
+  auto button = new (std::nothrow)
+      TextButton(MainWindow::instance(),
+                 {0, 0, 100, EdgeTxStyles::UI_ELEMENT_HEIGHT}, "Delete");
+  if (!button) return false;
+
+  bool closed = false;
+  button->setCloseHandler([&]() { closed = true; });
+  button->setLongPressHandler([&]() {
+    button->deleteLater();
+    return 0;
+  });
+
+  bool sent = button->sendLvEvent(LV_EVENT_LONG_PRESSED);
+  bool ok = sent && closed && !button->hasLiveLvObj() &&
+            !button->automationLongClickable();
+  MainWindow::instance()->runMainLoopTick();
+  return ok;
+}
 #endif
 
 //-----------------------------------------------------------------------------
 
 IconButton::IconButton(Window* parent, EdgeTxIcon icon, coord_t x, coord_t y,
                        std::function<uint8_t(void)> pressHandler) :
-    ButtonBase(parent, {x, y, EdgeTxStyles::UI_ELEMENT_HEIGHT, EdgeTxStyles::UI_ELEMENT_HEIGHT}, pressHandler, button_create)
+    ButtonBase(parent,
+               {x, y, EdgeTxStyles::UI_ELEMENT_HEIGHT,
+                EdgeTxStyles::UI_ELEMENT_HEIGHT},
+               pressHandler, button_create)
 {
   padAll(PAD_ZERO);
-  iconImage = new (std::nothrow) StaticIcon(this, 0, 0, icon, COLOR_THEME_SECONDARY1_INDEX);
+  iconImage = new (std::nothrow)
+      StaticIcon(this, 0, 0, icon, COLOR_THEME_SECONDARY1_INDEX);
   if (iconImage) {
-    iconImage->center(EdgeTxStyles::UI_ELEMENT_HEIGHT - 4, EdgeTxStyles::UI_ELEMENT_HEIGHT - 4);
+    iconImage->center(EdgeTxStyles::UI_ELEMENT_HEIGHT - 4,
+                      EdgeTxStyles::UI_ELEMENT_HEIGHT - 4);
   }
 }
 
@@ -242,9 +269,10 @@ void IconButton::setIcon(EdgeTxIcon icon)
 
 //-----------------------------------------------------------------------------
 
-MomentaryButton::MomentaryButton(Window* parent, const rect_t& rect, std::string text,
-                       std::function<void(void)> pressHandler,
-                       std::function<void(void)> releaseHandler) :
+MomentaryButton::MomentaryButton(Window* parent, const rect_t& rect,
+                                 std::string text,
+                                 std::function<void(void)> pressHandler,
+                                 std::function<void(void)> releaseHandler) :
     FormField(parent, rect, button_create),
     pressHandler(std::move(pressHandler)),
     releaseHandler(std::move(releaseHandler)),
@@ -264,14 +292,12 @@ bool MomentaryButton::onLiveCustomEvent(Window::LiveWindow& live,
   auto obj = live.lvobj();
   switch (lv_event_get_code(event)) {
     case LV_EVENT_PRESSED:
-      if (pressHandler)
-        pressHandler();
+      if (pressHandler) pressHandler();
       lv_obj_add_state(obj, LV_STATE_CHECKED);
       lv_obj_clear_state(obj, LV_STATE_PRESSED);
       return true;
     case LV_EVENT_RELEASED:
-      if (releaseHandler)
-        releaseHandler();
+      if (releaseHandler) releaseHandler();
       lv_obj_clear_state(obj, LV_STATE_CHECKED);
       return true;
     default:
