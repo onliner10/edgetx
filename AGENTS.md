@@ -6,6 +6,36 @@
 - This machine has 24 build threads available. Prefer `cmake --build ... --parallel 24`, or set `CMAKE_BUILD_PARALLEL_LEVEL=24` when invoking project build scripts.
 - The UI harness writes simulator builds under `build/ui-harness` by default. Set `EDGETX_UI_BUILD_ROOT=/tmp/edgetx-ui-build` only when you intentionally want build output outside the worktree.
 
+## C++ Semantic MCP
+
+This repo provides a reproducible Serena + clangd MCP setup through the Nix flake. Do not install Serena, clangd, or C/C++ language servers with host package managers for this project.
+
+Before using semantic tools, generate the firmware compilation database from the flake:
+
+```sh
+git submodule update --init --recursive
+nix develop -c tools/edge16-cpp-lsp setup tx16s
+```
+
+Use `tx16smk3` instead of `tx16s` when you need MK3-specific preprocessor state. The command writes build files under `build/cpp-lsp/<target>` and creates the ignored repo-root `compile_commands.json` symlink required by Serena/clangd.
+
+To verify the semantic backend directly:
+
+```sh
+nix develop -c tools/edge16-cpp-lsp check radio/src/crc.cpp
+```
+
+For Codex MCP, configure the client to start this repo's wrapper through Nix, replacing `<repo>` with the absolute checkout path:
+
+```toml
+[mcp_servers.edge16-serena]
+startup_timeout_sec = 60
+command = "nix"
+args = ["develop", "<repo>", "-c", "<repo>/tools/edge16-serena-mcp"]
+```
+
+When the MCP server is available, prefer Serena symbol tools for C/C++ navigation and cross-reference questions: `find_symbol`, `find_referencing_symbols`, `find_declaration`, `get_symbols_overview`, and diagnostics. If references look stale or new files are missing, rerun `tools/edge16-cpp-lsp setup` and restart the MCP server.
+
 ## Simulator UI Harness
 
 For exploratory simulator UI testing, prefer a persistent `tools/ui-harness/edgetx-mcp` session over one-off JSON flows. JSON flows are replay artifacts after a path is understood; they are not the best discovery tool.
