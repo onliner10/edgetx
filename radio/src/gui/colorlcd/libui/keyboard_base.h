@@ -38,6 +38,7 @@ class Keyboard : public NavWindow
 
   bool hasTwoPageKeys;
   lv_group_t* group = nullptr;
+  RequiredLvObj keyboardObj;
   lv_obj_t* keyboard = nullptr;
 
   FormField* field = nullptr;
@@ -60,8 +61,29 @@ class Keyboard : public NavWindow
   }
 
   void showKeyboard();
-  bool isKeyboardReady() const { return keyboard && group && acceptsEvents(); }
+  bool isKeyboardReady() const
+  {
+    return withKeyboardParts([](LiveWindow&, lv_obj_t*, lv_group_t*) {});
+  }
   bool bindField(FormField* newField, FieldBinding& binding) const;
+
+  template <typename Fn>
+  bool withKeyboardParts(Fn&& fn) const
+  {
+    return withLive([&](LiveWindow& live) {
+      if (!group) return false;
+      return keyboardObj.with([&](lv_obj_t* keyboard) {
+        using Result = std::invoke_result_t<Fn, LiveWindow&, lv_obj_t*,
+                                            lv_group_t*>;
+        if constexpr (std::is_void_v<Result>) {
+          fn(live, keyboard, group);
+          return true;
+        } else {
+          return static_cast<bool>(fn(live, keyboard, group));
+        }
+      });
+    });
+  }
 
   template <typename T>
   static void discardKeyboard(T*& instance)

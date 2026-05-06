@@ -98,26 +98,26 @@ Keyboard::Keyboard(coord_t height, bool fullScreen) :
 
     // use a separate group for the keyboard
     group = lv_group_create();
-    if (!group) {
-      failClosed();
-      return;
-    }
+    if (!requireLvGroup(group)) return;
     lv_group_set_editing(group, true);
 
     auto old_g = lv_group_get_default();
     lv_group_set_default(group);
 
-    keyboard = keyboard_create(obj);
+    initRequiredLvObj(keyboardObj, keyboard_create, [&](lv_obj_t* obj) {
+      keyboard = obj;
+    });
     lv_group_set_default(old_g);
-    if (!requireLvObj(keyboard)) return;
 
-    lv_obj_add_event_cb(keyboard, keyboard_event_cb, LV_EVENT_ALL, this);
+    keyboardObj.with([&](lv_obj_t* keyboard) {
+      lv_obj_add_event_cb(keyboard, keyboard_event_cb, LV_EVENT_ALL, this);
 
-    lv_obj_set_pos(keyboard, 0, 0);
-    lv_obj_set_size(keyboard, LCD_W, height);
+      lv_obj_set_pos(keyboard, 0, 0);
+      lv_obj_set_size(keyboard, LCD_W, height);
 
-    // TODO: really needed ???
-    lv_obj_clear_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+      // TODO: really needed ???
+      lv_obj_clear_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+    });
   });
 }
 
@@ -134,9 +134,8 @@ void Keyboard::onDelete()
 void Keyboard::clearField(bool wasCancelled)
 {
   TRACE("CLEAR FIELD");
-  if (keyboard != nullptr) {
-    lv_obj_add_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
-  }
+  keyboardObj.with(
+      [](lv_obj_t* keyboard) { lv_obj_add_flag(keyboard, LV_OBJ_FLAG_HIDDEN); });
 
   detach();
   withLive([](lv_obj_t* obj) { lv_obj_set_parent(obj, lv_layer_top()); });
@@ -197,8 +196,7 @@ bool Keyboard::attachKeyboard()
 
 void Keyboard::showKeyboard()
 {
-  withLive([&](LiveWindow& live) {
-    if (!keyboard) return;
+  withKeyboardParts([&](LiveWindow& live, lv_obj_t* keyboard, lv_group_t*) {
     lv_obj_clear_flag(live.lvobj(), LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
   });
@@ -227,7 +225,7 @@ bool Keyboard::bindField(FormField* newField, FieldBinding& binding) const
 
 bool Keyboard::setField(const FieldBinding& binding)
 {
-  if (!binding.field || !binding.obj || !isKeyboardReady()) return false;
+  if (!binding.field || !binding.obj) return false;
   if (!attachKeyboard()) return false;
 
   auto rollback = [&]() {
@@ -236,9 +234,8 @@ bool Keyboard::setField(const FieldBinding& binding)
     return false;
   };
 
-  if (!withLive([&](LiveWindow& live) {
-        if (!keyboard || !group) return false;
-
+  if (!withKeyboardParts([&](LiveWindow& live, lv_obj_t* keyboard,
+                             lv_group_t*) {
         if (fullScreen) {
           setTop(0);
           lv_obj_set_parent(live.lvobj(), lv_layer_top());
