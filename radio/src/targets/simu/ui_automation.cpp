@@ -55,7 +55,15 @@ std::string jsonEscape(const std::string& value)
         escaped += "\\t";
         break;
       default:
-        escaped += ch;
+        if (static_cast<unsigned char>(ch) < 0x20) {
+          constexpr char hex[] = "0123456789abcdef";
+          auto value = static_cast<unsigned char>(ch);
+          escaped += "\\u00";
+          escaped += hex[value >> 4];
+          escaped += hex[value & 0x0f];
+        } else {
+          escaped += ch;
+        }
         break;
     }
   }
@@ -433,5 +441,18 @@ bool requestAction(const std::string& id, const std::string& action,
   return false;
 #endif
 }
+
+#if defined(COLORLCD) && defined(SIMU)
+bool escapesJsonControlCharactersForTest()
+{
+  std::string value;
+  value += "A";
+  value += static_cast<char>(0x1e);
+  value += "\n\t";
+  value += static_cast<char>(0x01);
+  value += "Z";
+  return jsonEscape(value) == "A\\u001e\\n\\t\\u0001Z";
+}
+#endif
 
 }

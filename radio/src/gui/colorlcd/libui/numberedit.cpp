@@ -162,13 +162,13 @@ class NumberArea : public FormField
     FormField::onLiveEvent(live, event);
   }
 
-  void onLiveClicked(LiveWindow&) override
+  void onLiveClicked(LiveWindow& live) override
   {
     lv_indev_type_t indev_type = lv_indev_get_type(lv_indev_get_act());
     if (indev_type == LV_INDEV_TYPE_POINTER) {
       setEditMode(true);
     } else {
-      FormField::onClicked();
+      FormField::onLiveClicked(live);
       if (!editMode) changeEnd();
     }
   }
@@ -188,7 +188,7 @@ class NumberArea : public FormField
   void directEdit()
   {
     editTextIsRaw = false;
-    FormField::onClicked();
+    withLive([&](LiveWindow& live) { FormField::onLiveClicked(live); });
   }
 
   void update()
@@ -466,6 +466,55 @@ bool numberEditNumberAreaAllocationFailureDoesNotCacheDeadEditorForTest()
 
   bool ok = numberEdit->isAvailable() && numberEdit->automationClickable() &&
             !numberEdit->hasCachedEditor();
+  delete numberEdit;
+  return ok;
+}
+
+bool numberEditCancelActiveEditorDoesNotCrashForTest()
+{
+  class TestNumberEdit : public NumberEdit
+  {
+   public:
+    TestNumberEdit(Window* parent, std::function<int()> getValue,
+                   std::function<void(int)> setValue) :
+        NumberEdit(parent, {0, 0, 120, EdgeTxStyles::UI_ELEMENT_HEIGHT}, 0, 100,
+                   std::move(getValue), std::move(setValue))
+    {
+    }
+
+    void exerciseOpenEdit() { openEdit(); }
+
+    bool cancelEditor()
+    {
+      if (!edit) return false;
+      edit->dispatchKeyboardEvent(EVT_KEY_BREAK(KEY_EXIT));
+      return true;
+    }
+
+    bool editorVisible() const { return edit && edit->isVisible(); }
+  };
+
+  int value = 7;
+  bool edited = false;
+  auto numberEdit = new (std::nothrow) TestNumberEdit(
+      MainWindow::instance(), [&]() { return value; },
+      [&](int newValue) { value = newValue; });
+  if (!numberEdit || !numberEdit->isAvailable()) {
+    delete numberEdit;
+    return false;
+  }
+
+  numberEdit->setOnEditedHandler([&](int) { edited = true; });
+  numberEdit->exerciseOpenEdit();
+  if (!numberEdit->editorVisible()) {
+    delete numberEdit;
+    return false;
+  }
+
+  const bool canceled = numberEdit->cancelEditor();
+  const bool ok = canceled && !numberEdit->editorVisible() && edited &&
+                  numberEdit->isAvailable() && numberEdit->automationClickable();
+  MainWindow::instance()->runMainLoopTick();
   delete numberEdit;
   return ok;
 }

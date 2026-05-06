@@ -167,6 +167,21 @@ lv_obj_t* window_create(lv_obj_t* parent)
   return etx_create(&window_base_class, parent);
 }
 
+static lv_coord_t forcedScrollCorrection(lv_coord_t scroll_y,
+                                         lv_coord_t scroll_bottom,
+                                         lv_coord_t event_y)
+{
+  if (scroll_y > 0 && scroll_y <= EdgeTxStyles::UI_ELEMENT_HEIGHT * 2 &&
+      event_y > 0) {
+    return scroll_y;
+  }
+  if (scroll_bottom > 0 &&
+      scroll_bottom <= EdgeTxStyles::UI_ELEMENT_HEIGHT * 2 && event_y < 0) {
+    return -scroll_bottom;
+  }
+  return 0;
+}
+
 void Window::window_event_cb(lv_event_t* e)
 {
   Window* window = (Window*)lv_obj_get_user_data(lv_event_get_target(e));
@@ -188,19 +203,19 @@ void Window::eventHandler(lv_event_t* e)
             if (!lv_obj_is_scrolling(target) &&
                 ((windowFlags & NO_FORCED_SCROLL) == 0)) {
               lv_point_t* p = (lv_point_t*)lv_event_get_param(e);
-              lv_coord_t scroll_y = lv_obj_get_scroll_y(target);
-              lv_coord_t scroll_bottom = lv_obj_get_scroll_bottom(target);
+              if (p) {
+                lv_coord_t scroll_y = lv_obj_get_scroll_y(target);
+                lv_coord_t scroll_bottom = lv_obj_get_scroll_bottom(target);
 
-              TRACE("SCROLL[x=%d;y=%d;top=%d;bottom=%d]", p->x, p->y, scroll_y,
-                    scroll_bottom);
+                TRACE("SCROLL[x=%d;y=%d;top=%d;bottom=%d]", p->x, p->y,
+                      scroll_y, scroll_bottom);
 
-              // Force scroll to top or bottom when near either edge.
-              // Only applies when using rotary encoder or keys.
-              if (scroll_y <= EdgeTxStyles::UI_ELEMENT_HEIGHT * 2 && p->y > 0) {
-                lv_obj_scroll_by(target, 0, scroll_y, LV_ANIM_OFF);
-              } else if (scroll_bottom <= EdgeTxStyles::UI_ELEMENT_HEIGHT * 2 &&
-                         p->y < 0) {
-                lv_obj_scroll_by(target, 0, -scroll_bottom, LV_ANIM_OFF);
+                // Force scroll to top or bottom when near either edge.
+                // Only applies when using rotary encoder or keys.
+                const lv_coord_t correction =
+                    forcedScrollCorrection(scroll_y, scroll_bottom, p->y);
+                if (correction != 0)
+                  lv_obj_scroll_by(target, 0, correction, LV_ANIM_OFF);
               }
             }
 
@@ -538,6 +553,14 @@ bool windowDelayedLoadGatesLoadedTasksForTest()
 
   delete window;
   return immediateRuns && pendingDrops && afterDrawRuns;
+}
+
+bool forcedScrollIgnoresNegativeEdgeDistancesForTest()
+{
+  return forcedScrollCorrection(-1, 0, 1) == 0 &&
+         forcedScrollCorrection(0, -1, -1) == 0 &&
+         forcedScrollCorrection(1, 0, 1) == 1 &&
+         forcedScrollCorrection(0, 1, -1) == -1;
 }
 #endif
 

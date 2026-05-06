@@ -275,10 +275,10 @@ LuaWidget::~LuaWidget()
   if (errorMessage) free(errorMessage);
 }
 
-void LuaWidget::onLiveClicked(Window::LiveWindow&)
+void LuaWidget::onLiveClicked(Window::LiveWindow& live)
 {
   if (!fullscreen) {
-    ButtonBase::onClicked();
+    ButtonBase::onLiveClicked(live);
     return;
   }
 

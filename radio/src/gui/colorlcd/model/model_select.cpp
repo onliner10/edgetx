@@ -174,10 +174,11 @@ class ModelButton : public Button
                   COLOR_THEME_SECONDARY1_INDEX, CENTERED | font);
   }
 
-  void onLiveClicked(LiveWindow&) override
+  void onLiveClicked(LiveWindow& live) override
   {
     setFocused();
-    ButtonBase::onClicked();
+    ButtonBase::onLiveClicked(live);
+    if (!acceptsEvents()) return;
     if (m_setSelected) m_setSelected();
   }
 };
@@ -211,6 +212,52 @@ bool modelSelectMissingImageLoadReportsWorkForTest()
   button->markLoaded();
 
   return button->loadImage();
+}
+
+bool modelButtonClickHandlerMayDeleteButtonForTest()
+{
+  class TestModelButton : public ModelButton
+  {
+   public:
+    TestModelButton(Window* parent, const rect_t& rect, ModelCell* modelCell,
+                    std::function<void()> setSelected, uint8_t layout) :
+        ModelButton(parent, rect, modelCell, std::move(setSelected), layout)
+    {
+    }
+
+    void markLoaded() { Window::markLoaded(); }
+  };
+
+  ModelCell cell("model1.yml");
+  strncpy(cell.modelName, "Model 1", LEN_MODEL_NAME);
+  cell.modelName[LEN_MODEL_NAME] = '\0';
+
+  auto parent = new (std::nothrow) Window(MainWindow::instance(), {0, 0, 220, 120});
+  if (!parent) return false;
+
+  bool closed = false;
+  bool selectedAfterClose = false;
+  auto button = new (std::nothrow) TestModelButton(
+      parent, {0, 0, modelLayouts[0].width, modelLayouts[0].height}, &cell,
+      [&]() { selectedAfterClose = true; }, 0);
+  if (!button) {
+    parent->deleteLater();
+    MainWindow::instance()->runMainLoopTick();
+    return false;
+  }
+
+  button->markLoaded();
+  button->setPressHandler([&]() {
+    closed = true;
+    parent->deleteLater();
+    return 1;
+  });
+
+  const bool sent = button->sendLvEvent(LV_EVENT_CLICKED);
+  const bool ok = sent && closed && !button->hasLiveLvObj() &&
+                  !selectedAfterClose && !button->automationClickable();
+  MainWindow::instance()->runMainLoopTick();
+  return ok;
 }
 #endif
 

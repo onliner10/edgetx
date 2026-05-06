@@ -40,6 +40,7 @@ bool requiredWindowBuilderFailureFailsOwnerClosedForTest();
 bool attachToUnavailableParentPreservesExistingParentForTest();
 bool unavailableWindowDirectClickDoesNotBubbleForTest();
 bool windowDelayedLoadGatesLoadedTasksForTest();
+bool forcedScrollIgnoresNegativeEdgeDistancesForTest();
 bool buttonMatrixObjectAllocationFailureFailsClosedForTest();
 bool tableFieldObjectAllocationFailureFailsClosedForTest();
 bool tableFieldInvalidSelectionClearsWithoutScrollForTest();
@@ -47,6 +48,7 @@ bool tableFieldSelectMovesAcrossColumnsForTest();
 bool toggleSwitchObjectAllocationFailureFailsClosedForTest();
 bool textEditTextAreaAllocationFailureDoesNotCacheDeadEditorForTest();
 bool numberEditNumberAreaAllocationFailureDoesNotCacheDeadEditorForTest();
+bool numberEditCancelActiveEditorDoesNotCrashForTest();
 bool textKeyboardWindowAllocationFailureDoesNotCacheDeadKeyboardForTest();
 bool textKeyboardKeypadAllocationFailureDoesNotCacheDeadKeyboardForTest();
 bool numberKeyboardWindowAllocationFailureDoesNotCacheDeadKeyboardForTest();
@@ -232,6 +234,22 @@ TEST(ColorWindow, DelayedLoadGatesLoadedTasks)
   EXPECT_EQ(WEXITSTATUS(status), 0);
 }
 
+TEST(ColorWindow, ForcedScrollIgnoresNegativeEdgeDistances)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(forcedScrollIgnoresNegativeEdgeDistancesForTest() ? 0 : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
 TEST(ColorWindow, ButtonMatrixObjectAllocationFailureFailsClosed)
 {
   const pid_t pid = fork();
@@ -339,6 +357,22 @@ TEST(ColorWindow, NumberEditNumberAreaAllocationFailureDoesNotCacheDeadEditor)
     _exit(numberEditNumberAreaAllocationFailureDoesNotCacheDeadEditorForTest()
               ? 0
               : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorWindow, NumberEditCancelActiveEditorDoesNotCrash)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(numberEditCancelActiveEditorDoesNotCrashForTest() ? 0 : 1);
   }
 
   int status = 0;
