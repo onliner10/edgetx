@@ -352,7 +352,7 @@ lv_obj_t* LvglWidgetObjectBase::currentParentLvObj() const
   if (!parent) return nullptr;
 
   lv_obj_t* obj = nullptr;
-  parent->visitLive([&](Window::LiveWindow& live) { obj = live.lvobj(); });
+  parent->withLive([&](Window::LiveWindow& live) { obj = live.lvobj(); });
   return obj;
 }
 
@@ -2595,7 +2595,7 @@ class WidgetPage : public NavWindow, public LuaEventHandler
 
     etx_solid_bg(lvobj);
     if (body)
-      body->visitLive([&](Window::LiveWindow& live) {
+      body->withLive([&](Window::LiveWindow& live) {
         lv_obj_set_style_max_height(live.lvobj(),
                                     LCD_H - EdgeTxStyles::MENU_HEADER_HEIGHT,
                                     LV_PART_MAIN);

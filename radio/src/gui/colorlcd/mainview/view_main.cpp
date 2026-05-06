@@ -104,7 +104,7 @@ ViewMain::ViewMain() :
 {
   pushLayer();
 
-  dispatchLive([&](LiveWindow& live) {
+  withLive([&](LiveWindow& live) {
     tile_view = lv_tileview_create(live.lvobj());
     if (!requireLvObj(tile_view)) return false;
     lv_obj_set_pos(tile_view, rect.x, rect.y);
@@ -141,7 +141,7 @@ void ViewMain::addMainView(WidgetsContainer* view, uint32_t viewId)
       lv_tileview_add_tile(tile_view, viewId, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
   if (!tile) return;
 
-  if (!view->visitLive([&](Window::LiveWindow& liveView) {
+  if (!view->withLive([&](Window::LiveWindow& liveView) {
         lv_obj_set_parent(liveView.lvobj(), tile);
       }))
     return;
@@ -438,7 +438,7 @@ void ViewMain::hideTopBarEdgeTxButton()
 
 void ViewMain::_refreshWidgets()
 {
-  visitLive([&](LiveWindow&) {
+  withLive([&](LiveWindow&) {
     uint32_t now = time_get_ms();
     bool refreshBackground = timeReached(now, nextBackgroundWidgetRefresh);
     if (refreshBackground) {

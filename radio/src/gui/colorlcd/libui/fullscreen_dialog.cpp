@@ -47,7 +47,7 @@ FullScreenDialog::FullScreenDialog(
     confirmHandler(confirmHandler)
 {
   setWindowFlag(OPAQUE);
-  dispatchLive([&](LiveWindow& live) {
+  withLive([&](LiveWindow& live) {
     etx_solid_bg(live.lvobj(), (type == WARNING_TYPE_ALERT)
                                    ? COLOR_THEME_WARNING_INDEX
                                    : COLOR_THEME_SECONDARY1_INDEX);
@@ -67,7 +67,7 @@ bool FullScreenDialog::build()
       this, rect_t{0, ALERT_FRAME_TOP, LCD_W, ALERT_FRAME_HEIGHT});
   if (div) {
     div->setWindowFlag(NO_FOCUS);
-    div->visitLive([](Window::LiveWindow& live) {
+    div->withLive([](Window::LiveWindow& live) {
       etx_solid_bg(live.lvobj(), COLOR_THEME_PRIMARY2_INDEX);
     });
   }
@@ -116,7 +116,7 @@ bool FullScreenDialog::build()
       return false;
     }
     btn->setAutomationId("dialog.action");
-    btn->visitLive([](Window::LiveWindow& live) {
+    btn->withLive([](Window::LiveWindow& live) {
       etx_bg_color(live.lvobj(), COLOR_THEME_SECONDARY3_INDEX);
       etx_txt_color(live.lvobj(), COLOR_THEME_PRIMARY1_INDEX);
     });
@@ -134,7 +134,7 @@ bool FullScreenDialog::build()
         failClosed();
         return false;
       }
-      btn->visitLive([](Window::LiveWindow& live) {
+      btn->withLive([](Window::LiveWindow& live) {
         etx_bg_color(live.lvobj(), COLOR_THEME_SECONDARY3_INDEX);
         etx_txt_color(live.lvobj(), COLOR_THEME_PRIMARY1_INDEX);
       });
@@ -150,7 +150,7 @@ bool FullScreenDialog::build()
         failClosed();
         return false;
       }
-      btn->visitLive([](Window::LiveWindow& live) {
+      btn->withLive([](Window::LiveWindow& live) {
         etx_bg_color(live.lvobj(), COLOR_THEME_SECONDARY3_INDEX);
         etx_txt_color(live.lvobj(), COLOR_THEME_PRIMARY1_INDEX);
       });
@@ -194,7 +194,7 @@ void FullScreenDialog::setMessage(const char* text)
 void FullScreenDialog::setMessageLongMode(lv_label_long_mode_t mode)
 {
   if (messageLabel)
-    messageLabel->visitLive([&](Window::LiveWindow& live) {
+    messageLabel->withLive([&](Window::LiveWindow& live) {
       lv_label_set_long_mode(live.lvobj(), mode);
     });
 }

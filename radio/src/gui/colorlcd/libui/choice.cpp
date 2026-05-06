@@ -82,7 +82,7 @@ ChoiceBase::ChoiceBase(Window* parent, const rect_t& rect,
   padRight(PAD_SMALL);
 
   // Add image
-  withLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     lv_obj_t* img = choice_img_create(obj);
     if (img) {
       lv_img_set_src(
@@ -128,7 +128,7 @@ std::string Choice::getLabelText()
 
 void ChoiceBase::update()
 {
-  dispatchLive([&](LiveWindow& live) {
+  withLive([&](LiveWindow& live) {
     update(live);
   });
 }

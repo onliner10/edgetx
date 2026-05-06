@@ -72,11 +72,11 @@ MenuToolbarButton::MenuToolbarButton(Window* parent, const rect_t& rect,
                                      const char* picto) :
     ButtonBase(parent, rect, nullptr, menu_button_create)
 {
-  withLvObj([](lv_obj_t* obj) {
+  withLive([](lv_obj_t* obj) {
     lv_obj_add_flag(obj, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
   });
 
-  withLvObj([](lv_obj_t* obj) {
+  withLive([](lv_obj_t* obj) {
     lv_obj_add_event_cb(obj, toolbar_btn_defocus, LV_EVENT_DEFOCUSED, nullptr);
   });
 
@@ -100,7 +100,7 @@ MenuToolbar::MenuToolbar(Choice* choice, Menu* menu, const int columns) :
     return;
   }
 
-  dispatchLive([&](LiveWindow& live) {
+  withLive([&](LiveWindow& live) {
     padAll(PAD_SMALL);
 
     auto obj = live.lvobj();
@@ -129,7 +129,7 @@ MenuToolbar::~MenuToolbar()
 
 void MenuToolbar::resetFilter()
 {
-  dispatchLive([&](LiveWindow& live) {
+  withLive([&](LiveWindow& live) {
     auto obj = live.lvobj();
     if (lv_group_get_focused(group) != obj) {
       lv_group_focus_obj(obj);
@@ -141,7 +141,7 @@ void MenuToolbar::resetFilter()
 
 void MenuToolbar::nextFilter()
 {
-  dispatchLive([&](LiveWindow&) {
+  withLive([&](LiveWindow&) {
     lv_group_focus_next(group);
     if (auto window = Window::fromAvailableLvObj(lv_group_get_focused(group)))
       window->sendLvEvent(LV_EVENT_CLICKED);
@@ -150,7 +150,7 @@ void MenuToolbar::nextFilter()
 
 void MenuToolbar::prevFilter()
 {
-  dispatchLive([&](LiveWindow&) {
+  withLive([&](LiveWindow&) {
     lv_group_focus_prev(group);
     if (auto window = Window::fromAvailableLvObj(lv_group_get_focused(group)))
       window->sendLvEvent(LV_EVENT_CLICKED);
@@ -179,9 +179,9 @@ bool MenuToolbar::filterMenu(MenuToolbarButton* btn, int16_t filtermin,
                              const char* title)
 {
   bool checked = false;
-  dispatchLive([&](LiveWindow&) {
+  withLive([&](LiveWindow&) {
     if (!btn) return;
-    btn->visitLive([&](Window::LiveWindow& btnLive) {
+    btn->withLive([&](Window::LiveWindow& btnLive) {
       btn->check(!btn->checked());
 
       filter = nullptr;
@@ -212,7 +212,7 @@ void MenuToolbar::addButton(const char* picto, int16_t filtermin,
                             const Choice::FilterFct& filterFunc,
                             const char* title, bool wideButton)
 {
-  dispatchLive([&](LiveWindow&) {
+  withLive([&](LiveWindow&) {
     int vmin = choice->getMin();
     int vmax = choice->getMax();
 
@@ -238,7 +238,7 @@ void MenuToolbar::addButton(const char* picto, int16_t filtermin,
     button->setPressHandler(std::bind(&MenuToolbar::filterMenu, this, button,
                                       filtermin, filtermax, filterFunc, title));
 
-    button->visitLive([&](Window::LiveWindow& liveButton) {
+    button->withLive([&](Window::LiveWindow& liveButton) {
       lv_group_add_obj(group, liveButton.lvobj());
     });
 

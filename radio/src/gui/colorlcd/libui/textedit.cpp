@@ -38,7 +38,7 @@ class TextArea : public FormField
   {
     setWindowFlag(NO_FOCUS);
 
-    withLvObj([&](lv_obj_t* obj) {
+    withLive([&](lv_obj_t* obj) {
       lv_textarea_set_max_length(obj, length);
       lv_textarea_set_placeholder_text(obj, "---");
     });
@@ -48,7 +48,7 @@ class TextArea : public FormField
         setEditMode(false);
         hide();
         if (parent) {
-          parent->visitLive([](Window::LiveWindow& liveParent) {
+          parent->withLive([](Window::LiveWindow& liveParent) {
             lv_group_focus_obj(liveParent.lvobj());
             lv_obj_clear_state(liveParent.lvobj(), LV_STATE_FOCUSED);
           });
@@ -67,7 +67,7 @@ class TextArea : public FormField
   {
     // value may not be null-terminated
     std::string txt(value, length);
-    dispatchLive([&](LiveWindow& live) {
+    withLive([&](LiveWindow& live) {
       lv_textarea_set_text(live.lvobj(), txt.c_str());
     });
   }
@@ -100,7 +100,7 @@ class TextArea : public FormField
   {
     bool changed = false;
     std::string text;
-    if (!visitLive([&](LiveWindow& live) {
+    if (!withLive([&](LiveWindow& live) {
           auto rawText = lv_textarea_get_text(live.lvobj());
           text = rawText ? rawText : "";
         }))
@@ -183,7 +183,7 @@ void TextEdit::openEdit()
   if (!syncOverlay(edit)) return;
   edit->show();
   if (edit->focus()) {
-    edit->visitLive([](Window::LiveWindow& liveEdit) {
+    edit->withLive([](Window::LiveWindow& liveEdit) {
       lv_obj_add_state(liveEdit.lvobj(), LV_STATE_FOCUSED | LV_STATE_EDITED);
     });
   }
@@ -199,7 +199,7 @@ void TextEdit::preview(bool edited, char* text, uint8_t length)
   if (!edit) return;
   edit->setWindowFlag(NO_CLICK);
   if (edit->focus()) {
-    edit->visitLive([&](Window::LiveWindow& liveEdit) {
+    edit->withLive([&](Window::LiveWindow& liveEdit) {
       lv_obj_add_state(liveEdit.lvobj(), LV_STATE_FOCUSED);
       if (edited) lv_obj_add_state(liveEdit.lvobj(), LV_STATE_EDITED);
     });

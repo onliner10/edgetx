@@ -345,7 +345,7 @@ void PageGroupBase::addTab(PageGroupItem* page)
 
 void PageGroupBase::setCurrentTab(unsigned index)
 {
-  visitLive([&](LiveWindow&) {
+  withLive([&](LiveWindow&) {
     if (!header || !body) return;
 
     header->setCurrentIndex(index);

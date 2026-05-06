@@ -96,7 +96,7 @@ class ColorEditorPopup : public BaseDialog
       failClosed();
       return;
     }
-    cedit->visitLive([](Window::LiveWindow& live) {
+    cedit->withLive([](Window::LiveWindow& live) {
       lv_obj_set_style_grid_cell_x_align(live.lvobj(), LV_GRID_ALIGN_CENTER, 0);
     });
 
@@ -105,7 +105,7 @@ class ColorEditorPopup : public BaseDialog
       failClosed();
       return;
     }
-    vbox->visitLive([](Window::LiveWindow& live) {
+    vbox->withLive([](Window::LiveWindow& live) {
       lv_obj_set_style_grid_cell_x_align(live.lvobj(), LV_GRID_ALIGN_CENTER, 0);
     });
     vbox->setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_MEDIUM, r.w, r.h);
@@ -116,7 +116,7 @@ class ColorEditorPopup : public BaseDialog
       return;
     }
     hbox->setFlexLayout(LV_FLEX_FLOW_ROW, PAD_MEDIUM);
-    hbox->visitLive([](Window::LiveWindow& live) {
+    hbox->withLive([](Window::LiveWindow& live) {
       lv_obj_set_flex_align(live.lvobj(), LV_FLEX_ALIGN_CENTER,
                             LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_SPACE_AROUND);
     });
@@ -142,7 +142,7 @@ class ColorEditorPopup : public BaseDialog
     }
     hbox->padAll(PAD_TINY);
     hbox->setFlexLayout(LV_FLEX_FLOW_ROW_WRAP, PAD_MEDIUM);
-    hbox->visitLive([](Window::LiveWindow& live) {
+    hbox->withLive([](Window::LiveWindow& live) {
       lv_obj_set_flex_align(live.lvobj(), LV_FLEX_ALIGN_CENTER,
                             LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_AROUND);
     });
@@ -204,7 +204,7 @@ class ColorEditorPopup : public BaseDialog
       return;
     }
     hbox->setFlexLayout(LV_FLEX_FLOW_ROW, PAD_MEDIUM);
-    hbox->visitLive([](Window::LiveWindow& live) {
+    hbox->withLive([](Window::LiveWindow& live) {
       lv_obj_set_flex_align(live.lvobj(), LV_FLEX_ALIGN_CENTER,
                             LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_SPACE_BETWEEN);
       lv_obj_set_flex_grow(live.lvobj(), 1);
@@ -288,7 +288,7 @@ void ColorPicker::updateColor(uint32_t c)
   }
 
   auto lvcolor = lv_color_make(r, g, b);
-  dispatchLive([&](Window::LiveWindow& live) {
+  withLive([&](Window::LiveWindow& live) {
     lv_obj_set_style_bg_color(live.lvobj(), lvcolor, LV_PART_MAIN);
   });
 }

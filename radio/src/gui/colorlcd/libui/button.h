@@ -42,7 +42,7 @@ class ButtonBase : public FormField
   bool automationLongClickable() const override
   {
     return static_cast<bool>(longPressHandler) &&
-           visitLive([](LiveWindow&) { return true; });
+           withLive([](LiveWindow&) { return true; });
   }
 #endif
 

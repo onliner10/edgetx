@@ -36,7 +36,7 @@ class BaseDialogForm : public Window
  public:
   BaseDialogForm(Window* parent, lv_coord_t width, bool flexLayout) : Window(parent, rect_t{})
   {
-    withLvObj(etx_scrollbar);
+    withLive(etx_scrollbar);
     padAll(PAD_TINY);
     if (flexLayout)
       setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_ZERO, width, LV_SIZE_CONTENT);
@@ -62,7 +62,7 @@ BaseDialog::BaseDialog(const char* title,
   content->setWindowFlag(OPAQUE);
   content->padAll(PAD_ZERO);
   content->setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_ZERO, width, LV_SIZE_CONTENT);
-  content->visitLive([](Window::LiveWindow& live) {
+  content->withLive([](Window::LiveWindow& live) {
     etx_solid_bg(live.lvobj());
     lv_obj_center(live.lvobj());
   });
@@ -79,7 +79,7 @@ BaseDialog::BaseDialog(const char* title,
   form = Window::makeLive<BaseDialogForm>(content, width, flexLayout);
   if (!form) form = content;
   if (form && maxHeight != LV_SIZE_CONTENT) {
-    form->visitLive([&](Window::LiveWindow& live) {
+    form->withLive([&](Window::LiveWindow& live) {
       lv_obj_set_style_max_height(
           live.lvobj(), maxHeight - EdgeTxStyles::UI_ELEMENT_HEIGHT,
           LV_PART_MAIN);

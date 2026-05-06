@@ -98,14 +98,11 @@ WINDOW_LIFETIME_BOUNDARY_SUFFIXES = (
 )
 
 INVARIANT_BOUNDARY_CALLS = (
-    "dispatchLive",
     "fromAvailableLvObj",
     "initRequiredLvObj",
     "initRequiredWindow",
     "requireLvObj",
-    "visitLive",
-    "withAvailableLvObj",
-    "withLvObj",
+    "withLive",
 )
 
 KEYWORDS = {
@@ -139,6 +136,60 @@ INTERESTING_SUBSTRINGS = (
     "lvobj",
     "nullptr",
     "valid",
+)
+
+UI_SAFETY_FAMILIES = {
+    "LVGL object presence/lifetime",
+    "Window availability/event liveness",
+    "Content pointer presence",
+}
+
+UI_SAFETY_VARIABLES = {
+    "body",
+    "box",
+    "button",
+    "child",
+    "choice",
+    "content",
+    "dialog",
+    "field",
+    "form",
+    "header",
+    "keyboard",
+    "label",
+    "line",
+    "list",
+    "lvobj",
+    "menu",
+    "overlay",
+    "page",
+    "parent",
+    "slider",
+    "table",
+    "textedit",
+    "toolbar",
+    "w",
+    "widget",
+    "window",
+}
+
+UI_SAFETY_CALLS = {
+    "acceptsEvents",
+    "hasLiveLvObj",
+    "isAvailable",
+    "isKeyboardReady",
+}
+
+UI_SAFETY_ATOM_SUBSTRINGS = (
+    "acceptsevents",
+    "deleted",
+    "getlvobj",
+    "haslivelvobj",
+    "isavailable",
+    "iskeyboardready",
+    "loaded",
+    "lv_obj",
+    "lvobj",
 )
 
 
@@ -798,6 +849,37 @@ def is_interesting_atom(atom: str) -> bool:
     return bool(predicate_call_keys(atom))
 
 
+def ui_safety_variable_name(key: str) -> str:
+    key = key.strip()
+    key = re.sub(r"^(?:this->)", "", key)
+    key = re.sub(r"\(.*\)$", "", key)
+    return re.split(r"->|\.", key)[-1].lower()
+
+
+def is_ui_safety_atom(atom: str) -> bool:
+    lower = atom.lower()
+    if is_invariant_boundary_atom(atom):
+        return False
+    if any(part in lower for part in UI_SAFETY_ATOM_SUBSTRINGS):
+        return True
+    return any(
+        ui_safety_variable_name(variable) in UI_SAFETY_VARIABLES
+        for variable in predicate_variable_keys(atom)
+    )
+
+
+def is_ui_safety_record(record: IfRecord) -> bool:
+    if any(key in UI_SAFETY_FAMILIES for key in record.family_keys):
+        if any(is_allowed_family_boundary(record, key) for key in record.family_keys):
+            return False
+        return True
+    if any(call in UI_SAFETY_CALLS for call in record.call_keys):
+        return True
+    if any(ui_safety_variable_name(key) in UI_SAFETY_VARIABLES for key in record.variable_keys):
+        return True
+    return any(is_ui_safety_atom(atom) for atom in record.atoms)
+
+
 def body_summary(cursor, cache: dict[Path, bytes]) -> tuple[str, tuple[str, ...]]:
     text = extract_cursor_text(cursor, cache)
     compact = one_line(text)
@@ -1118,6 +1200,8 @@ def format_report(
     lines.append("")
     lines.append(f"- Mode: {mode}")
     lines.append(f"- Compile database: {relpath(Path(args.compile_commands_path), root)}")
+    if args.ui_safety:
+        lines.append("- Filter: UI safety invariants only")
     lines.append(f"- Files selected: {len(selected_files)}")
     lines.append(f"- If statements analyzed: {len(records)} ({len(production_records)} production, {len(test_records)} tests)")
     if diagnostics and args.verbose:
@@ -1149,6 +1233,9 @@ def append_scope_report(
     root: Path,
     args: argparse.Namespace,
 ) -> None:
+    if args.ui_safety:
+        records = [record for record in records if is_ui_safety_record(record)]
+
     lines.append(f"## {title}")
     if not records:
         lines.append("")
@@ -1260,6 +1347,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--show-local",
         action="store_true",
         help="Also report repeats confined to one file.",
+    )
+    parser.add_argument(
+        "--ui-safety",
+        action="store_true",
+        help=(
+            "Report only repeated UI lifetime, availability, and required-child "
+            "guards. Use this for Bob-style UI safety reviews."
+        ),
     )
     parser.add_argument(
         "--include-tests",

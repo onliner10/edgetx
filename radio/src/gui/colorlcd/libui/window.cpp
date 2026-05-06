@@ -179,7 +179,7 @@ void Window::eventHandler(lv_event_t* e)
   lv_event_code_t code = lv_event_get_code(e);
 
   if (code == LV_EVENT_DELETE) return;
-  if (!dispatchLive([&](LiveWindow& live) {
+  if (!withLive([&](LiveWindow& live) {
         if (onLiveCustomEvent(live, e)) return;
 
         switch (code) {
@@ -251,7 +251,7 @@ Window::Window(Window* parent, const rect_t& rect, LvglCreate objConstruct) :
 {
   lv_obj_t* lv_parent = nullptr;
   if (parent) {
-    parent->dispatchLive([&](LiveWindow& live) { lv_parent = live.lvobj(); });
+    parent->withLive([&](LiveWindow& live) { lv_parent = live.lvobj(); });
     if (!lv_parent) {
       this->parent = nullptr;
       availability = Availability::Unavailable;
@@ -456,7 +456,7 @@ void Window::delayLoader(lv_event_t* e)
 {
   auto w = (Window*)lv_obj_get_user_data(lv_event_get_target(e));
   if (!w) return;
-  w->dispatchLive([&](LiveWindow&) {
+  w->withLive([&](LiveWindow&) {
     if (!w->loaded) {
       w->loaded = true;
       w->delayedInit();
@@ -562,8 +562,8 @@ void Window::clearTextFlag(LcdFlags flag) { textFlags &= ~flag; }
 bool Window::attachTo(Window& newParent)
 {
   bool attached = false;
-  dispatchLive([&](LiveWindow& childLive) {
-    newParent.dispatchLive([&](LiveWindow& parentLive) {
+  withLive([&](LiveWindow& childLive) {
+    newParent.withLive([&](LiveWindow& parentLive) {
       if (parent && parent != &newParent) parent->children.remove(this);
       parent = &newParent;
 
@@ -590,9 +590,9 @@ void Window::detach()
 bool Window::syncOverlay(Window* overlay)
 {
   bool synced = false;
-  dispatchLive([&](LiveWindow& field) {
+  withLive([&](LiveWindow& field) {
     if (!overlay) return;
-    overlay->dispatchLive([&](LiveWindow& liveOverlay) {
+    overlay->withLive([&](LiveWindow& liveOverlay) {
       lv_obj_t* fieldParent = lv_obj_get_parent(field.lvobj());
       if (!fieldParent) return;
 
@@ -617,7 +617,7 @@ bool Window::syncOverlay(Window* overlay)
 
 bool Window::loadLvglScreen()
 {
-  return dispatchLive([&](LiveWindow& live) { lv_scr_load(live.lvobj()); });
+  return withLive([&](LiveWindow& live) { lv_scr_load(live.lvobj()); });
 }
 
 void Window::deleteLater()
@@ -664,14 +664,14 @@ void Window::deleteChildren()
 
 bool Window::hasFocus() const
 {
-  return dispatchLive([&](LiveWindow& live) {
+  return withLive([&](LiveWindow& live) {
     return lv_obj_has_state(live.lvobj(), LV_STATE_FOCUSED);
   });
 }
 
 bool Window::focus()
 {
-  return dispatchLive(
+  return withLive(
       [&](LiveWindow& live) { lv_group_focus_obj(live.lvobj()); });
 }
 
@@ -702,7 +702,7 @@ void Window::padAll(PaddingSize pad)
 
 void Window::checkEvents()
 {
-  dispatchLive([&](LiveWindow& live) { onLiveCheckEvents(live); });
+  withLive([&](LiveWindow& live) { onLiveCheckEvents(live); });
 }
 
 void Window::onLiveCheckEvents(Window::LiveWindow&)
@@ -715,7 +715,7 @@ void Window::onLiveCheckEvents(Window::LiveWindow&)
 
 void Window::onEvent(event_t event)
 {
-  dispatchLive([&](LiveWindow& live) { onLiveEvent(live, event); });
+  withLive([&](LiveWindow& live) { onLiveEvent(live, event); });
 }
 
 void Window::onLiveEvent(Window::LiveWindow&, event_t event)
@@ -727,7 +727,7 @@ void Window::onLiveEvent(Window::LiveWindow&, event_t event)
 
 void Window::onClicked()
 {
-  dispatchLive([&](LiveWindow& live) { onLiveClicked(live); });
+  withLive([&](LiveWindow& live) { onLiveClicked(live); });
 }
 
 void Window::onLiveClicked(Window::LiveWindow&)
@@ -743,7 +743,7 @@ void Window::onCancel()
 bool Window::onLongPress()
 {
   bool handled = true;
-  dispatchLive([&](LiveWindow& live) { handled = onLiveLongPress(live); });
+  withLive([&](LiveWindow& live) { handled = onLiveLongPress(live); });
   return handled;
 }
 
@@ -751,7 +751,7 @@ bool Window::onLiveLongPress(Window::LiveWindow&) { return true; }
 
 void Window::dispatchKeyboardEvent(event_t event)
 {
-  dispatchLive([&](LiveWindow& live) {
+  withLive([&](LiveWindow& live) {
     event_t key = EVT_KEY_MASK(event);
     if (event == EVT_KEY_BREAK(KEY_ENTER)) {
       onLiveClicked(live);
@@ -767,7 +767,7 @@ void Window::dispatchKeyboardEvent(event_t event)
 
 bool Window::sendLvEvent(lv_event_code_t code, void* param)
 {
-  return dispatchLive(
+  return withLive(
       [&](LiveWindow& live) { lv_event_send(live.lvobj(), code, param); });
 }
 
@@ -797,7 +797,7 @@ std::string Window::automationText() const { return automationText_; }
 bool Window::automationClickable() const
 {
   if (hasWindowFlag(NO_CLICK)) return false;
-  if (!dispatchLive([&](LiveWindow& live) {
+  if (!withLive([&](LiveWindow& live) {
         return lv_obj_has_flag(live.lvobj(), LV_OBJ_FLAG_CLICKABLE);
       }))
     return false;
@@ -810,9 +810,9 @@ bool Window::automationClickable() const
 bool Window::addChild(Window* window)
 {
   bool added = false;
-  dispatchLive([&](LiveWindow& parentLive) {
+  withLive([&](LiveWindow& parentLive) {
     if (!window) return;
-    window->dispatchLive([&](LiveWindow& childLive) {
+    window->withLive([&](LiveWindow& childLive) {
       auto lv_parent = lv_obj_get_parent(childLive.lvobj());
       if (lv_parent && (lv_parent != parentLive.lvobj())) {
         lv_obj_set_parent(childLive.lvobj(), parentLive.lvobj());
@@ -854,7 +854,7 @@ FormLine* Window::newLine(FlexGridLayout& layout)
 
 void Window::show(bool visible)
 {
-  dispatchLive([&](LiveWindow& live) { onLiveShow(live, visible); });
+  withLive([&](LiveWindow& live) { onLiveShow(live, visible); });
 }
 
 void Window::onLiveShow(Window::LiveWindow& live, bool visible)
@@ -870,14 +870,14 @@ void Window::onLiveShow(Window::LiveWindow& live, bool visible)
 
 bool Window::isVisible()
 {
-  return dispatchLive([&](LiveWindow& live) {
+  return withLive([&](LiveWindow& live) {
     return !lv_obj_has_flag(live.lvobj(), LV_OBJ_FLAG_HIDDEN);
   });
 }
 
 bool Window::isOnScreen()
 {
-  return dispatchLive([&](LiveWindow& live) {
+  return withLive([&](LiveWindow& live) {
     if (lv_obj_has_flag(live.lvobj(), LV_OBJ_FLAG_HIDDEN)) return false;
 
     // Check window is at least partially visible
@@ -899,9 +899,9 @@ void Window::enable(bool enabled)
   };
 
   if (enabled)
-    dispatchLive([&](LiveWindow& live) { apply(live.lvobj()); });
+    withLive([&](LiveWindow& live) { apply(live.lvobj()); });
   else
-    withLvObj(apply);
+    withLive(apply);
 }
 
 bool Window::requireLvObj(lv_obj_t* obj)

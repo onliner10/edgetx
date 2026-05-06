@@ -249,7 +249,7 @@ class Widget : public ButtonBase
   template <typename Fn>
   bool runWidgetTask(Fn&& fn)
   {
-    return visitLive([&](LiveWindow&) {
+    return withLive([&](LiveWindow&) {
       if (taskRequiresLoaded && !loaded) return false;
       fn();
       return true;

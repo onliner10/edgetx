@@ -101,7 +101,7 @@ void WidgetsContainer::showWidgets(bool visible)
 
 void WidgetsContainer::refreshWidgets(bool inForeground, bool refreshBackground)
 {
-  visitLive([&](LiveWindow&) {
+  withLive([&](LiveWindow&) {
     for (int i = 0; i < zoneCount; i++) {
       if (widgets && widgets[i]) {
         if ((inForeground && widgets[i]->isOnScreen()) || widgets[i]->isFullscreen())

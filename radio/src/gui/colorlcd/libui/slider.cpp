@@ -67,7 +67,7 @@ SliderBase::SliderBase(Window* parent, coord_t width, coord_t height, int32_t vm
 
 void SliderBase::update()
 {
-  dispatchLive([&](LiveWindow& live) {
+  withLive([&](LiveWindow& live) {
     update(live);
   });
 }
@@ -93,7 +93,7 @@ void SliderBase::onDelete()
 
 void SliderBase::setValue(int value)
 {
-  dispatchLive([&](LiveWindow&) {
+  withLive([&](LiveWindow&) {
     if (_setValue != nullptr) _setValue(limit(vmin, value, vmax));
   });
 }
@@ -110,7 +110,7 @@ void SliderBase::onLiveCheckEvents(Window::LiveWindow& live)
 
 void SliderBase::enable(bool enabled)
 {
-  dispatchLive([&](LiveWindow&) {
+  withLive([&](LiveWindow&) {
     if (slider && lv_obj_has_state(slider, LV_STATE_DISABLED) == enabled) {
       if (enabled)
         lv_obj_clear_state(slider, LV_STATE_DISABLED);

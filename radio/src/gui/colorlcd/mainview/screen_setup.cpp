@@ -100,7 +100,7 @@ class LayoutChoice : public Button
         std::distance(LayoutFactory::getRegisteredLayouts().begin(), it));
 
     menu->setCloseHandler([=]() {
-      menu->visitLive([&](Window::LiveWindow&) { update(); });
+      menu->withLive([&](Window::LiveWindow&) { update(); });
     });
   }
 

@@ -40,7 +40,7 @@ class ToggleSwitch : public FormField
 
   void setValue(uint8_t value)
   {
-    dispatchLive([&](LiveWindow&) {
+    withLive([&](LiveWindow&) {
       if (_setValue) _setValue(value);
     });
   }

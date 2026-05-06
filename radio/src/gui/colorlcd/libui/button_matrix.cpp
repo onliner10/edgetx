@@ -88,11 +88,11 @@ static void btn_matrix_event(lv_event_t* e)
 ButtonMatrix::ButtonMatrix(Window* parent, const rect_t& r) :
     FormField(parent, r, btnmatrix_create)
 {
-  withLvObj(
+  withLive(
       [](lv_obj_t* obj) { lv_obj_add_flag(obj, LV_OBJ_FLAG_SCROLL_ON_FOCUS); });
   setWindowFlag(NO_FOCUS);
 
-  withLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     lv_obj_add_event_cb(obj, btn_matrix_event, LV_EVENT_VALUE_CHANGED, this);
   });
 }
@@ -118,7 +118,7 @@ void ButtonMatrix::deallocate()
 void ButtonMatrix::initBtnMap(uint8_t cols, uint8_t btns)
 {
   deallocate();
-  dispatchLive([&](LiveWindow& live) {
+  withLive([&](LiveWindow& live) {
     auto obj = live.lvobj();
 
     if (cols == 0 || btns == 0) {
@@ -171,7 +171,7 @@ void ButtonMatrix::initBtnMap(uint8_t cols, uint8_t btns)
 
 void ButtonMatrix::setText(uint8_t btn_id, const char* txt)
 {
-  dispatchLive([&](LiveWindow&) {
+  withLive([&](LiveWindow&) {
     if (btn_id >= btn_cnt || !lv_btnm_map || !txt_index) return;
 
     char* copy = strdup(txt);
@@ -181,7 +181,7 @@ void ButtonMatrix::setText(uint8_t btn_id, const char* txt)
 
 void ButtonMatrix::update()
 {
-  dispatchLive([&](LiveWindow& live) {
+  withLive([&](LiveWindow& live) {
     auto obj = live.lvobj();
 
     if (!lv_btnm_map) {
@@ -210,7 +210,7 @@ void ButtonMatrix::onLiveClicked(Window::LiveWindow& live)
 
 void ButtonMatrix::setChecked(uint8_t btn_id)
 {
-  dispatchLive([&](LiveWindow& live) {
+  withLive([&](LiveWindow& live) {
     auto obj = live.lvobj();
 
     if (isActive(btn_id))

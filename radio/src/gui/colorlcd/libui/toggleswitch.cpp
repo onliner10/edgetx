@@ -84,7 +84,7 @@ ToggleSwitch::ToggleSwitch(Window* parent, const rect_t& rect,
 {
   update();
 
-  withLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     lv_obj_add_event_cb(obj, ToggleSwitch::toggleswitch_event_handler,
                         LV_EVENT_VALUE_CHANGED, this);
   });
@@ -93,7 +93,7 @@ ToggleSwitch::ToggleSwitch(Window* parent, const rect_t& rect,
 void ToggleSwitch::update() const
 {
   if (!_getValue) return;
-  withAvailableLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     if (_getValue())
       lv_obj_add_state(obj, LV_STATE_CHECKED);
     else
@@ -109,7 +109,7 @@ void ToggleSwitch::onLiveClicked(Window::LiveWindow&)
 void ToggleSwitch::onLiveCheckEvents(Window::LiveWindow& live)
 {
   Window::onLiveCheckEvents(live);
-  withAvailableLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     if (!_getValue) return;
     bool v = _getValue() != 0;
     bool s = (lv_obj_get_state(obj) & LV_STATE_CHECKED) == LV_STATE_CHECKED;

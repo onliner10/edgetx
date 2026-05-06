@@ -174,7 +174,7 @@ StandaloneLuaWindow::StandaloneLuaWindow(bool useLvgl, int initFn, int runFn) :
 {
   setWindowFlag(OPAQUE);
 
-  dispatchLive([&](LiveWindow& live) {
+  withLive([&](LiveWindow& live) {
   auto obj = live.lvobj();
 
   etx_solid_bg(obj);

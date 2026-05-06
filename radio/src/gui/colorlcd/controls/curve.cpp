@@ -34,7 +34,7 @@ CurveRenderer::CurveRenderer(Window* parent, const rect_t& rect,
                              std::function<int(int)> function)
 {
   if (!parent) return;
-  parent->visitLive(
+  parent->withLive(
       [&](Window::LiveWindow& live) { init(live, rect, std::move(function)); });
 }
 
@@ -148,7 +148,7 @@ Curve::Curve(Window* parent, const rect_t& rect,
 {
   setWindowFlag(NO_FOCUS | NO_CLICK);
 
-  if (!dispatchLive([&](LiveWindow& live) {
+  if (!withLive([&](LiveWindow& live) {
         auto obj = live.lvobj();
         auto renderRect =
             rect_t{(positionFunc ? POS_PT_SZ / 2 : PAD_BORDER),
@@ -193,7 +193,7 @@ Curve::Curve(Window* parent, const rect_t& rect,
           }
           positionValue->padLeft(PAD_TINY);
           positionValue->padRight(PAD_TINY);
-          positionValue->visitLive([](Window::LiveWindow& livePosition) {
+          positionValue->withLive([](Window::LiveWindow& livePosition) {
             etx_solid_bg(livePosition.lvobj(), COLOR_THEME_ACTIVE_INDEX);
           });
 
@@ -261,7 +261,7 @@ void Curve::updatePosition()
 
 void Curve::update()
 {
-  if (!visitLive([](LiveWindow&) { return true; })) return;
+  if (!withLive([](LiveWindow&) { return true; })) return;
   base.update();
   updatePosition();
 }

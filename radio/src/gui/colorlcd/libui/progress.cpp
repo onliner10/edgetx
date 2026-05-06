@@ -75,7 +75,7 @@ void Progress::setValue(int newValue)
 {
   if (newValue != value) {
     value = newValue;
-    dispatchLive([&](LiveWindow&) {
+    withLive([&](LiveWindow&) {
       if (bar) lv_bar_set_value(bar, value, LV_ANIM_OFF);
     });
   }

@@ -151,7 +151,7 @@ void InputMixButtonBase::setOpts(const char* s)
 
 void InputMixButtonBase::setFlightModes(uint16_t modes)
 {
-  bool handled = dispatchLive([&](LiveWindow& live) {
+  bool handled = withLive([&](LiveWindow& live) {
     auto obj = live.lvobj();
 
     if (!modelFMEnabled()) return;
@@ -410,7 +410,7 @@ void InputMixGroupBase::adjustHeight()
 
 void InputMixGroupBase::addLine(InputMixButtonBase* line)
 {
-  if (!line || !line->visitLive([](Window::LiveWindow&) { return true; }))
+  if (!line || !line->withLive([](Window::LiveWindow&) { return true; }))
     return;
 
   auto l = std::find_if(lines.begin(), lines.end(),

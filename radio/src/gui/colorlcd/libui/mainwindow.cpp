@@ -65,7 +65,7 @@ MainWindow::MainWindow() : Window(nullptr, {0, 0, LCD_W, LCD_H})
 {
   setWindowFlag(OPAQUE);
 
-  withLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     etx_solid_bg(obj);
 
     background = createBackgroundCanvas(obj);
@@ -174,7 +174,7 @@ void MainWindow::shutdown()
 
   // Re-add background canvas
   background = nullptr;
-  withLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     background = createBackgroundCanvas(obj);
     if (background) lv_obj_center(background);
   });

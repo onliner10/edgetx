@@ -80,7 +80,7 @@ ButtonBase::ButtonBase(Window* parent, const rect_t& rect,
 
 void ButtonBase::check(bool checked)
 {
-  withAvailableLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     if (checked != this->checked()) {
       if (checked)
         lv_obj_add_state(obj, LV_STATE_CHECKED);
@@ -93,7 +93,7 @@ void ButtonBase::check(bool checked)
 bool ButtonBase::checked() const
 {
   bool result = false;
-  withAvailableLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     result = lv_obj_get_state(obj) & LV_STATE_CHECKED;
   });
   return result;
@@ -108,7 +108,7 @@ bool ButtonBase::onLiveLongPress(Window::LiveWindow& live)
 {
   if (longPressHandler) {
     check(longPressHandler());
-    visitLive([](Window::LiveWindow& live) {
+    withLive([](Window::LiveWindow& live) {
       lv_obj_clear_state(live.lvobj(), LV_STATE_PRESSED);
     });
     lv_indev_wait_release(lv_indev_get_act());

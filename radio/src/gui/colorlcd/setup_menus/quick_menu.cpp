@@ -98,7 +98,7 @@ class QuickSubMenu
                         }, 
 	                        mainDef->enabled,
 	                        [=](bool focus) {
-	                          quickMenu->visitLive([&](Window::LiveWindow&) {
+	                          quickMenu->withLive([&](Window::LiveWindow&) {
 	                            if (focus) {
 	                              if (!subMenu) buildSubMenu();
 	                              quickMenu->getTopMenu()->setCurrent(menuButton);

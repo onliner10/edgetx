@@ -37,7 +37,7 @@ class NumberArea : public FormField
   {
     setWindowFlag(NO_FOCUS);
 
-    withLvObj([&](lv_obj_t* obj) {
+    withLive([&](lv_obj_t* obj) {
       if (parent->getTextFlags() & CENTERED)
         etx_obj_add_style(obj, styles->text_align_center, LV_PART_MAIN);
       else
@@ -54,7 +54,7 @@ class NumberArea : public FormField
         setEditMode(false);
         hide();
         if (parent) {
-          parent->visitLive([](Window::LiveWindow& liveParent) {
+          parent->withLive([](Window::LiveWindow& liveParent) {
             lv_obj_clear_state(liveParent.lvobj(), LV_STATE_FOCUSED);
           });
         }
@@ -175,7 +175,7 @@ class NumberArea : public FormField
   void openKeyboard()
   {
     editTextIsRaw = numEdit->useDirectKeyboard();
-    if (!dispatchLive([&](LiveWindow& live) {
+    if (!withLive([&](LiveWindow& live) {
           lv_textarea_set_text(
               live.lvobj(), editTextIsRaw ? numEdit->getEditVal().c_str()
                                           : numEdit->getDisplayVal().c_str());
@@ -192,7 +192,7 @@ class NumberArea : public FormField
 
   void update()
   {
-    dispatchLive([&](LiveWindow& live) {
+    withLive([&](LiveWindow& live) {
       lv_textarea_set_text(live.lvobj(), numEdit->getDisplayVal().c_str());
     });
   }
@@ -205,7 +205,7 @@ class NumberArea : public FormField
   {
     if (editTextIsRaw) {
       std::string text;
-      if (!visitLive([&](LiveWindow& live) {
+      if (!withLive([&](LiveWindow& live) {
             auto rawText = lv_textarea_get_text(live.lvobj());
             text = rawText ? rawText : "";
           }))
@@ -298,7 +298,7 @@ void NumberEdit::openEdit()
   edit->update();
   edit->show();
   if (edit->focus()) {
-    edit->visitLive([](Window::LiveWindow& liveEdit) {
+    edit->withLive([](Window::LiveWindow& liveEdit) {
       lv_obj_add_state(liveEdit.lvobj(), LV_STATE_FOCUSED | LV_STATE_EDITED);
     });
   }

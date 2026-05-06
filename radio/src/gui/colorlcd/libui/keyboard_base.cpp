@@ -93,7 +93,7 @@ Keyboard::Keyboard(coord_t height, bool fullScreen) :
   hasTwoPageKeys = keyIsSupported(KEY_PAGEUP);
 #endif
 
-  withLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     lv_obj_set_parent(obj, lv_layer_top());  // the keyboard is always on top
 
     // use a separate group for the keyboard
@@ -139,10 +139,10 @@ void Keyboard::clearField(bool wasCancelled)
   }
 
   detach();
-  withLvObj([](lv_obj_t* obj) { lv_obj_set_parent(obj, lv_layer_top()); });
+  withLive([](lv_obj_t* obj) { lv_obj_set_parent(obj, lv_layer_top()); });
 
   if (fieldContainer &&
-      fieldContainer->visitLive([&](Window::LiveWindow& live) {
+      fieldContainer->withLive([&](Window::LiveWindow& live) {
         lv_obj_scroll_to_y(live.lvobj(), scroll_pos, LV_ANIM_OFF);
       })) {
     fieldContainer = nullptr;
@@ -150,7 +150,7 @@ void Keyboard::clearField(bool wasCancelled)
 
   if (field) {
     // restore field's group
-    field->visitLive([](Window::LiveWindow& live) {
+    field->withLive([](Window::LiveWindow& live) {
       lv_obj_remove_event_cb(live.lvobj(), field_focus_leave);
     });
 
@@ -172,7 +172,7 @@ void Keyboard::hide(bool wasCancelled)
     auto keyboard = activeKeyboard;
     activeKeyboard = nullptr;
     keyboard->clearField(wasCancelled);
-    keyboard->withLvObj(
+    keyboard->withLive(
         [](lv_obj_t* obj) { lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN); });
   }
 }
@@ -180,7 +180,7 @@ void Keyboard::hide(bool wasCancelled)
 bool Keyboard::attachKeyboard()
 {
   bool attached = false;
-  dispatchLive([&](LiveWindow&) {
+  withLive([&](LiveWindow&) {
     if (activeKeyboard) {
       if (activeKeyboard == this) {
         clearField(false);
@@ -197,7 +197,7 @@ bool Keyboard::attachKeyboard()
 
 void Keyboard::showKeyboard()
 {
-  dispatchLive([&](LiveWindow& live) {
+  withLive([&](LiveWindow& live) {
     if (!keyboard) return;
     lv_obj_clear_flag(live.lvobj(), LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
@@ -209,7 +209,7 @@ bool Keyboard::bindField(FormField* newField, FieldBinding& binding) const
   if (!newField) return false;
 
   lv_obj_t* obj = nullptr;
-  if (!newField->visitLive(
+  if (!newField->withLive(
           [&](Window::LiveWindow& live) { obj = live.lvobj(); }))
     return false;
 
@@ -217,7 +217,7 @@ bool Keyboard::bindField(FormField* newField, FieldBinding& binding) const
   if (!fullScreen) {
     newFieldContainer = newField->getFullScreenWindow();
     if (!newFieldContainer ||
-        !newFieldContainer->visitLive([](Window::LiveWindow&) {}))
+        !newFieldContainer->withLive([](Window::LiveWindow&) {}))
       return false;
   }
 
@@ -236,7 +236,7 @@ bool Keyboard::setField(const FieldBinding& binding)
     return false;
   };
 
-  if (!dispatchLive([&](LiveWindow& live) {
+  if (!withLive([&](LiveWindow& live) {
         if (!keyboard || !group) return false;
 
         if (fullScreen) {
@@ -245,7 +245,7 @@ bool Keyboard::setField(const FieldBinding& binding)
           fieldContainer = nullptr;
         } else {
           if (!binding.container ||
-              !binding.container->visitLive([](Window::LiveWindow&) {}))
+              !binding.container->withLive([](Window::LiveWindow&) {}))
             return false;
 
           fieldContainer = binding.container;
@@ -258,7 +258,7 @@ bool Keyboard::setField(const FieldBinding& binding)
           setTop(max(coords.y2 + 21, LCD_H - height()));
 
           // save scroll position
-          fieldContainer->visitLive([&](Window::LiveWindow& liveContainer) {
+          fieldContainer->withLive([&](Window::LiveWindow& liveContainer) {
             scroll_pos = lv_obj_get_scroll_y(liveContainer.lvobj());
           });
           lv_obj_scroll_to_view(live.lvobj(), LV_ANIM_OFF);

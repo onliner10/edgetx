@@ -79,12 +79,12 @@ class QuickMenuButton : public ButtonBase
       return;
     }
 #if VERSION_MAJOR > 2
-    iconPtr->visitLive([](Window::LiveWindow& liveIcon) {
+    iconPtr->withLive([](Window::LiveWindow& liveIcon) {
       etx_obj_add_style(liveIcon.lvobj(), styles->qmdisabled,
                         LV_PART_MAIN | LV_STATE_DISABLED);
     });
 #endif
-    iconPtr->visitLive([](Window::LiveWindow& liveIcon) {
+    iconPtr->withLive([](Window::LiveWindow& liveIcon) {
       etx_img_color(liveIcon.lvobj(), COLOR_THEME_QM_BG_INDEX, LV_STATE_USER_1);
     });
 
@@ -98,16 +98,16 @@ class QuickMenuButton : public ButtonBase
       return;
     }
 #if VERSION_MAJOR > 2
-    textPtr->visitLive([](Window::LiveWindow& liveText) {
+    textPtr->withLive([](Window::LiveWindow& liveText) {
       etx_obj_add_style(liveText.lvobj(), styles->qmdisabled,
                         LV_PART_MAIN | LV_STATE_DISABLED);
     });
 #endif
-    textPtr->visitLive([](Window::LiveWindow& liveText) {
+    textPtr->withLive([](Window::LiveWindow& liveText) {
       etx_txt_color(liveText.lvobj(), COLOR_THEME_QM_BG_INDEX, LV_STATE_USER_1);
     });
 
-    dispatchLive([](LiveWindow& live) {
+    withLive([](LiveWindow& live) {
       lv_obj_add_event_cb(live.lvobj(), QuickMenuButton::focused_cb,
                           LV_EVENT_FOCUSED, nullptr);
       lv_obj_add_event_cb(live.lvobj(), QuickMenuButton::defocused_cb,
@@ -148,11 +148,11 @@ class QuickMenuButton : public ButtonBase
   void setFocused()
   {
     if (textPtr)
-      textPtr->visitLive([](Window::LiveWindow& live) {
+      textPtr->withLive([](Window::LiveWindow& live) {
         lv_obj_add_state(live.lvobj(), LV_STATE_USER_1);
       });
     if (iconPtr)
-      iconPtr->visitLive([](Window::LiveWindow& live) {
+      iconPtr->withLive([](Window::LiveWindow& live) {
         lv_obj_add_state(live.lvobj(), LV_STATE_USER_1);
       });
   }
@@ -160,11 +160,11 @@ class QuickMenuButton : public ButtonBase
   void setDeFocused()
   {
     if (textPtr)
-      textPtr->visitLive([](Window::LiveWindow& live) {
+      textPtr->withLive([](Window::LiveWindow& live) {
         lv_obj_clear_state(live.lvobj(), LV_STATE_USER_1);
       });
     if (iconPtr)
-      iconPtr->visitLive([](Window::LiveWindow& live) {
+      iconPtr->withLive([](Window::LiveWindow& live) {
         lv_obj_clear_state(live.lvobj(), LV_STATE_USER_1);
       });
   }
@@ -212,7 +212,7 @@ ButtonBase* QuickMenuGroup::addButton(EdgeTxIcon icon, const char* title,
   });
   btns.push_back(b);
   if (group)
-    b->visitLive([&](Window::LiveWindow& live) {
+    b->withLive([&](Window::LiveWindow& live) {
       lv_group_add_obj(group, live.lvobj());
     });
   b->setFocusHandler([=](bool focus) {
@@ -321,7 +321,7 @@ ButtonBase* QuickMenuGroup::getFocusedButton()
     lv_obj_t* b = lv_group_get_focused(group);
     if (b) {
       for (size_t i = 0; i < btns.size(); i += 1)
-        if (btns[i]->visitLive(
+        if (btns[i]->withLive(
                 [&](Window::LiveWindow& live) { return live.lvobj() == b; }))
           return btns[i];
     }

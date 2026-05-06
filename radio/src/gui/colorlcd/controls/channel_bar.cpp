@@ -40,7 +40,7 @@ ChannelBar::ChannelBar(Window* parent, const rect_t& rect, uint8_t channel,
 {
   setWindowFlag(NO_CLICK);
 
-  if (dispatchLive([&](LiveWindow& live) {
+  if (withLive([&](LiveWindow& live) {
         auto obj = live.lvobj();
         etx_solid_bg(obj, COLOR_THEME_PRIMARY2_INDEX);
         etx_obj_add_style(obj, styles->border_thin, LV_PART_MAIN);
@@ -143,7 +143,7 @@ OutputChannelBar::OutputChannelBar(Window* parent, const rect_t& rect,
     drawLimits(drawLimits)
 {
   if (drawLimits) {
-    dispatchLive([&](LiveWindow& live) {
+    withLive([&](LiveWindow& live) {
       auto obj = live.lvobj();
       leftLim = lv_line_create(obj);
       if (!requireLvObj(leftLim)) return false;

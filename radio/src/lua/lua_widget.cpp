@@ -180,7 +180,7 @@ void LuaEventHandler::onLuaEvent(event_t event) { luaPushEvent(event); }
 void LuaEventHandler::setupHandler(Window* w)
 {
   if (w)
-    w->visitLive([](Window::LiveWindow& live) {
+    w->withLive([](Window::LiveWindow& live) {
       lv_obj_add_event_cb(live.lvobj(), LuaEventHandler::event_cb, LV_EVENT_ALL,
                           nullptr);
     });
@@ -189,7 +189,7 @@ void LuaEventHandler::setupHandler(Window* w)
 void LuaEventHandler::removeHandler(Window* w)
 {
   if (w)
-    w->visitLive([](Window::LiveWindow& live) {
+    w->withLive([](Window::LiveWindow& live) {
       lv_obj_remove_event_cb(live.lvobj(), LuaEventHandler::event_cb);
     });
 }

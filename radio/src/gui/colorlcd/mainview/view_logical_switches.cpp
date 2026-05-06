@@ -66,7 +66,7 @@ class LogicalSwitchDisplayFooter : public Window
     padLeft(PAD_SMALL);
     padRight(PAD_SMALL);
 
-    if (dispatchLive([&](LiveWindow& live) {
+    if (withLive([&](LiveWindow& live) {
           auto obj = live.lvobj();
           etx_solid_bg(obj, COLOR_THEME_SECONDARY1_INDEX);
 
@@ -95,7 +95,7 @@ class LogicalSwitchDisplayFooter : public Window
           if (!createLabel(ANDSW_COL + 2, 1, ANDSW_ROW, lsDelay)) return false;
 
           if (parent) {
-            parent->visitLive([](Window::LiveWindow& liveParent) {
+            parent->withLive([](Window::LiveWindow& liveParent) {
               lv_obj_update_layout(liveParent.lvobj());
             });
           }
@@ -107,7 +107,7 @@ class LogicalSwitchDisplayFooter : public Window
 
   void refresh()
   {
-    visitLive([&](LiveWindow&) {
+    withLive([&](LiveWindow&) {
       if (!lsFunc || !lsV1 || !lsV2 || !lsAnd || !lsDuration || !lsDelay)
         return;
 

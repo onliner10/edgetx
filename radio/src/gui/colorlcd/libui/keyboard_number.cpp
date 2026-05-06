@@ -264,7 +264,7 @@ void NumberKeyboard::onPressPGDN() { runPageKey(*this, &NumberKeyboard::decLarge
 
 NumberKeyboard::NumberKeyboard() : Keyboard(KEYBOARD_HEIGHT, true)
 {
-  dispatchLive([&](LiveWindow& live) {
+  withLive([&](LiveWindow& live) {
     etx_solid_bg(live.lvobj(), COLOR_THEME_SECONDARY3_INDEX);
 
     if (!initRequiredLvObj(titleLabel,

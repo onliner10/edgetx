@@ -183,14 +183,14 @@ TableField::TableField(Window* parent, const rect_t& rect) :
 {
   setWindowFlag(OPAQUE);
 
-  withLvObj([](lv_obj_t* obj) {
+  withLive([](lv_obj_t* obj) {
     lv_table_set_col_cnt(obj, 1);
   });
 }
 
 void TableField::setRowCount(uint16_t rows)
 {
-  withAvailableLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     lv_table_set_row_cnt(obj, rows);
   });
 }
@@ -198,7 +198,7 @@ void TableField::setRowCount(uint16_t rows)
 uint16_t TableField::getRowCount() const
 {
   uint16_t rows = 0;
-  withAvailableLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     rows = lv_table_get_row_cnt(obj);
   });
   return rows;
@@ -206,14 +206,14 @@ uint16_t TableField::getRowCount() const
 
 void TableField::setColumnWidth(uint16_t col, coord_t w)
 {
-  withAvailableLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     lv_table_set_col_width(obj, col, w);
   });
 }
 
 void TableField::select(uint16_t row, uint16_t col, bool force)
 {
-  withAvailableLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     lv_table_t* table = (lv_table_t*)obj;
     if (!force && table->row_act == row && table->col_act == col) return;
 
@@ -235,7 +235,7 @@ void TableField::select(uint16_t row, uint16_t col, bool force)
 
 void TableField::adjustScroll()
 {
-  withAvailableLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     lv_table_t* table = (lv_table_t*)obj;
     if (table->row_act == LV_TABLE_CELL_NONE ||
         table->row_act >= table->row_cnt) {
@@ -269,7 +269,7 @@ int TableField::getSelected() const
 {
   uint16_t row = LV_TABLE_CELL_NONE;
   uint16_t col = LV_TABLE_CELL_NONE;
-  withAvailableLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     lv_table_get_selected_cell(obj, &row, &col);
   });
   if (row != LV_TABLE_CELL_NONE) {
@@ -293,7 +293,7 @@ void TableField::setAutoEdit()
 {
   if (autoedit) return;
 
-  dispatchLive([&](LiveWindow& live) {
+  withLive([&](LiveWindow& live) {
     auto obj = live.lvobj();
     autoedit = true;
 

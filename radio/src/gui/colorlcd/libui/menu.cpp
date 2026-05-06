@@ -84,7 +84,7 @@ class MenuBody : public TableField
   MenuBody(Window* parent, const rect_t& rect) : TableField(parent, rect)
   {
     // Allow encoder acceleration
-    withLvObj(
+    withLive(
         [](lv_obj_t* obj) { lv_obj_add_flag(obj, LV_OBJ_FLAG_ENCODER_ACCEL); });
 
     setColumnWidth(0, rect.w);
@@ -362,13 +362,13 @@ class MenuWindowContent : public NavWindow, public MenuContent
 
     coord_t w = (popupWidth > 0) ? popupWidth : MENUS_WIDTH;
 
-    withLvObj(lv_obj_center);
+    withLive(lv_obj_center);
     setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_ZERO, w, LV_SIZE_CONTENT);
 
     if (!initRequiredWindow(header, this, rect_t{0, 0, LV_PCT(100), 0}, "",
                             COLOR_THEME_PRIMARY2_INDEX))
       return;
-    header->visitLive([](Window::LiveWindow& liveHeader) {
+    header->withLive([](Window::LiveWindow& liveHeader) {
       etx_solid_bg(liveHeader.lvobj(), COLOR_THEME_SECONDARY1_INDEX);
     });
     header->padAll(PAD_SMALL);
@@ -376,7 +376,7 @@ class MenuWindowContent : public NavWindow, public MenuContent
 
     if (!initRequiredWindow(body, this, rect_t{0, 0, w, LV_SIZE_CONTENT}))
       return;
-    body->visitLive([](Window::LiveWindow& liveBody) {
+    body->withLive([](Window::LiveWindow& liveBody) {
       lv_obj_set_style_max_height(liveBody.lvobj(), LCD_H * 0.8, LV_PART_MAIN);
     });
   }
@@ -410,8 +410,8 @@ class MenuWindowContent : public NavWindow, public MenuContent
   void updatePosition(MenuToolbar* toolbar) override
   {
     if (!toolbar) return;
-    visitLive([&](Window::LiveWindow& liveContent) {
-      toolbar->visitLive([&](Window::LiveWindow& liveToolbar) {
+    withLive([&](Window::LiveWindow& liveContent) {
+      toolbar->withLive([&](Window::LiveWindow& liveToolbar) {
         auto contentObj = liveContent.lvobj();
         auto toolbarObj = liveToolbar.lvobj();
         coord_t cw = lv_obj_get_width(contentObj);

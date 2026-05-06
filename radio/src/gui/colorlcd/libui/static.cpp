@@ -90,7 +90,7 @@ StaticText::StaticText(Window* parent, const rect_t& rect, std::string txt,
   setTextFlag(textFlags);
   setWindowFlag(NO_FOCUS);
 
-  withLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     etx_font(obj, FONT_INDEX(textFlags));
     etx_txt_color(obj, color);
 
@@ -117,7 +117,7 @@ void StaticText::setText(std::string value)
 {
   if (text != value) {
     text = std::move(value);
-    withLvObj([&](lv_obj_t* obj) { lv_label_set_text(obj, text.c_str()); });
+    withLive([&](lv_obj_t* obj) { lv_label_set_text(obj, text.c_str()); });
   }
 }
 
@@ -137,7 +137,7 @@ std::string StaticText::automationText() const
 template <>
 void DynamicNumber<uint32_t>::updateText()
 {
-  withLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     const char* p = prefix ? prefix : "";
     const char* s = suffix ? suffix : "";
     if ((textFlags & PREC2) == PREC2) {
@@ -155,7 +155,7 @@ void DynamicNumber<uint32_t>::updateText()
 template <>
 void DynamicNumber<int32_t>::updateText()
 {
-  withLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     const char* p = prefix ? prefix : "";
     const char* s = suffix ? suffix : "";
     if ((textFlags & PREC2) == PREC2) {
@@ -173,7 +173,7 @@ void DynamicNumber<int32_t>::updateText()
 template <>
 void DynamicNumber<uint16_t>::updateText()
 {
-  withLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     const char* p = prefix ? prefix : "";
     const char* s = suffix ? suffix : "";
     if ((textFlags & PREC2) == PREC2) {
@@ -192,7 +192,7 @@ void DynamicNumber<uint16_t>::updateText()
 template <>
 void DynamicNumber<int16_t>::updateText()
 {
-  withLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     const char* p = prefix ? prefix : "";
     const char* s = suffix ? suffix : "";
     if ((textFlags & PREC2) == PREC2) {
@@ -219,7 +219,7 @@ StaticIcon::StaticIcon(Window* parent, coord_t x, coord_t y, EdgeTxIcon icon,
 
   setIcon(icon);
 
-  withLvObj(
+  withLive(
       [&](lv_obj_t* obj) { etx_img_color(obj, currentColor, LV_PART_MAIN); });
 }
 
@@ -229,7 +229,7 @@ StaticIcon::StaticIcon(Window* parent, coord_t x, coord_t y,
 {
   setWindowFlag(NO_FOCUS | NO_CLICK);
 
-  withLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     auto bm = BitmapBuffer::loadBitmap(filename, BMP_RGB565);
     if (bm) {
       size_t size;
@@ -255,14 +255,14 @@ void StaticIcon::onDelete()
 void StaticIcon::setColor(LcdColorIndex color)
 {
   if (currentColor != color) {
-    withLvObj([&](lv_obj_t* obj) { etx_img_color(obj, color, LV_PART_MAIN); });
+    withLive([&](lv_obj_t* obj) { etx_img_color(obj, color, LV_PART_MAIN); });
     currentColor = color;
   }
 }
 
 void StaticIcon::setIcon(EdgeTxIcon icon)
 {
-  withLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     auto newMask = getBuiltinIcon(icon);
     setSize(newMask->width, newMask->height);
     lv_canvas_set_buffer(obj, (void*)newMask->data, newMask->width,
@@ -292,7 +292,7 @@ StaticImage::StaticImage(Window* parent, const rect_t& rect,
 
 void StaticImage::setSource(std::string filename)
 {
-  dispatchLive([&](LiveWindow& live) {
+  withLive([&](LiveWindow& live) {
     auto obj = live.lvobj();
 
     if (!filename.empty()) {
@@ -359,7 +359,7 @@ StaticBitmap::StaticBitmap(Window* parent, const rect_t& rect,
 
 void StaticBitmap::setSource(const char* filename)
 {
-  dispatchLive([&](LiveWindow& live) {
+  withLive([&](LiveWindow& live) {
     auto obj = live.lvobj();
 
     if (filename) {
@@ -423,7 +423,7 @@ StaticLZ4Image::StaticLZ4Image(Window* parent, coord_t x, coord_t y,
 {
   setWindowFlag(NO_FOCUS | NO_CLICK);
 
-  withLvObj([&](lv_obj_t* obj) {
+  withLive([&](lv_obj_t* obj) {
     // Convert ARGB4444 to LV_IMG_CF_TRUE_COLOR_ALPHA
     uint16_t w = lz4Bitmap->width;
     uint16_t h = lz4Bitmap->height;

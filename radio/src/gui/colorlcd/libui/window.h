@@ -88,7 +88,7 @@ class Window
   template <typename T>
   static T* adoptLive(T* window)
   {
-    if (window && !window->dispatchLive([](LiveWindow&) {})) {
+    if (window && !window->withLive([](LiveWindow&) {})) {
       window->detach();
       delete window;
       return nullptr;
@@ -236,15 +236,15 @@ class Window
   bool loadLvglScreen();
 
   template <typename Fn>
-  bool visitLive(Fn&& handler)
+  bool withLive(Fn&& handler)
   {
-    return dispatchLiveImpl(*this, std::forward<Fn>(handler));
+    return withLiveImpl(*this, std::forward<Fn>(handler));
   }
 
   template <typename Fn>
-  bool visitLive(Fn&& handler) const
+  bool withLive(Fn&& handler) const
   {
-    return dispatchLiveImpl(*this, std::forward<Fn>(handler));
+    return withLiveImpl(*this, std::forward<Fn>(handler));
   }
 
 #if defined(HARDWARE_TOUCH)
@@ -334,24 +334,10 @@ class Window
   void failClosed();
   bool syncOverlay(Window* overlay);
 
-  template <typename Fn>
-  bool withLvObj(Fn&& fn) const
-  {
-    if (!hasLiveLvObj()) return false;
-    fn(lvobj);
-    return true;
-  }
-
-  template <typename Fn>
-  bool withAvailableLvObj(Fn&& fn) const
-  {
-    return dispatchLive([&](LiveWindow& live) { fn(live.lvobj()); });
-  }
-
   template <typename Create, typename Init>
   bool initRequiredLvObj(lv_obj_t*& target, Create&& create, Init&& init)
   {
-    return dispatchLive([&](LiveWindow& live) {
+    return withLive([&](LiveWindow& live) {
       target = create(live.lvobj());
       if (!requireLvObj(target)) return false;
       init(target);
@@ -372,35 +358,35 @@ class Window
   static void window_event_cb(lv_event_t* e);
 
   template <typename Fn>
-  static bool invokeLiveHandler(LiveWindow& live, Fn&& handler)
+  static constexpr bool LiveHandlerInvocable =
+      std::is_invocable_v<Fn, LiveWindow&> ||
+      std::is_invocable_v<Fn, lv_obj_t*>;
+
+  template <typename Arg, typename Fn>
+  static bool invokeLiveHandlerWith(Arg&& arg, Fn&& handler)
   {
-    using Result = std::invoke_result_t<Fn, LiveWindow&>;
+    using Result = std::invoke_result_t<Fn, Arg>;
     if constexpr (std::is_void_v<Result>) {
-      handler(live);
+      handler(std::forward<Arg>(arg));
       return true;
     } else {
-      return static_cast<bool>(handler(live));
+      return static_cast<bool>(handler(std::forward<Arg>(arg)));
     }
   }
 
   template <typename Self, typename Fn>
-  static bool dispatchLiveImpl(Self& self, Fn&& handler)
+  static bool withLiveImpl(Self& self, Fn&& handler)
   {
     if (!self.acceptsEvents()) return false;
     LiveWindow live(const_cast<Window&>(self), self.lvobj);
-    return invokeLiveHandler(live, std::forward<Fn>(handler));
-  }
-
-  template <typename Fn>
-  bool dispatchLive(Fn&& handler)
-  {
-    return visitLive(std::forward<Fn>(handler));
-  }
-
-  template <typename Fn>
-  bool dispatchLive(Fn&& handler) const
-  {
-    return visitLive(std::forward<Fn>(handler));
+    static_assert(LiveHandlerInvocable<Fn>,
+                  "withLive handler must accept Window::LiveWindow& or "
+                  "lv_obj_t*");
+    if constexpr (std::is_invocable_v<Fn, LiveWindow&>) {
+      return invokeLiveHandlerWith(live, std::forward<Fn>(handler));
+    } else {
+      return invokeLiveHandlerWith(live.lvobj(), std::forward<Fn>(handler));
+    }
   }
   virtual bool onLiveCustomEvent(LiveWindow& live, lv_event_t* event)
   {

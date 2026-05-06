@@ -529,7 +529,7 @@ class LvglWidgetObject : public LvglWidgetObjectBase
   template <typename Fn>
   bool visitWindow(Fn&& fn)
   {
-    return window && window->visitLive(
+    return window && window->withLive(
                          [&](Window::LiveWindow& live) { fn(live.lvobj()); });
   }
 
