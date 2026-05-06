@@ -745,10 +745,8 @@ class AntennaSelectionMenu : public Menu
 
 static void runAntennaSelectionMenu()
 {
-  auto menu = new (std::nothrow) AntennaSelectionMenu();
-  if (!menu) return;
-
-  MainWindow::instance()->blockUntilClosed(*menu, true);
+  auto menu = Window::makeLive<AntennaSelectionMenu>();
+  if (menu) MainWindow::instance()->blockUntilClosed(*menu, true);
 }
 #else
 void onAntennaSelection(const char* result)

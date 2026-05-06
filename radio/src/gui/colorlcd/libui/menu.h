@@ -35,10 +35,21 @@ class Menu : public ModalWindow
   template <typename Fn>
   static bool open(Fn&& build, bool multiple = false, coord_t popupWidth = 0)
   {
-    auto menu = new (std::nothrow) Menu(multiple, popupWidth);
-    if (!menu) return false;
-    build(*menu);
-    return true;
+    auto menu = Window::makeLive<Menu>(multiple, popupWidth);
+    if (menu) {
+      build(*menu);
+      return true;
+    }
+    return false;
+  }
+
+  template <typename Fn, typename FailFn>
+  static bool openOr(Fn&& build, FailFn&& onFailure, bool multiple = false,
+                     coord_t popupWidth = 0)
+  {
+    if (open(std::forward<Fn>(build), multiple, popupWidth)) return true;
+    onFailure();
+    return false;
   }
 
 #if defined(DEBUG_WINDOWS)

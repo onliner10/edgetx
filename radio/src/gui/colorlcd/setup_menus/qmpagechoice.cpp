@@ -28,7 +28,7 @@
 class QMPageChoiceMenuToolbar : public MenuToolbar
 {
  public:
-  QMPageChoiceMenuToolbar(Choice* choice, Menu* menu) :
+  QMPageChoiceMenuToolbar(Choice& choice, Menu& menu) :
       MenuToolbar(choice, menu, 3)
   {
     addButton(STR_MAIN_MENU_MODEL_SETTINGS, QM_MODEL_SETUP, QM_MODEL_NOTES, nullptr, STR_MAIN_MENU_MODEL_SETTINGS, true);
@@ -58,13 +58,14 @@ void QMPageChoice::openMenu()
 {
   setEditMode(true);  // this needs to be done first before menu is created.
 
-  auto menu = new Menu(false, popupWidth);
-  if (menuTitle) menu->setTitle(menuTitle);
+  Menu::openOr([&](Menu& menu) {
+    if (menuTitle) menu.setTitle(menuTitle);
 
-  auto tb = new QMPageChoiceMenuToolbar(this, menu);
-  menu->setToolbar(tb);
+    auto tb = Window::makeLive<QMPageChoiceMenuToolbar>(*this, menu);
+    if (tb) menu.setToolbar(tb);
 
-  // fillMenu(menu); - called by MenuToolbar
+    // fillMenu(menu); - called by MenuToolbar
 
-  menu->setCloseHandler([=]() { setEditMode(false); });
+    menu.setCloseHandler([=]() { setEditMode(false); });
+  }, [&]() { setEditMode(false); }, false, popupWidth);
 }

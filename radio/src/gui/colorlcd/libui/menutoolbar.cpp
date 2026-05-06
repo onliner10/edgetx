@@ -87,18 +87,19 @@ MenuToolbarButton::MenuToolbarButton(Window* parent, const rect_t& rect,
   });
 }
 
-MenuToolbar::MenuToolbar(Choice* choice, Menu* menu, const int columns) :
-    Window(menu, {0, 0, 0, 0}),
+MenuToolbar::MenuToolbar(Choice& choice, Menu& menu, const int columns) :
+    Window(&menu, {0, 0, 0, 0}),
     choice(choice),
     menu(menu),
     filterColumns(columns),
     group(lv_group_create())
 {
   setWindowFlag(OPAQUE);
-  if (!choice || !menu || filterColumns <= 0 || !group) {
+  if (filterColumns <= 0) {
     failClosed();
     return;
   }
+  if (!requireLvGroup(group)) return;
 
   withLive([&](LiveWindow& live) {
     padAll(PAD_SMALL);
@@ -110,7 +111,7 @@ MenuToolbar::MenuToolbar(Choice* choice, Menu* menu, const int columns) :
 
     setWidth((MENUS_TOOLBAR_BUTTON_WIDTH + PAD_SMALL) * columns + PAD_SMALL);
 
-    addButton(STR_SELECT_MENU_ALL, choice->getMin(), choice->getMax(), nullptr,
+    addButton(STR_SELECT_MENU_ALL, choice.getMin(), choice.getMax(), nullptr,
               nullptr, true);
 
     changeFilterMsg.subscribe(Messaging::MENU_CHANGE_FILTER, [=](uint32_t param) {
@@ -133,8 +134,8 @@ void MenuToolbar::resetFilter()
     auto obj = live.lvobj();
     if (lv_group_get_focused(group) != obj) {
       lv_group_focus_obj(obj);
-      choice->fillMenu(menu);
-      menu->setTitle(choice->getTitle());
+      choice.fillMenu(&menu);
+      menu.setTitle(choice.getTitle());
     }
   });
 }
@@ -187,15 +188,15 @@ bool MenuToolbar::filterMenu(MenuToolbarButton* btn, int16_t filtermin,
       filter = nullptr;
       if (btn->checked()) {
         if (title)
-          menu->setTitle(title);
+          menu.setTitle(title);
         else
-          menu->setTitle(choice->getTitle());
+          menu.setTitle(choice.getTitle());
         filter = [=](int16_t index) {
           if (filterFunc) return filterFunc(index);
           return index == 0 || (abs(index) >= filtermin && abs(index) <= filtermax);
         };
         lv_group_focus_obj(btnLive.lvobj());
-        choice->fillMenu(menu, filter);
+        choice.fillMenu(&menu, filter);
       } else {
         if (allBtn) allBtn->sendLvEvent(LV_EVENT_CLICKED);
       }
@@ -213,15 +214,15 @@ void MenuToolbar::addButton(const char* picto, int16_t filtermin,
                             const char* title, bool wideButton)
 {
   withLive([&](LiveWindow&) {
-    int vmin = choice->getMin();
-    int vmax = choice->getMax();
+    int vmin = choice.getMin();
+    int vmax = choice.getMax();
 
     if (vmin > filtermin || vmax < filtermin) return;
 
-    if (choice->isValueAvailable) {
+    if (choice.isValueAvailable) {
       bool found = false;
       for (int i = filtermin; i <= filtermax; i += 1) {
-        if (choice->isValueAvailable(i)) {
+        if (choice.isValueAvailable(i)) {
           if (filterFunc && !filterFunc(i))
             continue;
           found = true;

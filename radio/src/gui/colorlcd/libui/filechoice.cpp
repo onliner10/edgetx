@@ -29,20 +29,20 @@
 class FileChoiceMenuToolbar : public MenuToolbar
 {
  public:
-  FileChoiceMenuToolbar(FileChoice *choice, Menu *menu) :
+  FileChoiceMenuToolbar(FileChoice& choice, Menu& menu) :
       MenuToolbar(choice, menu, FC_COLS)
   {
-    filterButton(choice, 'a', 'd', "aA-dD");
-    filterButton(choice, 'e', 'h', "eE-hH");
-    filterButton(choice, 'i', 'l', "iI-lL");
-    filterButton(choice, 'm', 'p', "mM-pP");
-    filterButton(choice, 'q', 't', "qQ-tT");
-    filterButton(choice, 'u', 'z', "uU-zZ");
-    filterButton(choice, '0', '9', "0-9");
+    filterButton(&choice, 'a', 'd', "aA-dD");
+    filterButton(&choice, 'e', 'h', "eE-hH");
+    filterButton(&choice, 'i', 'l', "iI-lL");
+    filterButton(&choice, 'm', 'p', "mM-pP");
+    filterButton(&choice, 'q', 't', "qQ-tT");
+    filterButton(&choice, 'u', 'z', "uU-zZ");
+    filterButton(&choice, '0', '9', "0-9");
 
     bool found = false;
-    for (int i = 0; i <= choice->getMax(); i += 1) {
-      char c = choice->getString(i)[0];
+    for (int i = 0; i <= choice.getMax(); i += 1) {
+      char c = choice.getString(i)[0];
       if (c && !isdigit(c) && !isalpha(c)) {
         found = true;
         break;
@@ -51,9 +51,10 @@ class FileChoiceMenuToolbar : public MenuToolbar
 
     if (found) {
       addButton(
-          "._-", 0, choice->getMax(),
+          "._-", 0, choice.getMax(),
           [=](int16_t index) {
-            char c = choice->getString(index)[0];
+            auto& fileChoice = static_cast<FileChoice&>(this->choice);
+            char c = fileChoice.getString(index)[0];
             return c && !isdigit(c) && !isalpha(c);
           },
           STR_MENU_OTHER);
@@ -182,15 +183,16 @@ void FileChoice::openMenu()
   if (fileCount > 0) {
     setEditMode(true);  // this needs to be done first before menu is created.
 
-    auto menu = new Menu();
-    if (menuTitle) menu->setTitle(menuTitle);
+    Menu::openOr([&](Menu& menu) {
+      if (menuTitle) menu.setTitle(menuTitle);
 
-    auto tb = new FileChoiceMenuToolbar(this, menu);
-    menu->setToolbar(tb);
+      auto tb = Window::makeLive<FileChoiceMenuToolbar>(*this, menu);
+      if (tb) menu.setToolbar(tb);
 
-    // fillMenu(menu); - called by MenuToolbar
+      // fillMenu(menu); - called by MenuToolbar
 
-    menu->setCloseHandler([=]() { setEditMode(false); });
+      menu.setCloseHandler([=]() { setEditMode(false); });
+    }, [&]() { setEditMode(false); });
   } else {
     new MessageDialog(STR_SDCARD, STR_NO_FILES_ON_SD);
   }

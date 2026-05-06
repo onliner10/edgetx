@@ -29,7 +29,7 @@
 class SwitchChoiceMenuToolbar : public MenuToolbar
 {
  public:
-  SwitchChoiceMenuToolbar(SwitchChoice* choice, Menu* menu) :
+  SwitchChoiceMenuToolbar(SwitchChoice& choice, Menu& menu) :
       MenuToolbar(choice, menu, 2)
   {
     addButton(CHAR_SWITCH, SWSRC_FIRST_SWITCH, SWSRC_LAST_MULTIPOS_SWITCH,
@@ -58,31 +58,32 @@ class SwitchChoiceMenuToolbar : public MenuToolbar
         },
         STR_MENU_OTHER);
 
-    if ((nxtBtnPos > filterColumns) && choice->isValueAvailable &&
-        choice->isValueAvailable(0))
+    auto& switchChoice = static_cast<SwitchChoice&>(choice);
+    if ((nxtBtnPos > filterColumns) && choice.isValueAvailable &&
+        choice.isValueAvailable(0))
       addButton(STR_SELECT_MENU_CLR, 0, 0, nullptr, nullptr, true);
 
     invertBtn = new (std::nothrow) MenuToolbarButton(this, {0, 0, LV_PCT(100), 0},
                                       STR_SELECT_MENU_INV);
     if (!invertBtn) return;
-    invertBtn->check(choice->inverted);
+    invertBtn->check(switchChoice.inverted);
     lv_obj_align(invertBtn->getLvObj(), LV_ALIGN_BOTTOM_MID, 0, 0);
 
     invertBtn->setPressHandler([=]() {
       lv_obj_clear_state(invertBtn->getLvObj(), LV_STATE_FOCUSED);
       invertChoice();
-      return choice->inverted;
+      return static_cast<SwitchChoice&>(this->choice).inverted;
     });
   }
 
   void invertChoice()
   {
-    SwitchChoice* switchChoice = (SwitchChoice*)choice;
-    switchChoice->inverted = !switchChoice->inverted;
-    auto idx = menu->selection();
-    switchChoice->fillMenu(menu, filter);
-    menu->select(idx);
-    invertBtn->check(switchChoice->inverted);
+    auto& switchChoice = static_cast<SwitchChoice&>(choice);
+    switchChoice.inverted = !switchChoice.inverted;
+    auto idx = menu.selection();
+    switchChoice.fillMenu(&menu, filter);
+    menu.select(idx);
+    invertBtn->check(switchChoice.inverted);
   }
 
   void longPress()
@@ -125,14 +126,14 @@ void SwitchChoice::openMenu()
 {
   setEditMode(true);  // this needs to be done first before menu is created.
 
-  Menu::open([&](Menu& menu) {
+  Menu::openOr([&](Menu& menu) {
     auto menuPtr = &menu;
     if (menuTitle) menu.setTitle(menuTitle);
 
     inverted = _getValue() < 0;
     inMenu = true;
 
-    auto tb = new (std::nothrow) SwitchChoiceMenuToolbar(this, menuPtr);
+    auto tb = new (std::nothrow) SwitchChoiceMenuToolbar(*this, menu);
     if (tb) menu.setToolbar(tb);
 
     menu.setLongPressHandler([=]() { if (tb) tb->invertChoice(); });
@@ -161,6 +162,9 @@ void SwitchChoice::openMenu()
     // fillMenu(menu); - called by MenuToolbar
 
     menu.setCloseHandler([=]() { setEditMode(false); });
+  }, [&]() {
+    inMenu = false;
+    setEditMode(false);
   });
 }
 

@@ -36,7 +36,7 @@ class MenuToolbarButton : public ButtonBase
 class MenuToolbar : public Window
 {
  public:
-  MenuToolbar(Choice* choice, Menu* menu, const int columns);
+  MenuToolbar(Choice& choice, Menu& menu, const int columns);
   ~MenuToolbar();
 
   void resetFilter();
@@ -49,9 +49,9 @@ class MenuToolbar : public Window
   static LAYOUT_VAL_SCALED(MENUS_TOOLBAR_BUTTON_WIDTH, 36)
 
  protected:
-  Choice* choice;
+  Choice& choice;
   Choice::FilterFct filter;
-  Menu* menu;
+  Menu& menu;
   int nxtBtnPos = 0;
   int filterColumns = 0;
   MenuToolbarButton* allBtn = nullptr;

@@ -449,6 +449,12 @@ class Window
   virtual void onLiveCheckEvents(LiveWindow& live);
 
   bool requireLvObj(lv_obj_t* obj);
+  bool requireLvGroup(lv_group_t* group)
+  {
+    if (group) return true;
+    failClosed();
+    return false;
+  }
   void failClosed();
   bool syncOverlay(Window* overlay);
   void markLoaded();

@@ -30,7 +30,7 @@
 class SourceChoiceMenuToolbar : public MenuToolbar
 {
  public:
-  SourceChoiceMenuToolbar(SourceChoice* choice, Menu* menu) :
+  SourceChoiceMenuToolbar(SourceChoice& choice, Menu& menu) :
       MenuToolbar(choice, menu, FILTER_COLUMNS)
   {
     addButton(CHAR_INPUT, MIXSRC_FIRST_INPUT, MIXSRC_LAST_INPUT, nullptr,
@@ -91,34 +91,35 @@ class SourceChoiceMenuToolbar : public MenuToolbar
       addButton(CHAR_TELEMETRY, MIXSRC_FIRST_TELEM, MIXSRC_LAST_TELEM,
                 nullptr, STR_MENU_TELEMETRY);
 
-    if ((nxtBtnPos > filterColumns) && choice->isValueAvailable &&
-        choice->isValueAvailable(0))
+    auto& sourceChoice = static_cast<SourceChoice&>(choice);
+    if ((nxtBtnPos > filterColumns) && choice.isValueAvailable &&
+        choice.isValueAvailable(0))
       addButton(STR_SELECT_MENU_CLR, 0, 0, nullptr, nullptr, true);
 
-    if (choice->canInvert) {
+    if (sourceChoice.canInvert) {
       invertBtn = new (std::nothrow) MenuToolbarButton(this, {0, 0, LV_PCT(100), 0},
                                         STR_SELECT_MENU_INV);
       if (!invertBtn) return;
-      invertBtn->check(choice->inverted);
+      invertBtn->check(sourceChoice.inverted);
       lv_obj_align(invertBtn->getLvObj(), LV_ALIGN_BOTTOM_MID, 0, 0);
 
       invertBtn->setPressHandler([=]() {
         lv_obj_clear_state(invertBtn->getLvObj(), LV_STATE_FOCUSED);
         invertChoice();
-        return choice->inverted;
+        return static_cast<SourceChoice&>(this->choice).inverted;
       });
     }
   }
 
   void invertChoice()
   {
-    SourceChoice* sourceChoice = (SourceChoice*)choice;
-    if (sourceChoice->canInvert) {
-      sourceChoice->inverted = !sourceChoice->inverted;
-      auto idx = menu->selection();
-      sourceChoice->fillMenu(menu, filter);
-      menu->select(idx);
-      invertBtn->check(sourceChoice->inverted);
+    auto& sourceChoice = static_cast<SourceChoice&>(choice);
+    if (sourceChoice.canInvert) {
+      sourceChoice.inverted = !sourceChoice.inverted;
+      auto idx = menu.selection();
+      sourceChoice.fillMenu(&menu, filter);
+      menu.select(idx);
+      invertBtn->check(sourceChoice.inverted);
     }
   }
 
@@ -172,11 +173,11 @@ void SourceChoice::openMenu()
   inverted = getIntValue() < 0;
   inMenu = true;
 
-  Menu::open([&](Menu& menu) {
+  Menu::openOr([&](Menu& menu) {
     auto menuPtr = &menu;
     if (menuTitle) menu.setTitle(menuTitle);
 
-    auto tb = new (std::nothrow) SourceChoiceMenuToolbar(this, menuPtr);
+    auto tb = new (std::nothrow) SourceChoiceMenuToolbar(*this, menu);
     if (tb) menu.setToolbar(tb);
 
     if (canInvert)
@@ -207,6 +208,9 @@ void SourceChoice::openMenu()
     // fillMenu(menu); - called by MenuToolbar
 
     menu.setCloseHandler([=]() { setEditMode(false); });
+  }, [&]() {
+    inMenu = false;
+    setEditMode(false);
   });
 }
 
