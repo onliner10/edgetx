@@ -95,6 +95,7 @@ WINDOW_LIFETIME_BOUNDARY_SUFFIXES = (
     "radio/src/gui/colorlcd/libui/mainwindow.cpp",
     "radio/src/gui/colorlcd/libui/window.cpp",
     "radio/src/gui/colorlcd/libui/window.h",
+    "radio/src/lua/lua_lvgl_widget.h",
 )
 
 INVARIANT_BOUNDARY_CALLS = (

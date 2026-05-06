@@ -29,6 +29,7 @@ bool standaloneLuaCanvasCreateFailureSetsErrorForTest();
 bool standaloneLuaBitmapBufferDataFailureSetsErrorForTest();
 bool standaloneLuaWindowAllocationFailureDoesNotCacheDeadWindowForTest();
 bool standaloneLuaLoadingLabelFailureDoesNotCacheDeadWindowForTest();
+bool luaLvglWidgetMissingWindowHandleNoOpsForTest();
 
 TEST(ColorStandaloneLua, CanvasCreateFailureSetsError)
 {
@@ -90,6 +91,22 @@ TEST(ColorStandaloneLua, LoadingLabelFailureDoesNotCacheDeadWindow)
     _exit(standaloneLuaLoadingLabelFailureDoesNotCacheDeadWindowForTest()
               ? 0
               : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorLuaLvglWidget, MissingWindowHandleNoOps)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(luaLvglWidgetMissingWindowHandleNoOpsForTest() ? 0 : 1);
   }
 
   int status = 0;

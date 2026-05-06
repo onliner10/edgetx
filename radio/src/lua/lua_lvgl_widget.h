@@ -21,11 +21,54 @@
 
 #pragma once
 
+#include <utility>
+
+#include "window.h"
+
 #define LVGL_METATABLE "LVGL*"
 #define LVGL_SIMPLEMETATABLE "LVGLSIMPLE*"
 
 class LuaScriptManager;
 class LvglDialog;
+
+//-----------------------------------------------------------------------------
+
+class LvglWidgetWindow
+{
+ public:
+  LvglWidgetWindow() = default;
+
+  LvglWidgetWindow& operator=(Window* value)
+  {
+    window = value;
+    return *this;
+  }
+
+  Window* get() const { return window; }
+
+  template <typename Fn>
+  bool with(Fn&& fn) const
+  {
+    if (!window) return false;
+    fn(*window);
+    return true;
+  }
+
+  template <typename T, typename Fn>
+  bool withAs(Fn&& fn) const
+  {
+    return with([&](Window& value) { fn(static_cast<T&>(value)); });
+  }
+
+  template <typename Fn>
+  bool withLive(Fn&& fn) const
+  {
+    return window && window->withLive(std::forward<Fn>(fn));
+  }
+
+ private:
+  Window* window = nullptr;
+};
 
 //-----------------------------------------------------------------------------
 
@@ -490,20 +533,25 @@ class LvglWidgetObject : public LvglWidgetObjectBase
 
   void show() override
   {
-    if (window) window->show();
+    window.with([](Window& w) { w.show(); });
   }
   void hide() override
   {
-    if (window) window->hide();
+    window.with([](Window& w) { w.hide(); });
   }
-  bool isVisible() override { return window && window->isVisible(); }
+  bool isVisible() override
+  {
+    bool visible = false;
+    window.with([&](Window& w) { visible = w.isVisible(); });
+    return visible;
+  }
   void enable() override
   {
-    if (window) window->enable();
+    window.with([](Window& w) { w.enable(); });
   }
   void disable() override
   {
-    if (window) window->disable();
+    window.with([](Window& w) { w.disable(); });
   }
 
   void setPos(coord_t x, coord_t y) override;
@@ -513,10 +561,10 @@ class LvglWidgetObject : public LvglWidgetObjectBase
   bool callRefs(lua_State* L) override;
   void clearRefs(lua_State* L) override;
 
-  Window* getWindow() const override { return window; }
+  Window* getWindow() const override { return window.get(); }
 
  protected:
-  Window* window = nullptr;
+  LvglWidgetWindow window;
   int8_t flexFlow = -1;
   int8_t flexPad = PAD_OUTLINE;
   bool customPad = false;
@@ -529,8 +577,8 @@ class LvglWidgetObject : public LvglWidgetObjectBase
   template <typename Fn>
   bool visitWindow(Fn&& fn)
   {
-    return window && window->withLive(
-                         [&](Window::LiveWindow& live) { fn(live.lvobj()); });
+    return window.withLive(
+        [&](Window::LiveWindow& live) { fn(live.lvobj()); });
   }
 
   void parseParam(lua_State* L, const char* key) override;
