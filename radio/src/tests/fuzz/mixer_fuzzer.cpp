@@ -12,6 +12,9 @@
 #include "edgetx.h"
 #include "hal/adc_driver.h"
 #include "hal/switch_driver.h"
+#if defined(COLORLCD)
+#include "lcd.h"
+#endif
 #include "model_init.h"
 #include "simulib.h"
 #include "switches.h"
@@ -137,6 +140,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
   static bool initialized = false;
   if (!initialized) {
     simuInit();
+#if defined(COLORLCD)
+    lcdInitDisplayDriver();
+#endif
     initialized = true;
   }
 
