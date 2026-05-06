@@ -92,6 +92,7 @@ WINDOW_LIFETIME_RECEIVERS = {
 WINDOW_LIFETIME_BOUNDARY_SUFFIXES = (
     "radio/src/gui/colorlcd/LvglWrapper.cpp",
     "radio/src/gui/colorlcd/libui/etx_lv_theme.cpp",
+    "radio/src/gui/colorlcd/libui/keyboard_base.h",
     "radio/src/gui/colorlcd/libui/mainwindow.cpp",
     "radio/src/gui/colorlcd/libui/list_line_button.cpp",
     "radio/src/gui/colorlcd/libui/list_line_button.h",
@@ -193,11 +194,8 @@ UI_SAFETY_ATOM_SUBSTRINGS = (
     "deleted",
     "getlvobj",
     "haslivelvobj",
-    "isavailable",
     "iskeyboardready",
     "loaded",
-    "lv_obj",
-    "lvobj",
 )
 
 
@@ -692,13 +690,13 @@ def canonical_null_comparison(expr: str) -> str:
     match = re.fullmatch(r"(.+?)(==|!=)(nullptr|0)", expr)
     if match:
         left, op, right = match.groups()
-        if right == "0" and left.strip().isdigit():
+        if right == "0":
             return expr
         return f"{left}{op}nullptr"
     match = re.fullmatch(r"(nullptr|0)(==|!=)(.+)", expr)
     if match:
         left, op, right = match.groups()
-        if left == "0" and right.strip().isdigit():
+        if left == "0":
             return expr
         return f"{right}{op}nullptr"
     return expr
@@ -814,13 +812,32 @@ def family_keys(atom: str) -> tuple[str, ...]:
     keys: list[str] = []
     if is_invariant_boundary_atom(atom):
         return ()
-    if any(part in lower for part in ("lvobj", "lv_obj", "haslvobj", "livelvobj", "getlvobj")):
+    if is_lvobj_presence_atom(atom):
         keys.append("LVGL object presence/lifetime")
     if is_window_liveness_atom(atom):
         keys.append("Window availability/event liveness")
-    if "content" in lower:
+    if is_content_presence_atom(atom):
         keys.append("Content pointer presence")
     return tuple(sorted(set(keys)))
+
+
+def is_content_presence_atom(atom: str) -> bool:
+    return any(
+        ui_safety_variable_name(variable) == "content"
+        for variable in predicate_variable_keys(atom)
+    )
+
+
+def is_lvobj_presence_atom(atom: str) -> bool:
+    lower = atom.lower()
+    if any(part in lower for part in ("haslvobj", "haslivelvobj", "getlvobj")):
+        return True
+    if lower in {"lvobj", "this->lvobj"}:
+        return True
+    return any(
+        ui_safety_variable_name(variable) == "lvobj"
+        for variable in predicate_variable_keys(atom)
+    )
 
 
 def is_invariant_boundary_atom(atom: str) -> bool:
@@ -868,6 +885,8 @@ def is_ui_safety_atom(atom: str) -> bool:
     lower = atom.lower()
     if is_invariant_boundary_atom(atom):
         return False
+    if is_lvobj_presence_atom(atom):
+        return True
     if any(part in lower for part in UI_SAFETY_ATOM_SUBSTRINGS):
         return True
     return any(

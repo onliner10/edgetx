@@ -124,6 +124,7 @@ class WindowHandle
   }
 
  protected:
+  T* getUnchecked() const { return window_; }
   void reset(T* window) { window_ = window; }
 
  private:
@@ -133,6 +134,13 @@ class WindowHandle
 template <typename T>
 class RequiredWindow : public WindowHandle<T>
 {
+ public:
+  // Required handles interoperate with legacy APIs that already require T*.
+  // OptionalWindow deliberately does not expose pointer access.
+  operator T*() const { return this->getUnchecked(); }
+  T* operator->() const { return this->getUnchecked(); }
+  T& operator*() const { return *this->getUnchecked(); }
+
  private:
   friend class Window;
 
@@ -455,6 +463,12 @@ class Window
     failClosed();
     return false;
   }
+  bool requireLvObj(RequiredLvObj& target, lv_obj_t* obj)
+  {
+    if (!requireLvObj(obj)) return false;
+    target.reset(obj);
+    return true;
+  }
   void failClosed();
   bool syncOverlay(Window* overlay);
   void markLoaded();
@@ -505,6 +519,17 @@ class Window
   bool initRequiredWindow(RequiredWindow<T>& target, Args&&... args)
   {
     auto window = Window::makeLive<T>(std::forward<Args>(args)...);
+    if (!window) {
+      failClosed();
+      return false;
+    }
+    target.reset(window);
+    return true;
+  }
+
+  template <typename T>
+  bool requireWindow(RequiredWindow<T>& target, T* window)
+  {
     if (!window) {
       failClosed();
       return false;

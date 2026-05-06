@@ -55,34 +55,43 @@ BaseDialog::BaseDialog(const char* title,
   setAutomationText(title ? title : "");
 #endif
 
-  form = this;
+  requireWindow(form, static_cast<Window*>(this));
 
-  Window* content = nullptr;
+  RequiredWindow<Window> content;
   if (!initRequiredWindow(content, this, rect_t{})) return;
-  content->setWindowFlag(OPAQUE);
-  content->padAll(PAD_ZERO);
-  content->setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_ZERO, width, LV_SIZE_CONTENT);
-  content->withLive([](Window::LiveWindow& live) {
-    etx_solid_bg(live.lvobj());
-    lv_obj_center(live.lvobj());
-  });
+  content.with([&](Window& contentWindow) {
+    contentWindow.setWindowFlag(OPAQUE);
+    contentWindow.padAll(PAD_ZERO);
+    contentWindow.setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_ZERO, width,
+                                LV_SIZE_CONTENT);
+    contentWindow.withLive([](Window::LiveWindow& live) {
+      etx_solid_bg(live.lvobj());
+      lv_obj_center(live.lvobj());
+    });
 
-  header = Window::makeLive<StaticText>(
-      content, rect_t{0, 0, LV_PCT(100), 0}, title ? title : "",
-      COLOR_THEME_PRIMARY2_INDEX);
+    header = Window::makeLive<StaticText>(
+        &contentWindow, rect_t{0, 0, LV_PCT(100), 0}, title ? title : "",
+        COLOR_THEME_PRIMARY2_INDEX);
+  });
   if (header) {
     etx_solid_bg(header->getLvObj(), COLOR_THEME_SECONDARY1_INDEX);
     header->padAll(PAD_SMALL);
     header->show(title != nullptr);
   }
 
-  form = Window::makeLive<BaseDialogForm>(content, width, flexLayout);
-  if (!form) form = content;
-  if (form && maxHeight != LV_SIZE_CONTENT) {
-    form->withLive([&](Window::LiveWindow& live) {
-      lv_obj_set_style_max_height(
-          live.lvobj(), maxHeight - EdgeTxStyles::UI_ELEMENT_HEIGHT,
-          LV_PART_MAIN);
+  content.with([&](Window& contentWindow) {
+    Window* formWindow =
+        Window::makeLive<BaseDialogForm>(&contentWindow, width, flexLayout);
+    if (!formWindow) formWindow = &contentWindow;
+    requireWindow(form, formWindow);
+  });
+  if (maxHeight != LV_SIZE_CONTENT) {
+    form.with([&](Window& formWindow) {
+      formWindow.withLive([&](Window::LiveWindow& live) {
+        lv_obj_set_style_max_height(
+            live.lvobj(), maxHeight - EdgeTxStyles::UI_ELEMENT_HEIGHT,
+            LV_PART_MAIN);
+      });
     });
   }
 }
@@ -98,11 +107,11 @@ ProgressDialog::ProgressDialog(const char* title,
                                std::function<void()> onClose) :
     BaseDialog(title, false), onClose(std::move(onClose))
 {
-  if (form) {
+  form.with([&](Window& formWindow) {
     progress = Window::makeLive<Progress>(
-        form, rect_t{0, 0, LV_PCT(100), 32});
+        &formWindow, rect_t{0, 0, LV_PCT(100), 32});
     if (progress) updateProgress(0);
-  }
+  });
 }
 
 void ProgressDialog::setTitle(std::string title)
@@ -134,16 +143,17 @@ MessageDialog::MessageDialog(const char* title,
                              LcdFlags messageFlags, LcdFlags infoFlags) :
     BaseDialog(title, true)
 {
-  if (!form) return;
-  messageWidget = Window::makeLive<StaticText>(
-      form, rect_t{0, 0, LV_PCT(100), LV_SIZE_CONTENT}, message,
-      COLOR_THEME_PRIMARY1_INDEX, messageFlags);
+  form.with([&](Window& formWindow) {
+    messageWidget = Window::makeLive<StaticText>(
+        &formWindow, rect_t{0, 0, LV_PCT(100), LV_SIZE_CONTENT}, message,
+        COLOR_THEME_PRIMARY1_INDEX, messageFlags);
 
-  if (info) {
-    infoWidget = Window::makeLive<StaticText>(
-        form, rect_t{0, 0, LV_PCT(100), LV_SIZE_CONTENT}, info,
-        COLOR_THEME_PRIMARY1_INDEX, infoFlags);
-  }
+    if (info) {
+      infoWidget = Window::makeLive<StaticText>(
+          &formWindow, rect_t{0, 0, LV_PCT(100), LV_SIZE_CONTENT}, info,
+          COLOR_THEME_PRIMARY1_INDEX, infoFlags);
+    }
+  });
 }
 
 void MessageDialog::onLiveClicked(LiveWindow&) { deleteLater(); }
@@ -155,14 +165,15 @@ DynamicMessageDialog::DynamicMessageDialog(
     const char* message, const int lineHeight, LcdColorIndex color, LcdFlags textFlags) :
     BaseDialog(title, true)
 {
-  if (!form) return;
-  messageWidget = Window::makeLive<StaticText>(
-      form, rect_t{0, 0, LV_PCT(100), LV_SIZE_CONTENT}, message,
-      COLOR_THEME_PRIMARY1_INDEX, CENTERED);
+  form.with([&](Window& formWindow) {
+    messageWidget = Window::makeLive<StaticText>(
+        &formWindow, rect_t{0, 0, LV_PCT(100), LV_SIZE_CONTENT}, message,
+        COLOR_THEME_PRIMARY1_INDEX, CENTERED);
 
-  infoWidget = Window::makeLive<DynamicText>(
-      form, rect_t{0, 0, LV_PCT(100), LV_SIZE_CONTENT}, textHandler, color,
-      textFlags);
+    infoWidget = Window::makeLive<DynamicText>(
+        &formWindow, rect_t{0, 0, LV_PCT(100), LV_SIZE_CONTENT}, textHandler,
+        color, textFlags);
+  });
 }
 
 void DynamicMessageDialog::onLiveClicked(LiveWindow&) { deleteLater(); }
@@ -177,40 +188,41 @@ ConfirmDialog::ConfirmDialog(const char* title,
     confirmHandler(std::move(confirmHandler)),
     cancelHandler(std::move(cancelHandler))
 {
-  if (!form) return;
-  if (message) {
-    Window::makeLive<StaticText>(
-        form, rect_t{0, 0, LV_PCT(100), 0}, message,
-        COLOR_THEME_PRIMARY1_INDEX, CENTERED);
-  }
+  form.with([&](Window& formWindow) {
+    if (message) {
+      Window::makeLive<StaticText>(
+          &formWindow, rect_t{0, 0, LV_PCT(100), 0}, message,
+          COLOR_THEME_PRIMARY1_INDEX, CENTERED);
+    }
 
-  buildRequiredWindow<Window>(
-      [&](Window& box) {
-        box.padAll(PAD_TINY);
-        box.setFlexLayout(LV_FLEX_FLOW_ROW, 40, LV_PCT(100),
-                          LV_SIZE_CONTENT);
-        box.withLive([](Window::LiveWindow& live) {
-          lv_obj_set_flex_align(live.lvobj(), LV_FLEX_ALIGN_CENTER,
-                                LV_FLEX_ALIGN_CENTER,
-                                LV_FLEX_ALIGN_SPACE_BETWEEN);
-        });
+    buildRequiredWindow<Window>(
+        [&](Window& box) {
+          box.padAll(PAD_TINY);
+          box.setFlexLayout(LV_FLEX_FLOW_ROW, 40, LV_PCT(100),
+                            LV_SIZE_CONTENT);
+          box.withLive([](Window::LiveWindow& live) {
+            lv_obj_set_flex_align(live.lvobj(), LV_FLEX_ALIGN_CENTER,
+                                  LV_FLEX_ALIGN_CENTER,
+                                  LV_FLEX_ALIGN_SPACE_BETWEEN);
+          });
 
-        buildRequiredWindow<TextButton>(
-            [](TextButton&) {}, &box, rect_t{0, 0, 96, 0}, STR_NO,
-            [=]() -> int8_t {
-              onCancel();
-              return 0;
-            });
+          buildRequiredWindow<TextButton>(
+              [](TextButton&) {}, &box, rect_t{0, 0, 96, 0}, STR_NO,
+              [=]() -> int8_t {
+                onCancel();
+                return 0;
+              });
 
-        buildRequiredWindow<TextButton>(
-            [](TextButton&) {}, &box, rect_t{0, 0, 96, 0}, STR_YES,
-            [=]() -> int8_t {
-              this->deleteLater();
-              this->confirmHandler();
-              return 0;
-            });
-      },
-      form, rect_t{});
+          buildRequiredWindow<TextButton>(
+              [](TextButton&) {}, &box, rect_t{0, 0, 96, 0}, STR_YES,
+              [=]() -> int8_t {
+                this->deleteLater();
+                this->confirmHandler();
+                return 0;
+              });
+        },
+        &formWindow, rect_t{});
+  });
 }
 
 void ConfirmDialog::onCancel()

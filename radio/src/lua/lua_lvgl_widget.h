@@ -376,6 +376,29 @@ class LvglSimpleWidgetObject : public LvglWidgetObjectBase
 
  protected:
   lv_obj_t* lvobj = nullptr;
+
+  template <typename Fn>
+  bool withLvObj(Fn&& fn) const
+  {
+    if (!lvobj) return false;
+    fn(lvobj);
+    return true;
+  }
+
+  template <typename Value, typename Fn>
+  Value lvObjValueOr(Value missing, Fn&& fn) const
+  {
+    if (!lvobj) return missing;
+    return fn(lvobj);
+  }
+
+  bool ensureLvObj(lv_obj_t* parent, LvglCreate create)
+  {
+    if (lvobj) return true;
+    if (!parent) return false;
+    lvobj = create(parent);
+    return lvobj != nullptr;
+  }
 };
 
 //-----------------------------------------------------------------------------

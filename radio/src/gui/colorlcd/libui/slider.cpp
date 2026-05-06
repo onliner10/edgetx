@@ -74,15 +74,17 @@ void SliderBase::update()
 
 void SliderBase::update(Window::LiveWindow&)
 {
-  if (!slider || _getValue == nullptr) return;
+  if (_getValue == nullptr) return;
 
   // Fix for lv_slider_set_value not working when using the rotary encoder to
   // update value
-  auto bar = (lv_bar_t*)slider;
-  bar->cur_value_anim.anim_state = -1;
-  bar->cur_value_anim.anim_end = _getValue();
+  slider.with([&](lv_obj_t* sliderObj) {
+    auto bar = (lv_bar_t*)sliderObj;
+    bar->cur_value_anim.anim_state = -1;
+    bar->cur_value_anim.anim_end = _getValue();
 
-  lv_slider_set_value(slider, _getValue(), LV_ANIM_OFF);
+    lv_slider_set_value(sliderObj, _getValue(), LV_ANIM_OFF);
+  });
 }
 
 void SliderBase::onDelete()
@@ -101,29 +103,32 @@ void SliderBase::setValue(int value)
 void SliderBase::onLiveCheckEvents(Window::LiveWindow& live)
 {
   Window::onLiveCheckEvents(live);
-  if (slider && _getValue != nullptr) {
+  if (_getValue != nullptr) {
     int v = _getValue();
-    if (v != lv_slider_get_value(slider))
-      update(live);
+    slider.with([&](lv_obj_t* sliderObj) {
+      if (v != lv_slider_get_value(sliderObj)) update(live);
+    });
   }
 }
 
 void SliderBase::enable(bool enabled)
 {
   withLive([&](LiveWindow&) {
-    if (slider && lv_obj_has_state(slider, LV_STATE_DISABLED) == enabled) {
+    slider.with([&](lv_obj_t* sliderObj) {
+      if (lv_obj_has_state(sliderObj, LV_STATE_DISABLED) != enabled) return;
       if (enabled)
-        lv_obj_clear_state(slider, LV_STATE_DISABLED);
+        lv_obj_clear_state(sliderObj, LV_STATE_DISABLED);
       else
-        lv_obj_add_state(slider, LV_STATE_DISABLED);
-    }
+        lv_obj_add_state(sliderObj, LV_STATE_DISABLED);
+    });
   });
 }
 
 void SliderBase::setColor(LcdFlags color)
 {
-  if (slider)
-    etx_bg_color_from_flags(slider, color, LV_PART_KNOB);
+  slider.with([&](lv_obj_t* sliderObj) {
+    etx_bg_color_from_flags(sliderObj, color, LV_PART_KNOB);
+  });
   if (tickPts)
     for (int i = 0; i < (vmax - vmin - 1); i += 1)
       if (tickPts[i]) etx_bg_color_from_flags(tickPts[i], color);
@@ -205,16 +210,19 @@ Slider::Slider(Window* parent, coord_t width, int32_t vmin, int32_t vmax,
     failClosed();
     return;
   }
-  slider = sliderField->getLvObj();
-  if (!slider) {
+  if (!requireLvObj(slider, sliderField->getLvObj())) {
     delete sliderField;
-    failClosed();
     return;
   }
-  lv_obj_set_width(slider, lv_pct(100));
+  slider.with([](lv_obj_t* sliderObj) {
+    lv_obj_set_width(sliderObj, lv_pct(100));
+  });
 
-  lv_obj_add_event_cb(slider, SliderBase::slider_changed_cb, LV_EVENT_VALUE_CHANGED, this);
-  lv_slider_set_range(slider, vmin, vmax);
+  slider.with([&](lv_obj_t* sliderObj) {
+    lv_obj_add_event_cb(sliderObj, SliderBase::slider_changed_cb,
+                        LV_EVENT_VALUE_CHANGED, this);
+    lv_slider_set_range(sliderObj, vmin, vmax);
+  });
 
   delayLoad();
 
@@ -325,16 +333,19 @@ VerticalSlider::VerticalSlider(Window* parent, coord_t height, int32_t vmin, int
     failClosed();
     return;
   }
-  slider = sliderField->getLvObj();
-  if (!slider) {
+  if (!requireLvObj(slider, sliderField->getLvObj())) {
     delete sliderField;
-    failClosed();
     return;
   }
-  lv_obj_set_height(slider, lv_pct(100));
+  slider.with([](lv_obj_t* sliderObj) {
+    lv_obj_set_height(sliderObj, lv_pct(100));
+  });
 
-  lv_obj_add_event_cb(slider, SliderBase::slider_changed_cb, LV_EVENT_VALUE_CHANGED, this);
-  lv_slider_set_range(slider, vmin, vmax);
+  slider.with([&](lv_obj_t* sliderObj) {
+    lv_obj_add_event_cb(sliderObj, SliderBase::slider_changed_cb,
+                        LV_EVENT_VALUE_CHANGED, this);
+    lv_slider_set_range(sliderObj, vmin, vmax);
+  });
 
   delayLoad();
 
@@ -367,7 +378,7 @@ bool sliderFormFieldCreateFailureFailsClosedForTest()
     {
     }
 
-    bool hasSlider() const { return slider != nullptr; }
+    bool hasSlider() const { return slider.isPresentForTest(); }
   };
 
   sliderForceFormFieldCreateFailureForTest(true);

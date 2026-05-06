@@ -40,8 +40,8 @@ class BaseDialog : public ModalWindow
 
   void setTitle(const char* title);
 
- protected:
-  Window* form = nullptr;
+protected:
+  RequiredWindow<Window> form;
   StaticText* header = nullptr;
 
   void onCancel() override { deleteLater(); }

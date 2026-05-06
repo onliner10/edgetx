@@ -36,7 +36,7 @@ class SliderBase : public Window
  protected:
   int vmin;
   int vmax;
-  lv_obj_t* slider = nullptr;
+  RequiredLvObj slider;
   lv_obj_t** tickPts = nullptr;
 
   std::function<int()> _getValue;

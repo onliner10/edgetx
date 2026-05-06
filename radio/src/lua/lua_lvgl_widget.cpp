@@ -816,40 +816,46 @@ void LvglSimpleWidgetObject::setPos(coord_t x, coord_t y)
 {
   this->x = x;
   this->y = y;
-  if (lvobj) lv_obj_set_pos(lvobj, x, y);
+  withLvObj([&](lv_obj_t* obj) { lv_obj_set_pos(obj, x, y); });
 }
 
 void LvglSimpleWidgetObject::setSize(coord_t w, coord_t h)
 {
   this->w = w;
   this->h = h;
-  if (lvobj) lv_obj_set_size(lvobj, w, h);
+  withLvObj([&](lv_obj_t* obj) { lv_obj_set_size(obj, w, h); });
 }
 
 void LvglSimpleWidgetObject::setFloating(bool isFloating)
 {
   floating = isFloating;
-  if (lvobj) {
+  withLvObj([&](lv_obj_t* obj) {
     if (floating)
-      lv_obj_add_flag(lvobj, LV_OBJ_FLAG_FLOATING);
+      lv_obj_add_flag(obj, LV_OBJ_FLAG_FLOATING);
     else
-      lv_obj_clear_flag(lvobj, LV_OBJ_FLAG_FLOATING);
-  }
+      lv_obj_clear_flag(obj, LV_OBJ_FLAG_FLOATING);
+  });
 }
 
 void LvglSimpleWidgetObject::show()
 {
-  if (lvobj && !isVisible()) lv_obj_clear_flag(lvobj, LV_OBJ_FLAG_HIDDEN);
+  withLvObj([&](lv_obj_t* obj) {
+    if (!isVisible()) lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
+  });
 }
 
 void LvglSimpleWidgetObject::hide()
 {
-  if (lvobj && isVisible()) lv_obj_add_flag(lvobj, LV_OBJ_FLAG_HIDDEN);
+  withLvObj([&](lv_obj_t* obj) {
+    if (isVisible()) lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+  });
 }
 
 bool LvglSimpleWidgetObject::isVisible()
 {
-  return lvobj && !lv_obj_has_flag(lvobj, LV_OBJ_FLAG_HIDDEN);
+  return lvObjValueOr(false, [](lv_obj_t* obj) {
+    return !lv_obj_has_flag(obj, LV_OBJ_FLAG_HIDDEN);
+  });
 }
 
 //-----------------------------------------------------------------------------
@@ -887,38 +893,43 @@ void LvglWidgetLabel::clearRefs(lua_State* L)
 
 void LvglWidgetLabel::setText(const char* s)
 {
-  if (lvobj && txt.changedText(s)) lv_label_set_text(lvobj, txt.chars());
+  withLvObj([&](lv_obj_t* obj) {
+    if (txt.changedText(s)) lv_label_set_text(obj, txt.chars());
+  });
 }
 
 void LvglWidgetLabel::setColor(LcdFlags newColor)
 {
-  if (lvobj && color.changedColor(newColor))
-    etx_txt_color_from_flags(lvobj, color.flags);
+  withLvObj([&](lv_obj_t* obj) {
+    if (color.changedColor(newColor))
+      etx_txt_color_from_flags(obj, color.flags);
+  });
 }
 
 void LvglWidgetLabel::setFont(LcdFlags newFont)
 {
-  if (lvobj && font.changedFont(newFont))
-    etx_font(lvobj, FONT_INDEX(font.flags));
+  withLvObj([&](lv_obj_t* obj) {
+    if (font.changedFont(newFont)) etx_font(obj, FONT_INDEX(font.flags));
+  });
 }
 
 void LvglWidgetLabel::setAlign(LcdFlags newAlign)
 {
-  if (lvobj) {
+  withLvObj([&](lv_obj_t* obj) {
     align.flags = newAlign;
     if (align.flags & VCENTERED)
-      lv_obj_set_style_align(lvobj, LV_ALIGN_LEFT_MID, LV_PART_MAIN);
+      lv_obj_set_style_align(obj, LV_ALIGN_LEFT_MID, LV_PART_MAIN);
     else if (align.flags & VTOP)
-      lv_obj_set_style_align(lvobj, LV_ALIGN_TOP_LEFT, LV_PART_MAIN);
+      lv_obj_set_style_align(obj, LV_ALIGN_TOP_LEFT, LV_PART_MAIN);
     else if (align.flags & VBOTTOM)
-      lv_obj_set_style_align(lvobj, LV_ALIGN_BOTTOM_LEFT, LV_PART_MAIN);
-    lv_obj_set_style_text_align(lvobj,
+      lv_obj_set_style_align(obj, LV_ALIGN_BOTTOM_LEFT, LV_PART_MAIN);
+    lv_obj_set_style_text_align(obj,
                                 (align.flags & RIGHT) ? LV_TEXT_ALIGN_RIGHT
                                 : (align.flags & CENTERED)
                                     ? LV_TEXT_ALIGN_CENTER
                                     : LV_TEXT_ALIGN_LEFT,
                                 LV_PART_MAIN);
-  }
+  });
 }
 
 void LvglWidgetLabel::build(lua_State* L)
@@ -953,15 +964,18 @@ void LvglWidgetLineBase::parseParam(lua_State* L, const char* key)
 
 void LvglWidgetLineBase::setColor(LcdFlags newColor)
 {
-  if (lvobj && color.changedColor(newColor)) {
-    etx_line_color_from_flags(lvobj, color.flags);
-  }
+  withLvObj([&](lv_obj_t* obj) {
+    if (color.changedColor(newColor))
+      etx_line_color_from_flags(obj, color.flags);
+  });
 }
 
 void LvglWidgetLineBase::setOpacity(uint8_t newOpa)
 {
-  if (lvobj && opacity.changedValue(newOpa))
-    lv_obj_set_style_line_opa(lvobj, opacity.value, LV_PART_MAIN);
+  withLvObj([&](lv_obj_t* obj) {
+    if (opacity.changedValue(newOpa))
+      lv_obj_set_style_line_opa(obj, opacity.value, LV_PART_MAIN);
+  });
 }
 
 void LvglWidgetLineBase::setPos(coord_t x, coord_t y)
@@ -987,44 +1001,45 @@ void LvglWidgetLineBase::build(lua_State* L)
 
 void LvglWidgetLineBase::refresh()
 {
-  if (!lvobj) return;
-  setColor(color.flags);
-  setOpacity(opacity.value);
-  setFloating(floating);
-  setLine();
-  lv_obj_set_style_line_rounded(lvobj, rounded, LV_PART_MAIN);
-  if (dashGap > 0 && dashWidth > 0) {
-    lv_obj_set_style_line_dash_gap(lvobj, dashGap, LV_PART_MAIN);
-    lv_obj_set_style_line_dash_width(lvobj, dashWidth, LV_PART_MAIN);
-  }
+  withLvObj([&](lv_obj_t* obj) {
+    setColor(color.flags);
+    setOpacity(opacity.value);
+    setFloating(floating);
+    setLine();
+    lv_obj_set_style_line_rounded(obj, rounded, LV_PART_MAIN);
+    if (dashGap > 0 && dashWidth > 0) {
+      lv_obj_set_style_line_dash_gap(obj, dashGap, LV_PART_MAIN);
+      lv_obj_set_style_line_dash_width(obj, dashWidth, LV_PART_MAIN);
+    }
+  });
 }
 
 //-----------------------------------------------------------------------------
 
 void LvglWidgetHLine::setLine()
 {
-  if (lvobj) {
+  withLvObj([&](lv_obj_t* obj) {
     pts[0].x = x;
     pts[1].x = x + w;
     pts[0].y = y;
     pts[1].y = y;
-    lv_line_set_points(lvobj, pts, 2);
-    lv_obj_set_style_line_width(lvobj, abs(h), LV_PART_MAIN);
-  }
+    lv_line_set_points(obj, pts, 2);
+    lv_obj_set_style_line_width(obj, abs(h), LV_PART_MAIN);
+  });
 }
 
 //-----------------------------------------------------------------------------
 
 void LvglWidgetVLine::setLine()
 {
-  if (lvobj) {
+  withLvObj([&](lv_obj_t* obj) {
     pts[0].x = x;
     pts[1].x = x;
     pts[0].y = y;
     pts[1].y = y + h;
-    lv_line_set_points(lvobj, pts, 2);
-    lv_obj_set_style_line_width(lvobj, abs(w), LV_PART_MAIN);
-  }
+    lv_line_set_points(obj, pts, 2);
+    lv_obj_set_style_line_width(obj, abs(w), LV_PART_MAIN);
+  });
 }
 
 //-----------------------------------------------------------------------------
@@ -1125,16 +1140,18 @@ void LvglWidgetLine::clearRefs(lua_State* L)
 
 void LvglWidgetLine::setColor(LcdFlags newColor)
 {
-  if (lvobj && color.changedColor(newColor)) {
-    etx_line_color_from_flags(lvobj, color.flags);
-  }
+  withLvObj([&](lv_obj_t* obj) {
+    if (color.changedColor(newColor))
+      etx_line_color_from_flags(obj, color.flags);
+  });
 }
 
 void LvglWidgetLine::setOpacity(uint8_t newOpa)
 {
-  if (lvobj)
+  withLvObj([&](lv_obj_t* obj) {
     if (opacity.changedValue(newOpa))
-      lv_obj_set_style_line_opa(lvobj, opacity.value, LV_PART_MAIN);
+      lv_obj_set_style_line_opa(obj, opacity.value, LV_PART_MAIN);
+  });
 }
 
 void LvglWidgetLine::setPos(coord_t x, coord_t y)
@@ -1154,10 +1171,7 @@ void LvglWidgetLine::setSize(coord_t w, coord_t h) {}
 
 void LvglWidgetLine::setLine()
 {
-  if (pts && parent) {
-    if (!lvobj) lvobj = lv_line_create(parent);
-    if (!lvobj) return;
-
+  if (pts && ensureLvObj(parent, lv_line_create)) {
     x = pts[0].x;
     y = pts[0].y;
     for (size_t i = 1; i < ptCnt; i += 1) {
@@ -1165,9 +1179,11 @@ void LvglWidgetLine::setLine()
       if (pts[i].y < y) y = pts[i].y;
     }
 
-    lv_line_set_points(lvobj, pts, ptCnt);
-    lv_obj_set_style_line_width(lvobj, thickness, LV_PART_MAIN);
-    lv_obj_set_style_line_rounded(lvobj, rounded, LV_PART_MAIN);
+    withLvObj([&](lv_obj_t* obj) {
+      lv_line_set_points(obj, pts, ptCnt);
+      lv_obj_set_style_line_width(obj, thickness, LV_PART_MAIN);
+      lv_obj_set_style_line_rounded(obj, rounded, LV_PART_MAIN);
+    });
   }
 }
 
@@ -1268,17 +1284,18 @@ void LvglWidgetTriangle::clearRefs(lua_State* L)
 
 void LvglWidgetTriangle::setColor(LcdFlags newColor)
 {
-  if (lvobj && color.changedColor(newColor)) {
+  withLvObj([&](lv_obj_t* obj) {
+    if (!color.changedColor(newColor)) return;
     if (color.flags & RGB_FLAG) {
-      etx_remove_img_color(lvobj);
-      lv_obj_set_style_img_recolor(lvobj, makeLvColor(color.flags),
+      etx_remove_img_color(obj);
+      lv_obj_set_style_img_recolor(obj, makeLvColor(color.flags),
                                    LV_PART_MAIN);
-      lv_obj_set_style_img_recolor_opa(lvobj, LV_OPA_COVER, LV_PART_MAIN);
+      lv_obj_set_style_img_recolor_opa(obj, LV_OPA_COVER, LV_PART_MAIN);
     } else {
-      lv_obj_remove_local_style_prop(lvobj, LV_STYLE_IMG_RECOLOR, LV_PART_MAIN);
-      etx_img_color(lvobj, (LcdColorIndex)COLOR_VAL(color.flags));
+      lv_obj_remove_local_style_prop(obj, LV_STYLE_IMG_RECOLOR, LV_PART_MAIN);
+      etx_img_color(obj, (LcdColorIndex)COLOR_VAL(color.flags));
     }
-  }
+  });
 }
 
 void LvglWidgetTriangle::setSize(coord_t w, coord_t h)
@@ -1516,10 +1533,11 @@ void LvglWidgetTriangle::build(lua_State* L)
     fillTriangle();
 
     // Create canvas from mask buffer
-    if (lvobj == nullptr && parent) lvobj = lv_canvas_create(parent);
-    if (!lvobj) return;
-    lv_canvas_set_buffer(lvobj, (void*)mask->data, mask->width, mask->height,
-                         LV_IMG_CF_ALPHA_8BIT);
+    if (!ensureLvObj(parent, lv_canvas_create)) return;
+    withLvObj([&](lv_obj_t* obj) {
+      lv_canvas_set_buffer(obj, (void*)mask->data, mask->width, mask->height,
+                           LV_IMG_CF_ALPHA_8BIT);
+    });
 
     // Set position and, size
     setPos(x, y);
@@ -1537,11 +1555,11 @@ void LvglWidgetTriangle::refresh()
     free(mask);
     mask = nullptr;
   }
-  if (lvobj) {
+  withLvObj([&](lv_obj_t* obj) {
     // May render incorrectly when trying to reuse previous canvas
-    lv_obj_del(lvobj);
-    lvobj = nullptr;
-  }
+    lv_obj_del(obj);
+  });
+  lvobj = nullptr;
   color.forceUpdate();
   build(nullptr);
 }
@@ -2850,10 +2868,17 @@ class LvglDialog : public BaseDialog
              std::function<void()> onClose) :
       BaseDialog(title.c_str(), true, w, h, false), onClose(std::move(onClose))
   {
-    form->setHeight(h - EdgeTxStyles::UI_ELEMENT_HEIGHT);
+    form.with([&](Window& formWindow) {
+      formWindow.setHeight(h - EdgeTxStyles::UI_ELEMENT_HEIGHT);
+    });
   }
 
-  Window* getBody() { return form; }
+  Window* getBody()
+  {
+    return form.valueOr<Window*>(nullptr, [](Window& formWindow) {
+      return &formWindow;
+    });
+  }
 
   void onCancel() override
   {
