@@ -247,7 +247,7 @@ class ScriptLineButton : public ListLineButton
   }
 
   bool isActive() const override { return false; }
-  void refresh() override {}
+  void onRefresh() override {}
 
  protected:
   const ScriptData& scriptData;

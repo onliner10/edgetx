@@ -264,9 +264,8 @@ class SensorButton : public ListLineButton
     }
   }
 
-  void onLiveCheckEvents(LiveWindow& live) override
+  void onLoadedCheckEvents(LiveWindow& live) override
   {
-    ListLineButton::onLiveCheckEvents(live);
     refresh();
   }
 
@@ -312,10 +311,8 @@ class SensorButton : public ListLineButton
     lv_obj_refresh_style(lvobj, LV_PART_ANY, LV_STYLE_PROP_ANY);
   }
 
-  void refresh() override
+  void onRefresh() override
   {
-    if (!loaded) return;
-
     if (showId != g_model.showInstanceIds) setNumIdState();
 
     // Draw a 'fresh' marker

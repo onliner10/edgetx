@@ -248,7 +248,6 @@ void Widget::layoutTextLabel(lv_obj_t* label, const rect_t& rect,
 
 void Widget::delayWidgetLoad()
 {
-  taskRequiresLoaded = true;
   delayLoad();
 }
 
@@ -443,11 +442,9 @@ TrackedWidget::TrackedWidget(const WidgetFactory* factory, Window* parent,
                              LoadMode loadMode) :
     Widget(factory, parent, rect, location)
 {
-  taskRequiresLoaded = true;
-
   switch (loadMode) {
     case LoadMode::Immediate:
-      loaded = true;
+      markLoaded();
       break;
     case LoadMode::Delayed:
       delayLoad();

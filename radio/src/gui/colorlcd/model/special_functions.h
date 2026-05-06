@@ -46,7 +46,7 @@ class FunctionLineButton : public ListLineButton
 
   void delayedInit() override;
 
-  void refresh() override;
+  void onRefresh() override;
 
   static constexpr coord_t NM_X = PAD_TINY;
   static LAYOUT_SIZE_SCALED(NM_Y, 4, 10)

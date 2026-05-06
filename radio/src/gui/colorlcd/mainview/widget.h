@@ -25,6 +25,7 @@
 #include <string.h>
 #include <functional>
 #include <new>
+#include <utility>
 #include <vector>
 
 #include "button.h"
@@ -249,15 +250,8 @@ class Widget : public ButtonBase
   template <typename Fn>
   bool runWidgetTask(Fn&& fn)
   {
-    return withLive([&](LiveWindow&) {
-      if (taskRequiresLoaded && !loaded) return false;
-      fn();
-      return true;
-    });
+    return runWhenLoaded(std::forward<Fn>(fn));
   }
-
- protected:
-  bool taskRequiresLoaded = false;
 };
 
 //-----------------------------------------------------------------------------

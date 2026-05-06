@@ -101,7 +101,9 @@ INVARIANT_BOUNDARY_CALLS = (
     "fromAvailableLvObj",
     "initRequiredLvObj",
     "initRequiredWindow",
+    "markLoaded",
     "requireLvObj",
+    "runWhenLoaded",
     "withLive",
 )
 
@@ -869,12 +871,23 @@ def is_ui_safety_atom(atom: str) -> bool:
 
 
 def is_ui_safety_record(record: IfRecord) -> bool:
+    if is_allowed_ui_safety_boundary_record(record):
+        return False
     if any(key in UI_SAFETY_FAMILIES for key in record.family_keys):
         if any(is_allowed_family_boundary(record, key) for key in record.family_keys):
             return False
         return True
     if any(call in UI_SAFETY_CALLS for call in record.call_keys):
         return True
+    if any(ui_safety_variable_name(key) in UI_SAFETY_VARIABLES for key in record.variable_keys):
+        return True
+    return any(is_ui_safety_atom(atom) for atom in record.atoms)
+
+
+def is_allowed_ui_safety_boundary_record(record: IfRecord) -> bool:
+    path = record.file.as_posix()
+    if not any(path.endswith(suffix) for suffix in WINDOW_LIFETIME_BOUNDARY_SUFFIXES):
+        return False
     if any(ui_safety_variable_name(key) in UI_SAFETY_VARIABLES for key in record.variable_keys):
         return True
     return any(is_ui_safety_atom(atom) for atom in record.atoms)

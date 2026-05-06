@@ -81,8 +81,16 @@ ListLineButton::ListLineButton(Window* parent, uint8_t index) :
 
 void ListLineButton::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  check(isActive());
   ButtonBase::onLiveCheckEvents(live);
+  runWhenLoaded([&]() {
+    check(isActive());
+    onLoadedCheckEvents(live);
+  });
+}
+
+void ListLineButton::refresh()
+{
+  runWhenLoaded([&]() { onRefresh(); });
 }
 
 InputMixButtonBase::InputMixButtonBase(Window* parent, uint8_t index) :
@@ -248,7 +256,7 @@ bool listLineButtonMissingFmBufferLeavesNoCanvasForTest()
    public:
     TestInputMixButton(Window* parent) : InputMixButtonBase(parent, 0) {}
 
-    void refresh() override {}
+    void onRefresh() override {}
     void updatePos(coord_t, coord_t) override {}
     void swapLvglGroup(InputMixButtonBase*) override {}
 
@@ -277,7 +285,7 @@ bool listLineButtonLabelAllocationFailureFailsClosedForTest()
    public:
     TestInputMixButton(Window* parent) : InputMixButtonBase(parent, 0) {}
 
-    void refresh() override {}
+    void onRefresh() override {}
     void updatePos(coord_t, coord_t) override {}
     void swapLvglGroup(InputMixButtonBase*) override {}
 
@@ -331,9 +339,8 @@ bool listLineGroupLabelAllocationFailureFailsClosedForTest()
 }
 #endif
 
-void InputMixButtonBase::onLiveCheckEvents(Window::LiveWindow& live)
+void InputMixButtonBase::onLoadedCheckEvents(Window::LiveWindow& live)
 {
-  ListLineButton::onLiveCheckEvents(live);
   if (fm_canvas) {
     bool chkd = lv_obj_get_state(fm_canvas) & LV_STATE_CHECKED;
     if (chkd != this->checked()) {

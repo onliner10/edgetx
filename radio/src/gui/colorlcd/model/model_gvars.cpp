@@ -86,25 +86,22 @@ class GVarButton : public ListLineButton
 
   int numFlightModes() { return modelFMEnabled() ? MAX_FLIGHT_MODES : 1; }
 
-  void onLiveCheckEvents(LiveWindow& live) override
+  void onLoadedCheckEvents(LiveWindow& live) override
   {
-    ListLineButton::onLiveCheckEvents(live);
-    if (loaded) {
-      if (modelFMEnabled()) {
-        uint8_t newFM = getFlightMode();
-        if (currentFlightMode != newFM) {
-          lv_obj_add_state(valueTexts[newFM], LV_STATE_CHECKED);
-          lv_obj_clear_state(valueTexts[currentFlightMode], LV_STATE_CHECKED);
+    if (modelFMEnabled()) {
+      uint8_t newFM = getFlightMode();
+      if (currentFlightMode != newFM) {
+        lv_obj_add_state(valueTexts[newFM], LV_STATE_CHECKED);
+        lv_obj_clear_state(valueTexts[currentFlightMode], LV_STATE_CHECKED);
 
-          currentFlightMode = newFM;
-        }
+        currentFlightMode = newFM;
       }
+    }
 
-      for (int flightMode = 0; flightMode < numFlightModes(); flightMode++) {
-        FlightModeData* fmData = &g_model.flightModeData[flightMode];
-        if (values[flightMode] != fmData->gvars[index]) {
-          updateValueText(flightMode);
-        }
+    for (int flightMode = 0; flightMode < numFlightModes(); flightMode++) {
+      FlightModeData* fmData = &g_model.flightModeData[flightMode];
+      if (values[flightMode] != fmData->gvars[index]) {
+        updateValueText(flightMode);
       }
     }
   }
@@ -178,7 +175,7 @@ class GVarButton : public ListLineButton
   }
 
   bool isActive() const override { return false; }
-  void refresh() override {}
+  void onRefresh() override {}
 };
 
 static void gv_label_constructor(const lv_obj_class_t* class_p, lv_obj_t* obj)
@@ -244,7 +241,7 @@ class GVarHeader : public Window
   void onLiveCheckEvents(LiveWindow& live) override
   {
     Window::onLiveCheckEvents(live);
-    if (loaded) {
+    runWhenLoaded([&]() {
       uint8_t newFM = getFlightMode();
       if (currentFlightMode != newFM) {
         lv_obj_add_state(labelTexts[newFM], LV_STATE_CHECKED);
@@ -252,7 +249,7 @@ class GVarHeader : public Window
 
         currentFlightMode = newFM;
       }
-    }
+    });
   }
 
   void delayedInit() override

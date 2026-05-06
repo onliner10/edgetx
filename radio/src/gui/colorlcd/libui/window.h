@@ -109,6 +109,25 @@ class Window
     lv_obj_t* lvobj_;
   };
 
+  class LoadedWindow
+  {
+   public:
+    Window& window() const { return window_; }
+    lv_obj_t* lvobj() const { return lvobj_; }
+
+   private:
+    friend class Window;
+
+    explicit LoadedWindow(LiveWindow& live) :
+        window_(live.window()),
+        lvobj_(live.lvobj())
+    {
+    }
+
+    Window& window_;
+    lv_obj_t* lvobj_;
+  };
+
   Window(const rect_t& rect);
   Window(Window* parent, const rect_t& rect, LvglCreate objConstruct = nullptr);
 
@@ -336,8 +355,10 @@ class Window
   Availability availability = Availability::Available;
   bool longPressHandled = false;
 
+ private:
+  bool loaded = true;
+
  protected:
-  bool loaded = false;
   bool layerCreated = false;
   bool parentHidden = false;
 
@@ -365,6 +386,17 @@ class Window
   bool requireLvObj(lv_obj_t* obj);
   void failClosed();
   bool syncOverlay(Window* overlay);
+  void markLoaded();
+
+  template <typename Fn>
+  bool runWhenLoaded(Fn&& handler)
+  {
+    return withLive([&](LiveWindow& live) {
+      if (!loaded) return false;
+      LoadedWindow loadedWindow(live);
+      return invokeLoadedHandlerWith(loadedWindow, std::forward<Fn>(handler));
+    });
+  }
 
   template <typename Create, typename Init>
   bool initRequiredLvObj(lv_obj_t*& target, Create&& create, Init&& init)
@@ -406,6 +438,10 @@ class Window
       std::is_invocable_v<Fn, LiveWindow&> ||
       std::is_invocable_v<Fn, lv_obj_t*>;
 
+  template <typename Fn>
+  static constexpr bool LoadedHandlerInvocable =
+      std::is_invocable_v<Fn, LoadedWindow&> || std::is_invocable_v<Fn>;
+
   template <typename Arg, typename Fn>
   static bool invokeLiveHandlerWith(Arg&& arg, Fn&& handler)
   {
@@ -432,6 +468,31 @@ class Window
       return invokeLiveHandlerWith(live.lvobj(), std::forward<Fn>(handler));
     }
   }
+
+  template <typename Fn>
+  static bool invokeLoadedHandlerWith(LoadedWindow& loaded, Fn&& handler)
+  {
+    static_assert(LoadedHandlerInvocable<Fn>,
+                  "runWhenLoaded handler must accept Window::LoadedWindow& "
+                  "or no arguments");
+    if constexpr (std::is_invocable_v<Fn, LoadedWindow&>) {
+      using Result = std::invoke_result_t<Fn, LoadedWindow&>;
+      if constexpr (std::is_void_v<Result>) {
+        handler(loaded);
+        return true;
+      } else {
+        return static_cast<bool>(handler(loaded));
+      }
+    } else {
+      using Result = std::invoke_result_t<Fn>;
+      if constexpr (std::is_void_v<Result>) {
+        handler();
+        return true;
+      } else {
+        return static_cast<bool>(handler());
+      }
+    }
+  }
   virtual bool onLiveCustomEvent(LiveWindow& live, lv_event_t* event)
   {
     return false;
@@ -440,6 +501,10 @@ class Window
   static void delayLoader(lv_event_t* e);
   void delayLoad();
   virtual void delayedInit() {}
+
+#if defined(SIMU)
+  bool loadedForTest() const { return loaded; }
+#endif
 };
 
 //-----------------------------------------------------------------------------

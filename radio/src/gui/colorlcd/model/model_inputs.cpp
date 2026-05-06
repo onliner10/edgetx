@@ -111,7 +111,7 @@ class InputLineButton : public InputMixButtonBase
     refreshMsg.subscribe(Messaging::REFRESH, [=](uint32_t param) { refresh(); });
   }
 
-  void refresh() override
+  void onRefresh() override
   {
     const ExpoData& line = g_model.expoData[index];
     setWeight(line.weight, -100, 100);

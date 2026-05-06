@@ -122,12 +122,8 @@ void FunctionLineButton::delayedInit()
   refresh();
 }
 
-void FunctionLineButton::refresh()
+void FunctionLineButton::onRefresh()
 {
-  if (!loaded) return;
-
-  check(isActive());
-
   uint8_t func = CFN_FUNC(cfn);
 
   char s[64];

@@ -96,7 +96,7 @@ class MixLineButton : public InputMixButtonBase
     ((InputMixGroupBase*)parent)->adjustHeight();
   }
 
-  void refresh() override
+  void onRefresh() override
   {
     check(isActive());
 

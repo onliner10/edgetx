@@ -115,10 +115,8 @@ class OutputLineButton : public ListLineButton
     delayLoad();
   }
 
-  void refresh() override
+  void onRefresh() override
   {
-    if (!loaded) return;
-
     const LimitData* output = limitAddress(index);
     if (g_model.limitData[index].name[0] != '\0') {
 #if !NARROW_LAYOUT
@@ -194,12 +192,8 @@ class OutputLineButton : public ListLineButton
 
   bool isActive() const override { return false; }
 
-  void onLiveCheckEvents(LiveWindow& live) override
+  void onLoadedCheckEvents(LiveWindow& live) override
   {
-    if (!loaded) return;
-
-    ListLineButton::onLiveCheckEvents(live);
-
     int newValue = channelOutputs[index];
     if (value != newValue) {
       value = newValue;

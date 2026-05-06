@@ -33,9 +33,9 @@ class ListLineButton : public ButtonBase
   uint8_t getIndex() const { return index; }
   virtual void setIndex(uint8_t i) { index = i; }
 
-  void onLiveCheckEvents(LiveWindow& live) override;
+  void onLiveCheckEvents(LiveWindow& live) final;
 
-  virtual void refresh() = 0;
+  void refresh();
 
   static constexpr coord_t BTN_H = EdgeTxStyles::STD_FONT_HEIGHT + PAD_BORDER * 2 + PAD_OUTLINE * 2;
   static constexpr coord_t GRP_W = LCD_W - PAD_SMALL * 2;
@@ -44,6 +44,8 @@ class ListLineButton : public ButtonBase
   uint8_t index;
 
   virtual bool isActive() const = 0;
+  virtual void onLoadedCheckEvents(LiveWindow& live) {}
+  virtual void onRefresh() = 0;
 };
 
 class InputMixButtonBase : public ListLineButton
@@ -61,7 +63,7 @@ class InputMixButtonBase : public ListLineButton
   virtual void updatePos(coord_t x, coord_t y) = 0;
   virtual void swapLvglGroup(InputMixButtonBase* line2) = 0;
 
-  void onLiveCheckEvents(LiveWindow& live) override;
+  void onLoadedCheckEvents(LiveWindow& live) override;
 
   // total: 90 x 17
   static LAYOUT_VAL_SCALED(FM_CANVAS_HEIGHT, 17)

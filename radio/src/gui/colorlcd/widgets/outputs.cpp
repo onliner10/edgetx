@@ -108,9 +108,7 @@ class ChannelValue : public Window
 
   void refresh()
   {
-    withLive([&](LiveWindow&) {
-      if (!loaded) return;
-
+    runWhenLoaded([&]() {
       int16_t value = channelOutputs[channel];
 
       if (value != lastValue) {

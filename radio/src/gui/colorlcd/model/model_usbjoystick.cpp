@@ -422,10 +422,8 @@ class USBChannelLineButton : public ListLineButton
     refresh();
   }
 
-  void refresh() override
+  void onRefresh() override
   {
-    if (!loaded) return;
-
     USBJoystickChData* cch = usbJChAddress(index);
 
     lv_label_set_text(m_mode, STR_VUSBJOYSTICK_CH_MODE[cch->mode]);

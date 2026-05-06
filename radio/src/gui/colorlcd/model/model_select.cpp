@@ -127,7 +127,8 @@ class ModelButton : public Button
 
   bool loadImage()
   {
-    if (loaded && !imgLoaded) {
+    return runWhenLoaded([&]() {
+      if (imgLoaded) return false;
       imgLoaded = true;
 
       coord_t w = width() - PAD_SMALL * 2;
@@ -148,9 +149,7 @@ class ModelButton : public Button
       }
 
       return false;
-    }
-
-    return false;
+    });
   }
 
   bool isModel(ModelCell* cell) { return cell == modelCell; }
@@ -195,7 +194,7 @@ bool modelSelectMissingImageLoadReportsWorkForTest()
     {
     }
 
-    void markLoaded() { loaded = true; }
+    void markLoaded() { Window::markLoaded(); }
   };
 
   ModelCell cell("model1.yml");

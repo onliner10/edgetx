@@ -266,10 +266,9 @@ class FlightModeBtn : public ListLineButton
       lv_label_set_text(fmTrimValue[t], "");
   }
 
-  void onLiveCheckEvents(LiveWindow& live) override
+  void onLoadedCheckEvents(LiveWindow& live) override
   {
-    ListLineButton::onLiveCheckEvents(live);
-    if (!refreshing && loaded) {
+    if (!refreshing) {
       refreshing = true;
       for (int t = 0; t < keysGetMaxTrims() && t < MAX_FMTRIMS; t += 1) {
         if (lastTrim[t] != g_model.flightModeData[index].trim[t].value) {
@@ -280,10 +279,8 @@ class FlightModeBtn : public ListLineButton
     }
   }
 
-  void refresh() override
+  void onRefresh() override
   {
-    if (!loaded) return;
-
     const auto& fm = g_model.flightModeData[index];
 
     if (fm.name[0] != '\0') {

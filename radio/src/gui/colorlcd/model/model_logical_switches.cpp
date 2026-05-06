@@ -367,13 +367,8 @@ class LogicalSwitchButton : public ListLineButton
     return getSwitch(SWSRC_FIRST_LOGICAL_SWITCH + index);
   }
 
-  void onLiveCheckEvents(LiveWindow& live) override
+  void onLoadedCheckEvents(LiveWindow& live) override
   {
-    if (!loaded) return;
-
-    ListLineButton::onLiveCheckEvents(live);
-    check(isActive());
-
     LogicalSwitchData* ls = lswAddress(index);
     uint8_t lsFamily = lswFamily(ls->func);
 
@@ -398,10 +393,8 @@ class LogicalSwitchButton : public ListLineButton
       lv_obj_clear_state(lsAnd, LV_STATE_USER_1);
   }
 
-  void refresh() override
+  void onRefresh() override
   {
-    if (!loaded) return;
-
     char s[20] = "";
 
     LogicalSwitchData* ls = lswAddress(index);

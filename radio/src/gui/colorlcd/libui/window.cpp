@@ -450,6 +450,47 @@ bool unavailableWindowDirectClickDoesNotBubbleForTest()
   parent->deleteLater();
   return ok;
 }
+
+bool windowDelayedLoadGatesLoadedTasksForTest()
+{
+  class DeferredWindow : public Window
+  {
+   public:
+    DeferredWindow() : Window(nullptr, {0, 0, 10, 10}) {}
+
+    void defer() { delayLoad(); }
+    bool runLoadedTask()
+    {
+      return runWhenLoaded([&]() { taskRuns += 1; });
+    }
+    bool loaded() const { return loadedForTest(); }
+
+    int initRuns = 0;
+    int taskRuns = 0;
+
+   protected:
+    void delayedInit() override { initRuns += 1; }
+  };
+
+  auto window = new (std::nothrow) DeferredWindow();
+  if (!window) return false;
+
+  const bool immediateRuns =
+      window->loaded() && window->runLoadedTask() && window->taskRuns == 1;
+
+  window->defer();
+  const bool pendingDrops =
+      !window->loaded() && !window->runLoadedTask() &&
+      window->taskRuns == 1 && window->initRuns == 0;
+
+  lv_event_send(window->getLvObj(), LV_EVENT_DRAW_MAIN_BEGIN, nullptr);
+  const bool afterDrawRuns =
+      window->loaded() && window->initRuns == 1 && window->runLoadedTask() &&
+      window->taskRuns == 2;
+
+  delete window;
+  return immediateRuns && pendingDrops && afterDrawRuns;
+}
 #endif
 
 void Window::delayLoader(lv_event_t* e)
@@ -458,7 +499,7 @@ void Window::delayLoader(lv_event_t* e)
   if (!w) return;
   w->withLive([&](LiveWindow&) {
     if (!w->loaded) {
-      w->loaded = true;
+      w->markLoaded();
       w->delayedInit();
     }
   });
@@ -466,10 +507,14 @@ void Window::delayLoader(lv_event_t* e)
 
 void Window::delayLoad()
 {
-  if (!lvobj) return;
-  lv_obj_add_event_cb(lvobj, Window::delayLoader, LV_EVENT_DRAW_MAIN_BEGIN,
-                      nullptr);
+  loaded = false;
+  withLive([&](LiveWindow& live) {
+    lv_obj_add_event_cb(live.lvobj(), Window::delayLoader,
+                        LV_EVENT_DRAW_MAIN_BEGIN, nullptr);
+  });
 }
+
+void Window::markLoaded() { loaded = true; }
 
 #if defined(DEBUG_WINDOWS)
 std::string Window::getName() const { return "Window"; }
