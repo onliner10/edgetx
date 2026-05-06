@@ -44,6 +44,29 @@ static const struct YamlNode struct_test[] = {
 };
 
 static const struct YamlNode _root_node = YAML_ROOT( struct_test );
+
+struct LargeTestStruct {
+  uint8_t foo;
+  uint8_t bar;
+  char name[16];
+
+  LargeTestStruct() : foo(7), bar(9), name{"unchanged"} {}
+};
+
+static const struct YamlNode struct_LargeTestStruct[] = {
+  YAML_UNSIGNED("foo", 8),
+  YAML_UNSIGNED("bar", 8),
+  YAML_STRING("name", 16),
+  YAML_END
+};
+
+static const struct YamlNode struct_large_test[] = {
+  YAML_STRUCT("testStruct", sizeof(LargeTestStruct) * 8,
+              struct_LargeTestStruct, NULL),
+  YAML_END
+};
+
+static const struct YamlNode large_root_node = YAML_ROOT(struct_large_test);
     
 TEST(Yaml, SkipBlankLines)
 {
@@ -67,4 +90,21 @@ TEST(Yaml, SkipBlankLines)
   yp.set_eof();
   EXPECT_EQ(YamlParser::CONTINUE_PARSING, yp.parse(chunk_3, sizeof(chunk_3) - 1));
   EXPECT_EQ(45, t.foo);
+}
+
+TEST(Yaml, IgnoreScalarValueForStructNode)
+{
+  LargeTestStruct t;
+
+  YamlTreeWalker tree;
+  tree.reset(&large_root_node, (uint8_t*)&t);
+
+  const char yaml[] = "testStruct:]\n";
+
+  YamlParser yp;
+  yp.init(YamlTreeWalker::get_parser_calls(), &tree);
+  EXPECT_EQ(YamlParser::CONTINUE_PARSING, yp.parse(yaml, sizeof(yaml) - 1));
+  EXPECT_EQ(7, t.foo);
+  EXPECT_EQ(9, t.bar);
+  EXPECT_STREQ("unchanged", t.name);
 }
