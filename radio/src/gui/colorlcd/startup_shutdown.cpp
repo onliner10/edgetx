@@ -282,17 +282,36 @@ bool startupShutdownWindowAllocationFailureDoesNotCacheDeadWindowForTest()
   cancelShutdownAnimation();
   return result;
 }
+
+bool fatalErrorScreenAllocationFailureReturnsMissingHandleForTest()
+{
+  MainWindow::instance();
+
+  etxCreateForceObjectAllocationFailureForTest(true);
+  auto screen = drawFatalErrorScreen("fatal");
+  etxCreateForceObjectAllocationFailureForTest(false);
+
+  bool visited = false;
+  const bool withScreen =
+      screen.with([&](Window&) { visited = true; });
+  return !screen.isPresentForTest() && !withScreen && !visited;
+}
 #endif
 
-Window* drawFatalErrorScreen(const char* message)
+OptionalWindow<Window> drawFatalErrorScreen(const char* message)
 {
+  OptionalWindow<Window> screen;
   auto w = createOpaqueFullscreenWindow(COLOR_BLACK_INDEX);
-  if (!w) return nullptr;
+  if (w) {
+    screen.reset(w);
+    new (std::nothrow) StaticText(
+        w,
+        rect_t{0, LCD_H / 2 - EdgeTxStyles::STD_FONT_HEIGHT, LCD_W,
+               EdgeTxStyles::STD_FONT_HEIGHT * 2},
+        message, COLOR_WHITE_INDEX, FONT(XL) | CENTERED);
+  }
 
-  new (std::nothrow) StaticText(w, rect_t{0, LCD_H / 2 - EdgeTxStyles::STD_FONT_HEIGHT, LCD_W, EdgeTxStyles::STD_FONT_HEIGHT * 2},
-                 message, COLOR_WHITE_INDEX, FONT(XL) | CENTERED);
-
-  return w;
+  return screen;
 }
 
 void runFatalErrorScreen(const char* message)

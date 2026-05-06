@@ -23,9 +23,9 @@
 
 #include <stdint.h>
 
-class Window;
+#include "window.h"
 
-Window* drawFatalErrorScreen(const char* message);
+OptionalWindow<Window> drawFatalErrorScreen(const char* message);
 void runFatalErrorScreen(const char* message);
 
 // Screen templates

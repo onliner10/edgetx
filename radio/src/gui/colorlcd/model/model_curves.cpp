@@ -53,7 +53,7 @@ class CurveButton : public Button
 
     // Preview
     preview = new CurveRenderer(
-        this,
+        *this,
         {PAD_MEDIUM, PAD_MEDIUM + EdgeTxStyles::STD_FONT_HEIGHT, width() - PAD_MEDIUM * 2 - PAD_SMALL,
          width() - PAD_MEDIUM * 2 - PAD_SMALL},
         [=](int x) -> int { return applyCustomCurve(x, index); });

@@ -34,9 +34,9 @@ class FlexGridLayout
   {
   }
 
-  void apply(Window* w);
+  void apply(Window& w);
 
-  void add(Window* w);
+  void add(Window& w);
 
   void resetPos()
   {

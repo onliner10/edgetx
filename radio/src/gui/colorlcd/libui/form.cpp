@@ -20,13 +20,11 @@
 
 #include "etx_lv_theme.h"
 
-void FlexGridLayout::apply(Window* w)
+void FlexGridLayout::apply(Window& w)
 {
-  if (!w) return;
+  w.padAll(padding);
 
-  w->padAll(padding);
-
-  w->withLive([&](Window::LiveWindow& live) {
+  w.withLive([&](Window::LiveWindow& live) {
     // layout
     lv_obj_set_layout(live.lvobj(), LV_LAYOUT_GRID);
     if (col_dsc && row_dsc) {
@@ -35,11 +33,9 @@ void FlexGridLayout::apply(Window* w)
   });
 }
 
-void FlexGridLayout::add(Window* w)
+void FlexGridLayout::add(Window& w)
 {
-  if (!w) return;
-
-  w->withLive([&](Window::LiveWindow& live) {
+  w.withLive([&](Window::LiveWindow& live) {
     if (col_dsc && row_dsc) {
       lv_obj_set_grid_cell(live.lvobj(), LV_GRID_ALIGN_START, col_pos, col_span,
                            LV_GRID_ALIGN_CENTER, row_pos, row_span);
@@ -96,7 +92,7 @@ FormLine::FormLine(Window* parent, FlexGridLayout& layout) :
   setWindowFlag(NO_FOCUS);
 
   layout.resetPos();
-  layout.apply(this);
+  layout.apply(*this);
 
   withLive([](lv_obj_t* obj) {
     lv_obj_set_width(obj, lv_pct(100));
@@ -107,7 +103,7 @@ FormLine::FormLine(Window* parent, FlexGridLayout& layout) :
 bool FormLine::addChild(Window* window)
 {
   if (!Window::addChild(window)) return false;
-  layout.add(window);
+  layout.add(*window);
   layout.nextCell();
   return true;
 }

@@ -30,11 +30,10 @@
 
 //-----------------------------------------------------------------------------
 
-CurveRenderer::CurveRenderer(Window* parent, const rect_t& rect,
+CurveRenderer::CurveRenderer(Window& parent, const rect_t& rect,
                              std::function<int(int)> function)
 {
-  if (!parent) return;
-  parent->withLive(
+  parent.withLive(
       [&](Window::LiveWindow& live) { init(live, rect, std::move(function)); });
 }
 

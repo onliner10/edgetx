@@ -360,13 +360,11 @@ bool luaLvglWidgetMissingWindowHandleNoOpsForTest()
 
 lv_obj_t* LvglWidgetObjectBase::currentParentLvObj() const
 {
-  if (!lvglManager) return nullptr;
-
-  auto parent = lvglManager->getCurrentParent();
-  if (!parent) return nullptr;
-
   lv_obj_t* obj = nullptr;
-  parent->withLive([&](Window::LiveWindow& live) { obj = live.lvobj(); });
+  auto parent = lvglManager ? lvglManager->getCurrentParent() : nullptr;
+  if (parent) {
+    parent->withLive([&](Window::LiveWindow& live) { obj = live.lvobj(); });
+  }
   return obj;
 }
 

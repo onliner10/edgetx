@@ -32,7 +32,7 @@ class CurveRenderer
 {
  public:
   CurveRenderer() = default;
-  CurveRenderer(Window* parent, const rect_t& rect,
+  CurveRenderer(Window& parent, const rect_t& rect,
                 std::function<int(int)> function);
   ~CurveRenderer();
 

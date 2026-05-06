@@ -223,7 +223,7 @@ void handleUsbConnection()
         MainWindow::instance()->blockUntilClose(true, []() {
           return SD_CARD_PRESENT();
         }, true);
-        w->deleteLater();
+        w.with([](Window& window) { window.deleteLater(); });
       }
       edgeTxResume();
 #else
