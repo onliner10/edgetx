@@ -30,6 +30,7 @@
 #include "etx_lv_theme.h"
 #include "messaging.h"
 
+class Window;
 class FlexGridLayout;
 class FormLine;
 class MainWindow;
@@ -90,6 +91,52 @@ class OptionalLvObj : public LvObjHandle
 {
  public:
   using LvObjHandle::reset;
+};
+
+//-----------------------------------------------------------------------------
+
+template <typename T>
+class WindowHandle
+{
+ public:
+  bool isPresent() const { return window_ != nullptr; }
+  bool isPresentForTest() const { return isPresent(); }
+  T* getForTest() const { return window_; }
+
+  template <typename Fn>
+  bool with(Fn&& fn) const
+  {
+    if (!window_) return false;
+    using Result = std::invoke_result_t<Fn, T&>;
+    if constexpr (std::is_void_v<Result>) {
+      fn(*window_);
+      return true;
+    } else {
+      return static_cast<bool>(fn(*window_));
+    }
+  }
+
+ protected:
+  void reset(T* window) { window_ = window; }
+
+ private:
+  T* window_ = nullptr;
+};
+
+template <typename T>
+class RequiredWindow : public WindowHandle<T>
+{
+ private:
+  friend class Window;
+
+  using WindowHandle<T>::reset;
+};
+
+template <typename T>
+class OptionalWindow : public WindowHandle<T>
+{
+ public:
+  using WindowHandle<T>::reset;
 };
 
 //-----------------------------------------------------------------------------
@@ -439,6 +486,30 @@ class Window
     if (target) return true;
     failClosed();
     return false;
+  }
+
+  template <typename T, typename... Args>
+  bool initRequiredWindow(RequiredWindow<T>& target, Args&&... args)
+  {
+    auto window = Window::makeLive<T>(std::forward<Args>(args)...);
+    if (!window) {
+      failClosed();
+      return false;
+    }
+    target.reset(window);
+    return true;
+  }
+
+  template <typename T, typename Init, typename... Args>
+  bool buildRequiredWindow(Init&& init, Args&&... args)
+  {
+    if (!isAvailable()) return false;
+
+    RequiredWindow<T> window;
+    if (!initRequiredWindow(window, std::forward<Args>(args)...)) return false;
+
+    const bool initialized = window.with(std::forward<Init>(init));
+    return initialized && isAvailable();
   }
 
   void eventHandler(lv_event_t* e);

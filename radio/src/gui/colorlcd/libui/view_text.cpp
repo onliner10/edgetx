@@ -435,18 +435,22 @@ class ViewChecklistWindow : public Page, public TextViewer
         }
       }
 
-      auto box =
-          new (std::nothrow) Window(window, rect_t{0, 0, lv_pct(100), LV_SIZE_CONTENT});
-      if (!box) return;
-      box->padAll(PAD_LARGE);
+      buildRequiredWindow<Window>(
+          [&](Window& box) {
+            box.padAll(PAD_LARGE);
 
-      closeButton = new (std::nothrow) TextButton(box, rect_t{}, STR_EXIT, [=]() -> int8_t {
-        this->onCancel();
-        return 0;
-      });
-      if (closeButton) closeButton->setWidth(lv_pct(100));
-
-      updateCheckboxes();
+            buildRequiredWindow<TextButton>(
+                [&](TextButton& button) {
+                  closeButton = &button;
+                  closeButton->setWidth(lv_pct(100));
+                  updateCheckboxes();
+                },
+                &box, rect_t{}, STR_EXIT, [=]() -> int8_t {
+                  this->onCancel();
+                  return 0;
+                });
+          },
+          window, rect_t{0, 0, lv_pct(100), LV_SIZE_CONTENT});
     }
   }
 };

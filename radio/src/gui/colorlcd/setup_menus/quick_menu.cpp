@@ -280,32 +280,48 @@ QuickMenu::QuickMenu() :
     },
     window_create);
 
-  auto box = new (std::nothrow) Window(this, {QM_MAIN_X, QM_MAIN_Y, QM_MAIN_W, QM_MAIN_H});
-  if (!box) return;
-
-  mainMenu = new (std::nothrow) QuickMenuGroup(box);
-  if (!mainMenu) return;
+  OptionalWindow<Window> subMenuBox;
 
 #if VERSION_MAJOR > 2
-  box = new (std::nothrow) Window(this, {QM_SUB_X, QM_SUB_Y, QM_SUB_W, QM_SUB_H});
+  subMenuBox.reset(
+      Window::makeLive<Window>(this, rect_t{QM_SUB_X, QM_SUB_Y, QM_SUB_W, QM_SUB_H}));
 
   updateFavorites();
 #endif
 
-  for (int i = 0; qmTopItems[i].icon != EDGETX_ICONS_COUNT; i += 1) {
-    if (qmTopItems[i].pageAction == QM_ACTION) {
-      mainMenu->addButton(qmTopItems[i].icon, STR_VAL(qmTopItems[i].qmTitle),
-                  [=]() { onSelect(true); qmTopItems[i].action(); }, qmTopItems[i].enabled);
+  buildRequiredWindow<Window>(
+      [&](Window& box) {
+        buildRequiredWindow<QuickMenuGroup>(
+            [&](QuickMenuGroup& menu) {
+              mainMenu = &menu;
+
+              for (int i = 0; qmTopItems[i].icon != EDGETX_ICONS_COUNT;
+                   i += 1) {
+                if (qmTopItems[i].pageAction == QM_ACTION) {
+                  mainMenu->addButton(
+                      qmTopItems[i].icon, STR_VAL(qmTopItems[i].qmTitle),
+                      [=]() {
+                        onSelect(true);
+                        qmTopItems[i].action();
+                      },
+                      qmTopItems[i].enabled);
 #if VERSION_MAJOR > 2
-    } else {
-      if (!box) continue;
-      auto sub = new (std::nothrow) QuickSubMenu(box, this, &qmTopItems[i]);
-      if (!sub) continue;
-      sub->addButton();
-      subMenus.emplace_back(sub);
+                } else {
+                  subMenuBox.with([&](Window& subBox) {
+                    auto sub =
+                        new (std::nothrow) QuickSubMenu(&subBox, this,
+                                                        &qmTopItems[i]);
+                    if (!sub) return;
+                    sub->addButton();
+                    subMenus.emplace_back(sub);
+                  });
 #endif
-    }
-  }
+                }
+              }
+            },
+            &box);
+      },
+      this, rect_t{QM_MAIN_X, QM_MAIN_Y, QM_MAIN_W, QM_MAIN_H});
 }
 
 void QuickMenu::onDelete()

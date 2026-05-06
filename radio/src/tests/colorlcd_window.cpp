@@ -36,6 +36,7 @@ bool windowObjectAllocationFailureLeavesNoLvObjForTest();
 bool formFieldObjectAllocationFailureFailsClosedForTest();
 bool childOfUnavailableParentFailsClosedForTest();
 bool adoptLiveFailedChildDetachesFromParentForTest();
+bool requiredWindowBuilderFailureFailsOwnerClosedForTest();
 bool attachToUnavailableParentPreservesExistingParentForTest();
 bool unavailableWindowDirectClickDoesNotBubbleForTest();
 bool windowDelayedLoadGatesLoadedTasksForTest();
@@ -159,6 +160,22 @@ TEST(ColorWindow, AdoptLiveFailedChildDetachesFromParent)
   if (pid == 0) {
     alarm(2);
     _exit(adoptLiveFailedChildDetachesFromParentForTest() ? 0 : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorWindow, RequiredWindowBuilderFailureFailsOwnerClosed)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(requiredWindowBuilderFailureFailsOwnerClosedForTest() ? 0 : 1);
   }
 
   int status = 0;

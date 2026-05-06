@@ -385,6 +385,53 @@ bool adoptLiveFailedChildDetachesFromParentForTest()
   return ok;
 }
 
+bool requiredWindowBuilderFailureFailsOwnerClosedForTest()
+{
+  class RequiredOwner : public Window
+  {
+   public:
+    RequiredOwner() : Window(nullptr, {0, 0, 10, 10}) {}
+
+    bool buildChild(Window* parent, int& initCalls)
+    {
+      return buildRequiredWindow<Window>(
+          [&](Window& child) {
+            initCalls += 1;
+            child.padAll(PAD_ZERO);
+          },
+          parent, rect_t{0, 0, 10, 10});
+    }
+  };
+
+  auto successOwner = new (std::nothrow) RequiredOwner();
+  if (!successOwner) return false;
+
+  int successCalls = 0;
+  const bool success =
+      successOwner->buildChild(successOwner, successCalls) &&
+      successCalls == 1 && successOwner->isAvailable();
+  delete successOwner;
+  if (!success) return false;
+
+  auto failedOwner = new (std::nothrow) RequiredOwner();
+  auto unavailableParent = new (std::nothrow) UnavailableParentForTest();
+  if (!failedOwner || !unavailableParent) {
+    delete unavailableParent;
+    delete failedOwner;
+    return false;
+  }
+
+  int failedCalls = 0;
+  const bool failed =
+      !failedOwner->buildChild(unavailableParent, failedCalls) &&
+      failedCalls == 0 && !failedOwner->isAvailable() &&
+      !failedOwner->isVisible() && !failedOwner->automationClickable();
+
+  delete unavailableParent;
+  delete failedOwner;
+  return failed;
+}
+
 bool attachToUnavailableParentPreservesExistingParentForTest()
 {
   auto firstParent = new (std::nothrow) Window(nullptr, {0, 0, 10, 10});

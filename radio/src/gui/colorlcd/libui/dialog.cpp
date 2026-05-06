@@ -184,30 +184,33 @@ ConfirmDialog::ConfirmDialog(const char* title,
         COLOR_THEME_PRIMARY1_INDEX, CENTERED);
   }
 
-  auto box = Window::makeLive<Window>(form, rect_t{});
-  if (!box) {
-    failClosed();
-    return;
-  }
-  box->padAll(PAD_TINY);
-  box->setFlexLayout(LV_FLEX_FLOW_ROW, 40, LV_PCT(100), LV_SIZE_CONTENT);
-  lv_obj_set_flex_align(box->getLvObj(), LV_FLEX_ALIGN_CENTER,
-                        LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_BETWEEN);
+  buildRequiredWindow<Window>(
+      [&](Window& box) {
+        box.padAll(PAD_TINY);
+        box.setFlexLayout(LV_FLEX_FLOW_ROW, 40, LV_PCT(100),
+                          LV_SIZE_CONTENT);
+        box.withLive([](Window::LiveWindow& live) {
+          lv_obj_set_flex_align(live.lvobj(), LV_FLEX_ALIGN_CENTER,
+                                LV_FLEX_ALIGN_CENTER,
+                                LV_FLEX_ALIGN_SPACE_BETWEEN);
+        });
 
-  auto noButton = Window::makeLive<TextButton>(
-      box, rect_t{0, 0, 96, 0}, STR_NO, [=]() -> int8_t {
-        onCancel();
-        return 0;
-      });
+        buildRequiredWindow<TextButton>(
+            [](TextButton&) {}, &box, rect_t{0, 0, 96, 0}, STR_NO,
+            [=]() -> int8_t {
+              onCancel();
+              return 0;
+            });
 
-  auto yesButton = Window::makeLive<TextButton>(
-      box, rect_t{0, 0, 96, 0}, STR_YES, [=]() -> int8_t {
-        this->deleteLater();
-        this->confirmHandler();
-        return 0;
-      });
-
-  if (!noButton || !yesButton) failClosed();
+        buildRequiredWindow<TextButton>(
+            [](TextButton&) {}, &box, rect_t{0, 0, 96, 0}, STR_YES,
+            [=]() -> int8_t {
+              this->deleteLater();
+              this->confirmHandler();
+              return 0;
+            });
+      },
+      form, rect_t{});
 }
 
 void ConfirmDialog::onCancel()
@@ -229,63 +232,68 @@ LabelDialog::LabelDialog(const char *label, int length, const char* title,
   }
   this->label[labelLength] = '\0';
 
-  auto form = Window::makeLive<Window>(this, rect_t{});
-  if (!form) {
-    failClosed();
-    return;
-  }
-  form->padAll(PAD_ZERO);
-  form->setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_ZERO, LCD_W * 0.8,
-                      LV_SIZE_CONTENT);
-  etx_solid_bg(form->getLvObj());
-  lv_obj_center(form->getLvObj());
+  buildRequiredWindow<Window>(
+      [&](Window& form) {
+        form.padAll(PAD_ZERO);
+        form.setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_ZERO, LCD_W * 0.8,
+                           LV_SIZE_CONTENT);
+        form.withLive([](Window::LiveWindow& live) {
+          etx_solid_bg(live.lvobj());
+          lv_obj_center(live.lvobj());
+        });
 
-  auto hdr = Window::makeLive<StaticText>(
-      form, rect_t{0, 0, LV_PCT(100), 0}, title, COLOR_THEME_PRIMARY2_INDEX);
-  if (hdr) {
-    etx_solid_bg(hdr->getLvObj(), COLOR_THEME_SECONDARY1_INDEX);
-    hdr->padAll(PAD_MEDIUM);
-  }
+        auto hdr = Window::makeLive<StaticText>(
+            &form, rect_t{0, 0, LV_PCT(100), 0}, title,
+            COLOR_THEME_PRIMARY2_INDEX);
+        if (hdr) {
+          etx_solid_bg(hdr->getLvObj(), COLOR_THEME_SECONDARY1_INDEX);
+          hdr->padAll(PAD_MEDIUM);
+        }
 
-  auto box = Window::makeLive<Window>(form, rect_t{});
-  if (!box) {
-    failClosed();
-    return;
-  }
-  box->padAll(PAD_MEDIUM);
-  box->setFlexLayout(LV_FLEX_FLOW_ROW, 40, LV_PCT(100), LV_SIZE_CONTENT);
-  lv_obj_set_flex_align(box->getLvObj(), LV_FLEX_ALIGN_CENTER,
-                        LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_BETWEEN);
+        buildRequiredWindow<Window>(
+            [&](Window& box) {
+              box.padAll(PAD_MEDIUM);
+              box.setFlexLayout(LV_FLEX_FLOW_ROW, 40, LV_PCT(100),
+                                LV_SIZE_CONTENT);
+              box.withLive([](Window::LiveWindow& live) {
+                lv_obj_set_flex_align(live.lvobj(), LV_FLEX_ALIGN_CENTER,
+                                      LV_FLEX_ALIGN_CENTER,
+                                      LV_FLEX_ALIGN_SPACE_BETWEEN);
+              });
 
-  auto edit = Window::makeLive<TextEdit>(
-      box, rect_t{0, 0, LV_PCT(100), 0}, this->label, labelLength);
-  if (!edit) {
-    failClosed();
-    return;
-  }
+              buildRequiredWindow<TextEdit>(
+                  [](TextEdit&) {}, &box, rect_t{0, 0, LV_PCT(100), 0},
+                  this->label, labelLength);
+            },
+            &form, rect_t{});
 
-  box = Window::makeLive<Window>(form, rect_t{});
-  if (!box) {
-    failClosed();
-    return;
-  }
-  box->padAll(PAD_MEDIUM);
-  box->setFlexLayout(LV_FLEX_FLOW_ROW, 40, LV_PCT(100), LV_SIZE_CONTENT);
-  lv_obj_set_flex_align(box->getLvObj(), LV_FLEX_ALIGN_CENTER,
-                        LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_BETWEEN);
+        buildRequiredWindow<Window>(
+            [&](Window& box) {
+              box.padAll(PAD_MEDIUM);
+              box.setFlexLayout(LV_FLEX_FLOW_ROW, 40, LV_PCT(100),
+                                LV_SIZE_CONTENT);
+              box.withLive([](Window::LiveWindow& live) {
+                lv_obj_set_flex_align(live.lvobj(), LV_FLEX_ALIGN_CENTER,
+                                      LV_FLEX_ALIGN_CENTER,
+                                      LV_FLEX_ALIGN_SPACE_BETWEEN);
+              });
 
-  auto cancelButton = Window::makeLive<TextButton>(
-      box, rect_t{0, 0, 96, 0}, STR_CANCEL, [=]() {
-        deleteLater();
-        return 0;
-      });
+              buildRequiredWindow<TextButton>(
+                  [](TextButton&) {}, &box, rect_t{0, 0, 96, 0}, STR_CANCEL,
+                  [=]() {
+                    deleteLater();
+                    return 0;
+                  });
 
-  auto saveButton = Window::makeLive<TextButton>(
-      box, rect_t{0, 0, 96, 0}, STR_SAVE, [=]() {
-        if (saveHandler != nullptr) saveHandler(this->label);
-        deleteLater();
-        return 0;
-      });
-
-  if (!cancelButton || !saveButton) failClosed();
+              buildRequiredWindow<TextButton>(
+                  [](TextButton&) {}, &box, rect_t{0, 0, 96, 0}, STR_SAVE,
+                  [=]() {
+                    if (saveHandler != nullptr) saveHandler(this->label);
+                    deleteLater();
+                    return 0;
+                  });
+            },
+            &form, rect_t{});
+      },
+      this, rect_t{});
 }

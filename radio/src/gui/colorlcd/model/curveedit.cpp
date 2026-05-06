@@ -302,123 +302,153 @@ void CurveEditWindow::buildBody(Window* window)
   coord_t boxHeight = window->height();
 #endif
 
-  auto box = new (std::nothrow) Window(line, rect_t{});
-  if (!box) return;
-  box->setWidth(boxWidth);
-  box->setHeight(boxHeight);
-  box->padAll(PAD_ZERO);
-
   static const lv_coord_t controls_col_dsc[] = {
       LV_GRID_FR(5), LV_GRID_FR(8), LV_GRID_FR(5), LV_GRID_TEMPLATE_LAST};
 
-  auto form = new (std::nothrow) Window(box, rect_t{});
-  if (!form) return;
-  form->padAll(PAD_ZERO);
-  form->setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_ZERO);
+  buildRequiredWindow<Window>(
+      [&](Window& box) {
+        box.setWidth(boxWidth);
+        box.setHeight(boxHeight);
+        box.padAll(PAD_ZERO);
 
-  FlexGridLayout iGrid(controls_col_dsc, default_row_dsc, PAD_ZERO);
+        buildRequiredWindow<Window>(
+            [&](Window& form) {
+              form.padAll(PAD_ZERO);
+              form.setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_ZERO);
 
-  auto iLine = form->newLine(iGrid);
-  iLine->padAll(PAD_TINY);
-  lv_obj_set_grid_align(iLine->getLvObj(), LV_GRID_ALIGN_SPACE_BETWEEN,
-                        LV_GRID_ALIGN_SPACE_BETWEEN);
+              FlexGridLayout iGrid(controls_col_dsc, default_row_dsc,
+                                   PAD_ZERO);
 
-  // Name
-  new (std::nothrow) StaticText(iLine, rect_t{}, STR_NAME);
-  new (std::nothrow) ModelTextEdit(iLine, rect_t{}, curve.name, sizeof(curve.name));
+              auto iLine = form.newLine(iGrid);
+              iLine->padAll(PAD_TINY);
+              lv_obj_set_grid_align(iLine->getLvObj(),
+                                    LV_GRID_ALIGN_SPACE_BETWEEN,
+                                    LV_GRID_ALIGN_SPACE_BETWEEN);
 
-  // Smooth
-  auto smooth =
-      new (std::nothrow) TextButton(iLine, rect_t{0, 0, EdgeTxStyles::EDIT_FLD_WIDTH_NARROW, 0}, STR_SMOOTH, [=]() {
-        g_model.curves[index].smooth = !g_model.curves[index].smooth;
-        Messaging::send(Messaging::CURVE_EDIT);
-        SET_DIRTY();
-        return g_model.curves[index].smooth;
-      });
-  if (smooth) smooth->check(g_model.curves[index].smooth);
+              // Name
+              new (std::nothrow) StaticText(iLine, rect_t{}, STR_NAME);
+              new (std::nothrow)
+                  ModelTextEdit(iLine, rect_t{}, curve.name,
+                                sizeof(curve.name));
 
-  iLine = form->newLine(iGrid);
-  iLine->padAll(PAD_TINY);
-  lv_obj_set_grid_align(iLine->getLvObj(), LV_GRID_ALIGN_SPACE_BETWEEN,
-                        LV_GRID_ALIGN_SPACE_BETWEEN);
+              // Smooth
+              auto smooth = new (std::nothrow) TextButton(
+                  iLine,
+                  rect_t{0, 0, EdgeTxStyles::EDIT_FLD_WIDTH_NARROW, 0},
+                  STR_SMOOTH, [=]() {
+                    g_model.curves[index].smooth =
+                        !g_model.curves[index].smooth;
+                    Messaging::send(Messaging::CURVE_EDIT);
+                    SET_DIRTY();
+                    return g_model.curves[index].smooth;
+                  });
+              if (smooth) smooth->check(g_model.curves[index].smooth);
 
-  // Type
-  new (std::nothrow) StaticText(iLine, rect_t{}, STR_TYPE);
-  new (std::nothrow) Choice(
-      iLine, {0, 0, EdgeTxStyles::EDIT_FLD_WIDTH, 0}, STR_CURVE_TYPES, 0, 1,
-      GET_DEFAULT(g_model.curves[index].type), [=](int32_t newValue) {
-        CurveHeader& curve = g_model.curves[index];
-        if (newValue != curve.type) {
-          for (int i = 1; i < 4 + curve.points; i++) {
-            points[i] = calcRESXto100(applyCustomCurve(
-                calc100toRESX(-100 + i * 200 / (4 + curve.points)), index));
-          }
-          if (moveCurve(index, newValue == CURVE_TYPE_CUSTOM
-                                   ? 3 + curve.points
-                                   : -3 - curve.points)) {
-            if (newValue == CURVE_TYPE_CUSTOM) {
-              resetCustomCurveX(points, 5 + curve.points);
-            }
-            curve.type = newValue;
-          }
-          SET_DIRTY();
-          Messaging::send(Messaging::CURVE_EDIT);
-          if (curveDataEdit) {
-            curveDataEdit->update();
-          }
-        }
-      });
+              iLine = form.newLine(iGrid);
+              iLine->padAll(PAD_TINY);
+              lv_obj_set_grid_align(iLine->getLvObj(),
+                                    LV_GRID_ALIGN_SPACE_BETWEEN,
+                                    LV_GRID_ALIGN_SPACE_BETWEEN);
 
-  // Points count
-  auto edit = new (std::nothrow) Choice(
-      iLine, {0, 0, EdgeTxStyles::EDIT_FLD_WIDTH_NARROW, 0}, 2, 17,
-      GET_DEFAULT(g_model.curves[index].points + 5), [=](int32_t newValue) {
-        newValue -= 5;
-        CurveHeader& curve = g_model.curves[index];
-        int newPoints[MAX_POINTS_PER_CURVE];
-        newPoints[0] = points[0];
-        newPoints[4 + newValue] = points[4 + curve.points];
-        for (int i = 1; i < 4 + newValue; i++)
-          newPoints[i] = calcRESXto100(
-              applyCustomCurve(-RESX + (i * 2 * RESX) / (4 + newValue), index));
-        if (moveCurve(index, (newValue - curve.points) *
-                                 (curve.type == CURVE_TYPE_CUSTOM ? 2 : 1))) {
-          for (int i = 0; i < 5 + newValue; i++) {
-            points[i] = newPoints[i];
-            if (curve.type == CURVE_TYPE_CUSTOM && i != 0 && i != 4 + newValue)
-              points[5 + newValue + i - 1] = -100 + (i * 200) / (4 + newValue);
-          }
-          curve.points = newValue;
-          SET_DIRTY();
-          Messaging::send(Messaging::CURVE_EDIT);
-          if (curveDataEdit) {
-            curveDataEdit->update();
-          }
-        }
-      });
-  if (edit) {
-    edit->setTextHandler([=](int value) {
-      return std::to_string(value) + STR_PTS;
-    });
-  }
+              // Type
+              new (std::nothrow) StaticText(iLine, rect_t{}, STR_TYPE);
+              new (std::nothrow) Choice(
+                  iLine, {0, 0, EdgeTxStyles::EDIT_FLD_WIDTH, 0},
+                  STR_CURVE_TYPES, 0, 1,
+                  GET_DEFAULT(g_model.curves[index].type),
+                  [=](int32_t newValue) {
+                    CurveHeader& curve = g_model.curves[index];
+                    if (newValue != curve.type) {
+                      for (int i = 1; i < 4 + curve.points; i++) {
+                        points[i] = calcRESXto100(applyCustomCurve(
+                            calc100toRESX(-100 + i * 200 /
+                                                      (4 + curve.points)),
+                            index));
+                      }
+                      if (moveCurve(index, newValue == CURVE_TYPE_CUSTOM
+                                               ? 3 + curve.points
+                                               : -3 - curve.points)) {
+                        if (newValue == CURVE_TYPE_CUSTOM) {
+                          resetCustomCurveX(points, 5 + curve.points);
+                        }
+                        curve.type = newValue;
+                      }
+                      SET_DIRTY();
+                      Messaging::send(Messaging::CURVE_EDIT);
+                      if (curveDataEdit) {
+                        curveDataEdit->update();
+                      }
+                    }
+                  });
 
-  iLine = form->newLine(iGrid);
-  iLine->padAll(PAD_ZERO);
-  lv_obj_set_grid_align(iLine->getLvObj(), LV_GRID_ALIGN_SPACE_BETWEEN,
-                        LV_GRID_ALIGN_SPACE_BETWEEN);
+              // Points count
+              auto edit = new (std::nothrow) Choice(
+                  iLine, {0, 0, EdgeTxStyles::EDIT_FLD_WIDTH_NARROW, 0}, 2,
+                  17, GET_DEFAULT(g_model.curves[index].points + 5),
+                  [=](int32_t newValue) {
+                    newValue -= 5;
+                    CurveHeader& curve = g_model.curves[index];
+                    int newPoints[MAX_POINTS_PER_CURVE];
+                    newPoints[0] = points[0];
+                    newPoints[4 + newValue] = points[4 + curve.points];
+                    for (int i = 1; i < 4 + newValue; i++)
+                      newPoints[i] = calcRESXto100(applyCustomCurve(
+                          -RESX + (i * 2 * RESX) / (4 + newValue), index));
+                    if (moveCurve(index, (newValue - curve.points) *
+                                             (curve.type == CURVE_TYPE_CUSTOM
+                                                  ? 2
+                                                  : 1))) {
+                      for (int i = 0; i < 5 + newValue; i++) {
+                        points[i] = newPoints[i];
+                        if (curve.type == CURVE_TYPE_CUSTOM && i != 0 &&
+                            i != 4 + newValue)
+                          points[5 + newValue + i - 1] =
+                              -100 + (i * 200) / (4 + newValue);
+                      }
+                      curve.points = newValue;
+                      SET_DIRTY();
+                      Messaging::send(Messaging::CURVE_EDIT);
+                      if (curveDataEdit) {
+                        curveDataEdit->update();
+                      }
+                    }
+                  });
+              if (edit) {
+                edit->setTextHandler(
+                    [=](int value) { return std::to_string(value) + STR_PTS; });
+              }
 
-  curveDataEdit = new (std::nothrow) CurveDataEdit(
-      iLine,
-      rect_t{
-          0, 0, box->width(),
-          box->height() - (EdgeTxStyles::UI_ELEMENT_HEIGHT + PAD_TINY * 2) * 2},
-      index);
-  curveDataEdit->update();
+              iLine = form.newLine(iGrid);
+              iLine->padAll(PAD_ZERO);
+              lv_obj_set_grid_align(iLine->getLvObj(),
+                                    LV_GRID_ALIGN_SPACE_BETWEEN,
+                                    LV_GRID_ALIGN_SPACE_BETWEEN);
 
-  // Curve editor
-  lv_obj_set_flex_align(line->getLvObj(), LV_FLEX_ALIGN_CENTER,
-                        LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_AROUND);
-  new CurveEdit(line, {0, 0, CurveDataEdit::CURVE_WIDTH, CurveDataEdit::CURVE_WIDTH}, index, source);
+              buildRequiredWindow<CurveDataEdit>(
+                  [&](CurveDataEdit& edit) {
+                    curveDataEdit = &edit;
+                    curveDataEdit->update();
+                  },
+                  iLine,
+                  rect_t{0, 0, box.width(),
+                         box.height() -
+                             (EdgeTxStyles::UI_ELEMENT_HEIGHT +
+                              PAD_TINY * 2) *
+                                 2},
+                  index);
+
+              // Curve editor
+              lv_obj_set_flex_align(line->getLvObj(), LV_FLEX_ALIGN_CENTER,
+                                    LV_FLEX_ALIGN_CENTER,
+                                    LV_FLEX_ALIGN_SPACE_AROUND);
+              new CurveEdit(line,
+                            {0, 0, CurveDataEdit::CURVE_WIDTH,
+                             CurveDataEdit::CURVE_WIDTH},
+                            index, source);
+            },
+            &box, rect_t{});
+      },
+      line, rect_t{});
 }
 
 void CurveEditWindow::onCancel()
