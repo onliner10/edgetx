@@ -79,7 +79,8 @@ Page::Page(EdgeTxIcon icon, PaddingSize padding, bool pauseRefresh) :
   if (pauseRefresh)
     lv_obj_enable_style_refresh(false);
 
-  header = new (std::nothrow) PageHeader(this, icon);
+  initRequiredWindow(headerHandle, this, icon);
+  withPageHeader([&](PageHeader& pageHeader) { header = &pageHeader; });
 
 #if VERSION_MAJOR > 2
   if (header) new (std::nothrow) HeaderBackIcon(header);
@@ -96,13 +97,15 @@ Page::Page(EdgeTxIcon icon, PaddingSize padding, bool pauseRefresh) :
 #endif
 #endif
 
-  body = new (std::nothrow) Window(this,
-                                   {0, EdgeTxStyles::MENU_HEADER_HEIGHT, LCD_W, LCD_H - EdgeTxStyles::MENU_HEADER_HEIGHT});
-  if (!body) {
+  if (!initRequiredWindow(
+          bodyHandle, this,
+          rect_t{0, EdgeTxStyles::MENU_HEADER_HEIGHT, LCD_W,
+                 LCD_H - EdgeTxStyles::MENU_HEADER_HEIGHT})) {
     if (pauseRefresh)
       lv_obj_enable_style_refresh(true);
     return;
   }
+  withPageBody([&](Window& pageBody) { body = &pageBody; });
   body->setWindowFlag(NO_FOCUS);
 
   etx_solid_bg(lvobj);
@@ -206,37 +209,41 @@ void Page::onLongPressRTN() { onCancel(); }
 SubPage::SubPage(EdgeTxIcon icon, const char* title, const char* subtitle, bool pauseRefresh) :
   Page(icon, PAD_SMALL, pauseRefresh)
 {
-  if (!body || !header) return;
-  body->padBottom(PAD_LARGE * 2);
+  withPageFrame([&](PageHeader& header, Window& body) {
+    body.padBottom(PAD_LARGE * 2);
 
-  header->setTitle(title);
-  header->setTitle2(subtitle);
+    header.setTitle(title);
+    header.setTitle2(subtitle);
+  });
 }
 
 SubPage::SubPage(EdgeTxIcon icon, const char* title, const char* subtitle, const SetupLineDef* setupLines) :
   Page(icon, PAD_SMALL, true)
 {
-  if (!body || !header) return;
-  body->padBottom(PAD_LARGE * 2);
+  withPageFrame([&](PageHeader& header, Window& body) {
+    body.padBottom(PAD_LARGE * 2);
 
-  header->setTitle(title);
-  header->setTitle2(subtitle);
+    header.setTitle(title);
+    header.setTitle2(subtitle);
 
-  SetupLine::showLines(body, y, EDT_X, PAD_SMALL, setupLines);
+    SetupLine::showLines(&body, y, EDT_X, PAD_SMALL, setupLines);
+  });
 
   enableRefresh();
 }
 
 Window* SubPage::setupLine(const char* title, std::function<void(SetupLine*, coord_t, coord_t)> createEdit, coord_t lblYOffset)
 {
-  if (!body) return nullptr;
-  auto w = new (std::nothrow) SetupLine(body, y, EDT_X, PAD_SMALL, title, createEdit, lblYOffset);
-  if (!w) return nullptr;
-  y += w->height();
+  Window* w = nullptr;
+  withPageBody([&](Window& body) {
+    w = Window::makeLive<SetupLine>(&body, y, EDT_X, PAD_SMALL, title,
+                                    createEdit, lblYOffset);
+    if (w) y += w->height();
+  });
   return w;
 }
 
 void SubPage::useFlexLayout()
 {
-  if (body) body->setFlexLayout();
+  withPageBody([](Window& body) { body.setFlexLayout(); });
 }

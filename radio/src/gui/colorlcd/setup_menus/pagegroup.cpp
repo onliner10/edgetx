@@ -295,11 +295,14 @@ PageGroupBase::PageGroupBase(coord_t bodyY, EdgeTxIcon icon) :
 
   pushLayer(true);
 
-  body = new (std::nothrow) Window(this, {0, bodyY, LCD_W, LCD_H - bodyY});
-  if (!body) return;
-  body->setWindowFlag(NO_FOCUS);
-  lv_obj_set_style_max_height(body->getLvObj(), LCD_H - bodyY, LV_PART_MAIN);
-  etx_scrollbar(body->getLvObj());
+  initRequiredWindow(body, this, rect_t{0, bodyY, LCD_W, LCD_H - bodyY});
+  body.with([&](Window& body) {
+    body.setWindowFlag(NO_FOCUS);
+    body.withLive([&](Window::LiveWindow& live) {
+      lv_obj_set_style_max_height(live.lvobj(), LCD_H - bodyY, LV_PART_MAIN);
+      etx_scrollbar(live.lvobj());
+    });
+  });
 
 #if defined(DEBUG)
   lv_obj_add_event_cb(lvobj, on_draw_begin, LV_EVENT_COVER_CHECK, nullptr);
@@ -330,14 +333,14 @@ void PageGroupBase::onCancel()
 
 uint8_t PageGroupBase::tabCount() const
 {
-  if (!header) return 0;
-  return header->tabCount();
+  return header.valueOr<uint8_t>(0, [](PageGroupHeaderBase& header) {
+    return header.tabCount();
+  });
 }
 
 void PageGroupBase::addTab(PageGroupItem* page)
 {
-  if (!header) return;
-  header->addTab(page);
+  header.with([&](PageGroupHeaderBase& header) { header.addTab(page); });
   if (!currentTab) {
     setCurrentTab(0);
   }
@@ -346,53 +349,60 @@ void PageGroupBase::addTab(PageGroupItem* page)
 void PageGroupBase::setCurrentTab(unsigned index)
 {
   withLive([&](LiveWindow&) {
-    if (!header || !body) return;
+    header.with([&](PageGroupHeaderBase& header) {
+      body.with([&](Window& body) {
+        header.setCurrentIndex(index);
 
-    header->setCurrentIndex(index);
+        PageGroupItem* tab = header.pageTab(index);
+        if (!tab) return;
 
-    PageGroupItem* tab = header->pageTab(index);
-    if (!tab) return;
-
-    if (tab != currentTab) {
-      header->setTitle(tab->getTitle().c_str());
+        if (tab != currentTab) {
+          header.setTitle(tab->getTitle().c_str());
 #if VERSION_MAJOR > 2
-      header->setIcon(tab->getIcon());
+          header.setIcon(tab->getIcon());
 #endif
 
-      if (isPageGroup())
-        QuickMenu::setCurrentPage(tab->pageId(), icon);
+          if (isPageGroup())
+            QuickMenu::setCurrentPage(tab->pageId(), icon);
 
-      lv_obj_enable_style_refresh(false);
+          lv_obj_enable_style_refresh(false);
 
-      body->clear();
-      if (currentTab)
-        currentTab->cleanup();
-      currentTab = tab;
+          body.clear();
+          if (currentTab)
+            currentTab->cleanup();
+          currentTab = tab;
 
 #if defined(DEBUG)
-      start_ms = time_get_ms();
-      timepg = true;
+          start_ms = time_get_ms();
+          timepg = true;
 #endif
 
-      static lv_style_prop_t remStyles[] = {
-          LV_STYLE_FLEX_FLOW,  LV_STYLE_LAYOUT,    LV_STYLE_PAD_ROW,
-          LV_STYLE_PAD_COLUMN, LV_STYLE_PAD_LEFT,  LV_STYLE_PAD_RIGHT,
-          LV_STYLE_PAD_TOP,    LV_STYLE_PAD_BOTTOM};
-      for (uint8_t i = 0; i < DIM(remStyles); i += 1)
-        lv_obj_remove_local_style_prop(body->getLvObj(), remStyles[i],
-                                       LV_PART_MAIN);
+          static lv_style_prop_t remStyles[] = {
+              LV_STYLE_FLEX_FLOW,  LV_STYLE_LAYOUT,    LV_STYLE_PAD_ROW,
+              LV_STYLE_PAD_COLUMN, LV_STYLE_PAD_LEFT,  LV_STYLE_PAD_RIGHT,
+              LV_STYLE_PAD_TOP,    LV_STYLE_PAD_BOTTOM};
+          body.withLive([&](Window::LiveWindow& liveBody) {
+            for (uint8_t i = 0; i < DIM(remStyles); i += 1)
+              lv_obj_remove_local_style_prop(liveBody.lvobj(), remStyles[i],
+                                             LV_PART_MAIN);
+          });
 
-      body->padAll(tab->getPadding());
+          body.padAll(tab->getPadding());
 
-      tab->build(body);
+          tab->build(&body);
 
-      lv_obj_enable_style_refresh(true);
-      lv_obj_refresh_style(body->getLvObj(), LV_PART_ANY, LV_STYLE_PROP_ANY);
+          lv_obj_enable_style_refresh(true);
+          body.withLive([](Window::LiveWindow& liveBody) {
+            lv_obj_refresh_style(liveBody.lvobj(), LV_PART_ANY,
+                                 LV_STYLE_PROP_ANY);
+          });
 
 #if defined(DEBUG)
-      end_ms = time_get_ms();
+          end_ms = time_get_ms();
 #endif
-    }
+        }
+      });
+    });
   });
 }
 
@@ -421,29 +431,50 @@ void PageGroupBase::onLongPressMDL() { doKeyShortcut(EVT_KEY_LONG(KEY_MODEL)); }
 void PageGroupBase::onPressTELE() { doKeyShortcut(EVT_KEY_BREAK(KEY_TELE)); }
 void PageGroupBase::onLongPressTELE() { doKeyShortcut(EVT_KEY_LONG(KEY_TELE)); }
 
-void PageGroupBase::onPressPGUP() { if (header) header->prevTab(); }
-void PageGroupBase::onPressPGDN() { if (header) header->nextTab(); }
-void PageGroupBase::onLongPressPGUP() { if (header) header->prevTab(); }
-void PageGroupBase::onLongPressPGDN() { if (header) header->nextTab(); }
+void PageGroupBase::onPressPGUP()
+{
+  header.with([](PageGroupHeaderBase& header) { header.prevTab(); });
+}
+void PageGroupBase::onPressPGDN()
+{
+  header.with([](PageGroupHeaderBase& header) { header.nextTab(); });
+}
+void PageGroupBase::onLongPressPGUP()
+{
+  header.with([](PageGroupHeaderBase& header) { header.prevTab(); });
+}
+void PageGroupBase::onLongPressPGDN()
+{
+  header.with([](PageGroupHeaderBase& header) { header.nextTab(); });
+}
 void PageGroupBase::onLongPressRTN() { onCancel(); }
 #endif
 
 bool PageGroupBase::hasSubMenu(QMPage qmPage)
 {
-  if (!header) return false;
-  return header->hasSubMenu(qmPage);
+  return header.valueOr(false, [&](PageGroupHeaderBase& header) {
+    return header.hasSubMenu(qmPage);
+  });
 }
 
 coord_t PageGroupBase::getScrollY()
 {
-  if (!body) return 0;
-  return lv_obj_get_scroll_y(body->getLvObj());
+  return body.valueOr<coord_t>(0, [](Window& body) {
+    coord_t scrollY = 0;
+    body.withLive([&](Window::LiveWindow& live) {
+      scrollY = lv_obj_get_scroll_y(live.lvobj());
+    });
+    return scrollY;
+  });
 }
 
 void PageGroupBase::setScrollY(coord_t y)
 {
-  if (!body) return;
-  lv_obj_scroll_to_y(body->getLvObj(), y, LV_ANIM_OFF);
+  body.with([&](Window& body) {
+    body.withLive([&](Window::LiveWindow& live) {
+      lv_obj_scroll_to_y(live.lvobj(), y, LV_ANIM_OFF);
+    });
+  });
 }
 
 //-----------------------------------------------------------------------------
@@ -451,8 +482,8 @@ void PageGroupBase::setScrollY(coord_t y)
 PageGroup::PageGroup(EdgeTxIcon icon, const char* title, const PageDef* pages) :
     PageGroupBase(PAGE_GROUP_BODY_Y, icon)
 {
-  header = new (std::nothrow) PageGroupHeader(this, icon, title);
-  if (!header) return;
+  initRequiredWindowAs<PageGroupHeaderBase, PageGroupHeader>(header, this, icon,
+                                                            title);
 
   for (int i = 0; pages[i].icon < EDGETX_ICONS_COUNT; i += 1) {
     if (pages[i].create)
@@ -542,8 +573,8 @@ class TabsGroupHeader : public PageGroupHeaderBase
 TabsGroup::TabsGroup(EdgeTxIcon icon, const char* parentLabel) :
     PageGroupBase(TABS_GROUP_BODY_Y, icon)
 {
-  header = new (std::nothrow) TabsGroupHeader(this, icon, parentLabel);
-  if (!header) return;
+  initRequiredWindowAs<PageGroupHeaderBase, TabsGroupHeader>(
+      header, this, icon, parentLabel);
 
 #if defined(HARDWARE_TOUCH)
 #if VERSION_MAJOR == 2
@@ -559,5 +590,7 @@ TabsGroup::TabsGroup(EdgeTxIcon icon, const char* parentLabel) :
 
 void TabsGroup::hidePageButtons()
 {
-  ((TabsGroupHeader*)header)->hidePageButtons();
+  header.with([](PageGroupHeaderBase& header) {
+    static_cast<TabsGroupHeader&>(header).hidePageButtons();
+  });
 }

@@ -104,6 +104,8 @@ INVARIANT_BOUNDARY_CALLS = (
     "fromAvailableLvObj",
     "initRequiredLvObj",
     "initRequiredWindow",
+    "initRequiredWindowAs",
+    "buildRequiredWindow",
     "markLoaded",
     "requireLvObj",
     "runWhenLoaded",

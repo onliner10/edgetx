@@ -116,6 +116,13 @@ class WindowHandle
     }
   }
 
+  template <typename Value, typename Fn>
+  Value valueOr(Value missing, Fn&& fn) const
+  {
+    if (!window_) return missing;
+    return fn(*window_);
+  }
+
  protected:
   void reset(T* window) { window_ = window; }
 
@@ -492,6 +499,20 @@ class Window
   bool initRequiredWindow(RequiredWindow<T>& target, Args&&... args)
   {
     auto window = Window::makeLive<T>(std::forward<Args>(args)...);
+    if (!window) {
+      failClosed();
+      return false;
+    }
+    target.reset(window);
+    return true;
+  }
+
+  template <typename Stored, typename Actual, typename... Args>
+  bool initRequiredWindowAs(RequiredWindow<Stored>& target, Args&&... args)
+  {
+    static_assert(std::is_base_of_v<Stored, Actual>,
+                  "Actual window must derive from stored window type");
+    auto window = Window::makeLive<Actual>(std::forward<Args>(args)...);
     if (!window) {
       failClosed();
       return false;

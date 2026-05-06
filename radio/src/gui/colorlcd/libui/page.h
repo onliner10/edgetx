@@ -59,7 +59,9 @@ class Page : public NavWindow
 
   void enableRefresh();
 
- protected:
+protected:
+  RequiredWindow<PageHeader> headerHandle;
+  RequiredWindow<Window> bodyHandle;
   PageHeader* header = nullptr;
   Window* body = nullptr;
   Messaging quickMenuMsg;
@@ -67,6 +69,27 @@ class Page : public NavWindow
   bool bubbleEvents() override { return false; }
 
   NavWindow* navWindow();
+
+  template <typename Fn>
+  bool withPageHeader(Fn&& fn)
+  {
+    return headerHandle.with(std::forward<Fn>(fn));
+  }
+
+  template <typename Fn>
+  bool withPageBody(Fn&& fn)
+  {
+    return bodyHandle.with(std::forward<Fn>(fn));
+  }
+
+  template <typename Fn>
+  bool withPageFrame(Fn&& fn)
+  {
+    return headerHandle.with([&](PageHeader& header) {
+      return bodyHandle.with(
+          [&](Window& body) { return fn(header, body); });
+    });
+  }
 
 #if defined(HARDWARE_KEYS)
   void onPressSYS() override;

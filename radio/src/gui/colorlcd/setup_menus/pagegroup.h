@@ -118,7 +118,10 @@ class PageGroupHeaderBase : public Window
 
   bool hasSubMenu(QMPage n);
 
-  PageGroupItem* pageTab(uint8_t idx) const { return pages[idx]; }
+  PageGroupItem* pageTab(uint8_t idx) const
+  {
+    return idx < pages.size() ? pages[idx] : nullptr;
+  }
   bool isCurrent(uint8_t idx) const { return currentIndex == idx; }
   uint8_t tabCount() const { return pages.size(); }
 
@@ -170,8 +173,8 @@ class PageGroupBase : public NavWindow
   EdgeTxIcon getIcon() const { return icon; }
 
  protected:
-  PageGroupHeaderBase* header = nullptr;
-  Window* body = nullptr;
+  RequiredWindow<PageGroupHeaderBase> header;
+  RequiredWindow<Window> body;
   PageGroupItem* currentTab = nullptr;
   EdgeTxIcon icon;
   Messaging quickMenuMsg;
