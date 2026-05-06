@@ -1785,8 +1785,8 @@ void LvglWidgetSetting::parseParam(lua_State* L, const char* key)
 
 void LvglWidgetSetting::setTitle(const char* s)
 {
-  if (label && title.changedText(s))
-    lv_label_set_text(label, title.txt.c_str());
+  if (title.changedText(s))
+    label.with([&](lv_obj_t* obj) { lv_label_set_text(obj, title.txt.c_str()); });
 }
 
 bool LvglWidgetSetting::callRefs(lua_State* L)
@@ -1814,11 +1814,12 @@ void LvglWidgetSetting::build(lua_State* L)
                                     rect_t{x, y, w, h}, lv_obj_create);
   window.with([](Window& w) { w.padAll(PAD_OUTLINE); });
   visitWindow([&](lv_obj_t* obj) {
-    label = etx_label_create(obj);
-    if (!label) return;
-    lv_obj_align(label, LV_ALIGN_LEFT_MID, 0, 0);
-    etx_txt_color(label, COLOR_THEME_PRIMARY1_INDEX);
-    lv_label_set_text(label, title.txt.c_str());
+    label.reset(etx_label_create(obj));
+    label.with([&](lv_obj_t* labelObj) {
+      lv_obj_align(labelObj, LV_ALIGN_LEFT_MID, 0, 0);
+      etx_txt_color(labelObj, COLOR_THEME_PRIMARY1_INDEX);
+      lv_label_set_text(labelObj, title.txt.c_str());
+    });
   });
 }
 

@@ -1093,8 +1093,9 @@ class DateTextWidget : public Widget
       Widget(factory, parent, rect, location),
       kind(kind)
   {
-    label = etx_label_create(lvobj, FONT_XS_INDEX);
-    if (label) lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
+    initRequiredLvObj(
+        label, [](lv_obj_t* parent) { return etx_label_create(parent, FONT_XS_INDEX); },
+        [](lv_obj_t* obj) { lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT); });
 
     update();
     foreground();
@@ -1103,24 +1104,22 @@ class DateTextWidget : public Widget
  public:
   void onForeground() override
   {
-    if (!label) return;
-
     struct gtm time;
     gettime(&time);
     if (textValid && !shouldRefresh(time)) return;
 
     char text[16];
     formatText(text, sizeof(text), time);
-    layoutText(text);
-    lv_label_set_text(label, text);
-    lastTime = time;
-    textValid = true;
+    label.with([&](lv_obj_t* obj) {
+      layoutText(obj, text);
+      lv_label_set_text(obj, text);
+      lastTime = time;
+      textValid = true;
+    });
   }
 
   void onUpdate() override
   {
-    if (!label) return;
-
     auto widgetData = getPersistentData();
 
     memcpy(&color, &widgetData->options[0].value.unsignedValue, sizeof(color));
@@ -1166,7 +1165,7 @@ class DateTextWidget : public Widget
 #endif
   }
 
-  void layoutText(const char* text)
+  void layoutText(lv_obj_t* obj, const char* text)
   {
     const bool topbar = isCompactTopBarWidget();
     FontIndex font = topbar ? chipTextFontForBox(text, textBox.w, textBox.h)
@@ -1174,20 +1173,20 @@ class DateTextWidget : public Widget
     coord_t labelH = getFontHeight(LcdFlags(font) << 8u);
     coord_t labelY = textBox.y + (textBox.h - labelH) / 2;
 
-    etx_font(label, font);
+    etx_font(obj, font);
     if (topbar)
-      etx_txt_color(label, statusPrimaryColor(topbar));
+      etx_txt_color(obj, statusPrimaryColor(topbar));
     else
-      etx_txt_color_from_flags(label, color);
+      etx_txt_color_from_flags(obj, color);
     lv_obj_set_style_text_align(
-        label, topbar ? LV_TEXT_ALIGN_CENTER : LV_TEXT_ALIGN_LEFT,
+        obj, topbar ? LV_TEXT_ALIGN_CENTER : LV_TEXT_ALIGN_LEFT,
         LV_PART_MAIN);
-    lv_obj_set_pos(label, textBox.x, labelY);
-    lv_obj_set_size(label, textBox.w, labelH);
+    lv_obj_set_pos(obj, textBox.x, labelY);
+    lv_obj_set_size(obj, textBox.w, labelH);
   }
 
   DateTextKind kind;
-  lv_obj_t* label = nullptr;
+  RequiredLvObj label;
   StatusContentBox textBox = {};
   uint32_t color = COLOR2FLAGS(COLOR_THEME_PRIMARY2_INDEX);
   struct gtm lastTime = {};

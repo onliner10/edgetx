@@ -626,7 +626,7 @@ class LvglWidgetSetting : public LvglWidgetObject, public LvglTitleParam
   void clearRefs(lua_State* L) override;
 
  protected:
-  lv_obj_t* label = nullptr;
+  OptionalLvObj label;
 
   void build(lua_State* L) override;
   void parseParam(lua_State* L, const char* key) override;

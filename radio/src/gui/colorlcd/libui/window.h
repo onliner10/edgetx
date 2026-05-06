@@ -51,11 +51,9 @@ constexpr WindowFlags NO_FORCED_SCROLL = 1u << 4u;
 
 //-----------------------------------------------------------------------------
 
-class RequiredLvObj
+class LvObjHandle
 {
  public:
-  RequiredLvObj() = default;
-
   bool isPresent() const { return obj_ != nullptr; }
   bool isPresentForTest() const { return isPresent(); }
   lv_obj_t* getForTest() const { return obj_; }
@@ -73,12 +71,25 @@ class RequiredLvObj
     }
   }
 
+ protected:
+  void reset(lv_obj_t* obj) { obj_ = obj; }
+
+ private:
+  lv_obj_t* obj_ = nullptr;
+};
+
+class RequiredLvObj : public LvObjHandle
+{
  private:
   friend class Window;
 
-  void reset(lv_obj_t* obj) { obj_ = obj; }
+  using LvObjHandle::reset;
+};
 
-  lv_obj_t* obj_ = nullptr;
+class OptionalLvObj : public LvObjHandle
+{
+ public:
+  using LvObjHandle::reset;
 };
 
 //-----------------------------------------------------------------------------
