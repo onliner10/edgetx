@@ -70,10 +70,9 @@ SetupWidgetsPageSlot::SetupWidgetsPageSlot(Window* parent, const rect_t& rect,
     return 0;
   });
 
-  etx_obj_add_style(lvobj, styles->border, LV_STATE_FOCUSED);
-  etx_obj_add_style(lvobj, styles->border_color[COLOR_THEME_PRIMARY1_INDEX],
-                    LV_STATE_FOCUSED);
-  etx_obj_add_style(lvobj, styles->state_focus_frame, LV_STATE_FOCUSED);
+  addStyle(styles->border, LV_STATE_FOCUSED);
+  addStyle(styles->border_color[COLOR_THEME_PRIMARY1_INDEX], LV_STATE_FOCUSED);
+  addStyle(styles->state_focus_frame, LV_STATE_FOCUSED);
 
   lv_style_init(&borderStyle);
   lv_style_set_line_width(&borderStyle, PAD_BORDER);
@@ -82,10 +81,13 @@ SetupWidgetsPageSlot::SetupWidgetsPageSlot(Window* parent, const rect_t& rect,
   lv_style_set_line_dash_gap(&borderStyle, PAD_BORDER);
   lv_style_set_line_color(&borderStyle, makeLvColor(COLOR_THEME_SECONDARY2));
 
-  border = lv_line_create(lvobj);
-  if (border) {
-    lv_obj_add_style(border, &borderStyle, LV_PART_MAIN);
-  }
+  withLive([&](LiveWindow& live) {
+    auto obj = lv_line_create(live.lvobj());
+    if (!obj) return false;
+    border.reset(obj);
+    lv_obj_add_style(obj, &borderStyle, LV_PART_MAIN);
+    return true;
+  });
 
   updateBorder();
   setFocusState();
@@ -107,17 +109,17 @@ void SetupWidgetsPageSlot::updateBorder()
   borderPts[3] = {1, (lv_coord_t)(height() - 1)};
   borderPts[4] = {1, 1};
 
-  if (border) lv_line_set_points(border, borderPts, 5);
+  border.with([&](lv_obj_t* obj) { lv_line_set_points(obj, borderPts, 5); });
 }
 
 void SetupWidgetsPageSlot::setFocusState()
 {
-  if (!border) return;
-  if (hasFocus()) {
-    lv_obj_add_flag(border, LV_OBJ_FLAG_HIDDEN);
-  } else {
-    lv_obj_clear_flag(border, LV_OBJ_FLAG_HIDDEN);
-  }
+  border.with([&](lv_obj_t* obj) {
+    if (hasFocus())
+      lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+    else
+      lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
+  });
 }
 
 void SetupWidgetsPageSlot::addNewWidget()
@@ -185,7 +187,7 @@ SetupWidgetsPage::SetupWidgetsPage(uint8_t customScreenIdx) :
     auto slot = new (std::nothrow) SetupWidgetsPageSlot(this, rect, widget_container, i);
     if (i == 0) firstSlot = slot;
   }
-  if (firstSlot) lv_group_focus_obj(firstSlot->getLvObj());
+  if (firstSlot) firstSlot->focus();
 
 #if defined(HARDWARE_TOUCH)
   addBackButton();

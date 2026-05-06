@@ -260,12 +260,18 @@ QuickMenu::QuickMenu() :
 {
   setWindowFlag(OPAQUE);
 
-  etx_obj_add_style(lvobj, styles->bg_opacity_90, LV_PART_MAIN);
-  etx_bg_color(lvobj, COLOR_THEME_QM_BG_INDEX);
+  addStyle(styles->bg_opacity_90, LV_PART_MAIN);
+  withLive([](LiveWindow& live) {
+    etx_bg_color(live.lvobj(), COLOR_THEME_QM_BG_INDEX);
+  });
 
-  auto sep = lv_obj_create(lvobj);
-  etx_solid_bg(sep, COLOR_THEME_QM_FG_INDEX);
-  lv_obj_set_size(sep, QM_W, PAD_THREE);
+  withLive([&](LiveWindow& live) {
+    auto sep = lv_obj_create(live.lvobj());
+    if (!requireLvObj(sep)) return false;
+    etx_solid_bg(sep, COLOR_THEME_QM_FG_INDEX);
+    lv_obj_set_size(sep, QM_W, PAD_THREE);
+    return true;
+  });
 
   auto mask = getBuiltinIcon(ICON_TOP_LOGO);
   new (std::nothrow) StaticIcon(this, (QM_W - mask->width) / 2, 0,
@@ -344,7 +350,7 @@ void QuickMenu::openQM(PageGroupBase* newPageGroup, QMPage newCurPage)
 #endif
 
   show();
-  lv_obj_move_foreground(lvobj);
+  moveForeground();
   if (newPageGroup) {
     pageGroup = newPageGroup;
     curPage = newCurPage;

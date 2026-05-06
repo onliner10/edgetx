@@ -37,7 +37,8 @@ class NumberArea : public FormField
   {
     setWindowFlag(NO_FOCUS);
 
-    withLive([&](lv_obj_t* obj) {
+    withLive([&](LiveWindow& live) {
+      auto obj = live.lvobj();
       if (parent->getTextFlags() & CENTERED)
         etx_obj_add_style(obj, styles->text_align_center, LV_PART_MAIN);
       else

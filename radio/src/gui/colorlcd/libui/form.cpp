@@ -47,8 +47,8 @@ FormField::FormField(Window* parent, const rect_t& rect, LvglCreate objConstruct
     Window(parent, rect, objConstruct)
 {
   setTextFlag(textFlags);
-  withLive([](lv_obj_t* obj) {
-    lv_obj_add_flag(obj, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+  withLive([](LiveWindow& live) {
+    lv_obj_add_flag(live.lvobj(), LV_OBJ_FLAG_SCROLL_ON_FOCUS);
   });
 }
 
@@ -94,7 +94,8 @@ FormLine::FormLine(Window* parent, FlexGridLayout& layout) :
   layout.resetPos();
   layout.apply(*this);
 
-  withLive([](lv_obj_t* obj) {
+  withLive([](LiveWindow& live) {
+    auto obj = live.lvobj();
     lv_obj_set_width(obj, lv_pct(100));
     lv_obj_set_height(obj, LV_SIZE_CONTENT);
   });

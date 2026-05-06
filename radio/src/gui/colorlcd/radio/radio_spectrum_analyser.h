@@ -31,7 +31,7 @@ class RadioSpectrumAnalyser : public Page
  protected:
   uint8_t moduleIdx;
   lv_point_t trackPts[2];
-  lv_obj_t* trackLine = nullptr;
+  RequiredLvObj trackLine;
   int16_t trackX = -1;
 
   void buildHeader(Window* window);

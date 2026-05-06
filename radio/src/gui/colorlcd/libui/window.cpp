@@ -314,7 +314,7 @@ bool windowObjectAllocationFailureLeavesNoLvObjForTest()
   auto window = new (std::nothrow) Window(nullptr, {0, 0, 10, 10});
   etxCreateForceObjectAllocationFailureForTest(false);
 
-  bool ok = window && window->getLvObj() == nullptr && !window->isAvailable() &&
+  bool ok = window && window->getLvObjForTest() == nullptr && !window->isAvailable() &&
             !window->isVisible();
   delete window;
   return ok;
@@ -326,7 +326,7 @@ bool formFieldObjectAllocationFailureFailsClosedForTest()
   auto button = new (std::nothrow) Button(nullptr, {0, 0, 10, 10});
   etxCreateForceObjectAllocationFailureForTest(false);
 
-  bool ok = button && button->getLvObj() == nullptr && !button->isAvailable() &&
+  bool ok = button && button->getLvObjForTest() == nullptr && !button->isAvailable() &&
             !button->isVisible() && !button->automationClickable();
   delete button;
   return ok;
@@ -346,7 +346,7 @@ bool childOfUnavailableParentFailsClosedForTest()
   bool detachedAttachFailed = detached && !detached->attachTo(*parent);
 
   bool ok = parent && child && detached && !parent->isAvailable() &&
-            !parent->isVisible() && child->getLvObj() == nullptr &&
+            !parent->isVisible() && child->getLvObjForTest() == nullptr &&
             !child->isAvailable() && !child->isVisible() &&
             !child->automationClickable() && detachedAttachFailed &&
             detached->getParent() == nullptr && detached->isAvailable();
@@ -446,13 +446,14 @@ bool attachToUnavailableParentPreservesExistingParentForTest()
   }
 
   auto originalParent = child->getParent();
+  auto originalLvObj = child->getLvObjForTest();
   auto originalLvParent =
-      child->getLvObj() ? lv_obj_get_parent(child->getLvObj()) : nullptr;
+      originalLvObj ? lv_obj_get_parent(originalLvObj) : nullptr;
 
   bool attached = child->attachTo(*secondParent);
   bool ok = !attached && child->getParent() == originalParent &&
-            child->getParent() == firstParent && child->getLvObj() &&
-            lv_obj_get_parent(child->getLvObj()) == originalLvParent;
+            child->getParent() == firstParent && child->getLvObjForTest() &&
+            lv_obj_get_parent(child->getLvObjForTest()) == originalLvParent;
 
   child->detach();
   delete child;
@@ -530,7 +531,7 @@ bool windowDelayedLoadGatesLoadedTasksForTest()
       !window->loaded() && !window->runLoadedTask() &&
       window->taskRuns == 1 && window->initRuns == 0;
 
-  lv_event_send(window->getLvObj(), LV_EVENT_DRAW_MAIN_BEGIN, nullptr);
+  lv_event_send(window->getLvObjForTest(), LV_EVENT_DRAW_MAIN_BEGIN, nullptr);
   const bool afterDrawRuns =
       window->loaded() && window->initRuns == 1 && window->runLoadedTask() &&
       window->taskRuns == 2;
@@ -792,6 +793,264 @@ void Window::padAll(PaddingSize pad)
   if (lvobj) etx_padding(lvobj, pad, LV_PART_MAIN);
 }
 
+uint32_t Window::getLvIndex() const
+{
+  uint32_t index = 0;
+  withLive([&](LiveWindow& live) { index = lv_obj_get_index(live.lvobj()); });
+  return index;
+}
+
+coord_t Window::getScrollY() const
+{
+  coord_t y = 0;
+  withLive([&](LiveWindow& live) { y = lv_obj_get_scroll_y(live.lvobj()); });
+  return y;
+}
+
+void Window::addFlag(lv_obj_flag_t flag)
+{
+  withLive([&](LiveWindow& live) { lv_obj_add_flag(live.lvobj(), flag); });
+}
+
+void Window::clearFlag(lv_obj_flag_t flag)
+{
+  withLive([&](LiveWindow& live) { lv_obj_clear_flag(live.lvobj(), flag); });
+}
+
+bool Window::hasFlag(lv_obj_flag_t flag) const
+{
+  return withLive([&](LiveWindow& live) {
+    return lv_obj_has_flag(live.lvobj(), flag);
+  });
+}
+
+void Window::addState(lv_state_t state)
+{
+  withLive([&](LiveWindow& live) { lv_obj_add_state(live.lvobj(), state); });
+}
+
+void Window::clearState(lv_state_t state)
+{
+  withLive([&](LiveWindow& live) { lv_obj_clear_state(live.lvobj(), state); });
+}
+
+bool Window::hasState(lv_state_t state) const
+{
+  return withLive([&](LiveWindow& live) {
+    return lv_obj_has_state(live.lvobj(), state);
+  });
+}
+
+void Window::addStyle(lv_style_t* style, lv_style_selector_t selector)
+{
+  withLive([&](LiveWindow& live) {
+    if (style) lv_obj_add_style(live.lvobj(), style, selector);
+  });
+}
+
+void Window::addStyle(const lv_style_t& style, lv_style_selector_t selector)
+{
+  withLive([&](LiveWindow& live) {
+    lv_obj_add_style(live.lvobj(), const_cast<lv_style_t*>(&style), selector);
+  });
+}
+
+void Window::updateLayout()
+{
+  withLive([](LiveWindow& live) { lv_obj_update_layout(live.lvobj()); });
+}
+
+void Window::refreshStyle(lv_part_t part, lv_style_prop_t prop)
+{
+  withLive([&](LiveWindow& live) {
+    lv_obj_refresh_style(live.lvobj(), part, prop);
+  });
+}
+
+void Window::setStyleMaxWidth(lv_coord_t value, lv_style_selector_t selector)
+{
+  withLive([&](LiveWindow& live) {
+    lv_obj_set_style_max_width(live.lvobj(), value, selector);
+  });
+}
+
+void Window::setStyleMaxHeight(lv_coord_t value, lv_style_selector_t selector)
+{
+  withLive([&](LiveWindow& live) {
+    lv_obj_set_style_max_height(live.lvobj(), value, selector);
+  });
+}
+
+void Window::setStyleFlexCrossPlace(lv_flex_align_t align,
+                                    lv_style_selector_t selector)
+{
+  withLive([&](LiveWindow& live) {
+    lv_obj_set_style_flex_cross_place(live.lvobj(), align, selector);
+  });
+}
+
+void Window::setStyleFlexMainPlace(lv_flex_align_t align,
+                                   lv_style_selector_t selector)
+{
+  withLive([&](LiveWindow& live) {
+    lv_obj_set_style_flex_main_place(live.lvobj(), align, selector);
+  });
+}
+
+void Window::setStylePadColumn(lv_coord_t value, lv_style_selector_t selector)
+{
+  withLive([&](LiveWindow& live) {
+    lv_obj_set_style_pad_column(live.lvobj(), value, selector);
+  });
+}
+
+void Window::setStyleGridCellXAlign(lv_grid_align_t align,
+                                    lv_style_selector_t selector)
+{
+  withLive([&](LiveWindow& live) {
+    lv_obj_set_style_grid_cell_x_align(live.lvobj(), align, selector);
+  });
+}
+
+void Window::setStyleGridCellYAlign(lv_grid_align_t align,
+                                    lv_style_selector_t selector)
+{
+  withLive([&](LiveWindow& live) {
+    lv_obj_set_style_grid_cell_y_align(live.lvobj(), align, selector);
+  });
+}
+
+void Window::setLayout(uint32_t layout)
+{
+  withLive([&](LiveWindow& live) { lv_obj_set_layout(live.lvobj(), layout); });
+}
+
+void Window::setGridDscArray(const lv_coord_t* colDsc,
+                             const lv_coord_t* rowDsc)
+{
+  withLive([&](LiveWindow& live) {
+    lv_obj_set_grid_dsc_array(live.lvobj(), colDsc, rowDsc);
+  });
+}
+
+void Window::setGridCell(lv_grid_align_t x_align, lv_coord_t col_pos,
+                         lv_coord_t col_span, lv_grid_align_t y_align,
+                         lv_coord_t row_pos, lv_coord_t row_span)
+{
+  withLive([&](LiveWindow& live) {
+    lv_obj_set_grid_cell(live.lvobj(), x_align, col_pos, col_span, y_align,
+                         row_pos, row_span);
+  });
+}
+
+void Window::setGridAlign(lv_grid_align_t column_align,
+                          lv_grid_align_t row_align)
+{
+  withLive([&](LiveWindow& live) {
+    lv_obj_set_grid_align(live.lvobj(), column_align, row_align);
+  });
+}
+
+void Window::setAlign(lv_align_t align)
+{
+  withLive([&](LiveWindow& live) { lv_obj_set_align(live.lvobj(), align); });
+}
+
+void Window::align(lv_align_t align, lv_coord_t xOfs, lv_coord_t yOfs)
+{
+  withLive([&](LiveWindow& live) {
+    lv_obj_align(live.lvobj(), align, xOfs, yOfs);
+  });
+}
+
+void Window::setFlexFlow(lv_flex_flow_t flow)
+{
+  withLive([&](LiveWindow& live) { lv_obj_set_flex_flow(live.lvobj(), flow); });
+}
+
+void Window::setFlexGrow(uint8_t grow)
+{
+  withLive([&](LiveWindow& live) { lv_obj_set_flex_grow(live.lvobj(), grow); });
+}
+
+void Window::setFlexAlign(lv_flex_align_t main_place,
+                          lv_flex_align_t cross_place,
+                          lv_flex_align_t track_cross_place)
+{
+  withLive([&](LiveWindow& live) {
+    lv_obj_set_flex_align(live.lvobj(), main_place, cross_place,
+                          track_cross_place);
+  });
+}
+
+void Window::setStylePadRow(lv_coord_t value, lv_style_selector_t selector)
+{
+  withLive([&](LiveWindow& live) {
+    lv_obj_set_style_pad_row(live.lvobj(), value, selector);
+  });
+}
+
+void Window::addToGroup(lv_group_t* group)
+{
+  if (!group) return;
+  withLive([&](LiveWindow& live) { lv_group_add_obj(group, live.lvobj()); });
+}
+
+void Window::removeFromGroup()
+{
+  withLive([&](LiveWindow& live) { lv_group_remove_obj(live.lvobj()); });
+}
+
+void Window::center()
+{
+  withLive([](LiveWindow& live) { lv_obj_center(live.lvobj()); });
+}
+
+void Window::moveForeground()
+{
+  withLive([](LiveWindow& live) { lv_obj_move_foreground(live.lvobj()); });
+}
+
+void Window::moveBackground()
+{
+  withLive([](LiveWindow& live) { lv_obj_move_background(live.lvobj()); });
+}
+
+void Window::scrollToY(coord_t y, lv_anim_enable_t anim)
+{
+  withLive([&](LiveWindow& live) { lv_obj_scroll_to_y(live.lvobj(), y, anim); });
+}
+
+void Window::scrollbar()
+{
+  withLive([](LiveWindow& live) { etx_scrollbar(live.lvobj()); });
+}
+
+void Window::bgColor(LcdColorIndex color, lv_style_selector_t selector)
+{
+  withLive([&](LiveWindow& live) { etx_bg_color(live.lvobj(), color, selector); });
+}
+
+void Window::solidBg()
+{
+  withLive([](LiveWindow& live) { etx_solid_bg(live.lvobj()); });
+}
+
+void Window::solidBg(LcdColorIndex color, lv_style_selector_t selector)
+{
+  withLive([&](LiveWindow& live) { etx_solid_bg(live.lvobj(), color, selector); });
+}
+
+void Window::textColor(LcdColorIndex color, lv_style_selector_t selector)
+{
+  withLive([&](LiveWindow& live) { etx_txt_color(live.lvobj(), color, selector); });
+}
+
+void Window::font(FontIndex fontIndex, lv_style_selector_t selector)
+{
+  withLive([&](LiveWindow& live) { etx_font(live.lvobj(), fontIndex, selector); });
+}
+
 void Window::checkEvents()
 {
   withLive([&](LiveWindow& live) { onLiveCheckEvents(live); });
@@ -861,6 +1120,14 @@ bool Window::sendLvEvent(lv_event_code_t code, void* param)
 {
   return withLive(
       [&](LiveWindow& live) { lv_event_send(live.lvobj(), code, param); });
+}
+
+void Window::addLvEventCb(lv_event_cb_t eventCb, lv_event_code_t filter,
+                          void* userData)
+{
+  withLive([&](LiveWindow& live) {
+    lv_obj_add_event_cb(live.lvobj(), eventCb, filter, userData);
+  });
 }
 
 #if defined(SIMU)
@@ -990,10 +1257,7 @@ void Window::enable(bool enabled)
     }
   };
 
-  if (enabled)
-    withLive([&](LiveWindow& live) { apply(live.lvobj()); });
-  else
-    withLive(apply);
+  withLive([&](LiveWindow& live) { apply(live.lvobj()); });
 }
 
 bool Window::requireLvObj(lv_obj_t* obj)

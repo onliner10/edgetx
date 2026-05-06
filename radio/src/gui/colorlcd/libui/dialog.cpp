@@ -36,7 +36,7 @@ class BaseDialogForm : public Window
  public:
   BaseDialogForm(Window* parent, lv_coord_t width, bool flexLayout) : Window(parent, rect_t{})
   {
-    withLive(etx_scrollbar);
+    withLive([](LiveWindow& live) { etx_scrollbar(live.lvobj()); });
     padAll(PAD_TINY);
     if (flexLayout)
       setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_ZERO, width, LV_SIZE_CONTENT);
@@ -74,7 +74,9 @@ BaseDialog::BaseDialog(const char* title,
         COLOR_THEME_PRIMARY2_INDEX);
   });
   if (header) {
-    etx_solid_bg(header->getLvObj(), COLOR_THEME_SECONDARY1_INDEX);
+    header->withLive([](Window::LiveWindow& live) {
+      etx_solid_bg(live.lvobj(), COLOR_THEME_SECONDARY1_INDEX);
+    });
     header->padAll(PAD_SMALL);
     header->show(title != nullptr);
   }
@@ -258,7 +260,9 @@ LabelDialog::LabelDialog(const char *label, int length, const char* title,
             &form, rect_t{0, 0, LV_PCT(100), 0}, title,
             COLOR_THEME_PRIMARY2_INDEX);
         if (hdr) {
-          etx_solid_bg(hdr->getLvObj(), COLOR_THEME_SECONDARY1_INDEX);
+          hdr->withLive([](Window::LiveWindow& live) {
+            etx_solid_bg(live.lvobj(), COLOR_THEME_SECONDARY1_INDEX);
+          });
           hdr->padAll(PAD_MEDIUM);
         }
 

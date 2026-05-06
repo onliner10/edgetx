@@ -26,6 +26,8 @@
 #include "edgetx.h"
 #include "page.h"
 
+class StaticText;
+
 class TemplatePage : public Page
 {
   public:
@@ -39,7 +41,7 @@ class TemplatePage : public Page
 
   protected:
     Window* listWindow = nullptr;
-    lv_obj_t* infoLabel = nullptr;
+    StaticText* infoLabel = nullptr;
 
     static constexpr size_t LEN_INFO_TEXT = 300;
     static constexpr size_t LEN_PATH = sizeof(TEMPLATES_PATH) + TEXT_FILENAME_MAXLEN;

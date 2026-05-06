@@ -57,7 +57,7 @@ class MPlexIcon : public Window
       icon->center(width(), height());
     }
 
-    icon->show(lv_obj_get_index(lvobj) != 0);
+    icon->show(getLvIndex() != 0);
     icon->setIcon(n);
   }
 
@@ -143,26 +143,6 @@ class MixLineButton : public InputMixButtonBase
     mplex->show(y > ListLineButton::BTN_H);
   }
 
-  lv_obj_t* mplexLvObj() const { return mplex->getLvObj(); }
-
-  void swapLvglGroup(InputMixButtonBase* line2) override
-  {
-    MixLineButton* swapWith = (MixLineButton*)line2;
-
-    // Swap elements (focus + line list)
-    lv_obj_t* obj1 = getLvObj();
-    lv_obj_t* obj2 = swapWith->getLvObj();
-    if (lv_obj_get_parent(obj1) == lv_obj_get_parent(obj2)) {
-      // same input group: swap obj + focus group
-      lv_obj_swap(obj1, obj2);
-      lv_obj_swap(mplexLvObj(), swapWith->mplexLvObj());
-    } else {
-      // different input group: swap only focus group
-      lv_group_swap_obj(obj1, obj2);
-      lv_group_swap_obj(mplexLvObj(), swapWith->mplexLvObj());
-    }
-  }
-
   static LAYOUT_VAL_SCALED(MPLEX_XO, 28)
 
  protected:
@@ -184,12 +164,14 @@ class MixGroup : public InputMixGroupBase
     lv_obj_t* chText = nullptr;
     if (idx >= MIXSRC_FIRST_CH && idx <= MIXSRC_LAST_CH &&
         g_model.limitData[idx - MIXSRC_FIRST_CH].name[0] != '\0') {
-      chText = etx_label_create(lvobj, FONT_XS_INDEX);
-      char chanStr[10];
-      char* s = strAppend(chanStr, STR_CH);
-      strAppendUnsigned(s, idx - MIXSRC_FIRST_CH + 1);
-      lv_label_set_text(chText, chanStr);
-      lv_obj_set_pos(chText, PAD_TINY, CHNUM_Y-1);
+      withLive([&](LiveWindow& live) {
+        chText = etx_label_create(live.lvobj(), FONT_XS_INDEX);
+        char chanStr[10];
+        char* s = strAppend(chanStr, STR_CH);
+        strAppendUnsigned(s, idx - MIXSRC_FIRST_CH + 1);
+        lv_label_set_text(chText, chanStr);
+        lv_obj_set_pos(chText, PAD_TINY, CHNUM_Y - 1);
+      });
     }
 
     refresh();
@@ -306,13 +288,31 @@ InputMixButtonBase* ModelMixesPage::createLineButton(InputMixGroupBase *group, u
   return button;
 }
 
-void ModelMixesPage::addLineButton(uint8_t index)
+static int mixLineNumber(uint8_t index)
 {
   MixData* mix = mixAddress(index);
-  if (is_memclear(mix, sizeof(MixData))) return;
-  int channel = mix->destCh;
+  if (is_memclear(mix, sizeof(MixData))) return -1;
 
-  InputMixPageBase::addLineButton(MIXSRC_FIRST_CH + channel, index);
+  int number = 0;
+  for (uint8_t i = 0; i <= index && i < MAX_MIXERS; i += 1) {
+    MixData* current = mixAddress(i);
+    if (is_memclear(current, sizeof(MixData))) break;
+    if (current->destCh == mix->destCh) number += 1;
+  }
+  return number;
+}
+
+static uint8_t focusAfterMixDelete(uint8_t deletedIndex)
+{
+  if (deletedIndex < MAX_MIXERS &&
+      !is_memclear(mixAddress(deletedIndex), sizeof(MixData)))
+    return deletedIndex;
+
+  for (int i = deletedIndex - 1; i >= 0; i -= 1) {
+    if (!is_memclear(mixAddress(i), sizeof(MixData))) return i;
+  }
+
+  return UINT8_MAX;
 }
 
 void ModelMixesPage::newMix()
@@ -345,20 +345,14 @@ void ModelMixesPage::editMix(uint8_t channel, uint8_t index)
 {
   _copyMode = 0;
 
-  withGroupAndLineByIndex(index, [=](InputMixGroupBase& group,
-                                     InputMixButtonBase& line) {
-    auto groupPtr = &group;
-    auto linePtr = &line;
-    auto edit = new MixEditWindow(channel, index);
-    edit->setCloseHandler([=]() {
-      MixData* mix = mixAddress(index);
-      if (is_memclear(mix, sizeof(MixData))) {
-        deleteMix(index);
-      } else {
-        linePtr->refresh();
-        groupPtr->adjustHeight();
-      }
-    });
+  auto edit = new MixEditWindow(channel, index);
+  edit->setCloseHandler([=]() {
+    MixData* mix = mixAddress(index);
+    if (is_memclear(mix, sizeof(MixData))) {
+      rebuildFromModel(focusAfterMixDelete(index));
+    } else {
+      rebuildFromModel(index);
+    }
   });
 }
 
@@ -367,55 +361,47 @@ void ModelMixesPage::insertMix(uint8_t channel, uint8_t index)
   _copyMode = 0;
 
   ::insertMix(index, channel);
-  InputMixPageBase::addLineButton(MIXSRC_FIRST_CH + channel, index);
+  rebuildFromModel(index);
   editMix(channel, index);
 }
 
 void ModelMixesPage::deleteMix(uint8_t index)
 {
-  withGroupAndLineByIndex(index, [=](InputMixGroupBase& group,
-                                     InputMixButtonBase& line) {
-    auto mix = mixAddress(index);
-    std::string s(getSourceString(group.getMixSrc()));
-    s += " - ";
-    if (mix->name[0]) {
-      s += mix->name;
-    } else {
-      s += "#";
-      s += std::to_string(group.getLineNumber(index));
-    }
+  auto mix = mixAddress(index);
+  if (is_memclear(mix, sizeof(MixData))) return;
 
-    if (confirmationDialog(STR_DELETE_MIX_LINE, s.c_str())) {
-      _copyMode = 0;
+  std::string s(getSourceString(MIXSRC_FIRST_CH + mix->destCh));
+  s += " - ";
+  if (mix->name[0]) {
+    s += mix->name;
+  } else {
+    s += "#";
+    s += std::to_string(mixLineNumber(index));
+  }
 
-      ::deleteMix(index);
+  if (confirmationDialog(STR_DELETE_MIX_LINE, s.c_str())) {
+    _copyMode = 0;
+    _copySrc = nullptr;
 
-      group.removeLine(&line);
-      if (group.getLineCount() == 0) {
-        group.deleteLater();
-        removeGroup(&group);
-      } else {
-        line.deleteLater();
-      }
-      removeLine(&line);
-    }
-  });
+    ::deleteMix(index);
+    rebuildFromModel(focusAfterMixDelete(index));
+  }
 }
 
 void ModelMixesPage::pasteMix(uint8_t dst_idx, uint8_t channel)
 {
   if (!_copyMode || !_copySrc) return;
   uint8_t src_idx = _copySrc->getIndex();
+  bool move = _copyMode == MOVE_MODE;
+  uint8_t deleteIndex = src_idx + (dst_idx <= src_idx ? 1 : 0);
 
   ::copyMix(src_idx, dst_idx, channel);
-  addLineButton(dst_idx);
+  rebuildFromModel(dst_idx);
 
-  if (_copyMode == MOVE_MODE) {
-    src_idx = _copySrc->getIndex();
-    deleteMix(src_idx);
-  }
+  if (move) deleteMix(deleteIndex);
 
   _copyMode = 0;
+  _copySrc = nullptr;
 }
 
 static int _mixChnFromIndex(uint8_t index)
@@ -428,17 +414,23 @@ static int _mixChnFromIndex(uint8_t index)
 void ModelMixesPage::pasteMixBefore(uint8_t dst_idx)
 {
   int channel = _mixChnFromIndex(dst_idx);
+  if (channel < 0) return;
   pasteMix(dst_idx, channel);
 }
 
 void ModelMixesPage::pasteMixAfter(uint8_t dst_idx)
 {
   int channel = _mixChnFromIndex(dst_idx);
+  if (channel < 0) return;
   pasteMix(dst_idx + 1, channel);
 }
 
 void ModelMixesPage::build(Window * window)
 {
+  bindPageWindow(window);
+  _copyMode = 0;
+  _copySrc = nullptr;
+
   window->setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_TINY);
 
   form = new Window(window, rect_t{0, 0, ListLineButton::GRP_W, LV_SIZE_CONTENT});
@@ -449,8 +441,7 @@ void ModelMixesPage::build(Window * window)
   box->setFlexLayout(LV_FLEX_FLOW_ROW, PAD_SMALL);
   box->padLeft(PAD_MEDIUM);
 
-  auto box_obj = box->getLvObj();
-  lv_obj_set_style_flex_cross_place(box_obj, LV_FLEX_ALIGN_CENTER, 0);
+  box->setStyleFlexCrossPlace(LV_FLEX_ALIGN_CENTER, 0);
 
   new StaticText(box, rect_t{}, STR_SHOW_MIXER_MONITORS);
   new ToggleSwitch(
@@ -461,9 +452,8 @@ void ModelMixesPage::build(Window * window)
     newMix();
     return 0;
   });
-  auto btn_obj = btn->getLvObj();
-  lv_obj_set_width(btn_obj, lv_pct(100));
-  lv_group_focus_obj(btn_obj);
+  btn->setWidth(lv_pct(100));
+  btn->focus();
 
   groups.clear();
   lines.clear();
@@ -482,10 +472,7 @@ void ModelMixesPage::build(Window * window)
       while (index < MAX_MIXERS && (line->destCh == ch) && !skip_mix) {
         // one button per input line
         auto btn = createLineButton(group, index);
-        if (!focusSet) {
-          focusSet = true;
-          lv_group_focus_obj(btn->getLvObj());
-        }
+        if (shouldFocusLine(index, focusSet)) btn->focus();
         ++index;
         ++line;
         skip_mix = (ch == 0 && is_memclear(line, sizeof(MixData)));

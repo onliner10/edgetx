@@ -45,33 +45,49 @@ class ValueWidget : public TrackedWidget
     lv_style_set_width(&valueStyle, lv_pct(100));
     lv_style_set_height(&valueStyle, lv_pct(100));
 
-    labelShadow = etx_label_create(lvobj);
-    lv_obj_add_style(labelShadow, &labelStyle, LV_PART_MAIN);
-    lv_obj_set_style_text_color(labelShadow, lv_color_black(), LV_PART_MAIN);
-    lv_label_set_long_mode(labelShadow, LV_LABEL_LONG_DOT);
-    lv_label_set_text(labelShadow, "");
+    initRequiredLvObj(
+        labelShadow, [](lv_obj_t* parent) { return etx_label_create(parent); },
+        [&](lv_obj_t* obj) {
+          lv_obj_add_style(obj, &labelStyle, LV_PART_MAIN);
+          lv_obj_set_style_text_color(obj, lv_color_black(), LV_PART_MAIN);
+          lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
+          lv_label_set_text(obj, "");
+        });
 
-    label = etx_label_create(lvobj);
-    lv_obj_add_style(label, &labelStyle, LV_PART_MAIN);
-    etx_txt_color(label, COLOR_THEME_WARNING_INDEX, ETX_STATE_TIMER_ELAPSED);
-    etx_txt_color(label, COLOR_THEME_DISABLED_INDEX, ETX_STATE_TELEM_STALE);
-    lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
-    lv_label_set_text(label, "");
+    initRequiredLvObj(
+        label, [](lv_obj_t* parent) { return etx_label_create(parent); },
+        [&](lv_obj_t* obj) {
+          lv_obj_add_style(obj, &labelStyle, LV_PART_MAIN);
+          etx_txt_color(obj, COLOR_THEME_WARNING_INDEX,
+                        ETX_STATE_TIMER_ELAPSED);
+          etx_txt_color(obj, COLOR_THEME_DISABLED_INDEX, ETX_STATE_TELEM_STALE);
+          lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
+          lv_label_set_text(obj, "");
+        });
 
-    valueShadow = etx_label_create(lvobj, FONT_L_INDEX);
-    lv_obj_add_style(valueShadow, &valueStyle, LV_PART_MAIN);
-    lv_obj_set_style_text_color(valueShadow, lv_color_black(), LV_PART_MAIN);
-    etx_font(valueShadow, FONT_XL_INDEX, ETX_STATE_LARGE_FONT);
-    lv_label_set_long_mode(valueShadow, LV_LABEL_LONG_DOT);
-    lv_label_set_text(valueShadow, "");
+    initRequiredLvObj(
+        valueShadow,
+        [](lv_obj_t* parent) { return etx_label_create(parent, FONT_L_INDEX); },
+        [&](lv_obj_t* obj) {
+          lv_obj_add_style(obj, &valueStyle, LV_PART_MAIN);
+          lv_obj_set_style_text_color(obj, lv_color_black(), LV_PART_MAIN);
+          etx_font(obj, FONT_XL_INDEX, ETX_STATE_LARGE_FONT);
+          lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
+          lv_label_set_text(obj, "");
+        });
 
-    value = etx_label_create(lvobj, FONT_L_INDEX);
-    lv_obj_add_style(value, &valueStyle, LV_PART_MAIN);
-    etx_txt_color(value, COLOR_THEME_WARNING_INDEX, ETX_STATE_TIMER_ELAPSED);
-    etx_txt_color(value, COLOR_THEME_DISABLED_INDEX, ETX_STATE_TELEM_STALE);
-    etx_font(value, FONT_XL_INDEX, ETX_STATE_LARGE_FONT);
-    lv_label_set_long_mode(value, LV_LABEL_LONG_DOT);
-    lv_label_set_text(value, "");
+    initRequiredLvObj(
+        value,
+        [](lv_obj_t* parent) { return etx_label_create(parent, FONT_L_INDEX); },
+        [&](lv_obj_t* obj) {
+          lv_obj_add_style(obj, &valueStyle, LV_PART_MAIN);
+          etx_txt_color(obj, COLOR_THEME_WARNING_INDEX,
+                        ETX_STATE_TIMER_ELAPSED);
+          etx_txt_color(obj, COLOR_THEME_DISABLED_INDEX, ETX_STATE_TELEM_STALE);
+          etx_font(obj, FONT_XL_INDEX, ETX_STATE_LARGE_FONT);
+          lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
+          lv_label_set_text(obj, "");
+        });
 
     update();
     foreground();
@@ -126,26 +142,34 @@ class ValueWidget : public TrackedWidget
 
     if (changed) {
       // Set color to option value
-      lv_obj_clear_state(label,
-                         ETX_STATE_TIMER_ELAPSED | ETX_STATE_TELEM_STALE);
-      lv_obj_clear_state(value,
-                         ETX_STATE_TIMER_ELAPSED | ETX_STATE_TELEM_STALE);
+      label.with([](lv_obj_t* obj) {
+        lv_obj_clear_state(obj, ETX_STATE_TIMER_ELAPSED | ETX_STATE_TELEM_STALE);
+      });
+      value.with([](lv_obj_t* obj) {
+        lv_obj_clear_state(obj, ETX_STATE_TIMER_ELAPSED | ETX_STATE_TELEM_STALE);
+      });
 
       // Check for disabled or warning color states
       if (field >= MIXSRC_FIRST_TIMER && field <= MIXSRC_LAST_TIMER) {
         TimerState& timerState = timersStates[field - MIXSRC_FIRST_TIMER];
         if (timerState.val < 0) {
           // Set warning color
-          lv_obj_add_state(label, ETX_STATE_TIMER_ELAPSED);
-          lv_obj_add_state(value, ETX_STATE_TIMER_ELAPSED);
+          label.with([](lv_obj_t* obj) {
+            lv_obj_add_state(obj, ETX_STATE_TIMER_ELAPSED);
+          });
+          value.with([](lv_obj_t* obj) {
+            lv_obj_add_state(obj, ETX_STATE_TIMER_ELAPSED);
+          });
         }
       } else if (field >= MIXSRC_FIRST_TELEM) {
         TelemetryItem& telemetryItem =
             telemetryItems[(field - MIXSRC_FIRST_TELEM) / 3];
         if (!telemetryItem.isAvailable() || telemetryItem.isOld()) {
           // Set disabled color
-          lv_obj_add_state(label, ETX_STATE_TELEM_STALE);
-          lv_obj_add_state(value, ETX_STATE_TELEM_STALE);
+          label.with(
+              [](lv_obj_t* obj) { lv_obj_add_state(obj, ETX_STATE_TELEM_STALE); });
+          value.with(
+              [](lv_obj_t* obj) { lv_obj_add_state(obj, ETX_STATE_TELEM_STALE); });
         }
       }
 
@@ -182,8 +206,10 @@ class ValueWidget : public TrackedWidget
             getSourceCustomValueString(field, getValue(field), valueFlags);
       }
 
-      lv_label_set_text(value, valueTxt.c_str());
-      lv_label_set_text(valueShadow, valueTxt.c_str());
+      value.with(
+          [&](lv_obj_t* obj) { lv_label_set_text(obj, valueTxt.c_str()); });
+      valueShadow.with(
+          [&](lv_obj_t* obj) { lv_label_set_text(obj, valueTxt.c_str()); });
     }
   }
 
@@ -194,10 +220,10 @@ class ValueWidget : public TrackedWidget
   bool lastTelemState = false;
   lv_style_t labelStyle;
   lv_style_t valueStyle;
-  lv_obj_t* label;
-  lv_obj_t* labelShadow;
-  lv_obj_t* value;
-  lv_obj_t* valueShadow;
+  RequiredLvObj label;
+  RequiredLvObj labelShadow;
+  RequiredLvObj value;
+  RequiredLvObj valueShadow;
   LcdFlags valueFlags = 0;
 
   static LAYOUT_VAL_SCALED(VAL_Y1, 14)
@@ -214,8 +240,12 @@ class ValueWidget : public TrackedWidget
     mixsrc_t field = widgetData->options[0].value.unsignedValue;
 
     // get color from options[1]
-    etx_txt_color_from_flags(label, widgetData->options[1].value.unsignedValue);
-    etx_txt_color_from_flags(value, widgetData->options[1].value.unsignedValue);
+    label.with([&](lv_obj_t* obj) {
+      etx_txt_color_from_flags(obj, widgetData->options[1].value.unsignedValue);
+    });
+    value.with([&](lv_obj_t* obj) {
+      etx_txt_color_from_flags(obj, widgetData->options[1].value.unsignedValue);
+    });
 
     // get label alignment from options[3]
     LcdFlags lblAlign = widgetData->options[3].value.unsignedValue;
@@ -229,12 +259,16 @@ class ValueWidget : public TrackedWidget
     lv_coord_t valueY = VAL_Y1;
     bool compact = isCompactTopBarWidget();
 
-    etx_font(label, FONT_STD_INDEX);
-    etx_font(labelShadow, FONT_STD_INDEX);
-    etx_font(value, FONT_L_INDEX);
-    etx_font(valueShadow, FONT_L_INDEX);
-    lv_obj_clear_state(value, ETX_STATE_LARGE_FONT);
-    lv_obj_clear_state(valueShadow, ETX_STATE_LARGE_FONT);
+    label.with([](lv_obj_t* obj) { etx_font(obj, FONT_STD_INDEX); });
+    labelShadow.with([](lv_obj_t* obj) { etx_font(obj, FONT_STD_INDEX); });
+    value.with([](lv_obj_t* obj) {
+      etx_font(obj, FONT_L_INDEX);
+      lv_obj_clear_state(obj, ETX_STATE_LARGE_FONT);
+    });
+    valueShadow.with([](lv_obj_t* obj) {
+      etx_font(obj, FONT_L_INDEX);
+      lv_obj_clear_state(obj, ETX_STATE_LARGE_FONT);
+    });
 
     // Get positions, alignment and value font size.
     if (compact) {
@@ -244,10 +278,10 @@ class ValueWidget : public TrackedWidget
       labelY = 0;
       valueX = PAD_TINY;
       valueY = COMPACT_VAL_Y;
-      etx_font(label, FONT_XXS_INDEX);
-      etx_font(labelShadow, FONT_XXS_INDEX);
-      etx_font(value, FONT_BOLD_INDEX);
-      etx_font(valueShadow, FONT_BOLD_INDEX);
+      label.with([](lv_obj_t* obj) { etx_font(obj, FONT_XXS_INDEX); });
+      labelShadow.with([](lv_obj_t* obj) { etx_font(obj, FONT_XXS_INDEX); });
+      value.with([](lv_obj_t* obj) { etx_font(obj, FONT_BOLD_INDEX); });
+      valueShadow.with([](lv_obj_t* obj) { etx_font(obj, FONT_BOLD_INDEX); });
     } else if (height() < H_CHK) {
       if (width() >= W_CHK) {
         lblAlign = ALIGN_LEFT;
@@ -270,8 +304,10 @@ class ValueWidget : public TrackedWidget
         int8_t sensor = 1 + (field - MIXSRC_FIRST_TELEM) / 3;
         if (!isGPSSensor(sensor) && !isSensorUnit(sensor, UNIT_DATETIME) && !isSensorUnit(sensor, UNIT_TEXT)) {
           // Set font to XL
-          lv_obj_add_state(value, ETX_STATE_LARGE_FONT);
-          lv_obj_add_state(valueShadow, ETX_STATE_LARGE_FONT);
+          value.with(
+              [](lv_obj_t* obj) { lv_obj_add_state(obj, ETX_STATE_LARGE_FONT); });
+          valueShadow.with(
+              [](lv_obj_t* obj) { lv_obj_add_state(obj, ETX_STATE_LARGE_FONT); });
         }
       }
 #if defined(INTERNAL_GPS)
@@ -280,8 +316,10 @@ class ValueWidget : public TrackedWidget
 #endif
       else {
         // Set font to XL
-        lv_obj_add_state(value, ETX_STATE_LARGE_FONT);
-        lv_obj_add_state(valueShadow, ETX_STATE_LARGE_FONT);
+        value.with(
+            [](lv_obj_t* obj) { lv_obj_add_state(obj, ETX_STATE_LARGE_FONT); });
+        valueShadow.with(
+            [](lv_obj_t* obj) { lv_obj_add_state(obj, ETX_STATE_LARGE_FONT); });
       }
     }
 
@@ -297,23 +335,32 @@ class ValueWidget : public TrackedWidget
 
     // Set label text
     char* labelTxt = getSourceString(field);
-    lv_label_set_text(label, labelTxt);
-    lv_label_set_text(labelShadow, labelTxt);
+    label.with([&](lv_obj_t* obj) { lv_label_set_text(obj, labelTxt); });
+    labelShadow.with([&](lv_obj_t* obj) { lv_label_set_text(obj, labelTxt); });
 
     // Set label and value positions.
-    lv_obj_set_pos(labelShadow, labelX + 1, labelY + 1);
-    lv_obj_set_pos(label, labelX, labelY);
-    lv_obj_set_pos(valueShadow, valueX + 1, valueY + 1);
-    lv_obj_set_pos(value, valueX, valueY);
+    labelShadow.with([&](lv_obj_t* obj) {
+      lv_obj_set_pos(obj, labelX + 1, labelY + 1);
+    });
+    label.with([&](lv_obj_t* obj) { lv_obj_set_pos(obj, labelX, labelY); });
+    valueShadow.with([&](lv_obj_t* obj) {
+      lv_obj_set_pos(obj, valueX + 1, valueY + 1);
+    });
+    value.with([&](lv_obj_t* obj) { lv_obj_set_pos(obj, valueX, valueY); });
 
     // Show / hide shadow
-    if (widgetData->options[2].value.boolValue) {
-      lv_obj_clear_flag(labelShadow, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_clear_flag(valueShadow, LV_OBJ_FLAG_HIDDEN);
-    } else {
-      lv_obj_add_flag(labelShadow, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_add_flag(valueShadow, LV_OBJ_FLAG_HIDDEN);
-    }
+    labelShadow.with([&](lv_obj_t* obj) {
+      if (widgetData->options[2].value.boolValue)
+        lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
+      else
+        lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+    });
+    valueShadow.with([&](lv_obj_t* obj) {
+      if (widgetData->options[2].value.boolValue)
+        lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
+      else
+        lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+    });
 
     lastValue = -10000;
     requireRefresh();

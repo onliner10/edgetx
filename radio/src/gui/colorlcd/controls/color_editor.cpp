@@ -52,20 +52,22 @@ class ColorBar : public FormField
            uint32_t maxValue = 0) :
       FormField(parent, r)
   {
-    lv_obj_add_flag(lvobj, LV_OBJ_FLAG_ENCODER_ACCEL);
+    addFlag(LV_OBJ_FLAG_ENCODER_ACCEL);
 
-    lv_group_add_obj((lv_group_t*)lv_group_get_default(), lvobj);
+    addToGroup((lv_group_t*)lv_group_get_default());
 
-    lv_obj_add_event_cb(lvobj, ColorBar::pressing, LV_EVENT_PRESSING, nullptr);
-    lv_obj_add_event_cb(lvobj, ColorBar::on_key, LV_EVENT_KEY, nullptr);
-    lv_obj_add_event_cb(lvobj, ColorBar::draw_end, LV_EVENT_DRAW_PART_END,
-                        nullptr);
+    withLive([](LiveWindow& live) {
+      lv_obj_add_event_cb(live.lvobj(), ColorBar::pressing, LV_EVENT_PRESSING,
+                          nullptr);
+      lv_obj_add_event_cb(live.lvobj(), ColorBar::on_key, LV_EVENT_KEY, nullptr);
+      lv_obj_add_event_cb(live.lvobj(), ColorBar::draw_end,
+                          LV_EVENT_DRAW_PART_END, nullptr);
 
-    etx_std_style(lvobj, LV_PART_MAIN, PAD_ZERO);
-    etx_obj_add_style(lvobj, styles->border_color[COLOR_THEME_PRIMARY1_INDEX],
-                      LV_PART_MAIN | LV_STATE_EDITED);
-    etx_obj_add_style(lvobj, styles->state_edit_frame,
-                      LV_PART_MAIN | LV_STATE_EDITED);
+      etx_std_style(live.lvobj(), LV_PART_MAIN, PAD_ZERO);
+    });
+    addStyle(styles->border_color[COLOR_THEME_PRIMARY1_INDEX],
+             LV_PART_MAIN | LV_STATE_EDITED);
+    addStyle(styles->state_edit_frame, LV_PART_MAIN | LV_STATE_EDITED);
   }
 
   int valueToScreen(int val)
@@ -233,8 +235,12 @@ class BarColorType : public ColorType
       auto x = bars[i]->left() + PAD_TINY;
       auto y = bars[i]->bottom();
 
-      barLabels[i] = create_bar_label(parent->getLvObj(), x, y + ColorEditor::LBL_YO);
-      barValLabels[i] = create_bar_value_label(parent->getLvObj(), x + ColorEditor::VAL_XO, y + PAD_THREE);
+      parent->withLive([&](Window::LiveWindow& live) {
+        barLabels[i] =
+            create_bar_label(live.lvobj(), x, y + ColorEditor::LBL_YO);
+        barValLabels[i] = create_bar_value_label(
+            live.lvobj(), x + ColorEditor::VAL_XO, y + PAD_THREE);
+      });
     }
   }
 
@@ -409,7 +415,9 @@ class ThemeColorType : public ColorType
     if (!parent) return;
     auto btn = new (std::nothrow) TextButton(parent, {0, 0, BTN_W, 0}, "");
     if (!btn) return;
-    etx_bg_color(btn->getLvObj(), (LcdColorIndex)color);
+    btn->withLive([&](Window::LiveWindow& live) {
+      etx_bg_color(live.lvobj(), (LcdColorIndex)color);
+    });
     btn->setPressHandler([=]() {
       m_color = color;
       Messaging::send(Messaging::COLOR_CHANGED);
@@ -424,8 +432,8 @@ class ThemeColorType : public ColorType
     if (!hbox) return;
     hbox->padAll(PAD_OUTLINE);
     hbox->setFlexLayout(LV_FLEX_FLOW_ROW, PAD_OUTLINE);
-    lv_obj_set_flex_align(hbox->getLvObj(), LV_FLEX_ALIGN_CENTER,
-                          LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_AROUND);
+    hbox->setFlexAlign(LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
+                       LV_FLEX_ALIGN_SPACE_AROUND);
 
     makeButton(hbox, c1);
     if (c2 != c1) makeButton(hbox, c2);
@@ -447,8 +455,8 @@ class FixedColorType : public ColorType
     if (!vbox) return;
     vbox->padAll(PAD_OUTLINE);
     vbox->setFlexLayout(LV_FLEX_FLOW_ROW_WRAP, PAD_OUTLINE);
-    lv_obj_set_flex_align(vbox->getLvObj(), LV_FLEX_ALIGN_CENTER,
-                          LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_AROUND);
+    vbox->setFlexAlign(LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
+                       LV_FLEX_ALIGN_SPACE_AROUND);
 
     for (int c = COLOR_BLACK_INDEX; c < TOTAL_COLOR_COUNT; c += 1)
       makeButton(vbox, c);
@@ -464,7 +472,9 @@ class FixedColorType : public ColorType
     if (!parent) return;
     auto btn = new (std::nothrow) TextButton(parent, {0, 0, BTN_W, 0}, "");
     if (!btn) return;
-    etx_bg_color(btn->getLvObj(), (LcdColorIndex)color);
+    btn->withLive([&](Window::LiveWindow& live) {
+      etx_bg_color(live.lvobj(), (LcdColorIndex)color);
+    });
     btn->setPressHandler([=]() {
       m_color = color;
       Messaging::send(Messaging::COLOR_CHANGED);

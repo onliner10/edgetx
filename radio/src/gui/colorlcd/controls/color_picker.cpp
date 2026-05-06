@@ -86,7 +86,9 @@ class ColorEditorPopup : public BaseDialog
       format(fmt)
   {
     FlexGridLayout grid(col_dsc, row_dsc);
-    auto line = form->newLine(grid);
+    auto line = form.valueOr<FormLine*>(
+        nullptr, [&](Window& formWindow) { return formWindow.newLine(grid); });
+    if (!line) return;
 
     rect_t r{0, 0, CE_SZ, CE_SZ};
     auto cedit = Window::makeLive<ColorEditor>(

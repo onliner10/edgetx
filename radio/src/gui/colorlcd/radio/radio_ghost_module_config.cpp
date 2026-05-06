@@ -38,18 +38,15 @@ class GhostModuleConfigWindow : public Window
       menuLines[i][0] = new StaticText(
           this, {xOffset, yOffset + i * lineSpacing, LV_SIZE_CONTENT, h}, "",
           COLOR_THEME_PRIMARY1_INDEX, FONT(L));
-      etx_txt_color(menuLines[i][0]->getLvObj(), COLOR_THEME_SECONDARY1_INDEX,
-                    LV_PART_MAIN);
-      etx_solid_bg(menuLines[i][0]->getLvObj(), COLOR_THEME_FOCUS_INDEX,
-                   LV_STATE_USER_1);
-      etx_txt_color(menuLines[i][0]->getLvObj(), COLOR_THEME_SECONDARY3_INDEX,
-                    LV_STATE_USER_1);
+      menuLines[i][0]->textColor(COLOR_THEME_SECONDARY1_INDEX, LV_PART_MAIN);
+      menuLines[i][0]->solidBg(COLOR_THEME_FOCUS_INDEX, LV_STATE_USER_1);
+      menuLines[i][0]->textColor(COLOR_THEME_SECONDARY3_INDEX,
+                                 LV_STATE_USER_1);
 
       menuLines[i][1] = new StaticText(
           this, {xOffset2, yOffset + i * lineSpacing, LV_SIZE_CONTENT, h}, "",
           COLOR_THEME_PRIMARY1_INDEX, FONT(L));
-      etx_txt_color(menuLines[i][1]->getLvObj(), COLOR_THEME_SECONDARY1_INDEX,
-                    LV_PART_MAIN);
+      menuLines[i][1]->textColor(COLOR_THEME_SECONDARY1_INDEX, LV_PART_MAIN);
     }
   }
 
@@ -68,9 +65,9 @@ class GhostModuleConfigWindow : public Window
 
       if (reusableBuffer.ghostMenu.line[i].splitLine) {
         if (reusableBuffer.ghostMenu.line[i].lineFlags & (GHST_LINE_FLAGS_LABEL_SELECT | GHST_LINE_FLAGS_VALUE_SELECT)) {
-          lv_obj_add_state(menuLines[i][0]->getLvObj(), LV_STATE_USER_1);
+          menuLines[i][0]->addState(LV_STATE_USER_1);
         } else {
-          lv_obj_clear_state(menuLines[i][0]->getLvObj(), LV_STATE_USER_1);
+          menuLines[i][0]->clearState(LV_STATE_USER_1);
         }
 
         if (reusableBuffer.ghostMenu.line[i].lineFlags & GHST_LINE_FLAGS_VALUE_SELECT) {
@@ -88,9 +85,9 @@ class GhostModuleConfigWindow : public Window
           menuLines[i][0]->setText(reusableBuffer.ghostMenu.line[i].menuText);
 
         if (reusableBuffer.ghostMenu.line[i].lineFlags & GHST_LINE_FLAGS_LABEL_SELECT)
-          lv_obj_add_state(menuLines[i][0]->getLvObj(), LV_STATE_USER_1);
+          menuLines[i][0]->addState(LV_STATE_USER_1);
         else
-          lv_obj_clear_state(menuLines[i][0]->getLvObj(), LV_STATE_USER_1);
+          menuLines[i][0]->clearState(LV_STATE_USER_1);
       }
     }
   }
@@ -104,8 +101,11 @@ RadioGhostModuleConfig::RadioGhostModuleConfig(uint8_t moduleIdx) :
   init();
   buildHeader(header);
   buildBody(body);
-  lv_group_add_obj(lv_group_get_default(), lvobj);
-  lv_group_set_editing(lv_group_get_default(), true);
+  auto group = lv_group_get_default();
+  if (group) {
+    addToGroup(group);
+    lv_group_set_editing(group, true);
+  }
 #if defined(TRIMS_EMULATE_BUTTONS)
   setHatsAsKeys(true);  // Use trim joysticks to operate menu (e.g. on NV14)
 #endif

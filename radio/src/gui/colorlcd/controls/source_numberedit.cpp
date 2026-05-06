@@ -44,9 +44,11 @@ SourceNumberEdit::SourceNumberEdit(Window* parent,
   setTextFlag(textFlags);
 
   padAll(PAD_TINY);
-  lv_obj_set_flex_flow(lvobj, LV_FLEX_FLOW_ROW_WRAP);
-  lv_obj_set_style_flex_cross_place(lvobj, LV_FLEX_ALIGN_CENTER, 0);
-  lv_obj_set_size(lvobj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+  setFlexFlow(LV_FLEX_FLOW_ROW_WRAP);
+  withLive([](LiveWindow& live) {
+    lv_obj_set_style_flex_cross_place(live.lvobj(), LV_FLEX_ALIGN_CENTER, 0);
+  });
+  setSize(LV_SIZE_CONTENT, LV_SIZE_CONTENT);
 
   // Source field
   source_field = new (std::nothrow) SourceChoice(
@@ -135,6 +137,6 @@ void SourceNumberEdit::update()
   if (m_srcBtn) m_srcBtn->check(isSource());
 
   if (has_focus) {
-    lv_group_focus_obj(act_field->getLvObj());
+    act_field->focus();
   }
 }

@@ -65,7 +65,8 @@ MainWindow::MainWindow() : Window(nullptr, {0, 0, LCD_W, LCD_H})
 {
   setWindowFlag(OPAQUE);
 
-  withLive([&](lv_obj_t* obj) {
+  withLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
     etx_solid_bg(obj);
 
     background = createBackgroundCanvas(obj);
@@ -174,7 +175,8 @@ void MainWindow::shutdown()
 
   // Re-add background canvas
   background = nullptr;
-  withLive([&](lv_obj_t* obj) {
+  withLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
     background = createBackgroundCanvas(obj);
     if (background) lv_obj_center(background);
   });
@@ -234,8 +236,9 @@ bool mainWindowObjectAllocationFailureFailsClosedForTest()
   auto window = new TestMainWindow();
   etxCreateForceObjectAllocationFailureForTest(false);
 
-  bool ok = window && window->getLvObj() == nullptr && !window->isAvailable() &&
-            !window->isVisible() && !window->hasBackgroundCanvas();
+  bool ok = window && window->getLvObjForTest() == nullptr &&
+            !window->isAvailable() && !window->isVisible() &&
+            !window->hasBackgroundCanvas();
   delete window;
   return ok;
 }

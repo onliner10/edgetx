@@ -160,8 +160,11 @@ FileBrowser::FileBrowser(Window* parent, const rect_t& rect, const char* dir) :
 
   setLongPressHandler([=]() {
     int row = getSelected();
-    bool is_dir = lv_table_has_cell_ctrl(lvobj, row, 0, CELL_CTRL_DIR);
-    onPressLong(lv_table_get_cell_value(lvobj, row, 0), is_dir);
+    withLive([&](LiveWindow& live) {
+      auto obj = live.lvobj();
+      bool is_dir = lv_table_has_cell_ctrl(obj, row, 0, CELL_CTRL_DIR);
+      onPressLong(lv_table_get_cell_value(obj, row, 0), is_dir);
+    });
   });
 }
 
@@ -180,15 +183,21 @@ void FileBrowser::refresh()
   for (const auto& name: directories) {
 
     // LV_SYMBOL_DIRECTORY
-    lv_table_set_cell_value(lvobj, row, 0, name.c_str());
-    lv_table_add_cell_ctrl(lvobj, row, 0, CELL_CTRL_DIR);
+    withLive([&](LiveWindow& live) {
+      auto obj = live.lvobj();
+      lv_table_set_cell_value(obj, row, 0, name.c_str());
+      lv_table_add_cell_ctrl(obj, row, 0, CELL_CTRL_DIR);
+    });
     row++;
   }
 
   for (const auto& name: files) {
     // LV_SYMBOL_FILE
-    lv_table_set_cell_value(lvobj, row, 0, name.c_str());
-    lv_table_clear_cell_ctrl(lvobj, row, 0, CELL_CTRL_DIR);
+    withLive([&](LiveWindow& live) {
+      auto obj = live.lvobj();
+      lv_table_set_cell_value(obj, row, 0, name.c_str());
+      lv_table_clear_cell_ctrl(obj, row, 0, CELL_CTRL_DIR);
+    });
     row++;
   }
 
@@ -197,34 +206,48 @@ void FileBrowser::refresh()
 
 void FileBrowser::adjustWidth()
 {
-  lv_obj_update_layout(lvobj);
-  setColumnWidth(0, lv_obj_get_width(lvobj));
+  withLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
+    lv_obj_update_layout(obj);
+    setColumnWidth(0, lv_obj_get_width(obj));
+  });
 }
 
 void FileBrowser::onSelected(uint16_t row, uint16_t col)
 {
-  bool is_dir = lv_table_has_cell_ctrl(lvobj, row, col, CELL_CTRL_DIR);
-  onSelected(lv_table_get_cell_value(lvobj, row, col), is_dir);
+  withLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
+    bool is_dir = lv_table_has_cell_ctrl(obj, row, col, CELL_CTRL_DIR);
+    onSelected(lv_table_get_cell_value(obj, row, col), is_dir);
+  });
 }
 
 void FileBrowser::onPress(uint16_t row, uint16_t col)
 {
-  bool is_dir = lv_table_has_cell_ctrl(lvobj, row, col, CELL_CTRL_DIR);
-  onPress(lv_table_get_cell_value(lvobj, row, col), is_dir);
+  withLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
+    bool is_dir = lv_table_has_cell_ctrl(obj, row, col, CELL_CTRL_DIR);
+    onPress(lv_table_get_cell_value(obj, row, col), is_dir);
+  });
 }
 
 void FileBrowser::onDrawBegin(uint16_t row, uint16_t col, lv_obj_draw_part_dsc_t* dsc)
 {
-  lv_coord_t cell_left = lv_obj_get_style_pad_left(lvobj, LV_PART_ITEMS);
-  dsc->label_dsc->ofs_x = getFontHeight(FONT(STD)) + cell_left;
+  withLive([&](LiveWindow& live) {
+    lv_coord_t cell_left =
+        lv_obj_get_style_pad_left(live.lvobj(), LV_PART_ITEMS);
+    dsc->label_dsc->ofs_x = getFontHeight(FONT(STD)) + cell_left;
+  });
 }
 
 void FileBrowser::onDrawEnd(uint16_t row, uint16_t col, lv_obj_draw_part_dsc_t* dsc)
 {
   const char* sym = nullptr;
-  if (lv_table_has_cell_ctrl(lvobj, row, 0, CELL_CTRL_DIR)) {
+  withLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
+    if (lv_table_has_cell_ctrl(obj, row, 0, CELL_CTRL_DIR)) {
     // dir
-    const char* dir = lv_table_get_cell_value(lvobj, row, 0);
+    const char* dir = lv_table_get_cell_value(obj, row, 0);
     if (dir[0] == '.')
       sym = LV_SYMBOL_LEFT;
     else
@@ -233,11 +256,15 @@ void FileBrowser::onDrawEnd(uint16_t row, uint16_t col, lv_obj_draw_part_dsc_t* 
     // file
     sym = LV_SYMBOL_FILE;
   }
+  });
 
   lv_area_t coords;
   lv_coord_t area_h = lv_area_get_height(dsc->draw_area);
 
-  lv_coord_t cell_left = lv_obj_get_style_pad_left(lvobj, LV_PART_ITEMS);
+  lv_coord_t cell_left = 0;
+  withLive([&](LiveWindow& live) {
+    cell_left = lv_obj_get_style_pad_left(live.lvobj(), LV_PART_ITEMS);
+  });
   lv_coord_t font_h = getFontHeight(FONT(STD));
 
   coords.x1 = dsc->draw_area->x1 + cell_left;

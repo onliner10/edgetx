@@ -73,7 +73,9 @@ class LayoutChoice : public Button
       setValue(std::move(setValue))
   {
     padAll(PAD_ZERO);
-    canvas = createLayoutChoiceCanvas(lvobj);
+    withLive([&](LiveWindow& live) {
+      canvas = createLayoutChoiceCanvas(live.lvobj());
+    });
     if (!canvas) {
       failClosed();
       return;
@@ -176,7 +178,7 @@ void ScreenSetupPage::build(Window* window)
   auto label = new (std::nothrow) StaticText(line, rect_t{}, STR_LAYOUT);
 
   if (label)
-    lv_obj_set_style_grid_cell_y_align(label->getLvObj(), LV_GRID_ALIGN_CENTER, 0);
+    label->setStyleGridCellYAlign(LV_GRID_ALIGN_CENTER, 0);
 
   // Dynamic options window...
   LayoutChoice::LayoutFactoryGetter getFactory =
@@ -235,8 +237,8 @@ void ScreenSetupPage::build(Window* window)
     return 0;
   });
   if (btn) {
-    lv_obj_set_style_grid_cell_y_align(btn->getLvObj(), LV_GRID_ALIGN_CENTER, 0);
-    lv_group_focus_obj(btn->getLvObj());
+    btn->setStyleGridCellYAlign(LV_GRID_ALIGN_CENTER, 0);
+    btn->focus();
   }
 
   line = window->newLine(grid);
@@ -270,11 +272,10 @@ void ScreenSetupPage::build(Window* window)
 
           storageDirty(EE_MODEL);
           return 0;
-        });
+    });
     if (btn) {
-      auto obj = btn->getLvObj();
-      lv_obj_set_width(obj, lv_pct(100));
-      lv_obj_center(obj);
+      btn->setWidth(lv_pct(100));
+      btn->center();
     }
   }
 }

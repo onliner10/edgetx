@@ -446,7 +446,11 @@ lv_obj_t* etx_label_create(lv_obj_t* parent, FontIndex fontIdx)
 lv_obj_t* etx_label_create(Window* parent, FontIndex fontIdx)
 {
   if (!parent) return nullptr;
-  return etx_label_create(parent->getLvObj(), fontIdx);
+  lv_obj_t* label = nullptr;
+  parent->withLive([&](Window::LiveWindow& live) {
+    label = etx_label_create(live.lvobj(), fontIdx);
+  });
+  return label;
 }
 
 #if defined(SIMU)

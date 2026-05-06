@@ -72,8 +72,7 @@ AFHDS3Settings::AFHDS3Settings(Window* parent, const FlexGridLayout& g,
   afhds3TypeForm = new Window(line, rect_t{});
   afhds3TypeForm->padAll(PAD_TINY);
   afhds3TypeForm->setFlexLayout(LV_FLEX_FLOW_ROW_WRAP, PAD_TINY);
-  lv_obj_set_style_grid_cell_x_align(afhds3TypeForm->getLvObj(),
-                                     LV_GRID_ALIGN_STRETCH, 0);
+  afhds3TypeForm->setStyleGridCellXAlign(LV_GRID_ALIGN_STRETCH, 0);
 
   afhds3PhyMode =
       new Choice(afhds3TypeForm, rect_t{}, _afhds3_phy_mode, 0,

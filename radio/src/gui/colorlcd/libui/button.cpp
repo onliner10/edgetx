@@ -80,7 +80,8 @@ ButtonBase::ButtonBase(Window* parent, const rect_t& rect,
 
 void ButtonBase::check(bool checked)
 {
-  withLive([&](lv_obj_t* obj) {
+  withLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
     if (checked != this->checked()) {
       if (checked)
         lv_obj_add_state(obj, LV_STATE_CHECKED);
@@ -93,7 +94,8 @@ void ButtonBase::check(bool checked)
 bool ButtonBase::checked() const
 {
   bool result = false;
-  withLive([&](lv_obj_t* obj) {
+  withLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
     result = lv_obj_get_state(obj) & LV_STATE_CHECKED;
   });
   return result;
@@ -166,7 +168,7 @@ bool textButtonLabelCreateFailureFailsClosedForTest()
                  });
   forceTextButtonLabelCreateFailureForTest = false;
 
-  if (!button || !button->getLvObj() || button->isAvailable() ||
+  if (!button || !button->getLvObjForTest() || button->isAvailable() ||
       button->isVisible() || button->automationClickable()) {
     delete button;
     return false;
@@ -179,8 +181,8 @@ bool textButtonLabelCreateFailureFailsClosedForTest()
     longPressed = true;
     return 0;
   });
-  lv_event_send(button->getLvObj(), LV_EVENT_CLICKED, nullptr);
-  lv_event_send(button->getLvObj(), LV_EVENT_LONG_PRESSED, nullptr);
+  lv_event_send(button->getLvObjForTest(), LV_EVENT_CLICKED, nullptr);
+  lv_event_send(button->getLvObjForTest(), LV_EVENT_LONG_PRESSED, nullptr);
 
   const bool ok = button->automationText() == "Next" &&
                   !button->isAvailable() && !button->isVisible() && !pressed &&

@@ -175,9 +175,9 @@ class HeaderDateTime : public Window
   static LAYOUT_VAL_SCALED(HDR_DATE_HEIGHT, 12)
   static LAYOUT_VAL_SCALED(HDR_DATE_LINE2, 15)
 
- protected:
-  lv_obj_t *date = nullptr;
-  lv_obj_t *time = nullptr;
+protected:
+  RequiredLvObj date;
+  RequiredLvObj time;
   struct gtm lastTime = { 0 };
 
   void onLiveCheckEvents(LiveWindow& live) override;

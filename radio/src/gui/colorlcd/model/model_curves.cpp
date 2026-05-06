@@ -45,11 +45,9 @@ class CurveButton : public Button
     }
     title = new StaticText(this, {0, 0, lv_pct(100), EdgeTxStyles::STD_FONT_HEIGHT}, buf,
                            COLOR_THEME_SECONDARY1_INDEX, CENTERED | FONT(BOLD));
-    etx_txt_color(title->getLvObj(), COLOR_THEME_PRIMARY2_INDEX,
-                  LV_PART_MAIN | LV_STATE_USER_1);
-    etx_solid_bg(title->getLvObj(), COLOR_THEME_SECONDARY2_INDEX);
-    etx_solid_bg(title->getLvObj(), COLOR_THEME_FOCUS_INDEX,
-                 LV_PART_MAIN | LV_STATE_USER_1);
+    title->textColor(COLOR_THEME_PRIMARY2_INDEX, LV_PART_MAIN | LV_STATE_USER_1);
+    title->solidBg(COLOR_THEME_SECONDARY2_INDEX);
+    title->solidBg(COLOR_THEME_FOCUS_INDEX, LV_PART_MAIN | LV_STATE_USER_1);
 
     // Preview
     preview = new CurveRenderer(
@@ -80,9 +78,9 @@ class CurveButton : public Button
   void onLiveCheckEvents(LiveWindow& live) override
   {
     if (hasFocus()) {
-      lv_obj_add_state(title->getLvObj(), LV_STATE_USER_1);
+      title->addState(LV_STATE_USER_1);
     } else {
-      lv_obj_clear_state(title->getLvObj(), LV_STATE_USER_1);
+      title->clearState(LV_STATE_USER_1);
     }
   }
 };
@@ -214,8 +212,8 @@ void ModelCurvesPage::build(Window *window)
     if (isCurveUsed(index)) {
       if ((curveIndex % PER_ROW) == 0) {
         line = window->newLine(grid);
-        lv_obj_set_grid_align(line->getLvObj(), LV_GRID_ALIGN_SPACE_BETWEEN,
-                              LV_GRID_ALIGN_SPACE_BETWEEN);
+        line->setGridAlign(LV_GRID_ALIGN_SPACE_BETWEEN,
+                           LV_GRID_ALIGN_SPACE_BETWEEN);
       }
 
       // Curve drawing
@@ -244,7 +242,7 @@ void ModelCurvesPage::build(Window *window)
 
       button->setLongPressHandler([=]() -> uint8_t {
         if (addButton) {
-          lv_group_focus_obj(addButton->getLvObj());
+          addButton->focus();
           plusPopup(window);
         }
         return 0;
@@ -256,25 +254,25 @@ void ModelCurvesPage::build(Window *window)
 
       if (index == focusIndex) {
         hasFocusButton = true;
-        lv_group_focus_obj(button->getLvObj());
+        button->focus();
       }
 
-      lv_obj_set_grid_cell(button->getLvObj(), LV_GRID_ALIGN_CENTER,
-                           curveIndex % PER_ROW, 1, LV_GRID_ALIGN_CENTER, 0, 1);
+      button->setGridCell(LV_GRID_ALIGN_CENTER, curveIndex % PER_ROW, 1,
+                          LV_GRID_ALIGN_CENTER, 0, 1);
 
       curveIndex += 1;
     }
   }
 
   if (!hasFocusButton && firstCurveButton) {
-    lv_group_focus_obj(firstCurveButton->getLvObj());
+    firstCurveButton->focus();
   }
 
   if (curveIndex < MAX_CURVES) {
     if ((curveIndex % PER_ROW) == 0) {
       line = window->newLine(grid);
-      lv_obj_set_grid_align(line->getLvObj(), LV_GRID_ALIGN_SPACE_BETWEEN,
-                            LV_GRID_ALIGN_SPACE_BETWEEN);
+      line->setGridAlign(LV_GRID_ALIGN_SPACE_BETWEEN,
+                         LV_GRID_ALIGN_SPACE_BETWEEN);
     }
 
     addButton = new TextButton(line, rect_t{0, 0, CurveButton::CURVE_BTN_W, CurveButton::CURVE_BTH_H},
@@ -283,7 +281,7 @@ void ModelCurvesPage::build(Window *window)
                                  return 0;
                                });
 
-    lv_obj_set_grid_cell(addButton->getLvObj(), LV_GRID_ALIGN_CENTER,
-                         curveIndex % PER_ROW, 1, LV_GRID_ALIGN_CENTER, 0, 1);
+    addButton->setGridCell(LV_GRID_ALIGN_CENTER, curveIndex % PER_ROW, 1,
+                           LV_GRID_ALIGN_CENTER, 0, 1);
   }
 }

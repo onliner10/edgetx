@@ -166,22 +166,6 @@ class InputLineButton : public InputMixButtonBase
     setPos(x, y);
   }
 
-  void swapLvglGroup(InputMixButtonBase* line2) override
-  {
-    InputLineButton* swapWith = (InputLineButton*)line2;
-
-    // Swap elements (focus + line list)
-    lv_obj_t* obj1 = getLvObj();
-    lv_obj_t* obj2 = swapWith->getLvObj();
-    if (lv_obj_get_parent(obj1) == lv_obj_get_parent(obj2)) {
-      // same input group: swap obj + focus group
-      lv_obj_swap(obj1, obj2);
-    } else {
-      // different input group: swap only focus group
-      lv_group_swap_obj(obj1, obj2);
-    }
-  }
-
  protected:
   Messaging refreshMsg;
 
@@ -283,13 +267,30 @@ InputMixButtonBase* ModelInputsPage::createLineButton(InputMixGroupBase* group,
   return button;
 }
 
-void ModelInputsPage::addLineButton(uint8_t index)
+static int inputLineNumber(uint8_t index)
 {
   ExpoData* expo = expoAddress(index);
-  if (!EXPO_VALID(expo)) return;
-  int input = expo->chn;
+  if (!EXPO_VALID(expo)) return -1;
 
-  InputMixPageBase::addLineButton(MIXSRC_FIRST_INPUT + input, index);
+  int number = 0;
+  for (uint8_t i = 0; i <= index && i < MAX_EXPOS; i += 1) {
+    ExpoData* current = expoAddress(i);
+    if (!EXPO_VALID(current)) break;
+    if (current->chn == expo->chn) number += 1;
+  }
+  return number;
+}
+
+static uint8_t focusAfterInputDelete(uint8_t deletedIndex)
+{
+  if (deletedIndex < MAX_EXPOS && EXPO_VALID(expoAddress(deletedIndex)))
+    return deletedIndex;
+
+  for (int i = deletedIndex - 1; i >= 0; i -= 1) {
+    if (EXPO_VALID(expoAddress(i))) return i;
+  }
+
+  return UINT8_MAX;
 }
 
 void ModelInputsPage::newInput()
@@ -324,70 +325,57 @@ void ModelInputsPage::editInput(uint8_t input, uint8_t index)
 {
   _copyMode = 0;
 
-  withGroupAndLineBySrc(MIXSRC_FIRST_INPUT + input, index,
-                        [=](InputMixGroupBase& group, InputMixButtonBase&) {
-    auto groupPtr = &group;
-    auto edit = new InputEditWindow(input, index);
-    edit->setCloseHandler([=]() {
-      Messaging::send(Messaging::REFRESH);
-      groupPtr->refresh();
-      groupPtr->adjustHeight();
-    });
+  auto edit = new InputEditWindow(input, index);
+  edit->setCloseHandler([=]() {
+    Messaging::send(Messaging::REFRESH);
+    rebuildFromModel(index);
   });
 }
 
 void ModelInputsPage::insertInput(uint8_t input, uint8_t index)
 {
   ::insertExpo(index, input);
-  InputMixPageBase::addLineButton(MIXSRC_FIRST_INPUT + input, index);
+  rebuildFromModel(index);
   editInput(input, index);
 }
 
 void ModelInputsPage::deleteInput(uint8_t index)
 {
-  withGroupAndLineByIndex(index, [=](InputMixGroupBase& group,
-                                     InputMixButtonBase& line) {
-    auto expo = expoAddress(index);
-    std::string s(getSourceString(group.getMixSrc()));
-    s += " - ";
-    if (expo->name[0]) {
-      s += expo->name;
-    } else {
-      s += "#";
-      s += std::to_string(group.getLineNumber(index));
-    }
+  auto expo = expoAddress(index);
+  if (!EXPO_VALID(expo)) return;
 
-    if (confirmationDialog(STR_DELETE_INPUT_LINE, s.c_str())) {
-      _copyMode = 0;
+  std::string s(getSourceString(MIXSRC_FIRST_INPUT + expo->chn));
+  s += " - ";
+  if (expo->name[0]) {
+    s += expo->name;
+  } else {
+    s += "#";
+    s += std::to_string(inputLineNumber(index));
+  }
 
-      group.removeLine(&line);
-      if (group.getLineCount() == 0) {
-        group.deleteLater();
-        removeGroup(&group);
-      } else {
-        line.deleteLater();
-      }
-      removeLine(&line);
+  if (confirmationDialog(STR_DELETE_INPUT_LINE, s.c_str())) {
+    _copyMode = 0;
+    _copySrc = nullptr;
 
-      ::deleteExpo(index);
-    }
-  });
+    ::deleteExpo(index);
+    rebuildFromModel(focusAfterInputDelete(index));
+  }
 }
 
 void ModelInputsPage::pasteInput(uint8_t dst_idx, uint8_t input)
 {
   if (!_copyMode || !_copySrc) return;
   uint8_t src_idx = _copySrc->getIndex();
+  bool move = _copyMode == MOVE_MODE;
+  uint8_t deleteIndex = src_idx + (dst_idx <= src_idx ? 1 : 0);
 
   ::copyExpo(src_idx, dst_idx, input);
-  addLineButton(dst_idx);
+  rebuildFromModel(dst_idx);
 
-  if (_copyMode == MOVE_MODE) {
-    src_idx = _copySrc->getIndex();
-    deleteInput(src_idx);
-  }
+  if (move) deleteInput(deleteIndex);
 
   _copyMode = 0;
+  _copySrc = nullptr;
 }
 
 static int _inputChnFromIndex(uint8_t index)
@@ -400,19 +388,24 @@ static int _inputChnFromIndex(uint8_t index)
 void ModelInputsPage::pasteInputBefore(uint8_t dst_idx)
 {
   int input = _inputChnFromIndex(dst_idx);
+  if (input < 0) return;
   pasteInput(dst_idx, input);
 }
 
 void ModelInputsPage::pasteInputAfter(uint8_t dst_idx)
 {
   int input = _inputChnFromIndex(dst_idx);
+  if (input < 0) return;
   pasteInput(dst_idx + 1, input);
 }
 
 void ModelInputsPage::build(Window* window)
 {
+  bindPageWindow(window);
+
   // reset clipboard
   _copyMode = 0;
+  _copySrc = nullptr;
 
   window->setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_TINY);
 
@@ -423,9 +416,8 @@ void ModelInputsPage::build(Window* window)
     newInput();
     return 0;
   });
-  auto btn_obj = btn->getLvObj();
-  lv_obj_set_width(btn_obj, lv_pct(100));
-  lv_group_focus_obj(btn_obj);
+  btn->setWidth(lv_pct(100));
+  btn->focus();
 
   groups.clear();
   lines.clear();
@@ -443,10 +435,7 @@ void ModelInputsPage::build(Window* window)
       while (index < MAX_EXPOS && line->chn == input && EXPO_VALID(line)) {
         // one button per input line
         auto btn = createLineButton(group, index);
-        if (!focusSet) {
-          focusSet = true;
-          lv_group_focus_obj(btn->getLvObj());
-        }
+        if (shouldFocusLine(index, focusSet)) btn->focus();
         ++index;
         ++line;
       }

@@ -32,9 +32,9 @@ class SliderIcon : public Window
  public:
   SliderIcon(Window* parent);
 
- protected:
-  lv_obj_t* mask = nullptr;
-  lv_obj_t* shadow = nullptr;
+protected:
+  OptionalLvObj mask;
+  OptionalLvObj shadow;
 };
 
 class MainViewSlider : public Window
@@ -60,8 +60,8 @@ class MainViewSlider : public Window
   uint8_t potIdx;
   int16_t value = 0;
   bool isVertical;
-  lv_obj_t* maskCanvas = nullptr;
-  SliderIcon* sliderIcon = nullptr;
+  OptionalLvObj maskCanvas;
+  RequiredWindow<SliderIcon> sliderIcon;
   static std::vector<MaskBitmap*> tickMasks;
 
   void setPos();
@@ -97,6 +97,6 @@ class MainView6POS : public Window
  protected:
   uint8_t idx;
   int16_t value = -10000;
-  SliderIcon* posIcon = nullptr;
-  lv_obj_t* posVal = nullptr;
+  RequiredWindow<SliderIcon> posIcon;
+  RequiredLvObj posVal;
 };

@@ -82,7 +82,8 @@ ChoiceBase::ChoiceBase(Window* parent, const rect_t& rect,
   padRight(PAD_SMALL);
 
   // Add image
-  withLive([&](lv_obj_t* obj) {
+  withLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
     lv_obj_t* img = choice_img_create(obj);
     if (img) {
       lv_img_set_src(
@@ -283,7 +284,7 @@ bool choiceImageCreateFailureLeavesChoiceUsableForTest()
       0, 1, [] { return 0; });
   forceChoiceImageCreateFailureForTest = false;
 
-  bool ok = choice && choice->getLvObj() != nullptr && choice->isVisible();
+  bool ok = choice && choice->getLvObjForTest() != nullptr && choice->isVisible();
   delete choice;
   return ok;
 }
@@ -296,8 +297,9 @@ bool choiceLabelCreateFailureFailsClosedForTest()
       0, 1, [] { return 0; });
   forceChoiceLabelCreateFailureForTest = false;
 
-  bool ok = choice && choice->getLvObj() != nullptr && !choice->isAvailable() &&
-            !choice->isVisible() && !choice->automationClickable();
+  bool ok = choice && choice->getLvObjForTest() != nullptr &&
+            !choice->isAvailable() && !choice->isVisible() &&
+            !choice->automationClickable();
   delete choice;
   return ok;
 }

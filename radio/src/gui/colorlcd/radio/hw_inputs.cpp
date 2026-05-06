@@ -281,7 +281,7 @@ template <class T>
 HWInputDialog<T>::HWInputDialog(const char* title, coord_t w) :
     BaseDialog(title, true, w)
 {
-  new T(form);
+  form.with([](Window& formWindow) { Window::makeLive<T>(&formWindow); });
 }
 
 template struct HWInputDialog<HWSticks>;

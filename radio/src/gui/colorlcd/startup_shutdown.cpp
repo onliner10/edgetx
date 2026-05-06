@@ -64,7 +64,7 @@ static Window* createOpaqueFullscreenWindow(LcdColorIndex bgColor)
   if (!window) return nullptr;
 
   window->setWindowFlag(OPAQUE);
-  etx_solid_bg(window->getLvObj(), bgColor);
+  window->solidBg(bgColor);
   return window;
 }
 
@@ -74,9 +74,11 @@ void drawSplash()
 
   splashScreen = createFullscreenWindow();
   if (!splashScreen) return;
-  lv_obj_set_parent(splashScreen->getLvObj(), lv_layer_top());
+  splashScreen->withLive([](Window::LiveWindow& live) {
+    lv_obj_set_parent(live.lvobj(), lv_layer_top());
+  });
 
-  etx_solid_bg(splashScreen->getLvObj(), COLOR_BLACK_INDEX);
+  splashScreen->solidBg(COLOR_BLACK_INDEX);
 
   auto bg = new (std::nothrow) StaticImage(splashScreen, {0, 0, LCD_W, LCD_H},
                             BITMAPS_PATH "/" SPLASH_FILE);
@@ -219,7 +221,9 @@ void drawShutdownAnimation(uint32_t duration, uint32_t totalDuration,
           BITMAPS_PATH "/" SHUTDOWN_SPLASH_FILE, BMP_RGB565);
 
     if (shutdownSplashImg) {
-      shutdownCanvas = createShutdownCanvas(shutdownWindow->getLvObj());
+      shutdownWindow->withLive([&](Window::LiveWindow& live) {
+        shutdownCanvas = createShutdownCanvas(live.lvobj());
+      });
       if (shutdownCanvas) {
         lv_obj_center(shutdownCanvas);
         lv_canvas_set_buffer(shutdownCanvas, shutdownSplashImg->getData(),

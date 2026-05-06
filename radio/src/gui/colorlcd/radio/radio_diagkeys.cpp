@@ -52,6 +52,22 @@ static EnumKeys get_ith_key(uint8_t i)
   return (EnumKeys)0;
 }
 
+static lv_obj_t* createDiagLabel(lv_obj_t* parent, const char* text, coord_t x,
+                                 coord_t y)
+{
+  auto label = etx_label_create(parent);
+  if (label) {
+    lv_label_set_text(label, text);
+    lv_obj_set_pos(label, x, y);
+  }
+  return label;
+}
+
+static void setDiagLabelText(lv_obj_t* label, const char* text)
+{
+  if (label) lv_label_set_text(label, text);
+}
+
 class RadioKeyDiagsWindow : public Window
 {
  public:
@@ -67,7 +83,7 @@ class RadioKeyDiagsWindow : public Window
 
     if (keysGetMaxKeys() > 0) {
       form = new Window(parent, rect_t{x, PAD_MEDIUM, colWidth, colHeight});
-      etx_txt_color(form->getLvObj(), COLOR_THEME_PRIMARY1_INDEX);
+      form->textColor(COLOR_THEME_PRIMARY1_INDEX);
       addKeys(form);
       x += colWidth + PAD_MEDIUM;
     } else {
@@ -75,12 +91,12 @@ class RadioKeyDiagsWindow : public Window
     }
 
     form = new Window(parent, rect_t{x, PAD_MEDIUM, colWidth, colHeight});
-    etx_txt_color(form->getLvObj(), COLOR_THEME_PRIMARY1_INDEX);
+    form->textColor(COLOR_THEME_PRIMARY1_INDEX);
     addSwitches(form);
     x += colWidth + PAD_MEDIUM;
 
     form = new Window(parent, rect_t{x, PAD_MEDIUM, colWidth, colHeight});
-    etx_txt_color(form->getLvObj(), COLOR_THEME_PRIMARY1_INDEX);
+    form->textColor(COLOR_THEME_PRIMARY1_INDEX);
     addTrims(form);
   }
 
@@ -93,87 +109,68 @@ class RadioKeyDiagsWindow : public Window
 
   void addKeys(Window *form)
   {
-    keyValues = new lv_obj_t *[keysGetMaxKeys()];
-    lv_obj_t *obj = form->getLvObj();
-    uint8_t i;
+    keyValues = new lv_obj_t *[keysGetMaxKeys()]();
 
-    // KEYS
-    for (i = 0; i < keysGetMaxKeys(); i++) {
-      auto k = get_ith_key(i);
+    form->withLive([&](Window::LiveWindow& live) {
+      auto obj = live.lvobj();
+      uint8_t i;
 
-      auto lbl = etx_label_create(obj);
-      lv_label_set_text(lbl, keysGetLabel(k));
-      lv_obj_set_pos(lbl, 0, i * EdgeTxStyles::STD_FONT_HEIGHT);
-
-      lbl = etx_label_create(obj);
-      lv_label_set_text(lbl, "");
-      lv_obj_set_pos(lbl, KVAL_X, i * EdgeTxStyles::STD_FONT_HEIGHT);
-      keyValues[i] = lbl;
-    }
+      // KEYS
+      for (i = 0; i < keysGetMaxKeys(); i++) {
+        auto k = get_ith_key(i);
+        auto y = i * EdgeTxStyles::STD_FONT_HEIGHT;
+        createDiagLabel(obj, keysGetLabel(k), 0, y);
+        keyValues[i] = createDiagLabel(obj, "", KVAL_X, y);
+      }
 
 #if defined(ROTARY_ENCODER_NAVIGATION) && !defined(USE_HATS_AS_KEYS)
-    auto lbl = etx_label_create(obj);
-    lv_label_set_text(lbl, STR_ROTARY_ENCODER);
-    lv_obj_set_pos(lbl, 0, (i + 1) * EdgeTxStyles::STD_FONT_HEIGHT);
-
-    reValue = etx_label_create(obj);
-    lv_label_set_text(reValue, "");
-    lv_obj_set_pos(reValue, KVAL_X, (i + 1) * EdgeTxStyles::STD_FONT_HEIGHT);
+      auto y = (i + 1) * EdgeTxStyles::STD_FONT_HEIGHT;
+      createDiagLabel(obj, STR_ROTARY_ENCODER, 0, y);
+      reValue = createDiagLabel(obj, "", KVAL_X, y);
 #endif
+    });
   }
 
   void addSwitches(Window *form)
   {
-    switchValues = new lv_obj_t *[switchGetMaxAllSwitches()];
-    lv_obj_t *obj = form->getLvObj();
-    uint8_t i;
-    uint8_t row = 0;
+    switchValues = new lv_obj_t *[switchGetMaxAllSwitches()]();
 
-    // SWITCHES
-    for (i = 0; i < switchGetMaxAllSwitches(); i++) {
-      if (SWITCH_EXISTS(i) && !switchIsCustomSwitch(i)) {
-        auto lbl = etx_label_create(obj);
-        lv_label_set_text(lbl, "");
-        lv_obj_set_pos(lbl, 0, row * EdgeTxStyles::STD_FONT_HEIGHT);
-        switchValues[i] = lbl;
-        row += 1;
+    form->withLive([&](Window::LiveWindow& live) {
+      auto obj = live.lvobj();
+      uint8_t row = 0;
+
+      // SWITCHES
+      for (uint8_t i = 0; i < switchGetMaxAllSwitches(); i++) {
+        if (SWITCH_EXISTS(i) && !switchIsCustomSwitch(i)) {
+          switchValues[i] =
+              createDiagLabel(obj, "", 0, row * EdgeTxStyles::STD_FONT_HEIGHT);
+          row += 1;
+        }
       }
-    }
+    });
   }
 
   void addTrims(Window *form)
   {
-    trimValues = new lv_obj_t *[keysGetMaxTrims() * 2];
-    lv_obj_t *obj = form->getLvObj();
+    trimValues = new lv_obj_t *[keysGetMaxTrims() * 2]();
     char s[10];
 
-    auto lbl = etx_label_create(obj);
-    lv_label_set_text(lbl, STR_TRIMS);
-    lv_obj_set_pos(lbl, 0, 0);
-    lbl = etx_label_create(obj);
-    lv_label_set_text(lbl, "-");
-    lv_obj_set_pos(lbl, TRIM_MINUS_X, 0);
-    lbl = etx_label_create(obj);
-    lv_label_set_text(lbl, "+");
-    lv_obj_set_pos(lbl, TRIM_PLUS_X, 0);
+    form->withLive([&](Window::LiveWindow& live) {
+      auto obj = live.lvobj();
+      createDiagLabel(obj, STR_TRIMS, 0, 0);
+      createDiagLabel(obj, "-", TRIM_MINUS_X, 0);
+      createDiagLabel(obj, "+", TRIM_PLUS_X, 0);
 
-    // TRIMS
-    for (uint8_t i = 0; i < keysGetMaxTrims(); i++) {
-      lbl = etx_label_create(obj);
-      formatNumberAsString(s, 10, i + 1, 0, 10, "T");
-      lv_label_set_text(lbl, s);
-      lv_obj_set_pos(lbl, PAD_SMALL, i * EdgeTxStyles::STD_FONT_HEIGHT + EdgeTxStyles::STD_FONT_HEIGHT);
-
-      lbl = etx_label_create(obj);
-      lv_label_set_text(lbl, "");
-      lv_obj_set_pos(lbl, TRIM_MINUS_X - PAD_TINY, i * EdgeTxStyles::STD_FONT_HEIGHT + EdgeTxStyles::STD_FONT_HEIGHT);
-      trimValues[i * 2] = lbl;
-
-      lbl = etx_label_create(obj);
-      lv_label_set_text(lbl, "");
-      lv_obj_set_pos(lbl, TRIM_PLUS_X, i * EdgeTxStyles::STD_FONT_HEIGHT + EdgeTxStyles::STD_FONT_HEIGHT);
-      trimValues[i * 2 + 1] = lbl;
-    }
+      // TRIMS
+      for (uint8_t i = 0; i < keysGetMaxTrims(); i++) {
+        formatNumberAsString(s, 10, i + 1, 0, 10, "T");
+        auto y = i * EdgeTxStyles::STD_FONT_HEIGHT +
+                 EdgeTxStyles::STD_FONT_HEIGHT;
+        createDiagLabel(obj, s, PAD_SMALL, y);
+        trimValues[i * 2] = createDiagLabel(obj, "", TRIM_MINUS_X - PAD_TINY, y);
+        trimValues[i * 2 + 1] = createDiagLabel(obj, "", TRIM_PLUS_X, y);
+      }
+    });
   }
 
   void setKeyState()
@@ -183,12 +180,12 @@ class RadioKeyDiagsWindow : public Window
     for (uint8_t i = 0; i < keysGetMaxKeys(); i++) {
       auto k = get_ith_key(i);
       s[0] = keysGetState(k) + '0';
-      lv_label_set_text(keyValues[i], s);
+      setDiagLabelText(keyValues[i], s);
     }
 
 #if defined(ROTARY_ENCODER_NAVIGATION) && !defined(USE_HATS_AS_KEYS)
     formatNumberAsString(s, 10, rotaryEncoderGetValue());
-    lv_label_set_text(reValue, s);
+    setDiagLabelText(reValue, s);
 #endif
   }
 
@@ -201,7 +198,7 @@ class RadioKeyDiagsWindow : public Window
         getvalue_t val = getValue(MIXSRC_FIRST_SWITCH + i);
         getvalue_t sw =
             ((val < 0) ? 3 * i + 1 : ((val == 0) ? 3 * i + 2 : 3 * i + 3));
-        lv_label_set_text(switchValues[i], getSwitchPositionName(sw));
+        setDiagLabelText(switchValues[i], getSwitchPositionName(sw));
       }
     }
   }
@@ -212,7 +209,7 @@ class RadioKeyDiagsWindow : public Window
 
     for (int i = 0; i < keysGetMaxTrims() * 2; i++) {
       s[0] = keysGetTrimState(_trimMap[i]) + '0';
-      lv_label_set_text(trimValues[i], s);
+      setDiagLabelText(trimValues[i], s);
     }
   }
 

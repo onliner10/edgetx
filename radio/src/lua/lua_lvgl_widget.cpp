@@ -2638,7 +2638,7 @@ class WidgetPage : public NavWindow, public LuaEventHandler
     header->setTitle(title);
     header->setTitle2(subtitle);
 
-    etx_solid_bg(lvobj);
+    solidBg();
     if (body)
       body->withLive([&](Window::LiveWindow& live) {
         lv_obj_set_style_max_height(live.lvobj(),

@@ -53,7 +53,9 @@ class BindWaitDialog : public BaseDialog
       moduleIdx(moduleIdx),
       receiverIdx(receiverIdx)
   {
-    new StaticText(form, rect_t{}, STR_WAITING_FOR_RX);
+    form.with([](Window& formWindow) {
+      Window::makeLive<StaticText>(&formWindow, rect_t{}, STR_WAITING_FOR_RX);
+    });
 
     setCloseHandler([=]() { moduleState[moduleIdx].mode = MODULE_MODE_NORMAL; });
   }
@@ -339,51 +341,52 @@ RegisterDialog::RegisterDialog(uint8_t moduleIdx) :
     moduleIdx(moduleIdx)
 {
   FlexGridLayout grid(line_col_dsc, line_row_dsc);
-
-  // Register ID
-  auto line = form->newLine(grid);
-  new StaticText(line, rect_t{}, STR_REG_ID);
-  reg_id = new ModelTextEdit(line, rect_t{}, g_model.modelRegistrationID,
-                             sizeof(g_model.modelRegistrationID));
-
-  // UID
-  line = form->newLine(grid);
-  new StaticText(line, rect_t{}, "UID");
-
   auto* modSetup = &(getPXX2ModuleSetupBuffer());
-  uid = new NumberEdit(line, rect_t{}, 0, 2,
-                       GET_SET_DEFAULT(modSetup->registerLoopIndex));
 
-  // RX name
-  line = form->newLine(grid);
-  new StaticText(line, rect_t{}, STR_RX_NAME);
+  form.with([&](Window& formWindow) {
+    // Register ID
+    auto line = formWindow.newLine(grid);
+    new StaticText(line, rect_t{}, STR_REG_ID);
+    reg_id = new ModelTextEdit(line, rect_t{}, g_model.modelRegistrationID,
+                               sizeof(g_model.modelRegistrationID));
 
-  start();  // clears registration data buffer
-  rx_name = new ModelTextEdit(line, rect_t{}, modSetup->registerRxName,
-                              PXX2_LEN_RX_NAME);
-  rx_name->disable();
+    // UID
+    line = formWindow.newLine(grid);
+    new StaticText(line, rect_t{}, "UID");
 
-  // Status
-  // line = form->newLine(grid);
-  // new StaticText(line, rect_t{}, STR_STATUS);
-  // status = new StaticText(line, rect_t{}, STR_WAITING_FOR_RX);
+    uid = new NumberEdit(line, rect_t{}, 0, 2,
+                         GET_SET_DEFAULT(modSetup->registerLoopIndex));
 
-  auto box = new Window(form, rect_t{});
-  box->setFlexLayout(LV_FLEX_FLOW_ROW_WRAP, PAD_MEDIUM);
-  lv_obj_set_style_flex_main_place(box->getLvObj(), LV_FLEX_ALIGN_SPACE_EVENLY,
-                                   0);
-  box->padAll(PAD_MEDIUM);
+    // RX name
+    line = formWindow.newLine(grid);
+    new StaticText(line, rect_t{}, STR_RX_NAME);
 
-  new TextButton(box, rect_t{}, STR_CANCEL, [=]() -> int8_t {
-    this->deleteLater();
-    return 0;
+    start();  // clears registration data buffer
+    rx_name = new ModelTextEdit(line, rect_t{}, modSetup->registerRxName,
+                                PXX2_LEN_RX_NAME);
+    rx_name->disable();
+
+    // Status
+    // line = formWindow.newLine(grid);
+    // new StaticText(line, rect_t{}, STR_STATUS);
+    // status = new StaticText(line, rect_t{}, STR_WAITING_FOR_RX);
+
+    auto box = new Window(&formWindow, rect_t{});
+    box->setFlexLayout(LV_FLEX_FLOW_ROW_WRAP, PAD_MEDIUM);
+    box->setStyleFlexMainPlace(LV_FLEX_ALIGN_SPACE_EVENLY, 0);
+    box->padAll(PAD_MEDIUM);
+
+    new TextButton(box, rect_t{}, STR_CANCEL, [=]() -> int8_t {
+      this->deleteLater();
+      return 0;
+    });
+
+    btn_ok = new TextButton(box, rect_t{}, STR_SAVE, [=]() -> int8_t {
+      modSetup->registerStep = REGISTER_RX_NAME_SELECTED;
+      return 0;
+    });
+    btn_ok->hide();
   });
-
-  btn_ok = new TextButton(box, rect_t{}, STR_SAVE, [=]() -> int8_t {
-    modSetup->registerStep = REGISTER_RX_NAME_SELECTED;
-    return 0;
-  });
-  btn_ok->hide();
 
   setCloseHandler([=]() { moduleState[moduleIdx].mode = MODULE_MODE_NORMAL; });
 }
@@ -433,7 +436,9 @@ void RegisterDialog::onLiveCheckEvents(Window::LiveWindow& live)
 ModuleOptions::ModuleOptions(uint8_t moduleIdx) :
     BaseDialog(STR_MODULE_OPTIONS, true), moduleIdx(moduleIdx)
 {
-  new StaticText(form, rect_t{}, STR_WAITING_FOR_MODULE);
+  form.with([](Window& formWindow) {
+    Window::makeLive<StaticText>(&formWindow, rect_t{}, STR_WAITING_FOR_MODULE);
+  });
 
 #if defined(SIMU)
   auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
@@ -506,8 +511,6 @@ uint8_t ModuleOptions::getModuleSettingsState()
 
 void ModuleOptions::update()
 {
-  form->clear();
-
   auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
   uint8_t modelId = hwSettings.modules[moduleIdx].information.modelID;
 
@@ -525,93 +528,96 @@ void ModuleOptions::update()
 
   FlexGridLayout grid(line_col_dsc, line_row_dsc, PAD_TINY);
 
-  auto line = form->newLine(grid);
-  new StaticText(line, rect_t{}, STR_MODULE);
-  new StaticText(line, rect_t{}, getPXX2ModuleName(modelId));
+  form.with([&](Window& formWindow) {
+    formWindow.clear();
 
-  if (!optionsAvailable) {
-    // no options available
-    line = form->newLine(grid);
-    new StaticText(line, rect_t{}, STR_NO_TX_OPTIONS);
-  } else {
-    // some options available
-    if (optionsAvailable & (1 << MODULE_OPTION_EXTERNAL_ANTENNA)) {
-      line = form->newLine(grid);
-      new StaticText(line, rect_t{}, STR_EXT_ANTENNA);
-      new ToggleSwitch(
-          line, rect_t{},
-          []() {
-            const auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
-            return hwSettings.moduleSettings.externalAntenna;
-          },
-          [&](uint8_t val) {
-            auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
-            hwSettings.moduleSettings.externalAntenna = val;
-          });
+    auto line = formWindow.newLine(grid);
+    new StaticText(line, rect_t{}, STR_MODULE);
+    new StaticText(line, rect_t{}, getPXX2ModuleName(modelId));
+
+    if (!optionsAvailable) {
+      // no options available
+      line = formWindow.newLine(grid);
+      new StaticText(line, rect_t{}, STR_NO_TX_OPTIONS);
+    } else {
+      // some options available
+      if (optionsAvailable & (1 << MODULE_OPTION_EXTERNAL_ANTENNA)) {
+        line = formWindow.newLine(grid);
+        new StaticText(line, rect_t{}, STR_EXT_ANTENNA);
+        new ToggleSwitch(
+            line, rect_t{},
+            []() {
+              const auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
+              return hwSettings.moduleSettings.externalAntenna;
+            },
+            [&](uint8_t val) {
+              auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
+              hwSettings.moduleSettings.externalAntenna = val;
+            });
+      }
+
+      if (optionsAvailable & (1 << MODULE_OPTION_POWER)) {
+        // TODO: use isTelemetryAvailable() to check if rebind is necessary
+        line = formWindow.newLine(grid);
+        new StaticText(line, rect_t{}, STR_POWER);
+        auto txPower = new Choice(
+            line, rect_t{}, 0, 30,
+            []() {
+              const auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
+              return hwSettings.moduleSettings.txPower;
+            },
+            [&](int val) {
+              auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
+              hwSettings.moduleSettings.txPower = val;
+              // state = MO_WriteSettings;
+            });
+
+        txPower->setTextHandler([](int val) {
+          switch (val) {
+            case 10:
+              return std::string("10 mW");
+            case 14:
+              return std::string("25 mW");
+            case 20:
+              return std::string("100 mW");
+            case 23:
+              return std::string("200 mW");
+            case 27:
+              return std::string("500 mW");
+            case 30:
+              return std::string("1000 mW");
+            default:
+              return std::string("---");
+          }
+        });
+
+        txPower->setAvailableHandler([=](int val) {
+          const auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
+          return isPXX2PowerAvailable(hwSettings.modules[moduleIdx].information,
+                                      val);
+        });
+      }
     }
 
-    if (optionsAvailable & (1 << MODULE_OPTION_POWER)) {
-      // TODO: use isTelemetryAvailable() to check if rebind is necessary
-      line = form->newLine(grid);
-      new StaticText(line, rect_t{}, STR_POWER);
-      auto txPower = new Choice(
-          line, rect_t{}, 0, 30,
-          []() {
-            const auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
-            return hwSettings.moduleSettings.txPower;
-          },
-          [&](int val) {
-            auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
-            hwSettings.moduleSettings.txPower = val;
-            // state = MO_WriteSettings;
-          });
+    line = formWindow.newLine(grid);
+    new DynamicText(line, rect_t{}, [=]() { return statusText; });
 
-      txPower->setTextHandler([](int val) {
-        switch (val) {
-          case 10:
-            return std::string("10 mW");
-          case 14:
-            return std::string("25 mW");
-          case 20:
-            return std::string("100 mW");
-          case 23:
-            return std::string("200 mW");
-          case 27:
-            return std::string("500 mW");
-          case 30:
-            return std::string("1000 mW");
-          default:
-            return std::string("---");
-        }
-      });
+    line = formWindow.newLine(grid);
 
-      txPower->setAvailableHandler([=](int val) {
-        const auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
-        return isPXX2PowerAvailable(hwSettings.modules[moduleIdx].information,
-                                    val);
-      });
-    }
-  }
+    auto box = new Window(&formWindow, rect_t{});
+    box->setFlexLayout(LV_FLEX_FLOW_ROW_WRAP, PAD_MEDIUM);
+    box->setStyleFlexMainPlace(LV_FLEX_ALIGN_SPACE_EVENLY, 0);
+    box->padAll(PAD_MEDIUM);
 
-  line = form->newLine(grid);
-  new DynamicText(line, rect_t{}, [=]() { return statusText; });
+    new TextButton(box, rect_t{}, STR_CANCEL, [=]() -> int8_t {
+      this->deleteLater();
+      return 0;
+    });
 
-  line = form->newLine(grid);
-
-  auto box = new Window(form, rect_t{});
-  box->setFlexLayout(LV_FLEX_FLOW_ROW_WRAP, PAD_MEDIUM);
-  lv_obj_set_style_flex_main_place(box->getLvObj(), LV_FLEX_ALIGN_SPACE_EVENLY,
-                                   0);
-  box->padAll(PAD_MEDIUM);
-
-  new TextButton(box, rect_t{}, STR_CANCEL, [=]() -> int8_t {
-    this->deleteLater();
-    return 0;
-  });
-
-  new TextButton(box, rect_t{}, STR_SAVE, [=]() -> int8_t {
-    this->writeSettings();
-    return 0;
+    new TextButton(box, rect_t{}, STR_SAVE, [=]() -> int8_t {
+      this->writeSettings();
+      return 0;
+    });
   });
 }
 
@@ -628,7 +634,9 @@ RxOptions::RxOptions(uint8_t moduleIdx, uint8_t rxIdx) :
     moduleIdx(moduleIdx),
     receiverIdx(rxIdx)
 {
-  new StaticText(form, rect_t{}, STR_WAITING_FOR_RX);
+  form.with([](Window& formWindow) {
+    Window::makeLive<StaticText>(&formWindow, rect_t{}, STR_WAITING_FOR_RX);
+  });
 
 #if defined(SIMU)
   auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
@@ -838,136 +846,137 @@ void RxOptions::update()
 
   FlexGridLayout grid(line_col_dsc, line_row_dsc, PAD_TINY);
 
-  auto line = form->newLine(grid);
-  new StaticText(line, rect_t{}, STR_RECEIVER);
-  new StaticText(line, rect_t{},
-                 g_model.moduleData[moduleIdx].pxx2.receiverName[receiverIdx]);
+  form.with([&](Window& formWindow) {
+    auto line = formWindow.newLine(grid);
+    new StaticText(line, rect_t{}, STR_RECEIVER);
+    new StaticText(line, rect_t{},
+                   g_model.moduleData[moduleIdx].pxx2.receiverName[receiverIdx]);
 
-  // PWM rate
-  line = form->newLine(grid);
-  new StaticText(line, rect_t{},
-                 isModuleR9MAccess(moduleIdx) ? "6.67ms PWM" : "7ms PWM");
-  new ToggleSwitch(
-      line, rect_t{},
-      []() {
-        auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
-        return hwSettings.receiverSettings.pwmRate;
-      },
-      [](int val) {
-        auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
-        hwSettings.receiverSettings.pwmRate = val;
-      });
-
-  // telemetry disabled
-  line = form->newLine(grid);
-  new StaticText(line, rect_t{}, STR_TELEMETRY_DISABLED);
-  auto tele25mw = new ToggleSwitch(
-      line, rect_t{},
-      []() {
-        auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
-        return hwSettings.receiverSettings.telemetryDisabled;
-      },
-      [](int val) {
-        auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
-        hwSettings.receiverSettings.telemetryDisabled = val;
-      });
-
-  if (isModuleR9MAccess(moduleIdx) && rxVariant == PXX2_VARIANT_EU &&
-      hwSettings.moduleSettings.txPower > 14 /*25mW*/) {
-    // read only field in this case
-    tele25mw->disable();
-  }
-
-  if (capabilities & (1 << RECEIVER_CAPABILITY_TELEMETRY_25MW)) {
-    // telemetry 25 mW
-    line = form->newLine(grid);
-    new StaticText(line, rect_t{}, "25mw Tele");
+    // PWM rate
+    line = formWindow.newLine(grid);
+    new StaticText(line, rect_t{},
+                   isModuleR9MAccess(moduleIdx) ? "6.67ms PWM" : "7ms PWM");
     new ToggleSwitch(
         line, rect_t{},
         []() {
           auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
-          return hwSettings.receiverSettings.telemetry25mw;
+          return hwSettings.receiverSettings.pwmRate;
         },
         [](int val) {
           auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
-          hwSettings.receiverSettings.telemetry25mw = val;
+          hwSettings.receiverSettings.pwmRate = val;
         });
-  }
 
-  if (capabilities &
-      ((1 << RECEIVER_CAPABILITY_FPORT) | (1 << RECEIVER_CAPABILITY_FPORT2))) {
-    // SPORT modes
-    line = form->newLine(grid);
-    new StaticText(line, rect_t{}, STR_PROTOCOL);
-    auto sportModes = new Choice(
-        line, rect_t{}, STR_SPORT_MODES, 0, 2,
+    // telemetry disabled
+    line = formWindow.newLine(grid);
+    new StaticText(line, rect_t{}, STR_TELEMETRY_DISABLED);
+    auto tele25mw = new ToggleSwitch(
+        line, rect_t{},
         []() {
-          const auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
-          const auto& rxSettings = hwSettings.receiverSettings;
-          return rxSettings.fport | (rxSettings.fport2 << 1);
+          auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
+          return hwSettings.receiverSettings.telemetryDisabled;
         },
         [](int val) {
           auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
-          auto& rxSettings = hwSettings.receiverSettings;
-          rxSettings.fport = val & 0x01;
-          rxSettings.fport2 = (val & 0x02) >> 1;
+          hwSettings.receiverSettings.telemetryDisabled = val;
         });
 
-    sportModes->setAvailableHandler([=](int val) {
-      switch (val) {
-        case 1:  // FPORT
-          return (bool)(capabilities & (1 << RECEIVER_CAPABILITY_FPORT));
-        case 2:  // FPORT2
-          return (bool)(capabilities & (1 << RECEIVER_CAPABILITY_FPORT2));
-      }
-      return true;
+    if (isModuleR9MAccess(moduleIdx) && rxVariant == PXX2_VARIANT_EU &&
+        hwSettings.moduleSettings.txPower > 14 /*25mW*/) {
+      // read only field in this case
+      tele25mw->disable();
+    }
+
+    if (capabilities & (1 << RECEIVER_CAPABILITY_TELEMETRY_25MW)) {
+      // telemetry 25 mW
+      line = formWindow.newLine(grid);
+      new StaticText(line, rect_t{}, "25mw Tele");
+      new ToggleSwitch(
+          line, rect_t{},
+          []() {
+            auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
+            return hwSettings.receiverSettings.telemetry25mw;
+          },
+          [](int val) {
+            auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
+            hwSettings.receiverSettings.telemetry25mw = val;
+          });
+    }
+
+    if (capabilities & ((1 << RECEIVER_CAPABILITY_FPORT) |
+                        (1 << RECEIVER_CAPABILITY_FPORT2))) {
+      // SPORT modes
+      line = formWindow.newLine(grid);
+      new StaticText(line, rect_t{}, STR_PROTOCOL);
+      auto sportModes = new Choice(
+          line, rect_t{}, STR_SPORT_MODES, 0, 2,
+          []() {
+            const auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
+            const auto& rxSettings = hwSettings.receiverSettings;
+            return rxSettings.fport | (rxSettings.fport2 << 1);
+          },
+          [](int val) {
+            auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
+            auto& rxSettings = hwSettings.receiverSettings;
+            rxSettings.fport = val & 0x01;
+            rxSettings.fport2 = (val & 0x02) >> 1;
+          });
+
+      sportModes->setAvailableHandler([=](int val) {
+        switch (val) {
+          case 1:  // FPORT
+            return (bool)(capabilities & (1 << RECEIVER_CAPABILITY_FPORT));
+          case 2:  // FPORT2
+            return (bool)(capabilities & (1 << RECEIVER_CAPABILITY_FPORT2));
+        }
+        return true;
+      });
+    }
+
+    if (capabilities & (1 << RECEIVER_CAPABILITY_SBUS24)) {
+      line = formWindow.newLine(grid);
+      new StaticText(line, rect_t{}, STR_SBUS24);
+      new ToggleSwitch(
+          line, rect_t{},
+          []() {
+            auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
+            return hwSettings.receiverSettings.sbus24;
+          },
+          [](int val) {
+            auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
+            hwSettings.receiverSettings.sbus24 = val;
+          });
+    }
+
+    auto outputsCount =
+        min<uint8_t>(16, hwSettings.receiverSettings.outputsCount);
+    for (uint8_t i = 0; i < outputsCount; i++) {
+      line = formWindow.newLine(grid);
+      std::string i_str = std::to_string(i + 1);
+      new StaticText(line, rect_t{}, std::string(STR_PIN) + i_str);
+
+      uint8_t channels = sentModuleChannels(moduleIdx);
+      new OutputMappingChoice(line, capabilities, rxModelId, moduleIdx, channels,
+                              i);
+    }
+
+    line = formWindow.newLine(grid);
+    new DynamicText(line, rect_t{}, [=]() { return statusText; });
+
+    auto box = new Window(&formWindow, rect_t{});
+    box->setFlexLayout(LV_FLEX_FLOW_ROW_WRAP, PAD_MEDIUM);
+    box->setStyleFlexMainPlace(LV_FLEX_ALIGN_SPACE_EVENLY, 0);
+    box->padAll(PAD_MEDIUM);
+
+    new TextButton(box, rect_t{}, STR_CANCEL, [=]() -> int8_t {
+      this->deleteLater();
+      return 0;
     });
-  }
 
-  if (capabilities & (1 << RECEIVER_CAPABILITY_SBUS24)) {
-    line = form->newLine(grid);
-    new StaticText(line, rect_t{}, STR_SBUS24);
-    new ToggleSwitch(
-        line, rect_t{},
-        []() {
-          auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
-          return hwSettings.receiverSettings.sbus24;
-        },
-        [](int val) {
-          auto& hwSettings = getPXX2HardwareAndSettingsBuffer();
-          hwSettings.receiverSettings.sbus24 = val;
-        });
-  }
-
-  auto outputsCount =
-      min<uint8_t>(16, hwSettings.receiverSettings.outputsCount);
-  for (uint8_t i = 0; i < outputsCount; i++) {
-    line = form->newLine(grid);
-    std::string i_str = std::to_string(i + 1);
-    new StaticText(line, rect_t{}, std::string(STR_PIN) + i_str);
-
-    uint8_t channels = sentModuleChannels(moduleIdx);
-    new OutputMappingChoice(line, capabilities, rxModelId, moduleIdx, channels,
-                            i);
-  }
-
-  line = form->newLine(grid);
-  new DynamicText(line, rect_t{}, [=]() { return statusText; });
-
-  auto box = new Window(form, rect_t{});
-  box->setFlexLayout(LV_FLEX_FLOW_ROW_WRAP, PAD_MEDIUM);
-  lv_obj_set_style_flex_main_place(box->getLvObj(), LV_FLEX_ALIGN_SPACE_EVENLY,
-                                   0);
-  box->padAll(PAD_MEDIUM);
-
-  new TextButton(box, rect_t{}, STR_CANCEL, [=]() -> int8_t {
-    this->deleteLater();
-    return 0;
-  });
-
-  new TextButton(box, rect_t{}, STR_SAVE, [=]() -> int8_t {
-    this->writeSettings();
-    return 0;
+    new TextButton(box, rect_t{}, STR_SAVE, [=]() -> int8_t {
+      this->writeSettings();
+      return 0;
+    });
   });
 }
 

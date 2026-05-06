@@ -227,7 +227,7 @@ class Widget : public ButtonBase
   WidgetLocation location;
   bool fullscreen = false;
   bool closeFS = false;
-  lv_obj_t* focusBorder = nullptr;
+  OptionalLvObj focusBorder;
   lv_style_t borderStyle;
   lv_point_t borderPts[5];
 

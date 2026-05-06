@@ -526,17 +526,23 @@ void ThemePersistance::insertDefaultTheme()
 HeaderDateTime::HeaderDateTime(Window* parent, coord_t x, coord_t y) :
   Window(parent, {x, y, HDR_DATE_WIDTH, HDR_DATE_LINE2 + HDR_DATE_HEIGHT + 2})
 {
-  date = etx_label_create(lvobj, FONT_XS_INDEX);
-  lv_obj_set_pos(date, 0, 0);
-  lv_obj_set_size(date, HDR_DATE_WIDTH, HDR_DATE_HEIGHT);
-  lv_obj_set_style_text_align(date, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-  etx_txt_color(date, COLOR_THEME_PRIMARY2_INDEX);
+  initRequiredLvObj(
+      date, [](lv_obj_t* parent) { return etx_label_create(parent, FONT_XS_INDEX); },
+      [](lv_obj_t* obj) {
+        lv_obj_set_pos(obj, 0, 0);
+        lv_obj_set_size(obj, HDR_DATE_WIDTH, HDR_DATE_HEIGHT);
+        lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+        etx_txt_color(obj, COLOR_THEME_PRIMARY2_INDEX);
+      });
 
-  time = etx_label_create(lvobj, FONT_XS_INDEX);
-  lv_obj_set_pos(time, 0, HDR_DATE_LINE2);
-  lv_obj_set_size(time, HDR_DATE_WIDTH, HDR_DATE_HEIGHT);
-  lv_obj_set_style_text_align(time, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-  etx_txt_color(time, COLOR_THEME_PRIMARY2_INDEX);
+  initRequiredLvObj(
+      time, [](lv_obj_t* parent) { return etx_label_create(parent, FONT_XS_INDEX); },
+      [](lv_obj_t* obj) {
+        lv_obj_set_pos(obj, 0, HDR_DATE_LINE2);
+        lv_obj_set_size(obj, HDR_DATE_WIDTH, HDR_DATE_HEIGHT);
+        lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+        etx_txt_color(obj, COLOR_THEME_PRIMARY2_INDEX);
+      });
 
   setWindowFlag(NO_CLICK);
 
@@ -557,10 +563,10 @@ void HeaderDateTime::onLiveCheckEvents(Window::LiveWindow& live)
 #else
     sprintf(str, "%d %s", t.tm_mday, STR_MONTHS[t.tm_mon]);
 #endif
-    lv_label_set_text(date, str);
+    date.with([&](lv_obj_t* obj) { lv_label_set_text(obj, str); });
 
     getTimerString(str, getValue(MIXSRC_TX_TIME), timerOptions);
-    lv_label_set_text(time, str);
+    time.with([&](lv_obj_t* obj) { lv_label_set_text(obj, str); });
 
     lastTime = t;
   }
@@ -568,27 +574,29 @@ void HeaderDateTime::onLiveCheckEvents(Window::LiveWindow& live)
 
 void HeaderDateTime::setColor(LcdFlags color)
 {
-  etx_txt_color_from_flags(date, color);
-  etx_txt_color_from_flags(time, color);
+  date.with([&](lv_obj_t* obj) { etx_txt_color_from_flags(obj, color); });
+  time.with([&](lv_obj_t* obj) { etx_txt_color_from_flags(obj, color); });
 }
 
 void HeaderDateTime::setFont(FontIndex font)
 {
-  etx_font(date, font);
-  etx_font(time, font);
+  date.with([&](lv_obj_t* obj) { etx_font(obj, font); });
+  time.with([&](lv_obj_t* obj) { etx_font(obj, font); });
 }
 
 void HeaderDateTime::setDisplayWidth(coord_t width)
 {
   setWidth(width);
-  lv_obj_set_width(date, width);
-  lv_obj_set_width(time, width);
+  date.with([&](lv_obj_t* obj) { lv_obj_set_width(obj, width); });
+  time.with([&](lv_obj_t* obj) { lv_obj_set_width(obj, width); });
 }
 
 void HeaderDateTime::setTextAlign(lv_text_align_t align)
 {
-  lv_obj_set_style_text_align(date, align, LV_PART_MAIN);
-  lv_obj_set_style_text_align(time, align, LV_PART_MAIN);
+  date.with(
+      [&](lv_obj_t* obj) { lv_obj_set_style_text_align(obj, align, LV_PART_MAIN); });
+  time.with(
+      [&](lv_obj_t* obj) { lv_obj_set_style_text_align(obj, align, LV_PART_MAIN); });
 }
 
 HeaderIcon::HeaderIcon(Window* parent, EdgeTxIcon icon, std::function<void()> action) :

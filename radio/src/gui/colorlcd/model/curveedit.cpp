@@ -52,16 +52,22 @@ class CurveEdit : public Curve
 
     lockSource = currentSource;
 
-    for (int i = 0; i < 17; i += 1) {
-      auto p = lv_obj_create(lvobj);
-      etx_solid_bg(p, COLOR_THEME_PRIMARY2_INDEX);
-      etx_obj_add_style(p, styles->circle, LV_PART_MAIN);
-      etx_obj_add_style(p, styles->border, LV_PART_MAIN);
-      etx_obj_add_style(p, styles->border_color[COLOR_THEME_SECONDARY1_INDEX], LV_PART_MAIN);
-      lv_obj_set_size(p, POS_PT_SZ, POS_PT_SZ);
-      lv_obj_add_flag(p, LV_OBJ_FLAG_HIDDEN);
-      pointDots[i] = p;
-    }
+    withLive([&](LiveWindow& live) {
+      auto parent = live.lvobj();
+      for (int i = 0; i < 17; i += 1) {
+        auto p = lv_obj_create(parent);
+        if (!p) continue;
+        etx_solid_bg(p, COLOR_THEME_PRIMARY2_INDEX);
+        etx_obj_add_style(p, styles->circle, LV_PART_MAIN);
+        etx_obj_add_style(p, styles->border, LV_PART_MAIN);
+        etx_obj_add_style(
+            p, styles->border_color[COLOR_THEME_SECONDARY1_INDEX],
+            LV_PART_MAIN);
+        lv_obj_set_size(p, POS_PT_SZ, POS_PT_SZ);
+        lv_obj_add_flag(p, LV_OBJ_FLAG_HIDDEN);
+        pointDots[i] = p;
+      }
+    });
 
     previewUpdateMsg.subscribe(Messaging::CURVE_EDIT, [=](uint32_t param) { updatePreview(); });
 
@@ -82,7 +88,7 @@ class CurveEdit : public Curve
   {
     points.clear();
     for (int i = 0; i < 17; i += 1)
-      lv_obj_add_flag(pointDots[i], LV_OBJ_FLAG_HIDDEN);
+      if (pointDots[i]) lv_obj_add_flag(pointDots[i], LV_OBJ_FLAG_HIDDEN);
   }
 
   void addPoint(const point_t& point)
@@ -90,8 +96,10 @@ class CurveEdit : public Curve
     int i = points.size();
     coord_t x = getPointX(point.x);
     coord_t y = getPointY(point.y);
-    lv_obj_set_pos(pointDots[i], x - POS_PT_SZ / 2, y - POS_PT_SZ / 2);
-    lv_obj_clear_flag(pointDots[i], LV_OBJ_FLAG_HIDDEN);
+    if (pointDots[i]) {
+      lv_obj_set_pos(pointDots[i], x - POS_PT_SZ / 2, y - POS_PT_SZ / 2);
+      lv_obj_clear_flag(pointDots[i], LV_OBJ_FLAG_HIDDEN);
+    }
 
     points.push_back(point);
   }
@@ -122,8 +130,8 @@ class CurveDataEdit : public Window
   CurveDataEdit(Window* parent, const rect_t& rect, uint8_t index) :
       Window(parent, rect), index(index)
   {
-    etx_scrollbar(lvobj);
-    lv_obj_set_style_max_height(lvobj, rect.h, LV_PART_MAIN);
+    scrollbar();
+    setStyleMaxHeight(rect.h, LV_PART_MAIN);
 
     padAll(PAD_ZERO);
     padBottom(PAD_SMALL);
@@ -289,15 +297,15 @@ void CurveEditWindow::buildBody(Window* window)
 
   auto line = window->newLine(grid);
   line->padAll(PAD_ZERO);
-  lv_obj_set_grid_align(line->getLvObj(), LV_GRID_ALIGN_SPACE_BETWEEN,
-                        LV_GRID_ALIGN_SPACE_BETWEEN);
+  line->setGridAlign(LV_GRID_ALIGN_SPACE_BETWEEN,
+                     LV_GRID_ALIGN_SPACE_BETWEEN);
 
 #if PORTRAIT
-  lv_obj_set_flex_flow(line->getLvObj(), LV_FLEX_FLOW_COLUMN);
+  line->setFlexFlow(LV_FLEX_FLOW_COLUMN);
   coord_t boxWidth = window->width();
   coord_t boxHeight = window->height() - CurveDataEdit::CURVE_WIDTH;
 #else
-  lv_obj_set_flex_flow(line->getLvObj(), LV_FLEX_FLOW_ROW);
+  line->setFlexFlow(LV_FLEX_FLOW_ROW);
   coord_t boxWidth = window->width() - CurveDataEdit::CURVE_WIDTH;
   coord_t boxHeight = window->height();
 #endif
@@ -321,9 +329,8 @@ void CurveEditWindow::buildBody(Window* window)
 
               auto iLine = form.newLine(iGrid);
               iLine->padAll(PAD_TINY);
-              lv_obj_set_grid_align(iLine->getLvObj(),
-                                    LV_GRID_ALIGN_SPACE_BETWEEN,
-                                    LV_GRID_ALIGN_SPACE_BETWEEN);
+              iLine->setGridAlign(LV_GRID_ALIGN_SPACE_BETWEEN,
+                                  LV_GRID_ALIGN_SPACE_BETWEEN);
 
               // Name
               new (std::nothrow) StaticText(iLine, rect_t{}, STR_NAME);
@@ -346,9 +353,8 @@ void CurveEditWindow::buildBody(Window* window)
 
               iLine = form.newLine(iGrid);
               iLine->padAll(PAD_TINY);
-              lv_obj_set_grid_align(iLine->getLvObj(),
-                                    LV_GRID_ALIGN_SPACE_BETWEEN,
-                                    LV_GRID_ALIGN_SPACE_BETWEEN);
+              iLine->setGridAlign(LV_GRID_ALIGN_SPACE_BETWEEN,
+                                  LV_GRID_ALIGN_SPACE_BETWEEN);
 
               // Type
               new (std::nothrow) StaticText(iLine, rect_t{}, STR_TYPE);
@@ -420,9 +426,8 @@ void CurveEditWindow::buildBody(Window* window)
 
               iLine = form.newLine(iGrid);
               iLine->padAll(PAD_ZERO);
-              lv_obj_set_grid_align(iLine->getLvObj(),
-                                    LV_GRID_ALIGN_SPACE_BETWEEN,
-                                    LV_GRID_ALIGN_SPACE_BETWEEN);
+              iLine->setGridAlign(LV_GRID_ALIGN_SPACE_BETWEEN,
+                                  LV_GRID_ALIGN_SPACE_BETWEEN);
 
               buildRequiredWindow<CurveDataEdit>(
                   [&](CurveDataEdit& edit) {
@@ -438,9 +443,8 @@ void CurveEditWindow::buildBody(Window* window)
                   index);
 
               // Curve editor
-              lv_obj_set_flex_align(line->getLvObj(), LV_FLEX_ALIGN_CENTER,
-                                    LV_FLEX_ALIGN_CENTER,
-                                    LV_FLEX_ALIGN_SPACE_AROUND);
+              line->setFlexAlign(LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
+                                 LV_FLEX_ALIGN_SPACE_AROUND);
               new CurveEdit(line,
                             {0, 0, CurveDataEdit::CURVE_WIDTH,
                              CurveDataEdit::CURVE_WIDTH},

@@ -40,14 +40,18 @@ class Layout6x1 : public Layout
             uint8_t zoneCount, uint8_t* zoneMap) :
       Layout(parent, factory, screenNum, zoneCount, zoneMap)
   {
-    panel = lv_obj_create(lvobj);
-    lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, LV_PART_MAIN);
+    withLive([&](LiveWindow& live) {
+      auto obj = lv_obj_create(live.lvobj());
+      if (!requireLvObj(panel, obj)) return false;
+      lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_PART_MAIN);
+      return true;
+    });
     setPanel();
   }
 
  protected:
   rect_t mainZone = {0, 0, 0, 0};
-  lv_obj_t* panel = nullptr;
+  RequiredLvObj panel;
 
   void updateDecorations() override
   {
@@ -57,23 +61,25 @@ class Layout6x1 : public Layout
 
   void setPanel()
   {
-    rect_t zone = Layout::getWidgetsZone();
-    if (mainZone.x != zone.x || mainZone.y != zone.y || mainZone.w != zone.w ||
-        mainZone.h != zone.h) {
-      mainZone = zone;
-      lv_obj_set_pos(panel, mainZone.x, mainZone.y);
-      lv_obj_set_size(panel, mainZone.w, mainZone.h);
-    }
+    panel.with([&](lv_obj_t* obj) {
+      rect_t zone = Layout::getWidgetsZone();
+      if (mainZone.x != zone.x || mainZone.y != zone.y ||
+          mainZone.w != zone.w || mainZone.h != zone.h) {
+        mainZone = zone;
+        lv_obj_set_pos(obj, mainZone.x, mainZone.y);
+        lv_obj_set_size(obj, mainZone.w, mainZone.h);
+      }
 
-    bool vis = getOptionValue(OPTION_BACKGROUND)->boolValue;
-    if (vis == lv_obj_has_flag(panel, LV_OBJ_FLAG_HIDDEN)) {
-      if (vis)
-        lv_obj_clear_flag(panel, LV_OBJ_FLAG_HIDDEN);
-      else
-        lv_obj_add_flag(panel, LV_OBJ_FLAG_HIDDEN);
-    }
+      bool vis = getOptionValue(OPTION_BACKGROUND)->boolValue;
+      if (vis == lv_obj_has_flag(obj, LV_OBJ_FLAG_HIDDEN)) {
+        if (vis)
+          lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
+        else
+          lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+      }
 
-    etx_bg_color_from_flags(panel, getOptionValue(OPTION_COLOR)->unsignedValue);
+      etx_bg_color_from_flags(obj, getOptionValue(OPTION_COLOR)->unsignedValue);
+    });
   }
 };
 

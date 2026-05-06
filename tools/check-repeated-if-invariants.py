@@ -191,7 +191,6 @@ UI_SAFETY_CALLS = {
 
 UI_SAFETY_ATOM_SUBSTRINGS = (
     "acceptsevents",
-    "deleted",
     "getlvobj",
     "haslivelvobj",
     "iskeyboardready",
@@ -846,7 +845,11 @@ def is_invariant_boundary_atom(atom: str) -> bool:
 
 def is_window_liveness_atom(atom: str) -> bool:
     lower = atom.lower()
-    if any(part in lower for part in ("acceptsevents", "deleted", "_deleted")):
+    if "acceptsevents" in lower or "_deleted" in lower:
+        return True
+    if re.search(r"(?:^|[!(&|])(?:this->)?deleted\s*\(", lower):
+        return True
+    if re.search(r"(?:->|\.)\s*deleted\s*\(", lower):
         return True
     if "isavailable" not in lower:
         return False

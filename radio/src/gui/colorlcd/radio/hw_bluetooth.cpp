@@ -79,8 +79,8 @@ BluetoothConfigWindow::BluetoothConfigWindow(Window* parent, FlexGridLayout& gri
   auto box = new Window(line, rect_t{});
   box->padAll(PAD_TINY);
   box->setFlexLayout(LV_FLEX_FLOW_ROW_WRAP, PAD_SMALL);
-  lv_obj_set_style_grid_cell_x_align(box->getLvObj(), LV_GRID_ALIGN_STRETCH, 0);
-  lv_obj_set_style_flex_cross_place(box->getLvObj(), LV_FLEX_ALIGN_CENTER, 0);
+  box->setStyleGridCellXAlign(LV_GRID_ALIGN_STRETCH, 0);
+  box->setStyleFlexCrossPlace(LV_FLEX_ALIGN_CENTER, 0);
 
   new Choice(
       box, rect_t{}, STR_BLUETOOTH_MODES, BLUETOOTH_OFF, BLUETOOTH_TRAINER,
@@ -105,8 +105,8 @@ BluetoothConfigWindow::BluetoothConfigWindow(Window* parent, FlexGridLayout& gri
   box = new Window(nameEdit, rect_t{});
   box->padAll(PAD_TINY);
   box->setFlexLayout(LV_FLEX_FLOW_ROW_WRAP, PAD_SMALL);
-  lv_obj_set_style_grid_cell_x_align(box->getLvObj(), LV_GRID_ALIGN_STRETCH, 0);
-  lv_obj_set_style_flex_cross_place(box->getLvObj(), LV_FLEX_ALIGN_CENTER, 0);
+  box->setStyleGridCellXAlign(LV_GRID_ALIGN_STRETCH, 0);
+  box->setStyleFlexCrossPlace(LV_FLEX_ALIGN_CENTER, 0);
   new RadioTextEdit(box, rect_t{}, g_eeGeneral.bluetoothName,
                     LEN_BLUETOOTH_NAME);
   nameEdit->show(g_eeGeneral.bluetoothMode != BLUETOOTH_OFF);

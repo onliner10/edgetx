@@ -36,7 +36,7 @@ PageHeader::PageHeader(Window* parent, EdgeTxIcon icon) :
 {
   setWindowFlag(NO_FOCUS | OPAQUE);
 
-  etx_solid_bg(lvobj, COLOR_THEME_SECONDARY1_INDEX);
+  solidBg(COLOR_THEME_SECONDARY1_INDEX);
 
   new (std::nothrow) HeaderIcon(this, icon);
 
@@ -51,7 +51,7 @@ PageHeader::PageHeader(Window* parent, const char* iconFile) :
 {
   setWindowFlag(NO_FOCUS | OPAQUE);
 
-  etx_solid_bg(lvobj, COLOR_THEME_SECONDARY1_INDEX);
+  solidBg(COLOR_THEME_SECONDARY1_INDEX);
 
   new (std::nothrow) HeaderIcon(this, iconFile);
 
@@ -108,10 +108,10 @@ Page::Page(EdgeTxIcon icon, PaddingSize padding, bool pauseRefresh) :
   withPageBody([&](Window& pageBody) { body = &pageBody; });
   body->setWindowFlag(NO_FOCUS);
 
-  etx_solid_bg(lvobj);
-  lv_obj_set_style_max_height(body->getLvObj(), LCD_H - EdgeTxStyles::MENU_HEADER_HEIGHT,
-                              LV_PART_MAIN);
-  etx_scrollbar(body->getLvObj());
+  solidBg();
+  body->setStyleMaxHeight(LCD_H - EdgeTxStyles::MENU_HEADER_HEIGHT,
+                          LV_PART_MAIN);
+  body->scrollbar();
 
   pushLayer(true);
 
@@ -133,7 +133,9 @@ void Page::onLiveClicked(LiveWindow&) { Keyboard::hide(false); }
 void Page::enableRefresh()
 {
   lv_obj_enable_style_refresh(true);
-  lv_obj_refresh_style(lvobj, LV_PART_ANY, LV_STYLE_PROP_ANY);
+  withLive([](LiveWindow& live) {
+    lv_obj_refresh_style(live.lvobj(), LV_PART_ANY, LV_STYLE_PROP_ANY);
+  });
 }
 
 NavWindow* Page::navWindow()

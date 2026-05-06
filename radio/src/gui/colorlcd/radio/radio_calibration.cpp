@@ -61,7 +61,7 @@ class StickCalibrationWindow : public Window
     int32_t y = calibratedAnalogs[stickY];
     coord_t dx = width() / 2 - CAL_CTR + (CAL_SIZ / 2 * x) / RESX;
     coord_t dy = height() / 2 - CAL_CTR - (CAL_SIZ / 2 * y) / RESX;
-    lv_obj_set_pos(calibStick->getLvObj(), dx, dy);
+    calibStick->setPos(dx, dy);
   }
 
   static LAYOUT_VAL_SCALED(CAL_CTR, 9)
@@ -83,7 +83,7 @@ void RadioCalibrationPage::buildHeader(Window *window)
 {
   header->setTitle(STR_MENUCALIBRATION);
   title2 = header->setTitle2("");
-  etx_font(title2->getLvObj(), FONT_BOLD_INDEX);
+  title2->font(FONT_BOLD_INDEX);
 }
 
 void RadioCalibrationPage::buildBody(Window *window)

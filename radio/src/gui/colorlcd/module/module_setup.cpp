@@ -120,7 +120,7 @@ class ModuleWindow : public Window
   {
     setFlexLayout();
     updateModule();
-    lv_obj_add_event_cb(lvobj, ModuleWindow::mw_refresh_cb, LV_EVENT_REFRESH, this);
+    addLvEventCb(ModuleWindow::mw_refresh_cb, LV_EVENT_REFRESH, this);
     moduleUpdateMsg.subscribe(Messaging::MODULE_UPDATE, [=](uint32_t param) { updateLayout(); });
   }
 
@@ -208,8 +208,7 @@ class ModuleWindow : public Window
         auto line = newLine(grid);
         new StaticText(line, rect_t{}, "");
         idUnique = new StaticText(line, rect_t{}, "");
-        etx_txt_color(idUnique->getLvObj(), COLOR_THEME_WARNING_INDEX,
-                      ETX_STATE_UNIQUE_ID_WARN);
+        idUnique->textColor(COLOR_THEME_WARNING_INDEX, ETX_STATE_UNIQUE_ID_WARN);
         updateIDStaticText(moduleIdx);
       }
 
@@ -542,9 +541,9 @@ class ModuleWindow : public Window
     if (!modelslist.isModelIdUnique(mdIdx, buffer, sizeof(buffer))) {
       idStr = STR_MODELIDUSED;
       idStr = idStr + buffer;
-      lv_obj_add_state(idUnique->getLvObj(), ETX_STATE_UNIQUE_ID_WARN);
+      idUnique->addState(ETX_STATE_UNIQUE_ID_WARN);
     } else {
-      lv_obj_clear_state(idUnique->getLvObj(), ETX_STATE_UNIQUE_ID_WARN);
+      idUnique->clearState(ETX_STATE_UNIQUE_ID_WARN);
     }
     idUnique->setText(idStr);
   }

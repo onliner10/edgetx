@@ -123,9 +123,9 @@ class USBChannelButtonSel : public ButtonMatrix
     }
     update();
 
-    etx_obj_add_style(lvobj, styles->circle, LV_PART_ITEMS);
+    addStyle(styles->circle, LV_PART_ITEMS);
 
-    lv_obj_add_event_cb(lvobj, btnsel_event_cb, LV_EVENT_DRAW_PART_BEGIN, this);
+    addLvEventCb(btnsel_event_cb, LV_EVENT_DRAW_PART_BEGIN, this);
 
     memset(m_btns, 0, USBJ_BUTTON_SIZE);
     for (uint8_t ch = 0; ch < USBJ_MAX_JOYSTICK_CHANNELS; ch++) {
@@ -356,9 +356,9 @@ class USBChannelEditWindow : public Page
     collisionText =
         new StaticText(line, rect_t{}, "",
                        COLOR_THEME_PRIMARY2_INDEX, FONT(BOLD) | CENTERED);
-    etx_bg_color(collisionText->getLvObj(), COLOR_THEME_WARNING_INDEX);
-    lv_obj_set_grid_cell(collisionText->getLvObj(), LV_GRID_ALIGN_STRETCH, 0,
-                         USBCH_COLS, LV_GRID_ALIGN_CENTER, 0, 1);
+    collisionText->bgColor(COLOR_THEME_WARNING_INDEX);
+    collisionText->setGridCell(LV_GRID_ALIGN_STRETCH, 0, USBCH_COLS,
+                               LV_GRID_ALIGN_CENTER, 0, 1);
 
     update();
   }
@@ -375,49 +375,66 @@ class USBChannelLineButton : public ListLineButton
     padTop(PAD_SMALL);
 #endif
 
-    lv_obj_set_layout(lvobj, LV_LAYOUT_GRID);
-    lv_obj_set_grid_dsc_array(lvobj, b_col_dsc, b_row_dsc);
-    lv_obj_set_style_pad_row(lvobj, 0, 0);
-    lv_obj_set_style_pad_column(lvobj, PAD_SMALL, 0);
+    setLayout(LV_LAYOUT_GRID);
+    setGridDscArray(b_col_dsc, b_row_dsc);
+    setStylePadRow(0, 0);
+    setStylePadColumn(PAD_SMALL, 0);
 
     delayLoad();
   }
 
   void delayedInit() override
   {
-    m_chn = etx_label_create(lvobj);
-    lv_obj_set_grid_cell(m_chn, LV_GRID_ALIGN_START, 0, 1, LV_GRID_ALIGN_CENTER,
-                         0, USBCH_CHN_ROWS);
+    if (!withLive([&](LiveWindow& live) {
+          auto obj = live.lvobj();
+          m_chn = etx_label_create(obj);
+          if (!requireLvObj(m_chn)) return false;
+          lv_obj_set_grid_cell(m_chn, LV_GRID_ALIGN_START, 0, 1,
+                               LV_GRID_ALIGN_CENTER, 0, USBCH_CHN_ROWS);
 
-    m_inverse =
-        new StaticIcon(this, 0, 0, ICON_CHAN_MONITOR_INVERTED,
-                         COLOR_THEME_SECONDARY1_INDEX);
-    lv_obj_set_grid_cell(m_inverse->getLvObj(), LV_GRID_ALIGN_START, 1, 1,
-                         LV_GRID_ALIGN_CENTER, 0, 1);
+          m_inverse =
+              new StaticIcon(this, 0, 0, ICON_CHAN_MONITOR_INVERTED,
+                             COLOR_THEME_SECONDARY1_INDEX);
+          if (!m_inverse || !m_inverse->isAvailable()) {
+            failClosed();
+            return false;
+          }
+          m_inverse->setGridCell(LV_GRID_ALIGN_START, 1, 1,
+                                 LV_GRID_ALIGN_CENTER, 0, 1);
 
-    m_mode = etx_label_create(lvobj);
-    lv_obj_set_grid_cell(m_mode, LV_GRID_ALIGN_START, 2, 1,
-                         LV_GRID_ALIGN_CENTER, 0, 1);
+          m_mode = etx_label_create(obj);
+          if (!requireLvObj(m_mode)) return false;
+          lv_obj_set_grid_cell(m_mode, LV_GRID_ALIGN_START, 2, 1,
+                               LV_GRID_ALIGN_CENTER, 0, 1);
 
-    m_param = etx_label_create(lvobj);
-    etx_txt_color(m_param, COLOR_THEME_WARNING_INDEX, ETX_STATE_COLLISION_WARN);
-    etx_font(m_param, FONT_BOLD_INDEX, ETX_STATE_COLLISION_WARN);
-    lv_obj_set_grid_cell(m_param, LV_GRID_ALIGN_START, 3, 1,
-                         LV_GRID_ALIGN_CENTER, 0, 1);
+          m_param = etx_label_create(obj);
+          if (!requireLvObj(m_param)) return false;
+          etx_txt_color(m_param, COLOR_THEME_WARNING_INDEX,
+                        ETX_STATE_COLLISION_WARN);
+          etx_font(m_param, FONT_BOLD_INDEX, ETX_STATE_COLLISION_WARN);
+          lv_obj_set_grid_cell(m_param, LV_GRID_ALIGN_START, 3, 1,
+                               LV_GRID_ALIGN_CENTER, 0, 1);
 
-    m_btn_mode = etx_label_create(lvobj);
-    lv_obj_set_grid_cell(m_btn_mode, LV_GRID_ALIGN_START, USBCH_BTN_MODE_COL, 1,
-                         LV_GRID_ALIGN_CENTER, USBCH_BTN_MODE_ROW, 1);
+          m_btn_mode = etx_label_create(obj);
+          if (!requireLvObj(m_btn_mode)) return false;
+          lv_obj_set_grid_cell(m_btn_mode, LV_GRID_ALIGN_START,
+                               USBCH_BTN_MODE_COL, 1, LV_GRID_ALIGN_CENTER,
+                               USBCH_BTN_MODE_ROW, 1);
 
-    m_btns = etx_label_create(lvobj);
-    lv_obj_set_grid_cell(m_btns, LV_GRID_ALIGN_START, USBCH_BTN_MODE_COL + 1, 1,
-                         LV_GRID_ALIGN_CENTER, USBCH_BTN_MODE_ROW, 1);
+          m_btns = etx_label_create(obj);
+          if (!requireLvObj(m_btns)) return false;
+          lv_obj_set_grid_cell(m_btns, LV_GRID_ALIGN_START,
+                               USBCH_BTN_MODE_COL + 1, 1, LV_GRID_ALIGN_CENTER,
+                               USBCH_BTN_MODE_ROW, 1);
 
-    lv_label_set_text(m_chn, getSourceString(MIXSRC_FIRST_CH + index));
-    lv_label_set_text(m_mode, "");
-    lv_label_set_text(m_param, "");
-    lv_label_set_text(m_btn_mode, "");
-    lv_label_set_text(m_btns, "");
+          lv_label_set_text(m_chn, getSourceString(MIXSRC_FIRST_CH + index));
+          lv_label_set_text(m_mode, "");
+          lv_label_set_text(m_param, "");
+          lv_label_set_text(m_btn_mode, "");
+          lv_label_set_text(m_btns, "");
+          return true;
+        }))
+      return;
 
     refresh();
   }

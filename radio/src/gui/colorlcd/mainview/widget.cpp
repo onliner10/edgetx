@@ -193,14 +193,18 @@ Widget::Widget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
 {
   setWindowFlag(NO_FOCUS | NO_SCROLL);
   if (isMainViewWidget()) {
-    lv_obj_add_flag(lvobj, LV_OBJ_FLAG_SCROLL_CHAIN_HOR);
-    lv_obj_add_flag(lvobj, LV_OBJ_FLAG_SCROLL_CHAIN_VER);
+    addFlag(LV_OBJ_FLAG_SCROLL_CHAIN_HOR);
+    addFlag(LV_OBJ_FLAG_SCROLL_CHAIN_VER);
   }
 
   setPressHandler([&]() -> uint8_t {
     // When ViewMain is in "widget select mode",
     // the widget is added to a focus group
-    if (!fullscreen && lv_obj_get_group(lvobj)) openMenu();
+    if (!fullscreen &&
+        withLive([](LiveWindow& live) {
+          return lv_obj_get_group(live.lvobj()) != nullptr;
+        }))
+      openMenu();
     return 0;
   });
 }
@@ -333,11 +337,11 @@ void Widget::setFullscreen(bool enable)
   if (!enable) {
     clearWindowFlag(OPAQUE);
 
-    lv_group_remove_obj(lvobj);
+    removeFromGroup();
 
     // re-enable scroll chaining (sliding main view)
-    lv_obj_add_flag(lvobj, LV_OBJ_FLAG_SCROLL_CHAIN_HOR);
-    lv_obj_add_flag(lvobj, LV_OBJ_FLAG_SCROLL_CHAIN_VER);
+    addFlag(LV_OBJ_FLAG_SCROLL_CHAIN_HOR);
+    addFlag(LV_OBJ_FLAG_SCROLL_CHAIN_VER);
   }
   // Enter Fullscreen Mode
   else {
@@ -352,12 +356,14 @@ void Widget::setFullscreen(bool enable)
     updateZoneRect(parent->getRect(), false);
     setRect(parent->getRect());
 
-    if (!lv_obj_get_group(lvobj))
-      lv_group_add_obj(lv_group_get_default(), lvobj);
+    if (!withLive([](LiveWindow& live) {
+          return lv_obj_get_group(live.lvobj()) != nullptr;
+        }))
+      addToGroup(lv_group_get_default());
 
     // disable scroll chaining (sliding main view)
-    lv_obj_clear_flag(lvobj, LV_OBJ_FLAG_SCROLL_CHAIN_HOR);
-    lv_obj_clear_flag(lvobj, LV_OBJ_FLAG_SCROLL_CHAIN_VER);
+    clearFlag(LV_OBJ_FLAG_SCROLL_CHAIN_HOR);
+    clearFlag(LV_OBJ_FLAG_SCROLL_CHAIN_VER);
   }
 
   // set group in editing mode (keys LEFT / RIGHT)
@@ -387,7 +393,7 @@ const WidgetOption* Widget::getOptionDefinitions() const
 void Widget::enableFocus(bool enable)
 {
   if (enable) {
-    if (!focusBorder) {
+    if (!focusBorder.isPresent()) {
       lv_style_init(&borderStyle);
       lv_style_set_line_width(&borderStyle, PAD_BORDER);
       lv_style_set_line_opa(&borderStyle, LV_OPA_COVER);
@@ -399,33 +405,41 @@ void Widget::enableFocus(bool enable)
       borderPts[3] = {1, (lv_coord_t)(height() - 1)};
       borderPts[4] = {1, 1};
 
-      focusBorder = lv_line_create(lvobj);
-      lv_obj_add_style(focusBorder, &borderStyle, LV_PART_MAIN);
-      lv_line_set_points(focusBorder, borderPts, 5);
+      if (!withLive([&](LiveWindow& live) {
+            auto obj = lv_line_create(live.lvobj());
+            if (!requireLvObj(obj)) return false;
+            focusBorder.reset(obj);
+            lv_obj_add_style(obj, &borderStyle, LV_PART_MAIN);
+            lv_line_set_points(obj, borderPts, 5);
+            return true;
+          }))
+        return;
 
       if (!hasFocus()) {
-        lv_obj_add_flag(focusBorder, LV_OBJ_FLAG_HIDDEN);
+        focusBorder.with(
+            [](lv_obj_t* obj) { lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN); });
       }
 
       setFocusHandler([=](bool hasFocus) {
-        if (hasFocus) {
-          lv_obj_clear_flag(focusBorder, LV_OBJ_FLAG_HIDDEN);
-        } else {
-          lv_obj_add_flag(focusBorder, LV_OBJ_FLAG_HIDDEN);
-        }
+        focusBorder.with([&](lv_obj_t* obj) {
+          if (hasFocus)
+            lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
+          else
+            lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+        });
         auto viewMain = ViewMain::instance();
         if (viewMain) viewMain->refreshWidgetSelectTimer();
       });
 
-      lv_group_add_obj(lv_group_get_default(), lvobj);
+      addToGroup(lv_group_get_default());
     }
   } else {
-    if (focusBorder) {
-      lv_obj_del(focusBorder);
+    if (focusBorder.isPresent()) {
+      focusBorder.with([](lv_obj_t* obj) { lv_obj_del(obj); });
+      focusBorder.reset(nullptr);
       setFocusHandler(nullptr);
-      lv_group_remove_obj(lvobj);
+      removeFromGroup();
     }
-    focusBorder = nullptr;
   }
 }
 

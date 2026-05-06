@@ -48,7 +48,7 @@ class SensorValue : public StaticText
 
   void onLiveCheckEvents(LiveWindow& live) override
   {
-    if (lv_obj_has_flag(lvobj, LV_OBJ_FLAG_HIDDEN)) return;
+    if (lv_obj_has_flag(live.lvobj(), LV_OBJ_FLAG_HIDDEN)) return;
 
     // TODO: check for telemetry available
     if (isTelemetryValue()) {
@@ -88,8 +88,8 @@ InputSource::InputSource(Window *parent, ExpoData *input) :
     Window(parent, rect_t{}), input(input)
 {
   padAll(PAD_TINY);
-  lv_obj_set_flex_flow(lvobj, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_size(lvobj, lv_pct(100), LV_SIZE_CONTENT);
+  setFlexFlow(LV_FLEX_FLOW_COLUMN);
+  setSize(lv_pct(100), LV_SIZE_CONTENT);
 
   new (std::nothrow) SourceChoice(
       this, rect_t{}, INPUTSRC_FIRST, INPUTSRC_LAST, GET_DEFAULT(input->srcRaw),

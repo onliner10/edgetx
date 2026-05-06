@@ -74,9 +74,9 @@ public:
   static LAYOUT_VAL_SCALED(ERR_MSG_HO, 92)
 
 protected:
-  lv_obj_t* errorModal = nullptr;
-  lv_obj_t* errorTitle = nullptr;
-  lv_obj_t* errorMsg = nullptr;
+  RequiredLvObj errorModal;
+  RequiredLvObj errorTitle;
+  RequiredLvObj errorMsg;
   bool hasError = false;
   bool useLvgl = false;
   int initFunction = LUA_REFNIL;

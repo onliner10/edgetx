@@ -51,46 +51,54 @@ class TrimIcon : public SliderIcon
       barPoints[3] = {y1, x2};
     }
 
-    bar1 = lv_line_create(lvobj);
-    etx_obj_add_style(bar1, styles->div_line_white, LV_PART_MAIN);
-    etx_obj_add_style(bar1, styles->div_line_black, LV_STATE_USER_1);
-    lv_obj_set_style_line_width(bar1, lw, LV_PART_MAIN);
-    lv_line_set_points(bar1, &barPoints[0], 2);
-    bar2 = lv_line_create(lvobj);
-    etx_obj_add_style(bar2, styles->div_line_white, LV_PART_MAIN);
-    etx_obj_add_style(bar2, styles->div_line_black, LV_STATE_USER_1);
-    lv_obj_set_style_line_width(bar2, lw, LV_PART_MAIN);
-    lv_line_set_points(bar2, &barPoints[2], 2);
+    withLive([&](LiveWindow& live) {
+      auto obj = lv_line_create(live.lvobj());
+      if (!requireLvObj(bar1, obj)) return false;
+      etx_obj_add_style(obj, styles->div_line_white, LV_PART_MAIN);
+      etx_obj_add_style(obj, styles->div_line_black, LV_STATE_USER_1);
+      lv_obj_set_style_line_width(obj, lw, LV_PART_MAIN);
+      lv_line_set_points(obj, &barPoints[0], 2);
 
-    etx_img_color(mask, COLOR_THEME_ACTIVE_INDEX, LV_STATE_USER_1);
+      obj = lv_line_create(live.lvobj());
+      if (!requireLvObj(bar2, obj)) return false;
+      etx_obj_add_style(obj, styles->div_line_white, LV_PART_MAIN);
+      etx_obj_add_style(obj, styles->div_line_black, LV_STATE_USER_1);
+      lv_obj_set_style_line_width(obj, lw, LV_PART_MAIN);
+      lv_line_set_points(obj, &barPoints[2], 2);
+      return true;
+    });
+
+    mask.with([](lv_obj_t* obj) {
+      etx_img_color(obj, COLOR_THEME_ACTIVE_INDEX, LV_STATE_USER_1);
+    });
   }
 
   void setState(int value)
   {
     if (value < TRIM_MIN || value > TRIM_MAX) {
-      lv_obj_add_state(mask, LV_STATE_USER_1);
-      lv_obj_add_state(bar1, LV_STATE_USER_1);
-      lv_obj_add_state(bar2, LV_STATE_USER_1);
+      mask.with([](lv_obj_t* obj) { lv_obj_add_state(obj, LV_STATE_USER_1); });
+      bar1.with([](lv_obj_t* obj) { lv_obj_add_state(obj, LV_STATE_USER_1); });
+      bar2.with([](lv_obj_t* obj) { lv_obj_add_state(obj, LV_STATE_USER_1); });
     } else {
-      lv_obj_clear_state(mask, LV_STATE_USER_1);
-      lv_obj_clear_state(bar1, LV_STATE_USER_1);
-      lv_obj_clear_state(bar2, LV_STATE_USER_1);
+      mask.with([](lv_obj_t* obj) { lv_obj_clear_state(obj, LV_STATE_USER_1); });
+      bar1.with([](lv_obj_t* obj) { lv_obj_clear_state(obj, LV_STATE_USER_1); });
+      bar2.with([](lv_obj_t* obj) { lv_obj_clear_state(obj, LV_STATE_USER_1); });
     }
 
     if (value >= 0)
-      lv_obj_clear_flag(bar1, LV_OBJ_FLAG_HIDDEN);
+      bar1.with([](lv_obj_t* obj) { lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN); });
     else
-      lv_obj_add_flag(bar1, LV_OBJ_FLAG_HIDDEN);
+      bar1.with([](lv_obj_t* obj) { lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN); });
 
     if (value <= 0)
-      lv_obj_clear_flag(bar2, LV_OBJ_FLAG_HIDDEN);
+      bar2.with([](lv_obj_t* obj) { lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN); });
     else
-      lv_obj_add_flag(bar2, LV_OBJ_FLAG_HIDDEN);
+      bar2.with([](lv_obj_t* obj) { lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN); });
   }
 
  protected:
-  lv_obj_t* bar1 = nullptr;
-  lv_obj_t* bar2 = nullptr;
+  RequiredLvObj bar1;
+  RequiredLvObj bar2;
   lv_point_t barPoints[4];
 };
 
@@ -98,31 +106,41 @@ MainViewTrim::MainViewTrim(Window* parent, const rect_t& rect, uint8_t idx,
                            bool isVertical) :
     Window(parent, rect), idx(idx), isVertical(isVertical)
 {
-  trimBar = lv_obj_create(lvobj);
-  etx_solid_bg(trimBar, COLOR_THEME_SECONDARY1_INDEX);
-  etx_obj_add_style(trimBar, styles->rounded, LV_PART_MAIN);
-  if (isVertical) {
-    lv_obj_set_pos(trimBar, (MainViewSlider::SLIDER_BAR_SIZE - TRIM_LINE_WIDTH) / 2,
-                   MainViewSlider::SLIDER_BAR_SIZE / 2);
-    lv_obj_set_size(trimBar, TRIM_LINE_WIDTH,
-                    MainViewSlider::VERTICAL_SLIDERS_HEIGHT - MainViewSlider::SLIDER_BAR_SIZE + 1);
-  } else {
-    lv_obj_set_pos(trimBar, MainViewSlider::SLIDER_BAR_SIZE / 2,
-                   (MainViewSlider::SLIDER_BAR_SIZE - TRIM_LINE_WIDTH - 1) / 2);
-    lv_obj_set_size(trimBar, MainViewSlider::HORIZONTAL_SLIDERS_WIDTH - MainViewSlider::SLIDER_BAR_SIZE + 1,
-                    TRIM_LINE_WIDTH);
-  }
+  withLive([&](LiveWindow& live) {
+    auto obj = lv_obj_create(live.lvobj());
+    if (!requireLvObj(trimBar, obj)) return false;
+    etx_solid_bg(obj, COLOR_THEME_SECONDARY1_INDEX);
+    etx_obj_add_style(obj, styles->rounded, LV_PART_MAIN);
+    if (isVertical) {
+      lv_obj_set_pos(obj, (MainViewSlider::SLIDER_BAR_SIZE - TRIM_LINE_WIDTH) / 2,
+                     MainViewSlider::SLIDER_BAR_SIZE / 2);
+      lv_obj_set_size(obj, TRIM_LINE_WIDTH,
+                      MainViewSlider::VERTICAL_SLIDERS_HEIGHT -
+                          MainViewSlider::SLIDER_BAR_SIZE + 1);
+    } else {
+      lv_obj_set_pos(obj, MainViewSlider::SLIDER_BAR_SIZE / 2,
+                     (MainViewSlider::SLIDER_BAR_SIZE - TRIM_LINE_WIDTH - 1) / 2);
+      lv_obj_set_size(obj,
+                      MainViewSlider::HORIZONTAL_SLIDERS_WIDTH -
+                          MainViewSlider::SLIDER_BAR_SIZE + 1,
+                      TRIM_LINE_WIDTH);
+    }
+    return true;
+  });
 
-  trimIcon = new (std::nothrow) TrimIcon(this, isVertical);
+  initRequiredWindow(trimIcon, this, isVertical);
 
-  trimValue = new (std::nothrow) DynamicNumber<int16_t>(
-      this, {0, 0, MainViewSlider::SLIDER_BAR_SIZE, 12},
-      [=]() { return divRoundClosest(abs(value) * 100, trimMax); },
-      COLOR_THEME_PRIMARY2_INDEX, FONT(XXS) | CENTERED);
-  if (trimValue) {
-    etx_solid_bg(trimValue->getLvObj(), COLOR_THEME_SECONDARY1_INDEX);
-    trimValue->hide();
-  }
+  if (!initRequiredWindow(trimValue, this,
+                          rect_t{0, 0, MainViewSlider::SLIDER_BAR_SIZE, 12},
+                          [=]() {
+                            return divRoundClosest(abs(value) * 100, trimMax);
+                          },
+                          COLOR_THEME_PRIMARY2_INDEX, FONT(XXS) | CENTERED))
+    return;
+  trimValue.with([](DynamicNumber<int16_t>& value) {
+    value.solidBg(COLOR_THEME_SECONDARY1_INDEX);
+    value.hide();
+  });
 
   setRange();
   setPos();
@@ -145,10 +163,10 @@ void MainViewTrim::setPos()
   coord_t x = sx();
   coord_t y = sy();
 
-  if (trimIcon) {
-    lv_obj_set_pos(trimIcon->getLvObj(), x, y);
-    trimIcon->setState(value);
-  }
+  trimIcon.with([&](TrimIcon& icon) {
+    icon.setPos(x, y);
+    icon.setState(value);
+  });
 
   if ((g_model.displayTrims == DISPLAY_TRIMS_ALWAYS) ||
       ((g_model.displayTrims == DISPLAY_TRIMS_CHANGE) &&
@@ -164,17 +182,17 @@ void MainViewTrim::setPos()
                          MainViewSlider::SLIDER_BAR_SIZE / 2;
         y = (MainViewSlider::SLIDER_BAR_SIZE - 12) / 2;
       }
-      if (trimValue) {
-        lv_obj_set_pos(trimValue->getLvObj(), x, y);
-        trimValue->show();
-      }
+      trimValue.with([&](DynamicNumber<int16_t>& value) {
+        value.setPos(x, y);
+        value.show();
+      });
       showChange = true;
     } else {
-      if (trimValue) trimValue->hide();
+      trimValue.with([](DynamicNumber<int16_t>& value) { value.hide(); });
     }
   } else {
     showChange = false;
-    if (trimValue) trimValue->hide();
+    trimValue.with([](DynamicNumber<int16_t>& value) { value.hide(); });
   }
 }
 

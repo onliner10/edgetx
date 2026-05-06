@@ -262,8 +262,10 @@ LuaWidget::LuaWidget(const WidgetFactory* factory, Window* parent,
   if (useLvglLayout()) {
     update();
   } else {
-    lv_obj_add_event_cb(lvobj, LuaWidget::redraw_cb, LV_EVENT_DRAW_MAIN,
-                        nullptr);
+    withLive([](Window::LiveWindow& live) {
+      lv_obj_add_event_cb(live.lvobj(), LuaWidget::redraw_cb,
+                          LV_EVENT_DRAW_MAIN, nullptr);
+    });
   }
 }
 
@@ -381,9 +383,11 @@ void LuaWidget::onUpdate()
   luaScriptManager = this;
 
   if (useLvglLayout()) {
-    if (!lv_obj_has_flag(lvobj, LV_OBJ_FLAG_HIDDEN)) {
+    withLive([&](Window::LiveWindow& live) {
+      auto obj = live.lvobj();
+      if (lv_obj_has_flag(obj, LV_OBJ_FLAG_HIDDEN)) return;
       lv_area_t a;
-      lv_obj_get_coords(lvobj, &a);
+      lv_obj_get_coords(obj, &a);
       // Check widget is at least partially visible
       if (a.x2 >= 0 && a.x1 < LCD_W) {
         PROTECT_LUA()
@@ -398,7 +402,7 @@ void LuaWidget::onUpdate()
         }
         UNPROTECT_LUA();
       }
-    }
+    });
   }
 
   luaScriptManager = save;
@@ -491,13 +495,16 @@ void LuaWidget::refresh(BitmapBuffer* dc)
                         FONT(XS) | COLOR_THEME_WARNING);
     } else {
       if (errorLabel == nullptr) {
-        errorLabel = etx_label_create(lvobj, FONT_XS_INDEX);
-        lv_obj_set_pos(errorLabel, 0, 0);
-        lv_obj_set_size(errorLabel, width(), height());
-        lv_label_set_long_mode(errorLabel, LV_LABEL_LONG_WRAP);
-        etx_txt_color(errorLabel, COLOR_THEME_WARNING_INDEX);
-        etx_bg_color(errorLabel, COLOR_THEME_SECONDARY3_INDEX);
-        etx_obj_add_style(errorLabel, styles->bg_opacity_75, LV_PART_MAIN);
+        withLive([&](Window::LiveWindow& live) {
+          errorLabel = etx_label_create(live.lvobj(), FONT_XS_INDEX);
+          if (!errorLabel) return;
+          lv_obj_set_pos(errorLabel, 0, 0);
+          lv_obj_set_size(errorLabel, width(), height());
+          lv_label_set_long_mode(errorLabel, LV_LABEL_LONG_WRAP);
+          etx_txt_color(errorLabel, COLOR_THEME_WARNING_INDEX);
+          etx_bg_color(errorLabel, COLOR_THEME_SECONDARY3_INDEX);
+          etx_obj_add_style(errorLabel, styles->bg_opacity_75, LV_PART_MAIN);
+        });
       }
       lv_label_set_text(errorLabel, errorMessage);
     }

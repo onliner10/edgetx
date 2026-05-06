@@ -38,7 +38,8 @@ ListBox::ListBox(Window* parent, const rect_t& rect,
 
 void ListBox::setName(uint16_t idx, const std::string& name)
 {
-  withLive([&](lv_obj_t* obj) {
+  withLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
     lv_table_set_cell_value(obj, idx, 0, name.c_str());
   });
 }
@@ -56,7 +57,8 @@ void ListBox::setNames(const std::vector<std::string>& names)
 
 void ListBox::setLineHeight(uint8_t height)
 {
-  withLive([&](lv_obj_t* obj) {
+  withLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
     lv_obj_set_style_max_height(obj, height, LV_PART_ITEMS);
   });
 }
@@ -70,7 +72,8 @@ void ListBox::setSelected(std::set<uint32_t> selected)
 {
   if (!multiSelect) return;
 
-  withLive([&](lv_obj_t* obj) {
+  withLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
     for (int i = 0; i < getRowCount(); i++) {
       if (selected.find(i) != selected.end())
         lv_table_add_cell_ctrl(obj, i, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
@@ -83,7 +86,8 @@ void ListBox::setSelected(std::set<uint32_t> selected)
 bool ListBox::isRowSelected(uint16_t row)
 {
   bool selected = false;
-  withLive([&](lv_obj_t* obj) {
+  withLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
     selected = lv_table_has_cell_ctrl(obj, row, 0, LV_TABLE_CELL_CTRL_CUSTOM_1);
   });
   return selected;
@@ -93,7 +97,8 @@ std::set<uint32_t> ListBox::getSelection()
 {
   std::set<uint32_t> selectedIndexes;
   if (multiSelect) {
-    withLive([&](lv_obj_t* obj) {
+    withLive([&](LiveWindow& live) {
+      auto obj = live.lvobj();
       for (int i = 0; i < getRowCount(); i++) {
         if (lv_table_has_cell_ctrl(obj, i, 0, LV_TABLE_CELL_CTRL_CUSTOM_1))
           selectedIndexes.insert(i);

@@ -183,14 +183,15 @@ TableField::TableField(Window* parent, const rect_t& rect) :
 {
   setWindowFlag(OPAQUE);
 
-  withLive([](lv_obj_t* obj) {
-    lv_table_set_col_cnt(obj, 1);
+  withLive([](LiveWindow& live) {
+    lv_table_set_col_cnt(live.lvobj(), 1);
   });
 }
 
 void TableField::setRowCount(uint16_t rows)
 {
-  withLive([&](lv_obj_t* obj) {
+  withLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
     lv_table_set_row_cnt(obj, rows);
   });
 }
@@ -198,7 +199,8 @@ void TableField::setRowCount(uint16_t rows)
 uint16_t TableField::getRowCount() const
 {
   uint16_t rows = 0;
-  withLive([&](lv_obj_t* obj) {
+  withLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
     rows = lv_table_get_row_cnt(obj);
   });
   return rows;
@@ -206,14 +208,16 @@ uint16_t TableField::getRowCount() const
 
 void TableField::setColumnWidth(uint16_t col, coord_t w)
 {
-  withLive([&](lv_obj_t* obj) {
+  withLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
     lv_table_set_col_width(obj, col, w);
   });
 }
 
 void TableField::select(uint16_t row, uint16_t col, bool force)
 {
-  withLive([&](lv_obj_t* obj) {
+  withLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
     lv_table_t* table = (lv_table_t*)obj;
     if (!force && table->row_act == row && table->col_act == col) return;
 
@@ -235,7 +239,8 @@ void TableField::select(uint16_t row, uint16_t col, bool force)
 
 void TableField::adjustScroll()
 {
-  withLive([&](lv_obj_t* obj) {
+  withLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
     lv_table_t* table = (lv_table_t*)obj;
     if (table->row_act == LV_TABLE_CELL_NONE ||
         table->row_act >= table->row_cnt) {
@@ -269,7 +274,8 @@ int TableField::getSelected() const
 {
   uint16_t row = LV_TABLE_CELL_NONE;
   uint16_t col = LV_TABLE_CELL_NONE;
-  withLive([&](lv_obj_t* obj) {
+  withLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
     lv_table_get_selected_cell(obj, &row, &col);
   });
   if (row != LV_TABLE_CELL_NONE) {
@@ -395,13 +401,17 @@ bool tableFieldSelectMovesAcrossColumnsForTest()
   }
 
   table->setRowCount(1);
-  lv_table_set_col_cnt(table->getLvObj(), 2);
+  table->withLive([](Window::LiveWindow& live) {
+    lv_table_set_col_cnt(live.lvobj(), 2);
+  });
   table->select(0, 0);
   table->select(0, 1);
 
   uint16_t row = LV_TABLE_CELL_NONE;
   uint16_t col = LV_TABLE_CELL_NONE;
-  lv_table_get_selected_cell(table->getLvObj(), &row, &col);
+  table->withLive([&](Window::LiveWindow& live) {
+    lv_table_get_selected_cell(live.lvobj(), &row, &col);
+  });
 
   bool ok = row == 0 && col == 1;
   delete table;

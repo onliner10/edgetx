@@ -132,7 +132,7 @@ class SpectrumScaleWindow : public Window
  public:
   SpectrumScaleWindow(Window* parent, const rect_t& rect) : Window(parent, rect)
   {
-    etx_solid_bg(lvobj, COLOR_THEME_SECONDARY2_INDEX);
+    solidBg(COLOR_THEME_SECONDARY2_INDEX);
 
     build();
   }
@@ -179,36 +179,43 @@ class SpectrumWindow : public Window
     lv_style_set_line_opa(&style, LV_OPA_COVER);
     lv_style_set_line_color(&style, makeLvColor(COLOR_THEME_ACTIVE));
 
-    lv_coord_t w = width() - 1;
-    for (int i = 0; i < SPECTRUM_HEIGHT / LINE_SPACE; i += 1) {
-      lv_coord_t y = height() - LINE_SPACE - (i * LINE_SPACE);
-      hAxisPts[i * 2] = {0, y};
-      hAxisPts[i * 2 + 1] = {w, y};
-      auto line = lv_line_create(lvobj);
-      etx_obj_add_style(line, styles->graph_dashed, LV_PART_MAIN);
-      lv_line_set_points(line, &hAxisPts[i * 2], 2);
-    }
+    if (!withLive([&](LiveWindow& live) {
+          auto obj = live.lvobj();
+          lv_coord_t w = width() - 1;
+          for (int i = 0; i < SPECTRUM_HEIGHT / LINE_SPACE; i += 1) {
+            lv_coord_t y = height() - LINE_SPACE - (i * LINE_SPACE);
+            hAxisPts[i * 2] = {0, y};
+            hAxisPts[i * 2 + 1] = {w, y};
+            auto line = lv_line_create(obj);
+            if (!requireLvObj(line)) return false;
+            etx_obj_add_style(line, styles->graph_dashed, LV_PART_MAIN);
+            lv_line_set_points(line, &hAxisPts[i * 2], 2);
+          }
 
-    for (int i = 0; i < 8; i += 1) {
-      auto line = lv_line_create(lvobj);
-      etx_obj_add_style(line, styles->graph_dashed, LV_PART_MAIN);
-      lv_obj_add_flag(line, LV_OBJ_FLAG_HIDDEN);
-      vAxisLines[i] = line;
-    }
+          for (int i = 0; i < 8; i += 1) {
+            auto line = lv_line_create(obj);
+            if (!requireLvObj(vAxisLines[i], line)) return false;
+            etx_obj_add_style(line, styles->graph_dashed, LV_PART_MAIN);
+            lv_obj_add_flag(line, LV_OBJ_FLAG_HIDDEN);
+          }
 
-    for (int i = 0; i < width() / 4; i += 1) {
-      auto line = lv_line_create(lvobj);
-      etx_obj_add_style(line, styles->div_line_black, LV_PART_MAIN);
-      maxLines[i] = line;
+          for (int i = 0; i < width() / 4; i += 1) {
+            auto line = lv_line_create(obj);
+            if (!requireLvObj(maxLines[i], line)) return false;
+            etx_obj_add_style(line, styles->div_line_black, LV_PART_MAIN);
 
-      line = lv_line_create(lvobj);
-      lv_obj_add_style(line, &style, LV_PART_MAIN);
-      barLines[i] = line;
+            line = lv_line_create(obj);
+            if (!requireLvObj(barLines[i], line)) return false;
+            lv_obj_add_style(line, &style, LV_PART_MAIN);
 
-      line = lv_line_create(lvobj);
-      etx_obj_add_style(line, styles->div_line_warn, LV_PART_MAIN);
-      peakLines[i] = line;
-    }
+            line = lv_line_create(obj);
+            if (!requireLvObj(peakLines[i], line)) return false;
+            etx_obj_add_style(line, styles->div_line_warn, LV_PART_MAIN);
+          }
+
+          return true;
+        }))
+      return;
 
     warning = new StaticText(
         this, {0, height() / 2 - WARN_YO, lv_pct(100), LV_SIZE_CONTENT},
@@ -260,15 +267,18 @@ class SpectrumWindow : public Window
 
       maxPts[i] = {x, max_yv};
       maxPts[i + 1] = {(lv_coord_t)(x + 3), max_yv};
-      lv_line_set_points(maxLines[i / 2], &maxPts[i], 2);
+      maxLines[i / 2].with(
+          [&](lv_obj_t* line) { lv_line_set_points(line, &maxPts[i], 2); });
 
       peakPts[i] = {x, peak_yv};
       peakPts[i + 1] = {(lv_coord_t)(x + 3), peak_yv};
-      lv_line_set_points(peakLines[i / 2], &peakPts[i], 2);
+      peakLines[i / 2].with(
+          [&](lv_obj_t* line) { lv_line_set_points(line, &peakPts[i], 2); });
 
       barPts[i] = {(lv_coord_t)(x + 1), yv};
       barPts[i + 1] = {(lv_coord_t)(x + 1), SCALE_TOP};
-      lv_line_set_points(barLines[i / 2], &barPts[i], 2);
+      barLines[i / 2].with(
+          [&](lv_obj_t* line) { lv_line_set_points(line, &barPts[i], 2); });
 
       // Decay max values
       if (max_yv < yv) {
@@ -295,12 +305,15 @@ class SpectrumWindow : public Window
         if (x >= LCD_W - 1) break;
         vAxisPts[i * 2] = {x, 0};
         vAxisPts[i * 2 + 1] = {x, h};
-        lv_line_set_points(vAxisLines[i], &vAxisPts[i * 2], 2);
-        lv_obj_clear_flag(vAxisLines[i], LV_OBJ_FLAG_HIDDEN);
+        vAxisLines[i].with([&](lv_obj_t* line) {
+          lv_line_set_points(line, &vAxisPts[i * 2], 2);
+          lv_obj_clear_flag(line, LV_OBJ_FLAG_HIDDEN);
+        });
         i += 1;
       }
       for (; i < 8; i += 1) {
-        lv_obj_add_flag(vAxisLines[i], LV_OBJ_FLAG_HIDDEN);
+        vAxisLines[i].with(
+            [](lv_obj_t* line) { lv_obj_add_flag(line, LV_OBJ_FLAG_HIDDEN); });
       }
     }
 
@@ -316,10 +329,10 @@ class SpectrumWindow : public Window
   lv_point_t peakPts[2 * LCD_W / 4];
   lv_point_t hAxisPts[2 * SPECTRUM_HEIGHT / LINE_SPACE];
   lv_point_t vAxisPts[2 * 8];
-  lv_obj_t* maxLines[LCD_W / 4];
-  lv_obj_t* barLines[LCD_W / 4];
-  lv_obj_t* peakLines[LCD_W / 4];
-  lv_obj_t* vAxisLines[8];
+  RequiredLvObj maxLines[LCD_W / 4];
+  RequiredLvObj barLines[LCD_W / 4];
+  RequiredLvObj peakLines[LCD_W / 4];
+  RequiredLvObj vAxisLines[8];
   StaticText* warning = nullptr;
 
   uint32_t lastFreq = 0;
@@ -335,8 +348,12 @@ RadioSpectrumAnalyser::RadioSpectrumAnalyser(uint8_t moduleIdx) :
   buildBody(body);
   start();
 
-  trackLine = lv_line_create(lvobj);
-  etx_obj_add_style(trackLine, styles->div_line_black, LV_PART_MAIN);
+  withLive([&](LiveWindow& live) {
+    auto line = lv_line_create(live.lvobj());
+    if (!requireLvObj(trackLine, line)) return false;
+    etx_obj_add_style(line, styles->div_line_black, LV_PART_MAIN);
+    return true;
+  });
 }
 
 void RadioSpectrumAnalyser::buildHeader(Window* window)
@@ -368,7 +385,8 @@ void RadioSpectrumAnalyser::onLiveCheckEvents(Window::LiveWindow& live)
     trackPts[0] = {(lv_coord_t)x, EdgeTxStyles::MENU_HEADER_HEIGHT};
     trackPts[1] = {(lv_coord_t)x,
                    (lv_coord_t)(height() - EdgeTxStyles::UI_ELEMENT_HEIGHT)};
-    lv_line_set_points(trackLine, trackPts, 2);
+    trackLine.with(
+        [&](lv_obj_t* line) { lv_line_set_points(line, trackPts, 2); });
   }
   Page::onLiveCheckEvents(live);
 }

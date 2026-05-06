@@ -225,14 +225,18 @@ std::string buildSnapshot()
   if (auto* group = lv_group_get_default()) focused = lv_group_get_focused(group);
 
   auto* top = Window::topWindow();
+  std::string topWindowId;
+  if (top) {
+    top->withLive(
+        [&](Window::LiveWindow& live) { topWindowId = nodeId(live.lvobj()); });
+  }
   std::ostringstream out;
   out << "\"ui\":{"
       << "\"screen\":\"" << jsonEscape(nodeId(screen)) << "\""
       << ",\"focused\":\""
       << (focused ? jsonEscape(nodeId(focused)) : std::string()) << "\""
       << ",\"top_window\":\""
-      << (top && top->getLvObj() ? jsonEscape(nodeId(top->getLvObj()))
-                                  : std::string())
+      << jsonEscape(topWindowId)
       << "\""
       << ",\"nodes\":[";
   bool first = true;

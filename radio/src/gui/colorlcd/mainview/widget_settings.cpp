@@ -71,7 +71,9 @@ WidgetSettings::WidgetSettings(Widget* w) :
       continue;
     }
 
-    auto line = form->newLine(grid);
+    auto line = form.valueOr<FormLine*>(
+        nullptr, [&](Window& formWindow) { return formWindow.newLine(grid); });
+    if (!line) return;
 
     new (std::nothrow) StaticText(
         line, rect_t{}, opt->displayName ? opt->displayName : opt->name);

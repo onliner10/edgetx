@@ -55,7 +55,7 @@ class SwitchWarnMatrix : public ButtonMatrix
 
     update();
 
-    lv_obj_set_width(lvobj, min((int)btn_cnt, SW_BTNS) * SW_BTN_W + PAD_SMALL);
+    setWidth(min((int)btn_cnt, SW_BTNS) * SW_BTN_W + PAD_SMALL);
 
     uint8_t rows = ((btn_cnt - 1) / SW_BTNS) + 1;
     setHeight((rows * SW_BTN_H) + PAD_SMALL);
@@ -156,7 +156,9 @@ class PotWarnMatrix : public ButtonMatrix
 
     update();
 
-    lv_obj_set_width(lvobj, min((int)btn_cnt, SwitchWarnMatrix::SW_BTNS) * SwitchWarnMatrix::SW_BTN_W + PAD_SMALL);
+    setWidth(min((int)btn_cnt, SwitchWarnMatrix::SW_BTNS) *
+                 SwitchWarnMatrix::SW_BTN_W +
+             PAD_SMALL);
 
     uint8_t rows = ((btn_cnt - 1) / SwitchWarnMatrix::SW_BTNS) + 1;
     setHeight((rows * SwitchWarnMatrix::SW_BTN_H) + PAD_SMALL);

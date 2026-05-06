@@ -38,6 +38,7 @@ class StaticText : public Window
 
   void setText(std::string value);
   const std::string &getText() const;
+  void setLongMode(lv_label_long_mode_t mode);
 
 #if defined(SIMU)
   std::string automationRole() const override { return "text"; }

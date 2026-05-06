@@ -42,65 +42,78 @@ class TimerWidget : public TrackedWidget
 
   void delayedInit() override
   {
-    etx_solid_bg(lvobj, COLOR_THEME_WARNING_INDEX,
-                 LV_PART_MAIN | ETX_STATE_BG_WARNING);
+    solidBg(COLOR_THEME_WARNING_INDEX, LV_PART_MAIN | ETX_STATE_BG_WARNING);
 
     lv_style_init(&style);
     lv_style_set_width(&style, lv_pct(100));
     lv_style_set_height(&style, LV_SIZE_CONTENT);
 
-    timerBg = new StaticIcon(this, 0, 0, ICON_TIMER_BG, COLOR_THEME_PRIMARY2_INDEX);
-    timerIcon = new StaticIcon(this, PAD_THREE, PAD_SMALL, ICON_TIMER, COLOR_THEME_SECONDARY1_INDEX);
+    if (!initRequiredWindow(timerBg, this, 0, 0, ICON_TIMER_BG,
+                            COLOR_THEME_PRIMARY2_INDEX))
+      return;
+    if (!initRequiredWindow(timerIcon, this, PAD_THREE, PAD_SMALL, ICON_TIMER,
+                            COLOR_THEME_SECONDARY1_INDEX))
+      return;
 
     // Timer name
-    nameLabel = etx_label_create(lvobj, FONT_XS_INDEX);
-    lv_label_set_text(nameLabel, "");
-    lv_label_set_long_mode(nameLabel, LV_LABEL_LONG_DOT);
-    lv_obj_add_style(nameLabel, &style, LV_PART_MAIN);
-    etx_obj_add_style(nameLabel, styles->text_align_left, LV_PART_MAIN);
-    etx_obj_add_style(nameLabel, styles->text_align_right,
-                      LV_PART_MAIN | EXT_NAME_ALIGN_RIGHT);
-    etx_txt_color(nameLabel, COLOR_THEME_SECONDARY1_INDEX);
-    etx_txt_color(nameLabel, COLOR_THEME_SECONDARY2_INDEX,
-                  LV_PART_MAIN | ETX_NAME_TXT_WARNING);
-    etx_txt_color(nameLabel, COLOR_THEME_PRIMARY2_INDEX,
-                  LV_PART_MAIN | ETX_NAME_COLOR_WHITE);
+    initRequiredLvObj(
+        nameLabel,
+        [](lv_obj_t* parent) { return etx_label_create(parent, FONT_XS_INDEX); },
+        [&](lv_obj_t* obj) {
+          lv_label_set_text(obj, "");
+          lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
+          lv_obj_add_style(obj, &style, LV_PART_MAIN);
+          etx_obj_add_style(obj, styles->text_align_left, LV_PART_MAIN);
+          etx_obj_add_style(obj, styles->text_align_right,
+                            LV_PART_MAIN | EXT_NAME_ALIGN_RIGHT);
+          etx_txt_color(obj, COLOR_THEME_SECONDARY1_INDEX);
+          etx_txt_color(obj, COLOR_THEME_SECONDARY2_INDEX,
+                        LV_PART_MAIN | ETX_NAME_TXT_WARNING);
+          etx_txt_color(obj, COLOR_THEME_PRIMARY2_INDEX,
+                        LV_PART_MAIN | ETX_NAME_COLOR_WHITE);
+        });
 
     // Timer value - on small size widgets
-    valLabel = etx_label_create(lvobj);
-    lv_label_set_text(valLabel, "");
-    lv_label_set_long_mode(valLabel, LV_LABEL_LONG_DOT);
-    lv_obj_add_style(valLabel, &style, LV_PART_MAIN);
-    etx_txt_color(valLabel, COLOR_THEME_PRIMARY2_INDEX);
-    etx_font(valLabel, FONT_XS_INDEX, LV_PART_MAIN | ETX_VALUE_SMALL_FONT);
-    lv_obj_set_pos(valLabel, PAD_THREE, VAL_LBL_Y);
+    initRequiredLvObj(
+        valLabel, [](lv_obj_t* parent) { return etx_label_create(parent); },
+        [&](lv_obj_t* obj) {
+          lv_label_set_text(obj, "");
+          lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
+          lv_obj_add_style(obj, &style, LV_PART_MAIN);
+          etx_txt_color(obj, COLOR_THEME_PRIMARY2_INDEX);
+          etx_font(obj, FONT_XS_INDEX, LV_PART_MAIN | ETX_VALUE_SMALL_FONT);
+          lv_obj_set_pos(obj, PAD_THREE, VAL_LBL_Y);
+        });
 
     // Timer value - on large widgets
-    unit0 = createUnitLabel();
-    lv_obj_set_pos(unit0, U0_X, U0_Y);
-    unit1 = createUnitLabel();
-    lv_obj_set_pos(unit1, U1_X, U1_Y);
-    digits0 = createDigitsLabel();
-    lv_obj_set_pos(digits0, D0_X, D0_Y);
-    digits1 = createDigitsLabel();
-    lv_obj_set_pos(digits1, D1_X, D1_Y);
+    if (!createUnitLabel(unit0)) return;
+    unit0.with([](lv_obj_t* obj) { lv_obj_set_pos(obj, U0_X, U0_Y); });
+    if (!createUnitLabel(unit1)) return;
+    unit1.with([](lv_obj_t* obj) { lv_obj_set_pos(obj, U1_X, U1_Y); });
+    if (!createDigitsLabel(digits0)) return;
+    digits0.with([](lv_obj_t* obj) { lv_obj_set_pos(obj, D0_X, D0_Y); });
+    if (!createDigitsLabel(digits1)) return;
+    digits1.with([](lv_obj_t* obj) { lv_obj_set_pos(obj, D1_X, D1_Y); });
 
-    timerArc = lv_arc_create(lvobj);
-    lv_arc_set_rotation(timerArc, 270);
-    lv_arc_set_bg_angles(timerArc, 0, 360);
-    lv_arc_set_range(timerArc, 0, 360);
-    lv_arc_set_angles(timerArc, 0, 360);
-    lv_arc_set_start_angle(timerArc, 0);
-    lv_obj_remove_style(timerArc, NULL, LV_PART_KNOB);
-    lv_obj_clear_flag(timerArc, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_pos(timerArc, PAD_TINY, PAD_THREE);
-    lv_obj_set_size(timerArc, TMR_ARC_SZ, TMR_ARC_SZ);
-    lv_obj_set_style_arc_opa(timerArc, LV_OPA_TRANSP, LV_PART_MAIN);
-    lv_obj_set_style_arc_width(timerArc, TMR_ARC_W, LV_PART_MAIN);
-    lv_obj_set_style_arc_opa(timerArc, LV_OPA_COVER, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_width(timerArc, TMR_ARC_W, LV_PART_INDICATOR);
-    etx_arc_color(timerArc, COLOR_THEME_SECONDARY1_INDEX, LV_PART_INDICATOR);
-    lv_obj_add_flag(timerArc, LV_OBJ_FLAG_HIDDEN);
+    initRequiredLvObj(
+        timerArc, [](lv_obj_t* parent) { return lv_arc_create(parent); },
+        [](lv_obj_t* obj) {
+          lv_arc_set_rotation(obj, 270);
+          lv_arc_set_bg_angles(obj, 0, 360);
+          lv_arc_set_range(obj, 0, 360);
+          lv_arc_set_angles(obj, 0, 360);
+          lv_arc_set_start_angle(obj, 0);
+          lv_obj_remove_style(obj, NULL, LV_PART_KNOB);
+          lv_obj_clear_flag(obj, LV_OBJ_FLAG_CLICKABLE);
+          lv_obj_set_pos(obj, PAD_TINY, PAD_THREE);
+          lv_obj_set_size(obj, TMR_ARC_SZ, TMR_ARC_SZ);
+          lv_obj_set_style_arc_opa(obj, LV_OPA_TRANSP, LV_PART_MAIN);
+          lv_obj_set_style_arc_width(obj, TMR_ARC_W, LV_PART_MAIN);
+          lv_obj_set_style_arc_opa(obj, LV_OPA_COVER, LV_PART_INDICATOR);
+          lv_obj_set_style_arc_width(obj, TMR_ARC_W, LV_PART_INDICATOR);
+          etx_arc_color(obj, COLOR_THEME_SECONDARY1_INDEX, LV_PART_INDICATOR);
+          lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+        });
 
     update();
     foreground();
@@ -138,7 +151,8 @@ class TimerWidget : public TrackedWidget
         if (!timerData.showElapsed) {
           pieEnd = 360 - pieEnd;
         }
-        lv_arc_set_end_angle(timerArc, pieEnd);
+        timerArc.with(
+            [&](lv_obj_t* obj) { lv_arc_set_end_angle(obj, pieEnd); });
       }
 
       int val = lastValue;
@@ -154,16 +168,20 @@ class TimerWidget : public TrackedWidget
 
         splitTimer(sDigitGroup0, sDigitGroup1, sUnit0, sUnit1, abs(val), false);
 
-        lv_label_set_text(digits0, sDigitGroup0);
-        lv_label_set_text(digits1, sDigitGroup1);
-        lv_label_set_text(unit0, sUnit0);
-        lv_label_set_text(unit1, sUnit1);
+        digits0.with(
+            [&](lv_obj_t* obj) { lv_label_set_text(obj, sDigitGroup0); });
+        digits1.with(
+            [&](lv_obj_t* obj) { lv_label_set_text(obj, sDigitGroup1); });
+        unit0.with([&](lv_obj_t* obj) { lv_label_set_text(obj, sUnit0); });
+        unit1.with([&](lv_obj_t* obj) { lv_label_set_text(obj, sUnit1); });
 
         if (lastValue > 0 && lastStartValue > 0) {
-          lv_obj_clear_flag(timerArc, LV_OBJ_FLAG_HIDDEN);
+          timerArc.with(
+              [](lv_obj_t* obj) { lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN); });
           timerIcon->hide();
         } else {
-          lv_obj_add_flag(timerArc, LV_OBJ_FLAG_HIDDEN);
+          timerArc.with(
+              [](lv_obj_t* obj) { lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN); });
           timerIcon->show();
         }
       } else {
@@ -172,42 +190,61 @@ class TimerWidget : public TrackedWidget
         TimerOptions timerOptions;
         timerOptions.options = (abs(val) >= 3600) ? SHOW_TIME : SHOW_TIMER;
         getTimerString(str, abs(val), timerOptions);
-        lv_label_set_text(valLabel, str);
+        valLabel.with([&](lv_obj_t* obj) { lv_label_set_text(obj, str); });
 
-        if (width() <= SMALL_TXT_MAX_W && height() <= SMALL_TXT_MAX_H && abs(val) >= 3600)
-          lv_obj_add_state(valLabel, ETX_VALUE_SMALL_FONT);
-        else
-          lv_obj_clear_state(valLabel, ETX_VALUE_SMALL_FONT);
+        valLabel.with([&](lv_obj_t* obj) {
+          if (width() <= SMALL_TXT_MAX_W && height() <= SMALL_TXT_MAX_H &&
+              abs(val) >= 3600)
+            lv_obj_add_state(obj, ETX_VALUE_SMALL_FONT);
+          else
+            lv_obj_clear_state(obj, ETX_VALUE_SMALL_FONT);
+        });
 
-        lv_obj_add_flag(timerArc, LV_OBJ_FLAG_HIDDEN);
+        timerArc.with(
+            [](lv_obj_t* obj) { lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN); });
         timerIcon->hide();
       }
 
       // Set colors if timer has elapsed.
       if (lastValue < 0 && lastValue % 2) {
         if (isLarge) {
-          lv_obj_add_state(nameLabel, ETX_NAME_TXT_WARNING);
-          lv_obj_add_state(digits0, ETX_NAME_TXT_WARNING);
-          lv_obj_add_state(digits1, ETX_NAME_TXT_WARNING);
-          lv_obj_add_state(unit0, ETX_NAME_TXT_WARNING);
-          lv_obj_add_state(unit1, ETX_NAME_TXT_WARNING);
-          lv_obj_clear_state(lvobj, ETX_STATE_BG_WARNING);
+          nameLabel.with(
+              [](lv_obj_t* obj) { lv_obj_add_state(obj, ETX_NAME_TXT_WARNING); });
+          digits0.with(
+              [](lv_obj_t* obj) { lv_obj_add_state(obj, ETX_NAME_TXT_WARNING); });
+          digits1.with(
+              [](lv_obj_t* obj) { lv_obj_add_state(obj, ETX_NAME_TXT_WARNING); });
+          unit0.with(
+              [](lv_obj_t* obj) { lv_obj_add_state(obj, ETX_NAME_TXT_WARNING); });
+          unit1.with(
+              [](lv_obj_t* obj) { lv_obj_add_state(obj, ETX_NAME_TXT_WARNING); });
+          clearState(ETX_STATE_BG_WARNING);
           timerBg->setColor(COLOR_THEME_WARNING_INDEX);
           timerIcon->setColor(COLOR_THEME_SECONDARY2_INDEX);
         } else {
-          lv_obj_add_state(lvobj, ETX_STATE_BG_WARNING);
+          addState(ETX_STATE_BG_WARNING);
         }
       } else {
         if (isLarge) {
-          lv_obj_clear_state(nameLabel, ETX_NAME_TXT_WARNING);
-          lv_obj_clear_state(digits0, ETX_NAME_TXT_WARNING);
-          lv_obj_clear_state(digits1, ETX_NAME_TXT_WARNING);
-          lv_obj_clear_state(unit0, ETX_NAME_TXT_WARNING);
-          lv_obj_clear_state(unit1, ETX_NAME_TXT_WARNING);
+          nameLabel.with([](lv_obj_t* obj) {
+            lv_obj_clear_state(obj, ETX_NAME_TXT_WARNING);
+          });
+          digits0.with([](lv_obj_t* obj) {
+            lv_obj_clear_state(obj, ETX_NAME_TXT_WARNING);
+          });
+          digits1.with([](lv_obj_t* obj) {
+            lv_obj_clear_state(obj, ETX_NAME_TXT_WARNING);
+          });
+          unit0.with([](lv_obj_t* obj) {
+            lv_obj_clear_state(obj, ETX_NAME_TXT_WARNING);
+          });
+          unit1.with([](lv_obj_t* obj) {
+            lv_obj_clear_state(obj, ETX_NAME_TXT_WARNING);
+          });
           timerBg->setColor(COLOR_THEME_PRIMARY2_INDEX);
           timerIcon->setColor(COLOR_THEME_SECONDARY1_INDEX);
         }
-        lv_obj_clear_state(lvobj, ETX_STATE_BG_WARNING);
+        clearState(ETX_STATE_BG_WARNING);
       }
     }
   }
@@ -239,13 +276,13 @@ class TimerWidget : public TrackedWidget
   uint32_t lastStartValue = -1;
   bool isLarge = false;
   lv_style_t style;
-  lv_obj_t* nameLabel = nullptr;
-  lv_obj_t* valLabel = nullptr;
-  lv_obj_t* digits0 = nullptr;
-  lv_obj_t* digits1 = nullptr;
-  lv_obj_t* unit0 = nullptr;
-  lv_obj_t* unit1 = nullptr;
-  lv_obj_t* timerArc = nullptr;
+  RequiredLvObj nameLabel;
+  RequiredLvObj valLabel;
+  RequiredLvObj digits0;
+  RequiredLvObj digits1;
+  RequiredLvObj unit0;
+  RequiredLvObj unit1;
+  RequiredLvObj timerArc;
   StaticIcon* timerBg = nullptr;
   StaticIcon* timerIcon = nullptr;
 
@@ -264,45 +301,59 @@ class TimerWidget : public TrackedWidget
 
     if (width() >= TMR_LRG_W && height() >= TMR_LRG_H) {
       isLarge = true;
-      etx_font(nameLabel, FONT_XS_INDEX);
-      etx_font(valLabel, FONT_STD_INDEX);
-      lv_obj_set_style_text_align(nameLabel, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
-      lv_obj_set_style_text_align(valLabel, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
-      if (hasName)
-        lv_obj_clear_state(nameLabel, EXT_NAME_ALIGN_RIGHT);
-      else
-        lv_obj_add_state(nameLabel, EXT_NAME_ALIGN_RIGHT);
-      lv_obj_set_pos(nameLabel, NM_LRG_X, NM_LRG_Y);
-      lv_obj_set_width(nameLabel, NM_LRG_W);
-      lv_obj_clear_state(nameLabel, ETX_NAME_COLOR_WHITE);
-
-      lv_obj_add_flag(valLabel, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_clear_flag(digits0, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_clear_flag(digits1, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_clear_flag(unit0, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_clear_flag(unit1, LV_OBJ_FLAG_HIDDEN);
+      nameLabel.with([&](lv_obj_t* obj) {
+        etx_font(obj, FONT_XS_INDEX);
+        lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+        if (hasName)
+          lv_obj_clear_state(obj, EXT_NAME_ALIGN_RIGHT);
+        else
+          lv_obj_add_state(obj, EXT_NAME_ALIGN_RIGHT);
+        lv_obj_set_pos(obj, NM_LRG_X, NM_LRG_Y);
+        lv_obj_set_width(obj, NM_LRG_W);
+        lv_obj_clear_state(obj, ETX_NAME_COLOR_WHITE);
+      });
+      valLabel.with([](lv_obj_t* obj) {
+        etx_font(obj, FONT_STD_INDEX);
+        lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+        lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+      });
+      digits0.with(
+          [](lv_obj_t* obj) { lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN); });
+      digits1.with(
+          [](lv_obj_t* obj) { lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN); });
+      unit0.with(
+          [](lv_obj_t* obj) { lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN); });
+      unit1.with(
+          [](lv_obj_t* obj) { lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN); });
       timerBg->show();
     } else {
       isLarge = false;
-      etx_font(nameLabel, compact ? FONT_XXS_INDEX : FONT_XS_INDEX);
-      etx_font(valLabel, compact ? FONT_BOLD_INDEX : FONT_STD_INDEX);
-      lv_obj_set_style_text_align(nameLabel, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
-      lv_obj_set_style_text_align(valLabel, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
-      lv_obj_clear_state(nameLabel, EXT_NAME_ALIGN_RIGHT);
       coord_t labelPad = PAD_TINY;
       coord_t labelWidth = width() > 2 * labelPad ? width() - 2 * labelPad : width();
-      lv_obj_set_pos(nameLabel, labelPad, 0);
-      lv_obj_set_width(nameLabel, labelWidth);
-      lv_obj_add_state(nameLabel, ETX_NAME_COLOR_WHITE);
-      lv_obj_set_width(valLabel, labelWidth);
-      lv_obj_set_pos(valLabel, compact ? labelPad : PAD_THREE,
-                     compact ? COMPACT_VAL_LBL_Y : VAL_LBL_Y);
-
-      lv_obj_clear_flag(valLabel, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_add_flag(digits0, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_add_flag(digits1, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_add_flag(unit0, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_add_flag(unit1, LV_OBJ_FLAG_HIDDEN);
+      nameLabel.with([&](lv_obj_t* obj) {
+        etx_font(obj, compact ? FONT_XXS_INDEX : FONT_XS_INDEX);
+        lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+        lv_obj_clear_state(obj, EXT_NAME_ALIGN_RIGHT);
+        lv_obj_set_pos(obj, labelPad, 0);
+        lv_obj_set_width(obj, labelWidth);
+        lv_obj_add_state(obj, ETX_NAME_COLOR_WHITE);
+      });
+      valLabel.with([&](lv_obj_t* obj) {
+        etx_font(obj, compact ? FONT_BOLD_INDEX : FONT_STD_INDEX);
+        lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+        lv_obj_set_width(obj, labelWidth);
+        lv_obj_set_pos(obj, compact ? labelPad : PAD_THREE,
+                       compact ? COMPACT_VAL_LBL_Y : VAL_LBL_Y);
+        lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
+      });
+      digits0.with(
+          [](lv_obj_t* obj) { lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN); });
+      digits1.with(
+          [](lv_obj_t* obj) { lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN); });
+      unit0.with(
+          [](lv_obj_t* obj) { lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN); });
+      unit1.with(
+          [](lv_obj_t* obj) { lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN); });
       timerBg->hide();
     }
 
@@ -312,31 +363,31 @@ class TimerWidget : public TrackedWidget
     } else {  // user name not exist "TMRn"
       formatNumberAsString(s, 16, index + 1, 1, 0, "TMR");
     }
-    lv_label_set_text(nameLabel, s);
+    nameLabel.with([&](lv_obj_t* obj) { lv_label_set_text(obj, s); });
 
     lastValue = 0;
     lastStartValue = -1;
     requireRefresh();
   }
 
-  lv_obj_t* createUnitLabel()
+  bool createUnitLabel(RequiredLvObj& label)
   {
-    auto lbl = etx_label_create(lvobj);
-    lv_label_set_text(lbl, "");
-    lv_obj_add_style(lbl, &style, LV_PART_MAIN);
-    etx_txt_color(lbl, COLOR_THEME_SECONDARY1_INDEX);
-    etx_txt_color(lbl, COLOR_THEME_SECONDARY2_INDEX,
-                  LV_PART_MAIN | ETX_NAME_TXT_WARNING);
-
-    return lbl;
+    return initRequiredLvObj(
+        label, [](lv_obj_t* parent) { return etx_label_create(parent); },
+        [&](lv_obj_t* obj) {
+          lv_label_set_text(obj, "");
+          lv_obj_add_style(obj, &style, LV_PART_MAIN);
+          etx_txt_color(obj, COLOR_THEME_SECONDARY1_INDEX);
+          etx_txt_color(obj, COLOR_THEME_SECONDARY2_INDEX,
+                        LV_PART_MAIN | ETX_NAME_TXT_WARNING);
+        });
   }
 
-  lv_obj_t* createDigitsLabel()
+  bool createDigitsLabel(RequiredLvObj& label)
   {
-    auto lbl = createUnitLabel();
-    etx_font(lbl, FONT_XL_INDEX);
-
-    return lbl;
+    if (!createUnitLabel(label)) return false;
+    label.with([](lv_obj_t* obj) { etx_font(obj, FONT_XL_INDEX); });
+    return true;
   }
 };
 

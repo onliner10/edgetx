@@ -42,8 +42,8 @@ ViewMainDecoration::ViewMainDecoration(Window* parent, bool calibration) :
 
   w_bc = layoutBox(this, LV_ALIGN_BOTTOM_MID, LV_FLEX_FLOW_COLUMN);
   if (w_bc) {
-    lv_obj_set_flex_align(w_bc->getLvObj(), LV_FLEX_ALIGN_CENTER,
-                          LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_AROUND);
+    w_bc->setFlexAlign(LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
+                       LV_FLEX_ALIGN_SPACE_AROUND);
   }
 
   if (!calibration) {
@@ -62,13 +62,13 @@ Window* ViewMainDecoration::layoutBox(Window* parent, lv_align_t align,
   auto w = new (std::nothrow) Window(parent, rect_t{0, 0, LV_SIZE_CONTENT, LV_SIZE_CONTENT});
   if (!w) return nullptr;
 
-  lv_obj_set_align(w->getLvObj(), align);
-  lv_obj_set_flex_flow(w->getLvObj(), flow);
+  w->setAlign(align);
+  w->setFlexFlow(flow);
 
   if (_LV_FLEX_COLUMN & flow) {
-    lv_obj_set_style_pad_row(w->getLvObj(), 0, 0);
+    w->setStylePadRow(0, 0);
   } else {
-    lv_obj_set_style_pad_column(w->getLvObj(), 0, 0);
+    w->setStylePadColumn(0, 0);
   }
 
   return w;

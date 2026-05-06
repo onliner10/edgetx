@@ -102,65 +102,63 @@ class VersionDialog : public BaseDialog
     FlexGridLayout grid(col_dsc, row_dsc);
 
     auto g = lv_group_get_default();
-    lv_group_set_editing(g, true);
+    if (g) lv_group_set_editing(g, true);
 
-    lv_group_add_obj(g, form->getLvObj());
+    form.with([&](Window& formWindow) {
+      formWindow.addToGroup(g);
 
-    // headline "Internal module"
-    new StaticText(form, rect_t{}, STR_INTERNAL_MODULE);
+      // headline "Internal module"
+      new StaticText(&formWindow, rect_t{}, STR_INTERNAL_MODULE);
 
-    // Internal module name
-    int_module_name_w = form->newLine(grid);
-    new StaticText(int_module_name_w, rect_t{}, STR_MODULE);
-    int_name = new StaticText(int_module_name_w, rect_t{}, "");
+      // Internal module name
+      int_module_name_w = formWindow.newLine(grid);
+      new StaticText(int_module_name_w, rect_t{}, STR_MODULE);
+      int_name = new StaticText(int_module_name_w, rect_t{}, "");
 
-    // internal module status
-    int_module_status_w = form->newLine(grid);
-    new StaticText(int_module_status_w, rect_t{}, STR_STATUS);
-    int_status = new StaticText(int_module_status_w, rect_t{}, "");
-    int_module_status_w->hide();
+      // internal module status
+      int_module_status_w = formWindow.newLine(grid);
+      new StaticText(int_module_status_w, rect_t{}, STR_STATUS);
+      int_status = new StaticText(int_module_status_w, rect_t{}, "");
+      int_module_status_w->hide();
 
-    // internal receiver name
-    int_rx_name_w = form->newLine(grid);
-    new StaticText(int_rx_name_w, rect_t{}, STR_RECEIVER);
-    int_rx_name =
-        new StaticText(int_rx_name_w, rect_t{}, "");
-    int_rx_name_w->hide();
+      // internal receiver name
+      int_rx_name_w = formWindow.newLine(grid);
+      new StaticText(int_rx_name_w, rect_t{}, STR_RECEIVER);
+      int_rx_name = new StaticText(int_rx_name_w, rect_t{}, "");
+      int_rx_name_w->hide();
 
-    // internal receiver status
-    int_rx_status_w = form->newLine(grid);
-    new StaticText(int_rx_status_w, rect_t{}, STR_STATUS);
-    int_rx_status =
-        new StaticText(int_rx_status_w, rect_t{}, "");
-    int_rx_status_w->hide();
+      // internal receiver status
+      int_rx_status_w = formWindow.newLine(grid);
+      new StaticText(int_rx_status_w, rect_t{}, STR_STATUS);
+      int_rx_status = new StaticText(int_rx_status_w, rect_t{}, "");
+      int_rx_status_w->hide();
 
-    // headline "External module"
-    new StaticText(form, rect_t{}, STR_EXTERNAL_MODULE);
+      // headline "External module"
+      new StaticText(&formWindow, rect_t{}, STR_EXTERNAL_MODULE);
 
-    // external module name
-    ext_module_name_w = form->newLine(grid);
-    new StaticText(ext_module_name_w, rect_t{}, STR_MODULE);
-    ext_name = new StaticText(ext_module_name_w, rect_t{}, "");
+      // external module name
+      ext_module_name_w = formWindow.newLine(grid);
+      new StaticText(ext_module_name_w, rect_t{}, STR_MODULE);
+      ext_name = new StaticText(ext_module_name_w, rect_t{}, "");
 
-    // external module status
-    ext_module_status_w = form->newLine(grid);
-    new StaticText(ext_module_status_w, rect_t{}, STR_STATUS);
-    ext_status = new StaticText(ext_module_status_w, rect_t{}, "");
-    ext_module_status_w->hide();
+      // external module status
+      ext_module_status_w = formWindow.newLine(grid);
+      new StaticText(ext_module_status_w, rect_t{}, STR_STATUS);
+      ext_status = new StaticText(ext_module_status_w, rect_t{}, "");
+      ext_module_status_w->hide();
 
-    // external receiver name
-    ext_rx_name_w = form->newLine(grid);
-    new StaticText(ext_rx_name_w, rect_t{}, STR_RECEIVER);
-    ext_rx_name =
-        new StaticText(ext_rx_name_w, rect_t{}, "");
-    ext_rx_name_w->hide();
+      // external receiver name
+      ext_rx_name_w = formWindow.newLine(grid);
+      new StaticText(ext_rx_name_w, rect_t{}, STR_RECEIVER);
+      ext_rx_name = new StaticText(ext_rx_name_w, rect_t{}, "");
+      ext_rx_name_w->hide();
 
-    // external receiver status
-    ext_rx_status_w = form->newLine(grid);
-    new StaticText(ext_rx_status_w, rect_t{}, STR_STATUS);
-    ext_rx_status =
-        new StaticText(ext_rx_status_w, rect_t{}, "");
-    ext_rx_status_w->hide();
+      // external receiver status
+      ext_rx_status_w = formWindow.newLine(grid);
+      new StaticText(ext_rx_status_w, rect_t{}, STR_STATUS);
+      ext_rx_status = new StaticText(ext_rx_status_w, rect_t{}, "");
+      ext_rx_status_w->hide();
+    });
 
     // content->setWidth(LCD_W * 0.8);
     update();
@@ -180,6 +178,10 @@ class VersionDialog : public BaseDialog
                     StaticText* status, Window* rx_name_w, StaticText* rx_name,
                     Window* rx_status_w, StaticText* rx_status)
   {
+    if (!name || !module_status_w || !status || !rx_name_w || !rx_name ||
+        !rx_status_w || !rx_status)
+      return;
+
     // initialize module name with module selection made in model settings
     // initialize to module does not provide status
     // PXX2 will overwrite name

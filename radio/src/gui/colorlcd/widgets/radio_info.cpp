@@ -110,6 +110,12 @@ lv_obj_t* makeStatusPart(lv_obj_t* parent)
   return obj;
 }
 
+template <typename Fn>
+void withStatusPart(lv_obj_t* obj, Fn&& fn)
+{
+  if (obj) fn(obj);
+}
+
 LcdColorIndex statusPrimaryColor(bool topbar)
 {
   return topbar ? COLOR_THEME_PRIMARY2_INDEX : COLOR_THEME_SECONDARY1_INDEX;
@@ -122,38 +128,39 @@ LcdColorIndex statusMutedColor(bool topbar)
 
 void setStatusPartColor(lv_obj_t* obj, LcdColorIndex color)
 {
-  if (!obj) return;
-  etx_solid_bg(obj, color);
+  withStatusPart(obj, [&](lv_obj_t* part) { etx_solid_bg(part, color); });
 }
 
 void setStatusPartBorder(lv_obj_t* obj, LcdColorIndex color, coord_t width)
 {
-  if (!obj) return;
-  etx_border_color(obj, color);
-  lv_obj_set_style_border_width(obj, width, LV_PART_MAIN);
+  withStatusPart(obj, [&](lv_obj_t* part) {
+    etx_border_color(part, color);
+    lv_obj_set_style_border_width(part, width, LV_PART_MAIN);
+  });
 }
 
 void setStatusLabel(lv_obj_t* label, const char* text, LcdColorIndex color,
                     FontIndex font, coord_t x, coord_t y, coord_t w, coord_t h)
 {
-  if (!label) return;
-
-  etx_font(label, font);
-  etx_txt_color(label, color);
-  lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
-  lv_label_set_text(label, text);
-  lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
-  lv_obj_set_pos(label, x, y);
-  lv_obj_set_size(label, w, h);
+  withStatusPart(label, [&](lv_obj_t* label) {
+    etx_font(label, font);
+    etx_txt_color(label, color);
+    lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
+    lv_label_set_text(label, text);
+    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+    lv_obj_set_pos(label, x, y);
+    lv_obj_set_size(label, w, h);
+  });
 }
 
 void setLvVisible(lv_obj_t* obj, bool visible)
 {
-  if (!obj) return;
-  if (visible)
-    lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
-  else
-    lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+  withStatusPart(obj, [&](lv_obj_t* part) {
+    if (visible)
+      lv_obj_clear_flag(part, LV_OBJ_FLAG_HIDDEN);
+    else
+      lv_obj_add_flag(part, LV_OBJ_FLAG_HIDDEN);
+  });
 }
 
 uint8_t activeLinkBars(uint8_t rssi)
@@ -206,13 +213,15 @@ class LinkStatusWidget : public Widget
                    const rect_t& rect, WidgetLocation location) :
       Widget(factory, parent, rect, location)
   {
-    for (uint8_t i = 0; i < LINK_BARS; i += 1) {
-      bars[i] = makeStatusPart(lvobj);
-      if (bars[i]) lv_obj_set_style_radius(bars[i], 1, LV_PART_MAIN);
-    }
+    withLive([&](LiveWindow& live) {
+      for (uint8_t i = 0; i < LINK_BARS; i += 1) {
+        bars[i] = makeStatusPart(live.lvobj());
+        if (bars[i]) lv_obj_set_style_radius(bars[i], 1, LV_PART_MAIN);
+      }
 
-    title = etx_label_create(lvobj, FONT_XXS_INDEX);
-    value = etx_label_create(lvobj, FONT_BOLD_INDEX);
+      title = etx_label_create(live.lvobj(), FONT_XXS_INDEX);
+      value = etx_label_create(live.lvobj(), FONT_BOLD_INDEX);
+    });
 
     update();
     foreground();
@@ -337,11 +346,13 @@ class TxBatteryStatusWidget : public Widget
                         const rect_t& rect, WidgetLocation location) :
       Widget(factory, parent, rect, location)
   {
-    shell = makeStatusPart(lvobj);
-    fill = makeStatusPart(lvobj);
-    cap = makeStatusPart(lvobj);
-    title = etx_label_create(lvobj, FONT_XXS_INDEX);
-    value = etx_label_create(lvobj, FONT_BOLD_INDEX);
+    withLive([&](LiveWindow& live) {
+      shell = makeStatusPart(live.lvobj());
+      fill = makeStatusPart(live.lvobj());
+      cap = makeStatusPart(live.lvobj());
+      title = etx_label_create(live.lvobj(), FONT_XXS_INDEX);
+      value = etx_label_create(live.lvobj(), FONT_BOLD_INDEX);
+    });
 
     if (shell) {
       lv_obj_set_style_bg_opa(shell, LV_OPA_TRANSP, LV_PART_MAIN);
@@ -494,16 +505,22 @@ class VolumeStatusWidget : public Widget
                      const rect_t& rect, WidgetLocation location) :
       Widget(factory, parent, rect, location)
   {
-    track = makeStatusPart(lvobj);
-    fill = makeStatusPart(lvobj);
+    withLive([&](LiveWindow& live) {
+      track = makeStatusPart(live.lvobj());
+      fill = makeStatusPart(live.lvobj());
+    });
     if (track) lv_obj_set_style_radius(track, LV_RADIUS_CIRCLE, LV_PART_MAIN);
     if (fill) lv_obj_set_style_radius(fill, LV_RADIUS_CIRCLE, LV_PART_MAIN);
 
-    capsuleLabel = etx_label_create(lvobj, FONT_BOLD_INDEX);
+    withLive([&](LiveWindow& live) {
+      capsuleLabel = etx_label_create(live.lvobj(), FONT_BOLD_INDEX);
+    });
     if (capsuleLabel) lv_label_set_long_mode(capsuleLabel, LV_LABEL_LONG_DOT);
 
-    title = etx_label_create(lvobj, FONT_XXS_INDEX);
-    value = etx_label_create(lvobj, FONT_BOLD_INDEX);
+    withLive([&](LiveWindow& live) {
+      title = etx_label_create(live.lvobj(), FONT_XXS_INDEX);
+      value = etx_label_create(live.lvobj(), FONT_BOLD_INDEX);
+    });
 
     update();
     foreground();
@@ -721,22 +738,24 @@ class RadioInfoWidget : public Widget
 #endif
 
     if (compact) {
-      batteryShell = lv_obj_create(lvobj);
-      if (batteryShell) {
-        lv_obj_clear_flag(batteryShell, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_set_style_bg_opa(batteryShell, LV_OPA_TRANSP, LV_PART_MAIN);
-        lv_obj_set_style_border_width(batteryShell, 2, LV_PART_MAIN);
-        lv_obj_set_style_border_opa(batteryShell, LV_OPA_COVER, LV_PART_MAIN);
-        lv_obj_set_style_border_color(batteryShell,
-                                      makeLvColor(COLOR_THEME_PRIMARY2),
-                                      LV_PART_MAIN);
-        lv_obj_set_style_radius(batteryShell, 2, LV_PART_MAIN);
-      }
-      batteryCap = lv_obj_create(lvobj);
-      if (batteryCap) {
-        lv_obj_clear_flag(batteryCap, LV_OBJ_FLAG_CLICKABLE);
-        etx_solid_bg(batteryCap, COLOR_THEME_PRIMARY2_INDEX);
-      }
+      withLive([&](LiveWindow& live) {
+        batteryShell = lv_obj_create(live.lvobj());
+        if (batteryShell) {
+          lv_obj_clear_flag(batteryShell, LV_OBJ_FLAG_CLICKABLE);
+          lv_obj_set_style_bg_opa(batteryShell, LV_OPA_TRANSP, LV_PART_MAIN);
+          lv_obj_set_style_border_width(batteryShell, 2, LV_PART_MAIN);
+          lv_obj_set_style_border_opa(batteryShell, LV_OPA_COVER, LV_PART_MAIN);
+          lv_obj_set_style_border_color(batteryShell,
+                                        makeLvColor(COLOR_THEME_PRIMARY2),
+                                        LV_PART_MAIN);
+          lv_obj_set_style_radius(batteryShell, 2, LV_PART_MAIN);
+        }
+        batteryCap = lv_obj_create(live.lvobj());
+        if (batteryCap) {
+          lv_obj_clear_flag(batteryCap, LV_OBJ_FLAG_CLICKABLE);
+          etx_solid_bg(batteryCap, COLOR_THEME_PRIMARY2_INDEX);
+        }
+      });
     }
 
 #if defined(INTERNAL_MODULE_PXX1) && defined(EXTERNAL_ANTENNA)
@@ -748,20 +767,24 @@ class RadioInfoWidget : public Widget
     }
 #endif
 
-    batteryFill = lv_obj_create(lvobj);
-    if (batteryFill) {
-      lv_obj_set_style_bg_opa(batteryFill, LV_OPA_COVER, LV_PART_MAIN);
-    }
+    withLive([&](LiveWindow& live) {
+      batteryFill = lv_obj_create(live.lvobj());
+      if (batteryFill) {
+        lv_obj_set_style_bg_opa(batteryFill, LV_OPA_COVER, LV_PART_MAIN);
+      }
+    });
     update();
 
     // RSSI bars
-    for (unsigned int i = 0; i < DIM(rssiBars); i++) {
-      rssiBars[i] = lv_obj_create(lvobj);
-      if (rssiBars[i]) {
-        etx_solid_bg(rssiBars[i], COLOR_THEME_SECONDARY2_INDEX);
-        etx_bg_color(rssiBars[i], COLOR_THEME_PRIMARY2_INDEX, LV_STATE_USER_1);
+    withLive([&](LiveWindow& live) {
+      for (unsigned int i = 0; i < DIM(rssiBars); i++) {
+        rssiBars[i] = lv_obj_create(live.lvobj());
+        if (rssiBars[i]) {
+          etx_solid_bg(rssiBars[i], COLOR_THEME_SECONDARY2_INDEX);
+          etx_bg_color(rssiBars[i], COLOR_THEME_PRIMARY2_INDEX, LV_STATE_USER_1);
+        }
       }
-    }
+    });
 
     layoutStatus();
     foreground();

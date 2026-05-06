@@ -84,8 +84,7 @@ class MenuBody : public TableField
   MenuBody(Window* parent, const rect_t& rect) : TableField(parent, rect)
   {
     // Allow encoder acceleration
-    withLive(
-        [](lv_obj_t* obj) { lv_obj_add_flag(obj, LV_OBJ_FLAG_ENCODER_ACCEL); });
+    addFlag(LV_OBJ_FLAG_ENCODER_ACCEL);
 
     setColumnWidth(0, rect.w);
 
@@ -106,37 +105,40 @@ class MenuBody : public TableField
     if (index == selectedIndex) return;
     selectedIndex = index;
 
-    lv_obj_invalidate(lvobj);
-    lv_table_t* table = (lv_table_t*)lvobj;
+    withLive([&](LiveWindow& live) {
+      auto obj = live.lvobj();
+      lv_obj_invalidate(obj);
+      lv_table_t* table = (lv_table_t*)obj;
 
-    if (index < 0) {
-      table->row_act = LV_TABLE_CELL_NONE;
-      table->col_act = LV_TABLE_CELL_NONE;
-      return;
-    }
+      if (index < 0) {
+        table->row_act = LV_TABLE_CELL_NONE;
+        table->col_act = LV_TABLE_CELL_NONE;
+        return;
+      }
 
-    table->row_act = index;
-    table->col_act = 0;
+      table->row_act = index;
+      table->col_act = 0;
 
-    lv_coord_t h_before = 0;
-    for (uint16_t i = 0; i < table->row_act; i++) h_before += table->row_h[i];
+      lv_coord_t h_before = 0;
+      for (uint16_t i = 0; i < table->row_act; i++) h_before += table->row_h[i];
 
-    lv_coord_t row_h = table->row_h[table->row_act];
-    lv_coord_t scroll_y = lv_obj_get_scroll_y(lvobj);
+      lv_coord_t row_h = table->row_h[table->row_act];
+      lv_coord_t scroll_y = lv_obj_get_scroll_y(obj);
 
-    lv_obj_update_layout(lvobj);
-    lv_coord_t h = lv_obj_get_height(lvobj);
+      lv_obj_update_layout(obj);
+      lv_coord_t h = lv_obj_get_height(obj);
 
-    lv_coord_t diff_y = 0;
-    if (h_before < scroll_y) {
-      diff_y = scroll_y - h_before;
-    } else if (scroll_y + h < h_before + row_h) {
-      diff_y = scroll_y + h - h_before - row_h;
-    } else {
-      return;
-    }
+      lv_coord_t diff_y = 0;
+      if (h_before < scroll_y) {
+        diff_y = scroll_y - h_before;
+      } else if (scroll_y + h < h_before + row_h) {
+        diff_y = scroll_y + h - h_before - row_h;
+      } else {
+        return;
+      }
 
-    lv_obj_scroll_by_bounded(lvobj, 0, diff_y, LV_ANIM_OFF);
+      lv_obj_scroll_by_bounded(obj, 0, diff_y, LV_ANIM_OFF);
+    });
   }
 
   int selection() const { return selectedIndex; }
@@ -164,7 +166,9 @@ class MenuBody : public TableField
 
     if (update) {
       auto idx = lines.size() - 1;
-      lv_table_set_cell_value(lvobj, idx, 0, text.c_str());
+      withLive([&](LiveWindow& live) {
+        lv_table_set_cell_value(live.lvobj(), idx, 0, text.c_str());
+      });
     }
   }
 
@@ -172,7 +176,10 @@ class MenuBody : public TableField
   {
     setRowCount(lines.size());
     for (unsigned int idx = 0; idx < lines.size(); idx++) {
-      lv_table_set_cell_value(lvobj, idx, 0, lines[idx]->text.c_str());
+      withLive([&](LiveWindow& live) {
+        lv_table_set_cell_value(live.lvobj(), idx, 0,
+                                lines[idx]->text.c_str());
+      });
     }
   }
 
@@ -193,7 +200,9 @@ class MenuBody : public TableField
     selectedIndex = 0;
 
     // reset vertical scroll
-    lv_obj_scroll_to_y(lvobj, 0, LV_ANIM_OFF);
+    withLive([](LiveWindow& live) {
+      lv_obj_scroll_to_y(live.lvobj(), 0, LV_ANIM_OFF);
+    });
   }
 
   void onPress(uint16_t row, uint16_t col) override
@@ -225,8 +234,11 @@ class MenuBody : public TableField
     if (!icon) return;
 
     lv_img_t* img = &icon->img;
-    lv_coord_t cell_left = lv_obj_get_style_pad_left(lvobj, LV_PART_ITEMS);
-    dsc->label_dsc->ofs_x = img->w + cell_left;
+    withLive([&](LiveWindow& live) {
+      lv_coord_t cell_left =
+          lv_obj_get_style_pad_left(live.lvobj(), LV_PART_ITEMS);
+      dsc->label_dsc->ofs_x = img->w + cell_left;
+    });
   }
 
   void onDrawEnd(uint16_t row, uint16_t col,
@@ -244,7 +256,10 @@ class MenuBody : public TableField
 
       lv_coord_t area_h = lv_area_get_height(dsc->draw_area);
 
-      lv_coord_t cell_left = lv_obj_get_style_pad_left(lvobj, LV_PART_ITEMS);
+      lv_coord_t cell_left = 0;
+      withLive([&](LiveWindow& live) {
+        cell_left = lv_obj_get_style_pad_left(live.lvobj(), LV_PART_ITEMS);
+      });
       coords.x1 = dsc->draw_area->x1 + cell_left;
       coords.x2 = coords.x1 + img->header.w - 1;
       coords.y1 = dsc->draw_area->y1 + (area_h - img->header.h) / 2;
@@ -256,7 +271,10 @@ class MenuBody : public TableField
     if (lines[row]->isChecked != nullptr && lines[row]->isChecked()) {
       lv_area_t coords;
       lv_coord_t area_h = lv_area_get_height(dsc->draw_area);
-      lv_coord_t cell_right = lv_obj_get_style_pad_right(lvobj, LV_PART_ITEMS);
+      lv_coord_t cell_right = 0;
+      withLive([&](LiveWindow& live) {
+        cell_right = lv_obj_get_style_pad_right(live.lvobj(), LV_PART_ITEMS);
+      });
       lv_coord_t font_h = getFontHeight(FONT(STD));
       coords.x1 = dsc->draw_area->x2 - cell_right - font_h;
       coords.x2 = coords.x1 + font_h;
@@ -362,7 +380,7 @@ class MenuWindowContent : public NavWindow, public MenuContent
 
     coord_t w = (popupWidth > 0) ? popupWidth : MENUS_WIDTH;
 
-    withLive(lv_obj_center);
+    withLive([](LiveWindow& live) { lv_obj_center(live.lvobj()); });
     setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_ZERO, w, LV_SIZE_CONTENT);
 
     if (!initRequiredWindow(header, this, rect_t{0, 0, LV_PCT(100), 0}, "",

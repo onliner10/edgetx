@@ -113,36 +113,58 @@ class PageGroupIconButton : public ButtonBase
 PageGroupHeaderBase::PageGroupHeaderBase(Window* parent, coord_t height, EdgeTxIcon icon, const char* parentTitle, PageGroupBase* menu) :
     Window(parent, {0, 0, LCD_W, height}), menu(menu)
 {
-    etx_solid_bg(lvobj, COLOR_THEME_SECONDARY1_INDEX);
+    solidBg(COLOR_THEME_SECONDARY1_INDEX);
 
     hdrIcon = new (std::nothrow) HeaderIcon(this, icon);
 
 #if VERSION_MAJOR > 2
     new (std::nothrow) HeaderBackIcon(this);
 
-    parentLabel = etx_label_create(lvobj);
-    etx_txt_color(parentLabel, COLOR_THEME_PRIMARY2_INDEX);
-    lv_obj_set_pos(parentLabel, PageHeader::PAGE_TITLE_LEFT, PageHeader::PAGE_TITLE_TOP);
-    lv_obj_set_size(parentLabel, LCD_W - PageHeader::PAGE_TITLE_LEFT - PageGroup::PAGE_GROUP_BACK_BTN_W * 2 - PAD_LARGE * 2, EdgeTxStyles::STD_FONT_HEIGHT);
-    lv_label_set_text(parentLabel, parentTitle);
+    withLive([&](LiveWindow& live) {
+      auto obj = etx_label_create(live.lvobj());
+      if (!obj) return;
+      parentLabel.reset(obj);
+      etx_txt_color(obj, COLOR_THEME_PRIMARY2_INDEX);
+      lv_obj_set_pos(obj, PageHeader::PAGE_TITLE_LEFT, PageHeader::PAGE_TITLE_TOP);
+      lv_obj_set_size(obj,
+                      LCD_W - PageHeader::PAGE_TITLE_LEFT -
+                          PageGroup::PAGE_GROUP_BACK_BTN_W * 2 - PAD_LARGE * 2,
+                      EdgeTxStyles::STD_FONT_HEIGHT);
+      lv_label_set_text(obj, parentTitle);
+    });
 #endif
 
-    titleLabel = etx_label_create(lvobj);
-    etx_txt_color(titleLabel, COLOR_THEME_PRIMARY2_INDEX);
+    initRequiredLvObj(
+        titleLabel, [](lv_obj_t* parent) { return etx_label_create(parent); },
+        [](lv_obj_t* obj) { etx_txt_color(obj, COLOR_THEME_PRIMARY2_INDEX); });
 
 #if VERSION_MAJOR == 2
-    auto sep = lv_obj_create(lvobj);
-    etx_solid_bg(sep);
-    lv_obj_set_pos(sep, 0, EdgeTxStyles::MENU_HEADER_HEIGHT);
-    lv_obj_set_size(sep, LCD_W, PageGroup::PAGE_GROUP_TOP_BAR_H - EdgeTxStyles::MENU_HEADER_HEIGHT);
+    withLive([&](LiveWindow& live) {
+      auto sep = lv_obj_create(live.lvobj());
+      if (!requireLvObj(sep)) return false;
+      etx_solid_bg(sep);
+      lv_obj_set_pos(sep, 0, EdgeTxStyles::MENU_HEADER_HEIGHT);
+      lv_obj_set_size(sep, LCD_W,
+                      PageGroup::PAGE_GROUP_TOP_BAR_H -
+                          EdgeTxStyles::MENU_HEADER_HEIGHT);
+      return true;
+    });
 
-    lv_obj_set_style_pad_left(titleLabel, PAD_MEDIUM, LV_PART_MAIN);
-    lv_obj_set_style_pad_top(titleLabel, 1, LV_PART_MAIN);
-    lv_obj_set_pos(titleLabel, 0, PageGroup::PAGE_GROUP_TOP_BAR_H);
-    lv_obj_set_size(titleLabel, LCD_W, PageGroup::PAGE_GROUP_ALT_TITLE_H);
+    titleLabel.with([](lv_obj_t* obj) {
+      lv_obj_set_style_pad_left(obj, PAD_MEDIUM, LV_PART_MAIN);
+      lv_obj_set_style_pad_top(obj, 1, LV_PART_MAIN);
+      lv_obj_set_pos(obj, 0, PageGroup::PAGE_GROUP_TOP_BAR_H);
+      lv_obj_set_size(obj, LCD_W, PageGroup::PAGE_GROUP_ALT_TITLE_H);
+    });
 #else
-    lv_obj_set_pos(titleLabel, PageHeader::PAGE_TITLE_LEFT, PageHeader::PAGE_TITLE_TOP + EdgeTxStyles::STD_FONT_HEIGHT);
-    lv_obj_set_size(titleLabel, LCD_W - PageHeader::PAGE_TITLE_LEFT - PageGroup::PAGE_GROUP_BACK_BTN_W * 2 - PAD_LARGE * 2, EdgeTxStyles::STD_FONT_HEIGHT);
+    titleLabel.with([](lv_obj_t* obj) {
+      lv_obj_set_pos(obj, PageHeader::PAGE_TITLE_LEFT,
+                     PageHeader::PAGE_TITLE_TOP + EdgeTxStyles::STD_FONT_HEIGHT);
+      lv_obj_set_size(obj,
+                      LCD_W - PageHeader::PAGE_TITLE_LEFT -
+                          PageGroup::PAGE_GROUP_BACK_BTN_W * 2 - PAD_LARGE * 2,
+                      EdgeTxStyles::STD_FONT_HEIGHT);
+    });
 #endif
 
     setTitle("");
@@ -181,11 +203,20 @@ void PageGroupHeaderBase::setCurrentIndex(uint8_t index)
       buttons[currentIndex]->check(true);
       coord_t x = getX(currentIndex);
       selectedIcon->setPos(x, 0);
-      coord_t sx = lv_obj_get_scroll_x(carousel->getLvObj());
+      coord_t sx = 0;
+      carousel->withLive([&](Window::LiveWindow& live) {
+        sx = lv_obj_get_scroll_x(live.lvobj());
+      });
       if (x + MENU_HEADER_BUTTON_WIDTH - sx > carousel->width()) {
-        lv_obj_scroll_to(carousel->getLvObj(), x + MENU_HEADER_BUTTON_WIDTH - carousel->width(), 0, LV_ANIM_OFF);
+        carousel->withLive([&](Window::LiveWindow& live) {
+          lv_obj_scroll_to(live.lvobj(),
+                           x + MENU_HEADER_BUTTON_WIDTH - carousel->width(), 0,
+                           LV_ANIM_OFF);
+        });
       } else if (x < sx) {
-        lv_obj_scroll_to(carousel->getLvObj(), x, 0, LV_ANIM_OFF);
+        carousel->withLive([&](Window::LiveWindow& live) {
+          lv_obj_scroll_to(live.lvobj(), x, 0, LV_ANIM_OFF);
+        });
       }
     }
 #endif
@@ -194,14 +225,12 @@ void PageGroupHeaderBase::setCurrentIndex(uint8_t index)
 
 void PageGroupHeaderBase::setTitle(const char* title)
 {
-  if (titleLabel) {
 #if VERSION_MAJOR == 2
-    std::string s = replaceAll(title, "\n", " ");
-    lv_label_set_text(titleLabel, s.c_str());
+  std::string s = replaceAll(title, "\n", " ");
+  titleLabel.with([&](lv_obj_t* obj) { lv_label_set_text(obj, s.c_str()); });
 #else
-    lv_label_set_text(titleLabel, title);
+  titleLabel.with([&](lv_obj_t* obj) { lv_label_set_text(obj, title); });
 #endif
-  }
 }
 
 void PageGroupHeaderBase::setIcon(EdgeTxIcon newIcon)
@@ -291,7 +320,7 @@ class PageGroupHeader : public PageGroupHeaderBase
 PageGroupBase::PageGroupBase(coord_t bodyY, EdgeTxIcon icon) :
     NavWindow(MainWindow::instance(), {0, 0, LCD_W, LCD_H}), icon(icon)
 {
-  etx_solid_bg(lvobj);
+  solidBg();
 
   pushLayer(true);
 
@@ -305,8 +334,12 @@ PageGroupBase::PageGroupBase(coord_t bodyY, EdgeTxIcon icon) :
   });
 
 #if defined(DEBUG)
-  lv_obj_add_event_cb(lvobj, on_draw_begin, LV_EVENT_COVER_CHECK, nullptr);
-  lv_obj_add_event_cb(lvobj, on_draw_end, LV_EVENT_DRAW_POST_END, nullptr);
+  withLive([](LiveWindow& live) {
+    lv_obj_add_event_cb(live.lvobj(), on_draw_begin, LV_EVENT_COVER_CHECK,
+                        nullptr);
+    lv_obj_add_event_cb(live.lvobj(), on_draw_end, LV_EVENT_DRAW_POST_END,
+                        nullptr);
+  });
 #endif
 
   quickMenuMsg.subscribe(Messaging::QUICK_MENU_ITEM_SELECT,
@@ -517,18 +550,32 @@ class TabsGroupHeader : public PageGroupHeaderBase
       PageGroupHeaderBase(menu, TabsGroup::TABS_GROUP_BODY_Y, icon, parentTitle, menu)
   {
 #if PORTRAIT && VERSION_MAJOR > 2
-    lv_obj_set_pos(parentLabel, PageGroup::PAGE_GROUP_TOP_BAR_H + PAD_LARGE, PAD_MEDIUM * 2);
-    lv_obj_set_size(parentLabel, LCD_W - PageGroup::PAGE_GROUP_TOP_BAR_H * 2 - PAD_LARGE * 2, PageGroup::PAGE_GROUP_TOP_BAR_H - PAD_MEDIUM * 2);
+    parentLabel.with([](lv_obj_t* obj) {
+      lv_obj_set_pos(obj, PageGroup::PAGE_GROUP_TOP_BAR_H + PAD_LARGE,
+                     PAD_MEDIUM * 2);
+      lv_obj_set_size(obj,
+                      LCD_W - PageGroup::PAGE_GROUP_TOP_BAR_H * 2 -
+                          PAD_LARGE * 2,
+                      PageGroup::PAGE_GROUP_TOP_BAR_H - PAD_MEDIUM * 2);
+    });
 
-    auto sep = lv_obj_create(lvobj);
-    etx_solid_bg(sep);
-    lv_obj_set_pos(sep, 0, EdgeTxStyles::MENU_HEADER_HEIGHT);
-    lv_obj_set_size(sep, LCD_W, TabsGroup::TABS_GROUP_TOP_BAR_H - EdgeTxStyles::MENU_HEADER_HEIGHT);
+    withLive([&](LiveWindow& live) {
+      auto sep = lv_obj_create(live.lvobj());
+      if (!requireLvObj(sep)) return false;
+      etx_solid_bg(sep);
+      lv_obj_set_pos(sep, 0, EdgeTxStyles::MENU_HEADER_HEIGHT);
+      lv_obj_set_size(sep, LCD_W,
+                      TabsGroup::TABS_GROUP_TOP_BAR_H -
+                          EdgeTxStyles::MENU_HEADER_HEIGHT);
+      return true;
+    });
 
-    lv_obj_set_style_pad_left(titleLabel, PAD_MEDIUM, LV_PART_MAIN);
-    lv_obj_set_style_pad_top(titleLabel, 1, LV_PART_MAIN);
-    lv_obj_set_pos(titleLabel, 0, TabsGroup::TABS_GROUP_TOP_BAR_H);
-    lv_obj_set_size(titleLabel, LCD_W, TabsGroup::TABS_GROUP_ALT_TITLE_H);
+    titleLabel.with([](lv_obj_t* obj) {
+      lv_obj_set_style_pad_left(obj, PAD_MEDIUM, LV_PART_MAIN);
+      lv_obj_set_style_pad_top(obj, 1, LV_PART_MAIN);
+      lv_obj_set_pos(obj, 0, TabsGroup::TABS_GROUP_TOP_BAR_H);
+      lv_obj_set_size(obj, LCD_W, TabsGroup::TABS_GROUP_ALT_TITLE_H);
+    });
 #endif
 
 #if VERSION_MAJOR > 2

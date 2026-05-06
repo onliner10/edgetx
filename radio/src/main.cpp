@@ -153,11 +153,11 @@ class UsbSDConnected : public Window
 
     pushLayer(false);
 
-    etx_solid_bg(lvobj, COLOR_THEME_PRIMARY1_INDEX);
+    solidBg(COLOR_THEME_PRIMARY1_INDEX);
     new HeaderDateTime(this, LCD_W - TopBar::HDR_DATE_XO, PAD_MEDIUM);
 
     auto icon = new StaticIcon(this, 0, 0, ICON_USB_PLUGGED, COLOR_THEME_PRIMARY2_INDEX);
-    lv_obj_center(icon->getLvObj());
+    icon->Window::center();
   }
 };
 

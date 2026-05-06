@@ -40,27 +40,28 @@ TemplatePage::TemplatePage() : Page(ICON_MODEL_SELECT, PAD_ZERO)
   auto line = body->newLine(grid);
 
   listWindow = new Window(line, rect_t{});
-  etx_scrollbar(listWindow->getLvObj());
+  listWindow->scrollbar();
   listWindow->padAll(PAD_TINY);
   listWindow->padRight(PAD_SMALL);
   listWindow->setFlexLayout(LV_FLEX_FLOW_COLUMN, PAD_SMALL, LV_PCT(100), body->height() - PAD_SMALL * 2);
-  lv_obj_set_flex_align(listWindow->getLvObj(), LV_FLEX_ALIGN_START,
-                        LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_SPACE_BETWEEN);
-  lv_obj_set_grid_cell(listWindow->getLvObj(), LV_GRID_ALIGN_STRETCH, 0, 1,
-                       LV_GRID_ALIGN_START, 0, 1);
+  listWindow->setFlexAlign(LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
+                           LV_FLEX_ALIGN_SPACE_BETWEEN);
+  listWindow->setGridCell(LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_START, 0,
+                          1);
 
-  infoLabel = etx_label_create(line->getLvObj());
-  lv_label_set_text(infoLabel, "");
-  lv_obj_set_height(infoLabel, body->height() - PAD_SMALL * 2);
-  etx_obj_add_style(infoLabel, styles->text_align_left, LV_PART_MAIN);
-  etx_txt_color(infoLabel, COLOR_THEME_PRIMARY1_INDEX);
-  etx_txt_color(infoLabel, COLOR_THEME_DISABLED_INDEX, ETX_STATE_NO_INFO_COLOR);
-  lv_obj_set_grid_cell(infoLabel, LV_GRID_ALIGN_STRETCH, 1, 1,
-                       LV_GRID_ALIGN_CENTER, 0, 1);
+  infoLabel = new StaticText(line, rect_t{}, "");
+  infoLabel->setHeight(body->height() - PAD_SMALL * 2);
+  infoLabel->addStyle(styles->text_align_left, LV_PART_MAIN);
+  infoLabel->textColor(COLOR_THEME_PRIMARY1_INDEX);
+  infoLabel->textColor(COLOR_THEME_DISABLED_INDEX, ETX_STATE_NO_INFO_COLOR);
+  infoLabel->setGridCell(LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_CENTER, 0,
+                         1);
 }
 
 void TemplatePage::updateInfo()
 {
+  if (!infoLabel) return;
+
   if (buffer[0]) {
     FIL fp;
     FRESULT res = f_open(&fp, buffer, FA_READ);
@@ -73,11 +74,11 @@ void TemplatePage::updateInfo()
   }
 
   if (infoText[0] == 0) {
-    lv_label_set_text(infoLabel, STR_NO_INFORMATION);
-    lv_obj_add_state(infoLabel, ETX_STATE_NO_INFO_COLOR);
+    infoLabel->setText(STR_NO_INFORMATION);
+    infoLabel->addState(ETX_STATE_NO_INFO_COLOR);
   } else {
-    lv_label_set_text(infoLabel, infoText);
-    lv_obj_clear_state(infoLabel, ETX_STATE_NO_INFO_COLOR);
+    infoLabel->setText(infoText);
+    infoLabel->clearState(ETX_STATE_NO_INFO_COLOR);
   }
 }
 
@@ -150,7 +151,7 @@ class SelectTemplate : public TemplatePage
       new StaticText(listWindow, rect_t{0, 0, lv_pct(100), lv_pct(50)},
                      STR_NO_TEMPLATES);
     } else {
-      lv_group_focus_obj(firstButton->getLvObj());
+      firstButton->focus();
     }
   }
 
@@ -231,5 +232,5 @@ SelectTemplateFolder::SelectTemplateFolder(
                    STR_NO_TEMPLATES);
   }
 
-  lv_group_focus_obj(tfb->getLvObj());
+  tfb->focus();
 }

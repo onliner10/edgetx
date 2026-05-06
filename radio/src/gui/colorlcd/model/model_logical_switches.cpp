@@ -71,9 +71,9 @@ class LogicalSwitchEditPage : public Page
     Page::onLiveCheckEvents(live);
     if (active != isActive()) {
       if (isActive()) {
-        lv_obj_add_state(headerSwitchName->getLvObj(), ETX_STATE_LS_ACTIVE);
+        headerSwitchName->addState(ETX_STATE_LS_ACTIVE);
       } else {
-        lv_obj_clear_state(headerSwitchName->getLvObj(), ETX_STATE_LS_ACTIVE);
+        headerSwitchName->clearState(ETX_STATE_LS_ACTIVE);
       }
       active = isActive();
     }
@@ -85,9 +85,8 @@ class LogicalSwitchEditPage : public Page
     headerSwitchName = header->setTitle2(
         getSwitchPositionName(SWSRC_FIRST_LOGICAL_SWITCH + index));
 
-    etx_txt_color(headerSwitchName->getLvObj(), COLOR_THEME_ACTIVE_INDEX,
-                  ETX_STATE_LS_ACTIVE);
-    etx_font(headerSwitchName->getLvObj(), FONT_BOLD_INDEX, ETX_STATE_LS_ACTIVE);
+    headerSwitchName->textColor(COLOR_THEME_ACTIVE_INDEX, ETX_STATE_LS_ACTIVE);
+    headerSwitchName->font(FONT_BOLD_INDEX, ETX_STATE_LS_ACTIVE);
   }
 
   void updateLogicalSwitchOneWindow()
@@ -312,52 +311,61 @@ class LogicalSwitchButton : public ListLineButton
 
   void delayedInit() override
   {
-    lv_obj_enable_style_refresh(false);
+    if (!withLive([&](LiveWindow& live) {
+          auto obj = live.lvobj();
+          lv_obj_enable_style_refresh(false);
 
-    lsName = etx_label_create(lvobj);
-    etx_obj_add_style(lsName, styles->text_align_left, LV_PART_MAIN);
-    lv_obj_set_pos(lsName, NM_X, NM_Y);
-    lv_obj_set_size(lsName, NM_W, EdgeTxStyles::STD_FONT_HEIGHT);
+          lsName = etx_label_create(obj);
+          etx_obj_add_style(lsName, styles->text_align_left, LV_PART_MAIN);
+          lv_obj_set_pos(lsName, NM_X, NM_Y);
+          lv_obj_set_size(lsName, NM_W, EdgeTxStyles::STD_FONT_HEIGHT);
 
-    lsFunc = etx_label_create(lvobj);
-    etx_obj_add_style(lsFunc, styles->text_align_left, LV_PART_MAIN);
-    lv_obj_set_pos(lsFunc, FN_X, FN_Y);
-    lv_obj_set_size(lsFunc, FN_W, EdgeTxStyles::STD_FONT_HEIGHT);
-    lv_obj_set_style_text_font(lsFunc, getFont(FONT(BOLD)), LV_STATE_USER_1);
+          lsFunc = etx_label_create(obj);
+          etx_obj_add_style(lsFunc, styles->text_align_left, LV_PART_MAIN);
+          lv_obj_set_pos(lsFunc, FN_X, FN_Y);
+          lv_obj_set_size(lsFunc, FN_W, EdgeTxStyles::STD_FONT_HEIGHT);
+          lv_obj_set_style_text_font(lsFunc, getFont(FONT(BOLD)),
+                                     LV_STATE_USER_1);
 
-    lsV1 = etx_label_create(lvobj);
-    etx_obj_add_style(lsV1, styles->text_align_center, LV_PART_MAIN);
-    etx_font(lsV1, FONT_XS_INDEX, ETX_STATE_V1_SMALL_FONT);
-    lv_obj_set_pos(lsV1, V1_X, V1_Y);
-    lv_obj_set_size(lsV1, V1_W, EdgeTxStyles::STD_FONT_HEIGHT);
-    lv_obj_set_style_text_font(lsV1, getFont(FONT(BOLD)), LV_STATE_USER_1);
+          lsV1 = etx_label_create(obj);
+          etx_obj_add_style(lsV1, styles->text_align_center, LV_PART_MAIN);
+          etx_font(lsV1, FONT_XS_INDEX, ETX_STATE_V1_SMALL_FONT);
+          lv_obj_set_pos(lsV1, V1_X, V1_Y);
+          lv_obj_set_size(lsV1, V1_W, EdgeTxStyles::STD_FONT_HEIGHT);
+          lv_obj_set_style_text_font(lsV1, getFont(FONT(BOLD)),
+                                     LV_STATE_USER_1);
 
-    lsV2 = etx_label_create(lvobj);
-    etx_obj_add_style(lsV2, styles->text_align_center, LV_PART_MAIN);
-    lv_obj_set_pos(lsV2, V2_X, V2_Y);
-    lv_obj_set_size(lsV2, V2_W, EdgeTxStyles::STD_FONT_HEIGHT);
-    lv_obj_set_style_text_font(lsV2, getFont(FONT(BOLD)), LV_STATE_USER_1);
+          lsV2 = etx_label_create(obj);
+          etx_obj_add_style(lsV2, styles->text_align_center, LV_PART_MAIN);
+          lv_obj_set_pos(lsV2, V2_X, V2_Y);
+          lv_obj_set_size(lsV2, V2_W, EdgeTxStyles::STD_FONT_HEIGHT);
+          lv_obj_set_style_text_font(lsV2, getFont(FONT(BOLD)),
+                                     LV_STATE_USER_1);
 
-    lsAnd = etx_label_create(lvobj);
-    etx_obj_add_style(lsAnd, styles->text_align_center, LV_PART_MAIN);
-    lv_obj_set_pos(lsAnd, AND_X, AND_Y);
-    lv_obj_set_size(lsAnd, AND_W, EdgeTxStyles::STD_FONT_HEIGHT);
-    lv_obj_set_style_text_font(lsAnd, getFont(FONT(BOLD)), LV_STATE_USER_1);
+          lsAnd = etx_label_create(obj);
+          etx_obj_add_style(lsAnd, styles->text_align_center, LV_PART_MAIN);
+          lv_obj_set_pos(lsAnd, AND_X, AND_Y);
+          lv_obj_set_size(lsAnd, AND_W, EdgeTxStyles::STD_FONT_HEIGHT);
+          lv_obj_set_style_text_font(lsAnd, getFont(FONT(BOLD)),
+                                     LV_STATE_USER_1);
 
-    lsDuration = etx_label_create(lvobj);
-    etx_obj_add_style(lsDuration, styles->text_align_center, LV_PART_MAIN);
-    lv_obj_set_pos(lsDuration, DUR_X, DUR_Y);
-    lv_obj_set_size(lsDuration, DUR_W, EdgeTxStyles::STD_FONT_HEIGHT);
+          lsDuration = etx_label_create(obj);
+          etx_obj_add_style(lsDuration, styles->text_align_center,
+                            LV_PART_MAIN);
+          lv_obj_set_pos(lsDuration, DUR_X, DUR_Y);
+          lv_obj_set_size(lsDuration, DUR_W, EdgeTxStyles::STD_FONT_HEIGHT);
 
-    lsDelay = etx_label_create(lvobj);
-    etx_obj_add_style(lsDelay, styles->text_align_center, LV_PART_MAIN);
-    lv_obj_set_pos(lsDelay, DEL_X, DEL_Y);
-    lv_obj_set_size(lsDelay, DEL_W, EdgeTxStyles::STD_FONT_HEIGHT);
+          lsDelay = etx_label_create(obj);
+          etx_obj_add_style(lsDelay, styles->text_align_center, LV_PART_MAIN);
+          lv_obj_set_pos(lsDelay, DEL_X, DEL_Y);
+          lv_obj_set_size(lsDelay, DEL_W, EdgeTxStyles::STD_FONT_HEIGHT);
 
-    lv_obj_update_layout(lvobj);
+          lv_obj_update_layout(obj);
 
-    lv_obj_enable_style_refresh(true);
-    lv_obj_refresh_style(lvobj, LV_PART_ANY, LV_STYLE_PROP_ANY);
+          lv_obj_enable_style_refresh(true);
+          lv_obj_refresh_style(obj, LV_PART_ANY, LV_STYLE_PROP_ANY);
+        }))
+      return;
 
     refresh();
   }
@@ -616,12 +624,12 @@ void ModelLogicalSwitchesPage::build(Window* window)
       });
 
       if (focusIndex == i) {
-        lv_group_focus_obj(button->getLvObj());
+        button->focus();
       }
 
       button->setLongPressHandler([=]() -> uint8_t {
         if (addButton) {
-          lv_group_focus_obj(addButton->getLvObj());
+          addButton->focus();
           plusPopup(window);
         }
         return 0;

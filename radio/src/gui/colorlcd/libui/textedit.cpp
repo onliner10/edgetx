@@ -38,7 +38,8 @@ class TextArea : public FormField
   {
     setWindowFlag(NO_FOCUS);
 
-    withLive([&](lv_obj_t* obj) {
+    withLive([&](LiveWindow& live) {
+      auto obj = live.lvobj();
       lv_textarea_set_max_length(obj, length);
       lv_textarea_set_placeholder_text(obj, "---");
     });

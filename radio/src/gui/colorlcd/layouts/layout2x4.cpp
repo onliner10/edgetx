@@ -44,17 +44,22 @@ class Layout2x4 : public Layout
             uint8_t zoneCount, uint8_t* zoneMap) :
       Layout(parent, factory, screenNum, zoneCount, zoneMap)
   {
-    panel1 = lv_obj_create(lvobj);
-    lv_obj_set_style_bg_opa(panel1, LV_OPA_COVER, LV_PART_MAIN);
-    panel2 = lv_obj_create(lvobj);
-    lv_obj_set_style_bg_opa(panel2, LV_OPA_COVER, LV_PART_MAIN);
+    withLive([&](LiveWindow& live) {
+      auto obj1 = lv_obj_create(live.lvobj());
+      if (!requireLvObj(panel1, obj1)) return false;
+      lv_obj_set_style_bg_opa(obj1, LV_OPA_COVER, LV_PART_MAIN);
+      auto obj2 = lv_obj_create(live.lvobj());
+      if (!requireLvObj(panel2, obj2)) return false;
+      lv_obj_set_style_bg_opa(obj2, LV_OPA_COVER, LV_PART_MAIN);
+      return true;
+    });
     setPanels();
   }
 
  protected:
   rect_t mainZone = {0, 0, 0, 0};
-  lv_obj_t* panel1 = nullptr;
-  lv_obj_t* panel2 = nullptr;
+  RequiredLvObj panel1;
+  RequiredLvObj panel2;
 
   void updateDecorations() override
   {
@@ -64,35 +69,39 @@ class Layout2x4 : public Layout
 
   void setPanels()
   {
-    rect_t zone = Layout::getWidgetsZone();
-    if (mainZone.x != zone.x || mainZone.y != zone.y || mainZone.w != zone.w ||
-        mainZone.h != zone.h) {
-      mainZone = zone;
-      lv_obj_set_pos(panel1, mainZone.x, mainZone.y);
-      lv_obj_set_size(panel1, mainZone.w / 2, mainZone.h);
-      lv_obj_set_pos(panel2, mainZone.x + mainZone.w / 2, mainZone.y);
-      lv_obj_set_size(panel2, mainZone.w / 2, mainZone.h);
-    }
+    panel1.with([&](lv_obj_t* obj1) {
+      panel2.with([&](lv_obj_t* obj2) {
+        rect_t zone = Layout::getWidgetsZone();
+        if (mainZone.x != zone.x || mainZone.y != zone.y ||
+            mainZone.w != zone.w || mainZone.h != zone.h) {
+          mainZone = zone;
+          lv_obj_set_pos(obj1, mainZone.x, mainZone.y);
+          lv_obj_set_size(obj1, mainZone.w / 2, mainZone.h);
+          lv_obj_set_pos(obj2, mainZone.x + mainZone.w / 2, mainZone.y);
+          lv_obj_set_size(obj2, mainZone.w / 2, mainZone.h);
+        }
 
-    bool vis = getOptionValue(OPTION_PANEL1_BACKGROUND)->boolValue;
-    if (vis == lv_obj_has_flag(panel1, LV_OBJ_FLAG_HIDDEN)) {
-      if (vis)
-        lv_obj_clear_flag(panel1, LV_OBJ_FLAG_HIDDEN);
-      else
-        lv_obj_add_flag(panel1, LV_OBJ_FLAG_HIDDEN);
-    }
-    vis = getOptionValue(OPTION_PANEL2_BACKGROUND)->boolValue;
-    if (vis == lv_obj_has_flag(panel2, LV_OBJ_FLAG_HIDDEN)) {
-      if (vis)
-        lv_obj_clear_flag(panel2, LV_OBJ_FLAG_HIDDEN);
-      else
-        lv_obj_add_flag(panel2, LV_OBJ_FLAG_HIDDEN);
-    }
+        bool vis = getOptionValue(OPTION_PANEL1_BACKGROUND)->boolValue;
+        if (vis == lv_obj_has_flag(obj1, LV_OBJ_FLAG_HIDDEN)) {
+          if (vis)
+            lv_obj_clear_flag(obj1, LV_OBJ_FLAG_HIDDEN);
+          else
+            lv_obj_add_flag(obj1, LV_OBJ_FLAG_HIDDEN);
+        }
+        vis = getOptionValue(OPTION_PANEL2_BACKGROUND)->boolValue;
+        if (vis == lv_obj_has_flag(obj2, LV_OBJ_FLAG_HIDDEN)) {
+          if (vis)
+            lv_obj_clear_flag(obj2, LV_OBJ_FLAG_HIDDEN);
+          else
+            lv_obj_add_flag(obj2, LV_OBJ_FLAG_HIDDEN);
+        }
 
-    etx_bg_color_from_flags(panel1,
-                            getOptionValue(OPTION_PANEL1_COLOR)->unsignedValue);
-    etx_bg_color_from_flags(panel2,
-                            getOptionValue(OPTION_PANEL2_COLOR)->unsignedValue);
+        etx_bg_color_from_flags(
+            obj1, getOptionValue(OPTION_PANEL1_COLOR)->unsignedValue);
+        etx_bg_color_from_flags(
+            obj2, getOptionValue(OPTION_PANEL2_COLOR)->unsignedValue);
+      });
+    });
   }
 };
 

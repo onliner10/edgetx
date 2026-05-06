@@ -38,15 +38,21 @@ class TextWidget : public Widget
   {
     lv_style_init(&style);
 
-    shadow = etx_label_create(lvobj);
-    lv_obj_add_style(shadow, &style, LV_PART_MAIN);
-    lv_obj_set_style_text_color(shadow, lv_color_black(), LV_PART_MAIN);
-    lv_obj_set_pos(shadow, 1, 1);
-    lv_label_set_long_mode(shadow, LV_LABEL_LONG_DOT);
+    initRequiredLvObj(
+        shadow, [](lv_obj_t* parent) { return etx_label_create(parent); },
+        [&](lv_obj_t* obj) {
+          lv_obj_add_style(obj, &style, LV_PART_MAIN);
+          lv_obj_set_style_text_color(obj, lv_color_black(), LV_PART_MAIN);
+          lv_obj_set_pos(obj, 1, 1);
+          lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
+        });
 
-    label = etx_label_create(lvobj);
-    lv_obj_add_style(label, &style, LV_PART_MAIN);
-    lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
+    initRequiredLvObj(
+        label, [](lv_obj_t* parent) { return etx_label_create(parent); },
+        [&](lv_obj_t* obj) {
+          lv_obj_add_style(obj, &style, LV_PART_MAIN);
+          lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
+        });
 
     update();
   }
@@ -55,34 +61,46 @@ class TextWidget : public Widget
 
  protected:
   lv_style_t style;
-  lv_obj_t* shadow;
-  lv_obj_t* label;
+  RequiredLvObj shadow;
+  RequiredLvObj label;
 
   void onUpdate() override
   {
     auto widgetData = getPersistentData();
 
     // Set text value from options
-    lv_label_set_text(shadow, widgetData->options[0].value.stringValue.c_str());
-    lv_label_set_text(label, widgetData->options[0].value.stringValue.c_str());
+    shadow.with([&](lv_obj_t* obj) {
+      lv_label_set_text(obj, widgetData->options[0].value.stringValue.c_str());
+    });
+    label.with([&](lv_obj_t* obj) {
+      lv_label_set_text(obj, widgetData->options[0].value.stringValue.c_str());
+    });
 
     auto color = widgetData->options[1].value.unsignedValue;
-    if (isCompactTopBarWidget() &&
-        color == COLOR2FLAGS(COLOR_THEME_SECONDARY1_INDEX)) {
-      etx_txt_color(label, COLOR_THEME_PRIMARY2_INDEX);
-    } else {
-      etx_txt_color_from_flags(label, color);
-    }
+    label.with([&](lv_obj_t* obj) {
+      if (isCompactTopBarWidget() &&
+          color == COLOR2FLAGS(COLOR_THEME_SECONDARY1_INDEX)) {
+        etx_txt_color(obj, COLOR_THEME_PRIMARY2_INDEX);
+      } else {
+        etx_txt_color_from_flags(obj, color);
+      }
+    });
 
     FontIndex font = responsiveTextFont(height());
-    layoutTextLabel(shadow, {0, 0, width(), height()}, font, 1, 1);
-    layoutTextLabel(label, {0, 0, width(), height()}, font);
+    shadow.with([&](lv_obj_t* obj) {
+      layoutTextLabel(obj, {0, 0, width(), height()}, font, 1, 1);
+    });
+    label.with([&](lv_obj_t* obj) {
+      layoutTextLabel(obj, {0, 0, width(), height()}, font);
+    });
 
     // Show or hide shadow
-    if (isMainViewWidget() && widgetData->options[3].value.boolValue)
-      lv_obj_clear_flag(shadow, LV_OBJ_FLAG_HIDDEN);
-    else
-      lv_obj_add_flag(shadow, LV_OBJ_FLAG_HIDDEN);
+    shadow.with([&](lv_obj_t* obj) {
+      if (isMainViewWidget() && widgetData->options[3].value.boolValue)
+        lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
+      else
+        lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+    });
   }
 };
 

@@ -210,7 +210,8 @@ Slider::Slider(Window* parent, coord_t width, int32_t vmin, int32_t vmax,
     failClosed();
     return;
   }
-  if (!requireLvObj(slider, sliderField->getLvObj())) {
+  if (!sliderField->withLive(
+          [&](LiveWindow& live) { return requireLvObj(slider, live.lvobj()); })) {
     delete sliderField;
     return;
   }
@@ -231,7 +232,8 @@ Slider::Slider(Window* parent, coord_t width, int32_t vmin, int32_t vmax,
     tickPts = new (std::nothrow) lv_obj_t*[range - 1];
     if (tickPts) {
       for (int n = 1; n < range; n += 1) {
-        lv_obj_t* p = lv_obj_create(lvobj);
+        lv_obj_t* p = nullptr;
+        withLive([&](LiveWindow& live) { p = lv_obj_create(live.lvobj()); });
         if (p) {
           lv_obj_set_size(p, PAD_TINY, PAD_MEDIUM);
           etx_solid_bg(p, COLOR_THEME_PRIMARY2_INDEX);
@@ -246,7 +248,10 @@ Slider::Slider(Window* parent, coord_t width, int32_t vmin, int32_t vmax,
 
 void Slider::delayedInit()
 {
-  coord_t w = lv_obj_get_width(lvobj) - PAD_LARGE * 2;
+  coord_t w = 0;
+  withLive([&](LiveWindow& live) {
+    w = lv_obj_get_width(live.lvobj()) - PAD_LARGE * 2;
+  });
   coord_t x = -1;
   int range = vmax - vmin;
   if (tickPts && range > 1 && range < 10) {
@@ -333,7 +338,8 @@ VerticalSlider::VerticalSlider(Window* parent, coord_t height, int32_t vmin, int
     failClosed();
     return;
   }
-  if (!requireLvObj(slider, sliderField->getLvObj())) {
+  if (!sliderField->withLive(
+          [&](LiveWindow& live) { return requireLvObj(slider, live.lvobj()); })) {
     delete sliderField;
     return;
   }
@@ -354,7 +360,8 @@ VerticalSlider::VerticalSlider(Window* parent, coord_t height, int32_t vmin, int
     tickPts = new (std::nothrow) lv_obj_t*[range - 1];
     if (tickPts) {
       for (int n = 1; n < range; n += 1) {
-        lv_obj_t* p = lv_obj_create(lvobj);
+        lv_obj_t* p = nullptr;
+        withLive([&](LiveWindow& live) { p = lv_obj_create(live.lvobj()); });
         if (p) {
           lv_obj_set_size(p, PAD_MEDIUM, PAD_TINY);
           etx_solid_bg(p, COLOR_THEME_PRIMARY2_INDEX);
@@ -394,7 +401,10 @@ bool sliderFormFieldCreateFailureFailsClosedForTest()
 
 void VerticalSlider::delayedInit()
 {
-  coord_t h = lv_obj_get_height(lvobj) - PAD_LARGE * 2;
+  coord_t h = 0;
+  withLive([&](LiveWindow& live) {
+    h = lv_obj_get_height(live.lvobj()) - PAD_LARGE * 2;
+  });
   coord_t y = -1;
   int range = vmax - vmin;
   if (tickPts && range > 1 && range < 10) {

@@ -55,7 +55,7 @@ void RadioTrainerPage::build(Window* form)
 
   if (SLAVE_MODE()) {
     auto txt = new StaticText(form, rect_t{}, STR_SLAVE, COLOR_THEME_PRIMARY1_INDEX, FONT(L));
-    lv_obj_align(txt->getLvObj(), LV_ALIGN_CENTER, 0, 0);
+    txt->align(LV_ALIGN_CENTER);
   } else {
     FlexGridLayout grid(col_dsc, row_dsc, PAD_TINY);
     form->setFlexLayout();
@@ -103,16 +103,14 @@ void RadioTrainerPage::build(Window* form)
     if (g_model.trainerData.mode == TRAINER_MODE_MASTER_TRAINER_JACK) {
       auto lbl = new StaticText(line, rect_t{}, STR_MULTIPLIER);
       lbl->padRight(PAD_SMALL);
-      lv_obj_set_grid_cell(lbl->getLvObj(), LV_GRID_ALIGN_END, 0, 2,
-                           LV_GRID_ALIGN_CENTER, 0, 1);
+      lbl->setGridCell(LV_GRID_ALIGN_END, 0, 2, LV_GRID_ALIGN_CENTER, 0, 1);
 
       auto multiplier =
               new NumberEdit(line, rect_t{0, 0, EdgeTxStyles::EDIT_FLD_WIDTH_NARROW, 0}, -10, 40,
                              GET_SET_DEFAULT(g_eeGeneral.PPM_Multiplier));
       multiplier->setDisplayHandler(
               [](int32_t value) { return formatNumberAsString(value + 10, PREC1); });
-      lv_obj_set_grid_cell(multiplier->getLvObj(), LV_GRID_ALIGN_START, 2, 1,
-                           LV_GRID_ALIGN_CENTER, 0, 1);
+      multiplier->setGridCell(LV_GRID_ALIGN_START, 2, 1, LV_GRID_ALIGN_CENTER, 0, 1);
 
 #if PORTRAIT
       line = form->newLine(grid);
@@ -129,11 +127,9 @@ void RadioTrainerPage::build(Window* form)
                                 return 0;
                               });
 #if PORTRAIT
-    lv_obj_set_grid_cell(btn->getLvObj(), LV_GRID_ALIGN_STRETCH, 1, 2,
-                         LV_GRID_ALIGN_CENTER, 0, 1);
+    btn->setGridCell(LV_GRID_ALIGN_STRETCH, 1, 2, LV_GRID_ALIGN_CENTER, 0, 1);
 #else
-    lv_obj_set_grid_cell(btn->getLvObj(), LV_GRID_ALIGN_START, 3, 2,
-                         LV_GRID_ALIGN_CENTER, 0, 1);
+    btn->setGridCell(LV_GRID_ALIGN_START, 3, 2, LV_GRID_ALIGN_CENTER, 0, 1);
 #endif
   }
 }

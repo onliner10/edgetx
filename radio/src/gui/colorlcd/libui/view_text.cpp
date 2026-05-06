@@ -106,25 +106,28 @@ class TextViewer
   void build(Window* window)
   {
     if (openFile()) {
-      auto obj = window->getLvObj();
-      lv_obj_add_flag(obj, LV_OBJ_FLAG_SCROLL_WITH_ARROW | LV_OBJ_FLAG_SCROLL_MOMENTUM);
-      etx_scrollbar(obj);
-      // prevents resetting the group's edit mode
-      window->setWindowFlag(NO_FOCUS);
+      window->withLive([&](Window::LiveWindow& live) {
+        auto obj = live.lvobj();
+        lv_obj_add_flag(obj, LV_OBJ_FLAG_SCROLL_WITH_ARROW |
+                                 LV_OBJ_FLAG_SCROLL_MOMENTUM);
+        etx_scrollbar(obj);
+        // prevents resetting the group's edit mode
+        window->setWindowFlag(NO_FOCUS);
 
-      auto g = lv_group_get_default();
-      lb = lv_label_create(obj);
-      lv_obj_set_size(lb, lv_pct(100), LV_SIZE_CONTENT);
-      etx_obj_add_style(lb, styles->pad_medium, LV_PART_MAIN);
+        auto g = lv_group_get_default();
+        lb = lv_label_create(obj);
+        lv_obj_set_size(lb, lv_pct(100), LV_SIZE_CONTENT);
+        etx_obj_add_style(lb, styles->pad_medium, LV_PART_MAIN);
 
-      lv_group_add_obj(g, obj);
-      lv_group_set_editing(g, true);
-      lv_label_set_text_static(lb, buffer);
+        lv_group_add_obj(g, obj);
+        lv_group_set_editing(g, true);
+        lv_label_set_text_static(lb, buffer);
 
-      if (openFromEnd)
-        lv_obj_scroll_to_y(obj, LV_COORD_MAX, LV_ANIM_OFF);
-      else
-        lv_obj_scroll_to_y(obj, 0, LV_ANIM_OFF);
+        if (openFromEnd)
+          lv_obj_scroll_to_y(obj, LV_COORD_MAX, LV_ANIM_OFF);
+        else
+          lv_obj_scroll_to_y(obj, 0, LV_ANIM_OFF);
+      });
     }
   }
 
@@ -355,7 +358,7 @@ class ViewChecklistWindow : public Page, public TextViewer
   {
     if (allChecked()) {
       closeButton->enable();
-      lv_group_focus_obj(closeButton->getLvObj());
+      closeButton->focus();
     } else {
       closeButton->disable();
     }
@@ -373,67 +376,70 @@ class ViewChecklistWindow : public Page, public TextViewer
   void buildBody(Window* window)
   {
     if (openFile()) {
-      auto obj = window->getLvObj();
-      lv_obj_add_flag(obj, LV_OBJ_FLAG_SCROLL_WITH_ARROW | LV_OBJ_FLAG_SCROLL_MOMENTUM);
-      etx_scrollbar(obj);
-      // prevents resetting the group's edit mode
-      window->setWindowFlag(NO_FOCUS);
+      window->withLive([&](Window::LiveWindow& live) {
+        auto obj = live.lvobj();
+        lv_obj_add_flag(obj, LV_OBJ_FLAG_SCROLL_WITH_ARROW |
+                                 LV_OBJ_FLAG_SCROLL_MOMENTUM);
+        etx_scrollbar(obj);
+        // prevents resetting the group's edit mode
+        window->setWindowFlag(NO_FOCUS);
 
-      lv_obj_set_layout(obj, LV_LAYOUT_FLEX);
-      lv_obj_set_flex_flow(obj, LV_FLEX_FLOW_COLUMN);
-      lv_obj_set_style_pad_all(obj, PAD_THREE, LV_PART_MAIN);
-      lv_obj_set_style_pad_row(obj, 0, LV_PART_MAIN);
+        lv_obj_set_layout(obj, LV_LAYOUT_FLEX);
+        lv_obj_set_flex_flow(obj, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_style_pad_all(obj, PAD_THREE, LV_PART_MAIN);
+        lv_obj_set_style_pad_row(obj, 0, LV_PART_MAIN);
 
-      auto g = lv_group_get_default();
+        auto g = lv_group_get_default();
 
-      checkBoxes.clear();
+        checkBoxes.clear();
 
-      size_t cur = 0;
+        size_t cur = 0;
 
-      for (size_t i = 0; i <= bufSize; ++i) {
-        if (buffer[i] == '\n' || buffer[i] == '\r' || buffer[i] == 0) {
-          // Check for end of line & end of file
-          if (buffer[i] == 0 && cur == i) break;
-          buffer[i] = 0;
-          if (buffer[i] == '\r' && buffer[i + 1] == '\n') i += 1;
+        for (size_t i = 0; i <= bufSize; ++i) {
+          if (buffer[i] == '\n' || buffer[i] == '\r' || buffer[i] == 0) {
+            // Check for end of line & end of file
+            if (buffer[i] == 0 && cur == i) break;
+            buffer[i] = 0;
+            if (buffer[i] == '\r' && buffer[i + 1] == '\n') i += 1;
 
-          lv_obj_t* row = lv_obj_create(obj);
-          lv_obj_set_layout(row, LV_LAYOUT_FLEX);
-          lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
-          lv_obj_set_width(row, lv_pct(100));
-          lv_obj_set_height(row, LV_SIZE_CONTENT);
-          lv_obj_set_style_pad_all(row, PAD_THREE, 0);
-          lv_obj_set_style_pad_column(row, PAD_MEDIUM, 0);
-          lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
-                                LV_FLEX_ALIGN_SPACE_EVENLY);
+            lv_obj_t* row = lv_obj_create(obj);
+            lv_obj_set_layout(row, LV_LAYOUT_FLEX);
+            lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+            lv_obj_set_width(row, lv_pct(100));
+            lv_obj_set_height(row, LV_SIZE_CONTENT);
+            lv_obj_set_style_pad_all(row, PAD_THREE, 0);
+            lv_obj_set_style_pad_column(row, PAD_MEDIUM, 0);
+            lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
+                                  LV_FLEX_ALIGN_SPACE_EVENLY);
 
-          lv_coord_t w = lv_obj_get_content_width(obj) - PAD_MEDIUM;
+            lv_coord_t w = lv_obj_get_content_width(obj) - PAD_MEDIUM;
 
-          if (buffer[cur] == '=') {
-            cur++;
-            w -= 46;
+            if (buffer[cur] == '=') {
+              cur++;
+              w -= 46;
 
-            lv_obj_set_style_pad_left(row, PAD_LARGE + PAD_TINY, 0);
+              lv_obj_set_style_pad_left(row, PAD_LARGE + PAD_TINY, 0);
 
-            auto cb = checkbox_create(row);
+              auto cb = checkbox_create(row);
 
-            lv_group_add_obj(g, cb);
+              lv_group_add_obj(g, cb);
 
-            lv_obj_add_event_cb(cb, ViewChecklistWindow::checkbox_event_handler,
-                                LV_EVENT_VALUE_CHANGED, this);
-            lv_obj_set_user_data(cb, this);
+              lv_obj_add_event_cb(cb, ViewChecklistWindow::checkbox_event_handler,
+                                  LV_EVENT_VALUE_CHANGED, this);
+              lv_obj_set_user_data(cb, this);
 
-            checkBoxes.push_back(cb);
+              checkBoxes.push_back(cb);
+            }
+
+            auto lbl = etx_label_create(row);
+            lv_obj_set_width(lbl, w);
+            lv_label_set_long_mode(lbl, LV_LABEL_LONG_WRAP);
+            lv_label_set_text_static(lbl, &buffer[cur]);
+
+            cur = i + 1;
           }
-
-          auto lbl = etx_label_create(row);
-          lv_obj_set_width(lbl, w);
-          lv_label_set_long_mode(lbl, LV_LABEL_LONG_WRAP);
-          lv_label_set_text_static(lbl, &buffer[cur]);
-
-          cur = i + 1;
         }
-      }
+      });
 
       buildRequiredWindow<Window>(
           [&](Window& box) {

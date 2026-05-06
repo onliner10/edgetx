@@ -160,10 +160,10 @@ class ScriptEditWindow : public Page
 
   void rebuildBody(Window* window)
   {
-    auto scroll_y = lv_obj_get_scroll_y(window->getLvObj());
+    auto scroll_y = window->getScrollY();
     window->clear();
     buildBody(window);
-    lv_obj_scroll_to_y(window->getLvObj(), scroll_y, LV_ANIM_OFF);
+    window->scrollToY(scroll_y, LV_ANIM_OFF);
   }
 };
 
@@ -181,68 +181,77 @@ class ScriptLineButton : public ListLineButton
     padTop(PAD_SMALL);
     padLeft(PAD_TINY);
     padRight(PAD_TINY);
-    lv_obj_set_layout(lvobj, LV_LAYOUT_GRID);
-    lv_obj_set_grid_dsc_array(lvobj, b_col_dsc, row_dsc);
-    lv_obj_set_style_pad_row(lvobj, 0, 0);
-    lv_obj_set_style_pad_column(lvobj, PAD_SMALL, 0);
+    setLayout(LV_LAYOUT_GRID);
+    setGridDscArray(b_col_dsc, row_dsc);
+    setStylePadRow(0, 0);
+    setStylePadColumn(PAD_SMALL, 0);
 
-    lv_obj_update_layout(parent->getLvObj());
+    parent->updateLayout();
 
     delayLoad();
   }
 
   void delayedInit() override
   {
-    auto lbl = etx_label_create(lvobj);
-    etx_obj_add_style(lbl, styles->text_align_left, LV_PART_MAIN);
-    lv_obj_set_grid_cell(lbl, LV_GRID_ALIGN_START, 0, 1, LV_GRID_ALIGN_CENTER,
-                         0, 1);
+    if (!withLive([&](LiveWindow& live) {
+          auto obj = live.lvobj();
+          auto lbl = etx_label_create(obj);
+          if (!requireLvObj(lbl)) return false;
+          etx_obj_add_style(lbl, styles->text_align_left, LV_PART_MAIN);
+          lv_obj_set_grid_cell(lbl, LV_GRID_ALIGN_START, 0, 1,
+                               LV_GRID_ALIGN_CENTER, 0, 1);
 
-    lv_label_set_text(lbl,
-                      (std::string("LUA") + std::to_string(index + 1)).c_str());
+          lv_label_set_text(
+              lbl, (std::string("LUA") + std::to_string(index + 1)).c_str());
 
-    if (runtimeData) {
-      char s[20];
+          if (runtimeData) {
+            char s[20];
 
-      lbl = etx_label_create(lvobj);
-      etx_obj_add_style(lbl, styles->text_align_left, LV_PART_MAIN);
-      lv_obj_set_grid_cell(lbl, LV_GRID_ALIGN_START, 1, 1, LV_GRID_ALIGN_CENTER,
-                           0, 1);
+            lbl = etx_label_create(obj);
+            if (!requireLvObj(lbl)) return false;
+            etx_obj_add_style(lbl, styles->text_align_left, LV_PART_MAIN);
+            lv_obj_set_grid_cell(lbl, LV_GRID_ALIGN_START, 1, 1,
+                                 LV_GRID_ALIGN_CENTER, 0, 1);
 
-      strAppend(s, scriptData.name, LEN_SCRIPT_NAME);
-      lv_label_set_text(lbl, s);
+            strAppend(s, scriptData.name, LEN_SCRIPT_NAME);
+            lv_label_set_text(lbl, s);
 
-      lbl = etx_label_create(lvobj);
-      etx_obj_add_style(lbl, styles->text_align_left, LV_PART_MAIN);
-      lv_obj_set_grid_cell(lbl, LV_GRID_ALIGN_START, 2, 1, LV_GRID_ALIGN_CENTER,
-                           0, 1);
+            lbl = etx_label_create(obj);
+            if (!requireLvObj(lbl)) return false;
+            etx_obj_add_style(lbl, styles->text_align_left, LV_PART_MAIN);
+            lv_obj_set_grid_cell(lbl, LV_GRID_ALIGN_START, 2, 1,
+                                 LV_GRID_ALIGN_CENTER, 0, 1);
 
-      strAppend(s, scriptData.file, LEN_SCRIPT_FILENAME);
-      lv_label_set_text(lbl, s);
+            strAppend(s, scriptData.file, LEN_SCRIPT_FILENAME);
+            lv_label_set_text(lbl, s);
 
-      lbl = etx_label_create(lvobj);
-      etx_obj_add_style(lbl, styles->text_align_left, LV_PART_MAIN);
-      lv_obj_set_grid_cell(lbl, LV_GRID_ALIGN_START, 3, 1, LV_GRID_ALIGN_CENTER,
-                           0, 1);
+            lbl = etx_label_create(obj);
+            if (!requireLvObj(lbl)) return false;
+            etx_obj_add_style(lbl, styles->text_align_left, LV_PART_MAIN);
+            lv_obj_set_grid_cell(lbl, LV_GRID_ALIGN_START, 3, 1,
+                                 LV_GRID_ALIGN_CENTER, 0, 1);
 
-      // TODO: runtimeData->instructions has no value
-      switch (runtimeData->state) {
-        case SCRIPT_SYNTAX_ERROR:
-          lv_label_set_text(lbl, STR_SCRIPT_ERROR);
-          break;
-        case SCRIPT_NOFILE:
-          lv_label_set_text(lbl, STR_NEEDS_FILE);
-          break;
-        case SCRIPT_OK:
-          lv_label_set_text(lbl, "-");
-          break;
-        default:
-          lv_label_set_text(lbl, "");
-          break;
-      }
-    }
+            // TODO: runtimeData->instructions has no value
+            switch (runtimeData->state) {
+              case SCRIPT_SYNTAX_ERROR:
+                lv_label_set_text(lbl, STR_SCRIPT_ERROR);
+                break;
+              case SCRIPT_NOFILE:
+                lv_label_set_text(lbl, STR_NEEDS_FILE);
+                break;
+              case SCRIPT_OK:
+                lv_label_set_text(lbl, "-");
+                break;
+              default:
+                lv_label_set_text(lbl, "");
+                break;
+            }
+          }
 
-    lv_obj_update_layout(lvobj);
+          lv_obj_update_layout(obj);
+          return true;
+        }))
+      return;
     refresh();
   }
 
@@ -261,10 +270,10 @@ ModelMixerScriptsPage::ModelMixerScriptsPage(const PageDef& pageDef) :
 
 void ModelMixerScriptsPage::rebuild(Window* window, int8_t focusIdx)
 {
-  auto scroll_y = lv_obj_get_scroll_y(window->getLvObj());
+  auto scroll_y = window->getScrollY();
   window->clear();
   build(window, focusIdx);
-  lv_obj_scroll_to_y(window->getLvObj(), scroll_y, LV_ANIM_OFF);
+  window->scrollToY(scroll_y, LV_ANIM_OFF);
 }
 
 void ModelMixerScriptsPage::build(Window* window, int8_t focusIdx)

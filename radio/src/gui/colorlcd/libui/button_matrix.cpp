@@ -88,12 +88,14 @@ static void btn_matrix_event(lv_event_t* e)
 ButtonMatrix::ButtonMatrix(Window* parent, const rect_t& r) :
     FormField(parent, r, btnmatrix_create)
 {
-  withLive(
-      [](lv_obj_t* obj) { lv_obj_add_flag(obj, LV_OBJ_FLAG_SCROLL_ON_FOCUS); });
+  withLive([](LiveWindow& live) {
+    lv_obj_add_flag(live.lvobj(), LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+  });
   setWindowFlag(NO_FOCUS);
 
-  withLive([&](lv_obj_t* obj) {
-    lv_obj_add_event_cb(obj, btn_matrix_event, LV_EVENT_VALUE_CHANGED, this);
+  withLive([&](LiveWindow& live) {
+    lv_obj_add_event_cb(live.lvobj(), btn_matrix_event, LV_EVENT_VALUE_CHANGED,
+                        this);
   });
 }
 

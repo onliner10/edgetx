@@ -116,6 +116,9 @@ class WindowHandle
     }
   }
 
+  template <typename Fn>
+  bool withLive(Fn&& fn) const;
+
   template <typename Value, typename Fn>
   Value valueOr(Value missing, Fn&& fn) const
   {
@@ -124,7 +127,6 @@ class WindowHandle
   }
 
  protected:
-  T* getUnchecked() const { return window_; }
   void reset(T* window) { window_ = window; }
 
  private:
@@ -134,13 +136,6 @@ class WindowHandle
 template <typename T>
 class RequiredWindow : public WindowHandle<T>
 {
- public:
-  // Required handles interoperate with legacy APIs that already require T*.
-  // OptionalWindow deliberately does not expose pointer access.
-  operator T*() const { return this->getUnchecked(); }
-  T* operator->() const { return this->getUnchecked(); }
-  T& operator*() const { return *this->getUnchecked(); }
-
  private:
   friend class Window;
 
@@ -314,12 +309,61 @@ class Window
   coord_t height() const { return rect.h; }
 
   rect_t getRect() const { return rect; }
+  uint32_t getLvIndex() const;
+  coord_t getScrollY() const;
 
   void padLeft(coord_t pad);
   void padRight(coord_t pad);
   void padTop(coord_t pad);
   void padBottom(coord_t pad);
   void padAll(PaddingSize pad);
+  void addFlag(lv_obj_flag_t flag);
+  void clearFlag(lv_obj_flag_t flag);
+  bool hasFlag(lv_obj_flag_t flag) const;
+  void addState(lv_state_t state);
+  void clearState(lv_state_t state);
+  bool hasState(lv_state_t state) const;
+  void addStyle(lv_style_t* style, lv_style_selector_t selector);
+  void addStyle(const lv_style_t& style, lv_style_selector_t selector);
+  void updateLayout();
+  void refreshStyle(lv_part_t part = LV_PART_ANY,
+                    lv_style_prop_t prop = LV_STYLE_PROP_ANY);
+  void setStyleMaxWidth(lv_coord_t value, lv_style_selector_t selector);
+  void setStyleMaxHeight(lv_coord_t value, lv_style_selector_t selector);
+  void setStyleFlexCrossPlace(lv_flex_align_t align,
+                              lv_style_selector_t selector);
+  void setStyleFlexMainPlace(lv_flex_align_t align,
+                             lv_style_selector_t selector);
+  void setStylePadColumn(lv_coord_t value, lv_style_selector_t selector);
+  void setStyleGridCellXAlign(lv_grid_align_t align,
+                              lv_style_selector_t selector);
+  void setStyleGridCellYAlign(lv_grid_align_t align,
+                              lv_style_selector_t selector);
+  void setLayout(uint32_t layout);
+  void setGridDscArray(const lv_coord_t* colDsc, const lv_coord_t* rowDsc);
+  void setGridCell(lv_grid_align_t x_align, lv_coord_t col_pos,
+                   lv_coord_t col_span, lv_grid_align_t y_align,
+                   lv_coord_t row_pos, lv_coord_t row_span);
+  void setGridAlign(lv_grid_align_t column_align, lv_grid_align_t row_align);
+  void setAlign(lv_align_t align);
+  void align(lv_align_t align, lv_coord_t xOfs = 0, lv_coord_t yOfs = 0);
+  void setFlexFlow(lv_flex_flow_t flow);
+  void setFlexGrow(uint8_t grow);
+  void setFlexAlign(lv_flex_align_t main_place, lv_flex_align_t cross_place,
+                    lv_flex_align_t track_cross_place);
+  void setStylePadRow(lv_coord_t value, lv_style_selector_t selector);
+  void addToGroup(lv_group_t* group);
+  void removeFromGroup();
+  void center();
+  void moveForeground();
+  void moveBackground();
+  void scrollToY(coord_t y, lv_anim_enable_t anim);
+  void scrollbar();
+  void bgColor(LcdColorIndex color, lv_style_selector_t selector = LV_PART_MAIN);
+  void solidBg();
+  void solidBg(LcdColorIndex color, lv_style_selector_t selector = LV_PART_MAIN);
+  void textColor(LcdColorIndex color, lv_style_selector_t selector = LV_PART_MAIN);
+  void font(FontIndex fontIndex, lv_style_selector_t selector = LV_PART_MAIN);
 
   void onEvent(event_t event);
   void onClicked();
@@ -327,6 +371,8 @@ class Window
   bool onLongPress();
   void dispatchKeyboardEvent(event_t event);
   bool sendLvEvent(lv_event_code_t code, void* param = nullptr);
+  void addLvEventCb(lv_event_cb_t eventCb, lv_event_code_t filter,
+                    void* userData);
   void checkEvents();
 
 #if defined(SIMU)
@@ -378,7 +424,9 @@ class Window
                        const char* automationText = nullptr);
 #endif
 
-  inline lv_obj_t* getLvObj() const { return lvobj; }
+#if defined(SIMU)
+  lv_obj_t* getLvObjForTest() const { return lvobj; }
+#endif
 
   virtual bool isTopBar() { return false; }
   virtual bool isNavWindow() { return false; }
@@ -406,14 +454,18 @@ class Window
 
   void assignLvGroup(lv_group_t* g, bool setDefault);
 
- protected:
+ private:
   static std::list<Window*> trash;
 
+ protected:
   rect_t rect;
 
   Window* parent = nullptr;
+
+ private:
   lv_obj_t* lvobj = nullptr;
 
+ protected:
   std::list<Window*> children;
 
   WindowFlags windowFlags = 0;
@@ -569,8 +621,7 @@ class Window
 
   template <typename Fn>
   static constexpr bool LiveHandlerInvocable =
-      std::is_invocable_v<Fn, LiveWindow&> ||
-      std::is_invocable_v<Fn, lv_obj_t*>;
+      std::is_invocable_v<Fn, LiveWindow&>;
 
   template <typename Fn>
   static constexpr bool LoadedHandlerInvocable =
@@ -594,13 +645,8 @@ class Window
     if (!self.acceptsEvents()) return false;
     LiveWindow live(const_cast<Window&>(self), self.lvobj);
     static_assert(LiveHandlerInvocable<Fn>,
-                  "withLive handler must accept Window::LiveWindow& or "
-                  "lv_obj_t*");
-    if constexpr (std::is_invocable_v<Fn, LiveWindow&>) {
-      return invokeLiveHandlerWith(live, std::forward<Fn>(handler));
-    } else {
-      return invokeLiveHandlerWith(live.lvobj(), std::forward<Fn>(handler));
-    }
+                  "withLive handler must accept Window::LiveWindow&");
+    return invokeLiveHandlerWith(live, std::forward<Fn>(handler));
   }
 
   template <typename Fn>
@@ -640,6 +686,14 @@ class Window
   bool loadedForTest() const { return loaded; }
 #endif
 };
+
+template <typename T>
+template <typename Fn>
+bool WindowHandle<T>::withLive(Fn&& fn) const
+{
+  if (!window_) return false;
+  return window_->withLive(std::forward<Fn>(fn));
+}
 
 //-----------------------------------------------------------------------------
 

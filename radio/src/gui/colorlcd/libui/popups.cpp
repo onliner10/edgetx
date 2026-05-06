@@ -124,14 +124,20 @@ class BubbleDialog : public Window
   {
     setWindowFlag(OPAQUE);
 
-    lv_obj_set_parent(lvobj, lv_layer_top());
+    withLive([](LiveWindow& live) {
+      lv_obj_set_parent(live.lvobj(), lv_layer_top());
+    });
 
-    auto label = etx_label_create(lvobj);
-    lv_label_set_text(label, message);
-    lv_obj_center(label);
-    lv_obj_set_width(label, lv_pct(100));
-    etx_obj_add_style(label, styles->text_align_center, LV_PART_MAIN);
-    lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
+    RequiredLvObj label;
+    initRequiredLvObj(
+        label, [](lv_obj_t* parent) { return etx_label_create(parent); },
+        [&](lv_obj_t* label) {
+          lv_label_set_text(label, message);
+          lv_obj_center(label);
+          lv_obj_set_width(label, lv_pct(100));
+          etx_obj_add_style(label, styles->text_align_center, LV_PART_MAIN);
+          lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
+        });
   }
 
   bool isBubblePopup() override { return true; }

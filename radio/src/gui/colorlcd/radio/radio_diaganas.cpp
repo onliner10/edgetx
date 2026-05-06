@@ -79,11 +79,11 @@ class AnaViewWindow : public Window
 #if LANDSCAPE
       if ((i & 1) == 0) {
         line = newLine(grid);
-        lv_obj_set_style_pad_column(line->getLvObj(), PAD_SMALL, LV_PART_MAIN);
+        line->setStylePadColumn(PAD_SMALL, LV_PART_MAIN);
       }
 #else
       line = newLine(grid);
-      lv_obj_set_style_pad_column(line->getLvObj(), PAD_SMALL, LV_PART_MAIN);
+      line->setStylePadColumn(PAD_SMALL, LV_PART_MAIN);
 #endif
 
       if (((adcGetInputMask() & (1 << i)) != 0) && i < adcGetMaxInputs(ADC_INPUT_MAIN))
@@ -106,12 +106,11 @@ class AnaViewWindow : public Window
             COLOR_THEME_PRIMARY1_INDEX, (column4size() == 2) ? 0 : RIGHT,
             column4prefix());
 #if LANDSCAPE
-        lv_obj_set_grid_cell(lbl->getLvObj(), LV_GRID_ALIGN_STRETCH,
-                             3 + (i & 1) * 5, column4size(),
-                             LV_GRID_ALIGN_CENTER, 0, 1);
+        lbl->setGridCell(LV_GRID_ALIGN_STRETCH, 3 + (i & 1) * 5,
+                         column4size(), LV_GRID_ALIGN_CENTER, 0, 1);
 #else
-        lv_obj_set_grid_cell(lbl->getLvObj(), LV_GRID_ALIGN_STRETCH, 3,
-                             column4size(), LV_GRID_ALIGN_CENTER, 0, 1);
+        lbl->setGridCell(LV_GRID_ALIGN_STRETCH, 3, column4size(),
+                         LV_GRID_ALIGN_CENTER, 0, 1);
 #endif
       } else {
         grid.nextCell();
@@ -127,7 +126,7 @@ class AnaViewWindow : public Window
 #if defined(IMU) && LANDSCAPE
     if (imuGetName()) {
       line = newLine(grid);
-      lv_obj_set_style_pad_column(line->getLvObj(), PAD_SMALL, LV_PART_MAIN);
+      line->setStylePadColumn(PAD_SMALL, LV_PART_MAIN);
 
       grid.setColSpan(2);
       new StaticText(line, rect_t{}, STR_GYRO);
@@ -136,7 +135,7 @@ class AnaViewWindow : public Window
       grid.setColSpan(1);
 
       line = newLine(grid);
-      lv_obj_set_style_pad_column(line->getLvObj(), PAD_SMALL, LV_PART_MAIN);
+      line->setStylePadColumn(PAD_SMALL, LV_PART_MAIN);
 
       grid.setColSpan(2);
       new StaticText(line, rect_t{}, "Tilt X");
@@ -147,7 +146,7 @@ class AnaViewWindow : public Window
       for (int i = 0; i < 3; i++) {grid.nextCell();}
 
       line = newLine(grid);
-      lv_obj_set_style_pad_column(line->getLvObj(), PAD_SMALL, LV_PART_MAIN);
+      line->setStylePadColumn(PAD_SMALL, LV_PART_MAIN);
 
       grid.setColSpan(2);
       new StaticText(line, rect_t{}, "Tilt Y");
@@ -159,7 +158,7 @@ class AnaViewWindow : public Window
 
 #if defined(LUMINOSITY_SENSOR)
     line = newLine(grid);
-    lv_obj_set_style_pad_column(line->getLvObj(), PAD_SMALL, LV_PART_MAIN);
+    line->setStylePadColumn(PAD_SMALL, LV_PART_MAIN);
 
     grid.setColSpan(2);
     new StaticText(line, rect_t{}, STR_SRC_LIGHT);
@@ -192,12 +191,31 @@ class AnaCalibratedViewWindow : public AnaViewWindow
     AnaViewWindow::build();
 
 #if defined(HARDWARE_TOUCH)
-    touchLines[0] = lv_line_create(parent->getParent()->getLvObj());
-    etx_obj_add_style(touchLines[0], styles->div_line_edit, LV_PART_MAIN);
-    lv_obj_add_flag(touchLines[0], LV_OBJ_FLAG_HIDDEN);
-    touchLines[1] = lv_line_create(parent->getParent()->getLvObj());
-    etx_obj_add_style(touchLines[1], styles->div_line_edit, LV_PART_MAIN);
-    lv_obj_add_flag(touchLines[1], LV_OBJ_FLAG_HIDDEN);
+    auto overlayParent = parent ? parent->getParent() : nullptr;
+    lv_obj_t* touchLine0 = nullptr;
+    lv_obj_t* touchLine1 = nullptr;
+    const bool created =
+        overlayParent && overlayParent->withLive([&](Window::LiveWindow& live) {
+          touchLine0 = lv_line_create(live.lvobj());
+          touchLine1 = lv_line_create(live.lvobj());
+          return touchLine0 && touchLine1;
+        });
+    if (!created) {
+      if (touchLine0) lv_obj_del(touchLine0);
+      if (touchLine1) lv_obj_del(touchLine1);
+      failClosed();
+      return;
+    }
+    requireLvObj(touchLines[0], touchLine0);
+    requireLvObj(touchLines[1], touchLine1);
+    touchLines[0].with([](lv_obj_t* line) {
+      etx_obj_add_style(line, styles->div_line_edit, LV_PART_MAIN);
+      lv_obj_add_flag(line, LV_OBJ_FLAG_HIDDEN);
+    });
+    touchLines[1].with([](lv_obj_t* line) {
+      etx_obj_add_style(line, styles->div_line_edit, LV_PART_MAIN);
+      lv_obj_add_flag(line, LV_OBJ_FLAG_HIDDEN);
+    });
 
     line = newLine(grid);
 #if PORTRAIT
@@ -217,8 +235,7 @@ class AnaCalibratedViewWindow : public AnaViewWindow
                    std::to_string(rawTouchState.y);
           return std::string("");
         });
-    lv_obj_set_grid_cell(lbl->getLvObj(), LV_GRID_ALIGN_STRETCH, 0, 5,
-                         LV_GRID_ALIGN_CENTER, 0, 1);
+    lbl->setGridCell(LV_GRID_ALIGN_STRETCH, 0, 5, LV_GRID_ALIGN_CENTER, 0, 1);
 
 #if !defined(SIMU) && defined(TP_GT911)
     line = newLine(grid);
@@ -226,16 +243,15 @@ class AnaCalibratedViewWindow : public AnaViewWindow
         line, rect_t{},
         std::string("Touch GT911 FW ver: ") + std::to_string(touchGT911fwver),
         COLOR_THEME_PRIMARY1_INDEX);
-    lv_obj_set_grid_cell(lbl2->getLvObj(), LV_GRID_ALIGN_STRETCH, 0, 5,
-                         LV_GRID_ALIGN_CENTER, 0, 1);
+    lbl2->setGridCell(LV_GRID_ALIGN_STRETCH, 0, 5, LV_GRID_ALIGN_CENTER, 0, 1);
 
 #if PORTRAIT
     line = newLine(grid);
 #endif
     lbl2 = new StaticText(line, rect_t{},
                           "TSI2CEvents: " + std::to_string(touchGT911hiccups));
-    lv_obj_set_grid_cell(lbl2->getLvObj(), LV_GRID_ALIGN_STRETCH,
-                         TSI2CEventsCol, 5, LV_GRID_ALIGN_CENTER, 0, 1);
+    lbl2->setGridCell(LV_GRID_ALIGN_STRETCH, TSI2CEventsCol, 5,
+                      LV_GRID_ALIGN_CENTER, 0, 1);
 #endif
 #endif  // defined(HARDWARE_TOUCH)
 
@@ -254,21 +270,29 @@ class AnaCalibratedViewWindow : public AnaViewWindow
       touchPts[2] = {(lv_coord_t)(rawTouchState.x - 10), (lv_coord_t)(rawTouchState.y + 8)};
       touchPts[3] = {(lv_coord_t)(rawTouchState.x + 10), (lv_coord_t)(rawTouchState.y - 8)};
 
-      lv_line_set_points(touchLines[0], &touchPts[0], 2);
-      lv_line_set_points(touchLines[1], &touchPts[2], 2);
-      lv_obj_clear_flag(touchLines[0], LV_OBJ_FLAG_HIDDEN);
-      lv_obj_clear_flag(touchLines[1], LV_OBJ_FLAG_HIDDEN);
+      touchLines[0].with([&](lv_obj_t* line) {
+        lv_line_set_points(line, &touchPts[0], 2);
+        lv_obj_clear_flag(line, LV_OBJ_FLAG_HIDDEN);
+      });
+      touchLines[1].with([&](lv_obj_t* line) {
+        lv_line_set_points(line, &touchPts[2], 2);
+        lv_obj_clear_flag(line, LV_OBJ_FLAG_HIDDEN);
+      });
     } else {
-      lv_obj_add_flag(touchLines[0], LV_OBJ_FLAG_HIDDEN);
-      lv_obj_add_flag(touchLines[1], LV_OBJ_FLAG_HIDDEN);
+      touchLines[0].with([](lv_obj_t* line) {
+        lv_obj_add_flag(line, LV_OBJ_FLAG_HIDDEN);
+      });
+      touchLines[1].with([](lv_obj_t* line) {
+        lv_obj_add_flag(line, LV_OBJ_FLAG_HIDDEN);
+      });
     }
   }
 
   void onDelete() override
   {
     // Attached to parent->parent window
-    lv_obj_del(touchLines[0]);
-    lv_obj_del(touchLines[1]);
+    touchLines[0].with([](lv_obj_t* line) { lv_obj_del(line); });
+    touchLines[1].with([](lv_obj_t* line) { lv_obj_del(line); });
   }
 #endif
 
@@ -277,7 +301,7 @@ class AnaCalibratedViewWindow : public AnaViewWindow
  protected:
 #if defined(HARDWARE_TOUCH)
   lv_point_t touchPts[4];
-  lv_obj_t* touchLines[2];
+  RequiredLvObj touchLines[2];
 #endif
   int16_t column3(int i) override { return anaIn(i); }
 };
@@ -462,8 +486,8 @@ class AnaMinMaxViewWindow : public AnaViewWindow
     line = newLine(grid);
     auto ttl =
         new StaticText(line, rect_t{}, STR_ANADIAGS_MOVE);
-    lv_obj_set_grid_cell(ttl->getLvObj(), LV_GRID_ALIGN_STRETCH, 0, GRIDCOLS,
-                         LV_GRID_ALIGN_CENTER, 0, 1);
+    ttl->setGridCell(LV_GRID_ALIGN_STRETCH, 0, GRIDCOLS,
+                     LV_GRID_ALIGN_CENTER, 0, 1);
 
     AnaViewWindow::build();
   }

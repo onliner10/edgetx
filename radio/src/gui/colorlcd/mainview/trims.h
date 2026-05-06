@@ -41,9 +41,9 @@ class MainViewTrim : public Window
   int trimMin = 0, trimMax = 0;
   bool extendedTrims = false;
   bool hidden = false;
-  TrimIcon* trimIcon = nullptr;
-  DynamicNumber<int16_t>* trimValue = nullptr;
-  lv_obj_t* trimBar = nullptr;
+  RequiredWindow<TrimIcon> trimIcon;
+  RequiredWindow<DynamicNumber<int16_t>> trimValue;
+  RequiredLvObj trimBar;
 
   void setRange();
   void setPos();

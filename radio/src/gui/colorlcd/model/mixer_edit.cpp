@@ -138,5 +138,5 @@ void MixEditWindow::buildBody(Window *form)
         new MixEditAdvanced(channel, index);
         return 0;
       });
-  lv_obj_set_width(btn->getLvObj(), lv_pct(100));
+  btn->setWidth(lv_pct(100));
 }

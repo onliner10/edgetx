@@ -147,7 +147,7 @@ void SetupTopBarWidgetsPage::refreshSlots(const WidgetMoveResult& moveResult)
 
   const unsigned int index = moveResult.to.asUnsigned();
   if (index < MAX_TOPBAR_ZONES && slots[index]) {
-    lv_group_focus_obj(slots[index]->getLvObj());
+    slots[index]->focus();
   }
 }
 
@@ -178,7 +178,7 @@ TopBar::TopBar(Window * parent) :
   WidgetsContainer(parent, {0, 0, LCD_W, EdgeTxStyles::MENU_HEADER_HEIGHT}, MAX_TOPBAR_ZONES)
 {
   setWindowFlag(NO_FOCUS);
-  etx_solid_bg(lvobj, COLOR_THEME_SECONDARY1_INDEX);
+  solidBg(COLOR_THEME_SECONDARY1_INDEX);
 
   headerIcon = new (std::nothrow) HeaderIcon(parent, ICON_EDGETX, [=]() { QuickMenu::openQuickMenu(); });
 }

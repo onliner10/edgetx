@@ -88,20 +88,28 @@ class ThrottleCurveWindow : public Window
     axis[0] = {0, 0};
     axis[1] = {0, (lv_coord_t)(h - PAD_THREE)};
     axis[2] = {(lv_coord_t)width(), (lv_coord_t)(h - PAD_THREE)};
-    auto axisLine = lv_line_create(lvobj);
-    etx_obj_add_style(axisLine, styles->div_line_black, LV_PART_MAIN);
-    lv_line_set_points(axisLine, axis, 3);
 
-    for (int x = 0, i = 0; x < width() && i + 1 < int(DIM(ticks)); x += 6, i += 2) {
-      ticks[i] = {lv_coord_t(x), (lv_coord_t)(h - PAD_SMALL - 1)};
-      ticks[i + 1] = {lv_coord_t(x), h};
-      auto tick = lv_line_create(lvobj);
-      lv_line_set_points(tick, &ticks[i], 2);
-      etx_obj_add_style(tick, styles->div_line_black, LV_PART_MAIN);
-    }
+    withLive([&](LiveWindow& live) {
+      auto axisLine = lv_line_create(live.lvobj());
+      if (!requireLvObj(axisLine)) return false;
+      etx_obj_add_style(axisLine, styles->div_line_black, LV_PART_MAIN);
+      lv_line_set_points(axisLine, axis, 3);
 
-    line = lv_line_create(lvobj);
-    etx_obj_add_style(line, styles->graph_line, LV_PART_MAIN);
+      for (int x = 0, i = 0; x < width() && i + 1 < int(DIM(ticks));
+           x += 6, i += 2) {
+        ticks[i] = {lv_coord_t(x), (lv_coord_t)(h - PAD_SMALL - 1)};
+        ticks[i + 1] = {lv_coord_t(x), h};
+        auto tick = lv_line_create(live.lvobj());
+        if (!requireLvObj(tick)) return false;
+        lv_line_set_points(tick, &ticks[i], 2);
+        etx_obj_add_style(tick, styles->div_line_black, LV_PART_MAIN);
+      }
+
+      auto graphLine = lv_line_create(live.lvobj());
+      if (!requireLvObj(line, graphLine)) return false;
+      etx_obj_add_style(graphLine, styles->graph_line, LV_PART_MAIN);
+      return true;
+    });
   }
 
   void onLiveCheckEvents(LiveWindow& live) override
@@ -119,7 +127,7 @@ class ThrottleCurveWindow : public Window
         graph[x] = {lv_coord_t(x), y};
         graphSize += 1;
       }
-      lv_line_set_points(line, graph, graphSize);
+      line.with([&](lv_obj_t* obj) { lv_line_set_points(obj, graph, graphSize); });
     }
   }
 
@@ -128,7 +136,7 @@ class ThrottleCurveWindow : public Window
   lv_point_t graph[MAXTRACE];
   lv_point_t axis[3];
   lv_point_t ticks[MAXTRACE * 2 / 6];
-  lv_obj_t* line = nullptr;
+  RequiredLvObj line;
   int16_t graphSize = 0;
 };
 
@@ -189,8 +197,7 @@ void StatisticsViewPage::build(Window* window)
   auto curve =
       new (std::nothrow) ThrottleCurveWindow(line, {0, 0, CV_WIDTH, CV_HEIGHT});
   if (curve) {
-    lv_obj_set_grid_cell(curve->getLvObj(), LV_GRID_ALIGN_CENTER, 0, 4,
-                         LV_GRID_ALIGN_CENTER, 0, 1);
+    curve->setGridCell(LV_GRID_ALIGN_CENTER, 0, 4, LV_GRID_ALIGN_CENTER, 0, 1);
   }
 
   line = window->newLine(grid);
@@ -209,8 +216,7 @@ void StatisticsViewPage::build(Window* window)
                                       return 0;
                                     });
   if (btn) {
-    lv_obj_set_grid_cell(btn->getLvObj(), LV_GRID_ALIGN_STRETCH, 0, 4,
-                         LV_GRID_ALIGN_START, 0, 1);
+    btn->setGridCell(LV_GRID_ALIGN_STRETCH, 0, 4, LV_GRID_ALIGN_START, 0, 1);
   }
 }
 
@@ -377,7 +383,7 @@ void DebugViewPage::build(Window* window)
                                       return 0;
                                     });
   if (btn) {
-    lv_obj_set_grid_cell(btn->getLvObj(), LV_GRID_ALIGN_STRETCH, 0,
-                         DBG_COL_CNT, LV_GRID_ALIGN_CENTER, 0, 1);
+    btn->setGridCell(LV_GRID_ALIGN_STRETCH, 0, DBG_COL_CNT,
+                     LV_GRID_ALIGN_CENTER, 0, 1);
   }
 }

@@ -114,60 +114,56 @@ class ThemeDetailsDialog : public BaseDialog
     strAppend(author, this->theme.getAuthor().c_str(), ThemeFile::AUTHOR_LENGTH);
     strAppend(info, this->theme.getInfo().c_str(), ThemeFile::INFO_LENGTH);
 
-    auto line = form->newLine(grid);
-    line->padAll(PAD_TINY);
+    form.with([&](Window& formWindow) {
+      auto line = formWindow.newLine(grid);
+      line->padAll(PAD_TINY);
 
-    new StaticText(line, rect_t{}, STR_NAME);
-    auto te = new TextEdit(line, rect_t{}, name, SELECTED_THEME_NAME_LEN);
-    lv_obj_set_grid_cell(te->getLvObj(), LV_GRID_ALIGN_STRETCH, 1, 1,
-                         LV_GRID_ALIGN_CENTER, 0, 1);
+      new StaticText(line, rect_t{}, STR_NAME);
+      auto te = new TextEdit(line, rect_t{}, name, SELECTED_THEME_NAME_LEN);
+      te->setGridCell(LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_CENTER, 0, 1);
 
-    line = form->newLine(grid);
-    line->padAll(PAD_TINY);
+      line = formWindow.newLine(grid);
+      line->padAll(PAD_TINY);
 
-    new StaticText(line, rect_t{}, STR_AUTHOR);
-    te = new TextEdit(line, rect_t{}, author, ThemeFile::AUTHOR_LENGTH);
-    lv_obj_set_grid_cell(te->getLvObj(), LV_GRID_ALIGN_STRETCH, 1, 1,
-                         LV_GRID_ALIGN_CENTER, 0, 1);
+      new StaticText(line, rect_t{}, STR_AUTHOR);
+      te = new TextEdit(line, rect_t{}, author, ThemeFile::AUTHOR_LENGTH);
+      te->setGridCell(LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_CENTER, 0, 1);
 
-    FlexGridLayout grid2(b_col_dsc, row_dsc, PAD_TINY);
+      FlexGridLayout grid2(b_col_dsc, row_dsc, PAD_TINY);
 
-    line = form->newLine(grid2);
-    line->padAll(PAD_TINY);
+      line = formWindow.newLine(grid2);
+      line->padAll(PAD_TINY);
 
-    new StaticText(line, rect_t{}, STR_DESCRIPTION);
-    line = form->newLine(grid2);
-    line->padAll(PAD_TINY);
-    te = new TextEdit(line, rect_t{}, info, ThemeFile::INFO_LENGTH);
-    lv_obj_set_grid_cell(te->getLvObj(), LV_GRID_ALIGN_STRETCH, 0, 2,
-                         LV_GRID_ALIGN_CENTER, 0, 1);
+      new StaticText(line, rect_t{}, STR_DESCRIPTION);
+      line = formWindow.newLine(grid2);
+      line->padAll(PAD_TINY);
+      te = new TextEdit(line, rect_t{}, info, ThemeFile::INFO_LENGTH);
+      te->setGridCell(LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 0, 1);
 
-    line = form->newLine(grid2);
-    line->padAll(PAD_TINY);
-    line->padTop(10);
+      line = formWindow.newLine(grid2);
+      line->padAll(PAD_TINY);
+      line->padTop(10);
 
-    auto button =
-        new TextButton(line, rect_t{0, 0, lv_pct(30), 0}, STR_CANCEL, [=]() {
-          deleteLater();
-          return 0;
-        });
-    lv_obj_set_grid_cell(button->getLvObj(), LV_GRID_ALIGN_CENTER, 0, 1,
-                         LV_GRID_ALIGN_CENTER, 0, 1);
+      auto button =
+          new TextButton(line, rect_t{0, 0, lv_pct(30), 0}, STR_CANCEL, [=]() {
+            deleteLater();
+            return 0;
+          });
+      button->setGridCell(LV_GRID_ALIGN_CENTER, 0, 1, LV_GRID_ALIGN_CENTER, 0, 1);
 
-    button =
-        new TextButton(line, rect_t{0, 0, lv_pct(30), 0}, STR_SAVE, [=]() {
-          if (saveHandler != nullptr) {
-            this->theme.setName(name);
-            this->theme.setAuthor(author);
-            this->theme.setInfo(info);
-            if (!saveHandler(this->theme))
-              return 0;
-          }
-          deleteLater();
-          return 0;
-        });
-    lv_obj_set_grid_cell(button->getLvObj(), LV_GRID_ALIGN_CENTER, 1, 1,
-                         LV_GRID_ALIGN_CENTER, 0, 1);
+      button =
+          new TextButton(line, rect_t{0, 0, lv_pct(30), 0}, STR_SAVE, [=]() {
+            if (saveHandler != nullptr) {
+              this->theme.setName(name);
+              this->theme.setAuthor(author);
+              this->theme.setInfo(info);
+              if (!saveHandler(this->theme)) return 0;
+            }
+            deleteLater();
+            return 0;
+          });
+      button->setGridCell(LV_GRID_ALIGN_CENTER, 1, 1, LV_GRID_ALIGN_CENTER, 0, 1);
+    });
   }
 
  protected:
@@ -304,7 +300,7 @@ class ColorEditPage : public Page
     auto t2 =
         header->setTitle2(ThemePersistance::getColorNames()[(int)_indexOfColor]);
 #if NARROW_LAYOUT
-    etx_font(t2->getLvObj(), FONT_XS_INDEX);
+    t2->font(FONT_XS_INDEX);
 #else
     LV_UNUSED(t2);
 #endif
@@ -380,7 +376,7 @@ class ThemeEditPage : public Page
     header->setTitle(STR_EDIT_THEME);
     _themeName = header->setTitle2(_theme.getName());
 #if NARROW_LAYOUT
-    etx_font(_themeName->getLvObj(), FONT_XS_INDEX);
+    _themeName->font(FONT_XS_INDEX);
 #endif
 
     // save and cancel
@@ -581,7 +577,7 @@ void ThemeSetupPage::setupListbox(Window *window, rect_t r,
                                   ThemePersistance *tp)
 {
   listBox = new ListBox(window, r, tp->getNames());
-  etx_scrollbar(listBox->getLvObj());
+  listBox->scrollbar();
   listBox->setAutoEdit();
   listBox->setSelected(currentTheme);
   listBox->setActiveItem(tp->getThemeIndex());
@@ -656,9 +652,9 @@ void ThemeSetupPage::build(Window *window)
 
   // author and name of theme on right side of screen
   nameText = new StaticText(rw, r, "");
-  lv_label_set_long_mode(nameText->getLvObj(), LV_LABEL_LONG_DOT);
+  nameText->setLongMode(LV_LABEL_LONG_DOT);
   authorText = new StaticText(rw, r, "");
-  lv_label_set_long_mode(authorText->getLvObj(), LV_LABEL_LONG_DOT);
+  authorText->setLongMode(LV_LABEL_LONG_DOT);
 
   setName(theme);
   setAuthor(theme);

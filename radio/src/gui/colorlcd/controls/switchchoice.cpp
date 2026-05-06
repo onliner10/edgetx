@@ -67,10 +67,12 @@ class SwitchChoiceMenuToolbar : public MenuToolbar
                                       STR_SELECT_MENU_INV);
     if (!invertBtn) return;
     invertBtn->check(switchChoice.inverted);
-    lv_obj_align(invertBtn->getLvObj(), LV_ALIGN_BOTTOM_MID, 0, 0);
+    invertBtn->withLive([](Window::LiveWindow& live) {
+      lv_obj_align(live.lvobj(), LV_ALIGN_BOTTOM_MID, 0, 0);
+    });
 
     invertBtn->setPressHandler([=]() {
-      lv_obj_clear_state(invertBtn->getLvObj(), LV_STATE_FOCUSED);
+      invertBtn->clearState(LV_STATE_FOCUSED);
       invertChoice();
       return static_cast<SwitchChoice&>(this->choice).inverted;
     });

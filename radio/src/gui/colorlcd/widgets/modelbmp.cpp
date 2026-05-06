@@ -35,19 +35,20 @@ class ModelBitmapWidget : public TrackedWidget
                     WidgetLocation location) :
       TrackedWidget(factory, parent, rect, location, LoadMode::Delayed)
   {
-    etx_obj_add_style(lvobj, styles->bg_opacity_transparent, LV_PART_MAIN);
-    etx_obj_add_style(lvobj, styles->bg_opacity_cover,
-                      LV_PART_MAIN | ETX_STATE_BG_FILL);
+    addStyle(styles->bg_opacity_transparent, LV_PART_MAIN);
+    addStyle(styles->bg_opacity_cover, LV_PART_MAIN | ETX_STATE_BG_FILL);
   }
 
   void delayedInit() override
   {
-    label = new StaticText(this, rect_t{}, "");
-    lv_label_set_long_mode(label->getLvObj(), LV_LABEL_LONG_DOT);
-    label->hide();
+    if (!initRequiredWindow(label, this, rect_t{}, "")) return;
+    label.withLive([](LiveWindow& live) {
+      lv_label_set_long_mode(live.lvobj(), LV_LABEL_LONG_DOT);
+    });
+    label.with([](StaticText& text) { text.hide(); });
 
-    image = new StaticBitmap(this, {0, 0, width(), height()});
-    image->hide();
+    if (!initRequiredWindow(image, this, rect_t{0, 0, width(), height()})) return;
+    image.with([](StaticBitmap& bitmap) { bitmap.hide(); });
 
     foreground();
   }
@@ -64,8 +65,11 @@ class ModelBitmapWidget : public TrackedWidget
   {
     char s[LEN_MODEL_NAME + 1];
     strAppend(s, g_model.header.name, LEN_MODEL_NAME);
-    bool textChanged = label->getText() != s;
-    if (textChanged) label->setText(s);
+    bool textChanged = label.valueOr(true, [&](StaticText& text) {
+      bool changed = text.getText() != s;
+      if (changed) text.setText(s);
+      return changed;
+    });
 
     if (textChanged || getHash() != deps_hash) {
       update();
@@ -80,52 +84,69 @@ class ModelBitmapWidget : public TrackedWidget
     isLarge = rect.h >= LARGE_H && rect.w >= LARGE_W;
 
     // set font colour from options[0], if use theme color option off
-    if (widgetData->options[4].value.boolValue) {
-      etx_txt_color(label->getLvObj(),
-                    isTopBarWidget() ? COLOR_THEME_PRIMARY2_INDEX : COLOR_THEME_SECONDARY1_INDEX,
-                    LV_PART_MAIN);
-    } else {
-      etx_txt_color_from_flags(label->getLvObj(), widgetData->options[0].value.unsignedValue);
-    }
+    label.withLive([&](LiveWindow& live) {
+      if (widgetData->options[4].value.boolValue) {
+        etx_txt_color(live.lvobj(),
+                      isTopBarWidget() ? COLOR_THEME_PRIMARY2_INDEX
+                                       : COLOR_THEME_SECONDARY1_INDEX,
+                      LV_PART_MAIN);
+      } else {
+        etx_txt_color_from_flags(live.lvobj(),
+                                 widgetData->options[0].value.unsignedValue);
+      }
+    });
 
     coord_t labelHeight = isLarge && hasBitmap ? LARGE_IMG_H : height();
     rect_t labelRect = {0, 0, width(), labelHeight};
     FontIndex font = responsiveTextFont(labelRect.h);
-    layoutTextLabel(label->getLvObj(), labelRect, font);
+    label.withLive([&](LiveWindow& live) {
+      layoutTextLabel(live.lvobj(), labelRect, font);
+    });
 
     // get fill color from options[3]
-    etx_bg_color_from_flags(lvobj, widgetData->options[3].value.unsignedValue);
+    withLive([&](LiveWindow& live) {
+      etx_bg_color_from_flags(live.lvobj(),
+                              widgetData->options[3].value.unsignedValue);
 
-    // Set background opacity from options[2]
-    if (widgetData->options[2].value.boolValue)
-      lv_obj_add_state(lvobj, ETX_STATE_BG_FILL);
-    else
-      lv_obj_clear_state(lvobj, ETX_STATE_BG_FILL);
+      // Set background opacity from options[2]
+      if (widgetData->options[2].value.boolValue)
+        lv_obj_add_state(live.lvobj(), ETX_STATE_BG_FILL);
+      else
+        lv_obj_clear_state(live.lvobj(), ETX_STATE_BG_FILL);
+    });
 
     coord_t w = width();
     coord_t h = height() - (isLarge && hasBitmap ? LARGE_IMG_H : 0);
-    bool sizeChg = (w != image->width()) || (h != image->height());
+    bool sizeChg = image.valueOr(true, [&](StaticBitmap& bitmap) {
+      return w != bitmap.width() || h != bitmap.height();
+    });
 
     if (sizeChg)
-      image->setRect({0, isLarge && hasBitmap ? LARGE_IMG_H : 0, w, h});
+      image.with([&](StaticBitmap& bitmap) {
+        bitmap.setRect({0, isLarge && hasBitmap ? LARGE_IMG_H : 0, w, h});
+      });
 
-    if (!image->hasImage() || deps_hash != getHash() || sizeChg) {
+    bool hasImage = image.valueOr(false,
+                                  [](StaticBitmap& bitmap) { return bitmap.hasImage(); });
+    if (!hasImage || deps_hash != getHash() || sizeChg) {
       if (g_model.header.bitmap[0]) {
         char filename[LEN_BITMAP_NAME + 1];
         strAppend(filename, g_model.header.bitmap, LEN_BITMAP_NAME);
         std::string fullpath =
             std::string(BITMAPS_PATH PATH_SEPARATOR) + filename;
 
-        image->setSource(fullpath.c_str());
+        image.with([&](StaticBitmap& bitmap) { bitmap.setSource(fullpath.c_str()); });
       } else {
-        image->clearSource();
+        image.with([](StaticBitmap& bitmap) { bitmap.clearSource(); });
       }
       deps_hash = getHash();
     }
 
-    image->show(image->hasImage());
+    hasImage = image.valueOr(false,
+                             [](StaticBitmap& bitmap) { return bitmap.hasImage(); });
+    image.with([&](StaticBitmap& bitmap) { bitmap.show(hasImage); });
 
-    label->show(isLarge || !image->hasImage());
+    label.with([&](StaticText& text) { text.show(isLarge || !hasImage); });
   }
 
   static const WidgetOption options[];
@@ -133,8 +154,8 @@ class ModelBitmapWidget : public TrackedWidget
  protected:
   bool isLarge = false;
   uint32_t deps_hash = 0;
-  StaticText* label = nullptr;
-  StaticBitmap* image = nullptr;
+  RequiredWindow<StaticText> label;
+  RequiredWindow<StaticBitmap> image;
 
   uint32_t getHash() { return hash(g_model.header.bitmap, LEN_BITMAP_NAME); }
 

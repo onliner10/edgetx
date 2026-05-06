@@ -76,19 +76,19 @@ void OutputEditWindow::onLiveCheckEvents(Window::LiveWindow& live)
     int chanVal = calcRESXto100(ex_chans[channel]);
 
     if (chanVal < -DEADBAND) {
-      lv_obj_add_state(minText->getLvObj(), ETX_STATE_MINMAX_HIGHLIGHT);
-      lv_obj_add_state(minEdit->getLvObj(), ETX_STATE_MINMAX_HIGHLIGHT);
+      minText->addState(ETX_STATE_MINMAX_HIGHLIGHT);
+      minEdit->addState(ETX_STATE_MINMAX_HIGHLIGHT);
     } else {
-      lv_obj_clear_state(minText->getLvObj(), ETX_STATE_MINMAX_HIGHLIGHT);
-      lv_obj_clear_state(minEdit->getLvObj(), ETX_STATE_MINMAX_HIGHLIGHT);
+      minText->clearState(ETX_STATE_MINMAX_HIGHLIGHT);
+      minEdit->clearState(ETX_STATE_MINMAX_HIGHLIGHT);
     }
 
     if (chanVal > DEADBAND) {
-      lv_obj_add_state(maxText->getLvObj(), ETX_STATE_MINMAX_HIGHLIGHT);
-      lv_obj_add_state(maxEdit->getLvObj(), ETX_STATE_MINMAX_HIGHLIGHT);
+      maxText->addState(ETX_STATE_MINMAX_HIGHLIGHT);
+      maxEdit->addState(ETX_STATE_MINMAX_HIGHLIGHT);
     } else {
-      lv_obj_clear_state(maxText->getLvObj(), ETX_STATE_MINMAX_HIGHLIGHT);
-      lv_obj_clear_state(maxEdit->getLvObj(), ETX_STATE_MINMAX_HIGHLIGHT);
+      maxText->clearState(ETX_STATE_MINMAX_HIGHLIGHT);
+      maxEdit->clearState(ETX_STATE_MINMAX_HIGHLIGHT);
     }
   }
 
@@ -144,12 +144,12 @@ void OutputEditWindow::buildBody(Window *form)
   // Min
   line = form->newLine(grid);
   minText = new StaticText(line, rect_t{}, STR_MIN);
-  etx_solid_bg(minText->getLvObj(), COLOR_THEME_ACTIVE_INDEX, ETX_STATE_MINMAX_HIGHLIGHT);
-  etx_font(minText->getLvObj(), FONT_BOLD_INDEX, ETX_STATE_MINMAX_HIGHLIGHT);
+  minText->solidBg(COLOR_THEME_ACTIVE_INDEX, ETX_STATE_MINMAX_HIGHLIGHT);
+  minText->font(FONT_BOLD_INDEX, ETX_STATE_MINMAX_HIGHLIGHT);
   minEdit = new GVarNumberEdit(line, -limit, 0,
                                GET_SET_DEFAULT(output->min), PREC1,
                                -LIMIT_STD_MAX, -limit);
-  etx_font(minEdit->getLvObj(), FONT_BOLD_INDEX, ETX_STATE_MINMAX_HIGHLIGHT);
+  minEdit->font(FONT_BOLD_INDEX, ETX_STATE_MINMAX_HIGHLIGHT);
   minEdit->setFastStep(20);
   minEdit->setAccelFactor(16);
   minEdit->setDisplayHandler([=](int value) {
@@ -160,12 +160,12 @@ void OutputEditWindow::buildBody(Window *form)
 
   // Max
   maxText = new StaticText(line, rect_t{}, STR_MAX);
-  etx_solid_bg(maxText->getLvObj(), COLOR_THEME_ACTIVE_INDEX, ETX_STATE_MINMAX_HIGHLIGHT);
-  etx_font(maxText->getLvObj(), FONT_BOLD_INDEX, ETX_STATE_MINMAX_HIGHLIGHT);
+  maxText->solidBg(COLOR_THEME_ACTIVE_INDEX, ETX_STATE_MINMAX_HIGHLIGHT);
+  maxText->font(FONT_BOLD_INDEX, ETX_STATE_MINMAX_HIGHLIGHT);
   maxEdit = new GVarNumberEdit(line, 0, +limit,
                                GET_SET_DEFAULT(output->max), PREC1,
                                +LIMIT_STD_MAX, limit);
-  etx_font(maxEdit->getLvObj(), FONT_BOLD_INDEX, ETX_STATE_MINMAX_HIGHLIGHT);
+  maxEdit->font(FONT_BOLD_INDEX, ETX_STATE_MINMAX_HIGHLIGHT);
   maxEdit->setFastStep(20);
   maxEdit->setAccelFactor(16);
   maxEdit->setDisplayHandler([=](int value) {
@@ -190,9 +190,8 @@ void OutputEditWindow::buildBody(Window *form)
   // PPM center
   line = form->newLine(grid);
   auto label = new StaticText(line, rect_t{}, STR_LIMITS_HEADERS_PPMCENTER);
-  lv_label_set_long_mode(label->getLvObj(), LV_LABEL_LONG_WRAP);
-  lv_obj_set_style_grid_cell_x_align(label->getLvObj(), LV_GRID_ALIGN_STRETCH,
-                                     0);
+  label->setLongMode(LV_LABEL_LONG_WRAP);
+  label->setStyleGridCellXAlign(LV_GRID_ALIGN_STRETCH, 0);
 
   auto center = new NumberEdit(
       line, rect_t{}, PPM_CENTER - PPM_CENTER_MAX, PPM_CENTER + PPM_CENTER_MAX,
@@ -204,9 +203,8 @@ void OutputEditWindow::buildBody(Window *form)
 
   // Subtrims mode
   label = new StaticText(line, rect_t{}, STR_LIMITS_HEADERS_SUBTRIMMODE);
-  lv_label_set_long_mode(label->getLvObj(), LV_LABEL_LONG_WRAP);
-  lv_obj_set_style_grid_cell_x_align(label->getLvObj(), LV_GRID_ALIGN_STRETCH,
-                                     0);
+  label->setLongMode(LV_LABEL_LONG_WRAP);
+  label->setStyleGridCellXAlign(LV_GRID_ALIGN_STRETCH, 0);
 
   new Choice(line, rect_t{}, STR_SUBTRIMMODES, 0, 1,
              GET_SET_DEFAULT(output->symetrical));

@@ -364,6 +364,9 @@ def semantic_lvobj_findings(
                 continue
             if cursor.spelling != "lvobj":
                 continue
+            referenced = cursor.referenced
+            if referenced is None or referenced.kind != cindex.CursorKind.FIELD_DECL:
+                continue
             location_file = cursor.location.file
             if location_file is None:
                 continue

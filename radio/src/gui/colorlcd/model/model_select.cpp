@@ -91,26 +91,26 @@ class ModelButton : public Button
 
       modelName = new StaticText(this, {PAD_TINY, PAD_TINY, w, fh}, modelCell->modelName,
                                  COLOR_THEME_SECONDARY1_INDEX, CENTERED | font);
-      etx_bg_color(modelName->getLvObj(), COLOR_THEME_ACTIVE_INDEX, LV_STATE_USER_1);
-      etx_bg_color(modelName->getLvObj(), COLOR_THEME_PRIMARY2_INDEX, LV_PART_MAIN);
-      etx_obj_add_style(modelName->getLvObj(), styles->bg_opacity_75, LV_PART_MAIN);
+      modelName->bgColor(COLOR_THEME_ACTIVE_INDEX, LV_STATE_USER_1);
+      modelName->bgColor(COLOR_THEME_PRIMARY2_INDEX, LV_PART_MAIN);
+      modelName->addStyle(styles->bg_opacity_75, LV_PART_MAIN);
       modelName->padTop(fo);
     } else {
       modelName = new StaticText(this, {PAD_TINY, PAD_SMALL, w, EdgeTxStyles::STD_FONT_HEIGHT}, modelCell->modelName,
                                  COLOR_THEME_SECONDARY1_INDEX, font);
     }
-    lv_label_set_long_mode(modelName->getLvObj(), LV_LABEL_LONG_DOT);
+    modelName->setLongMode(LV_LABEL_LONG_DOT);
 
     bool chk = (modelCell == modelslist.getCurrentModel());
     if (chk != checked()) {
       check(chk);
       if (chk)
-        lv_obj_add_state(modelName->getLvObj(), LV_STATE_USER_1);
+        modelName->addState(LV_STATE_USER_1);
       else
-        lv_obj_clear_state(modelName->getLvObj(), LV_STATE_USER_1);
+        modelName->clearState(LV_STATE_USER_1);
     }
 
-    lv_obj_update_layout(lvobj);
+    updateLayout();
   }
 
   const char *modelFilename() { return modelCell->modelFilename; }
@@ -118,8 +118,8 @@ class ModelButton : public Button
 
   void setFocused()
   {
-    if (!lv_obj_has_state(lvobj, LV_STATE_FOCUSED)) {
-      lv_group_focus_obj(lvobj);
+    if (!hasState(LV_STATE_FOCUSED)) {
+      focus();
     } else {
       if (m_setSelected) m_setSelected();
     }
@@ -138,7 +138,7 @@ class ModelButton : public Button
         if (modelCell->modelBitmap[0]) {
           GET_FILENAME(filename, BITMAPS_PATH, modelCell->modelBitmap, "");
           auto bitmap = new StaticBitmap(this, {PAD_TINY, PAD_TINY, w, h}, filename);
-          lv_obj_move_background(bitmap->getLvObj());
+          bitmap->moveBackground();
           bitmap->show(bitmap->hasImage());
           if (bitmap->hasImage()) {
             return true;
@@ -228,7 +228,7 @@ class ModelsPageBody : public Window
   {
     for (auto b : modelButtons) {
       b->hide();
-      lv_group_remove_obj(b->getLvObj());
+      b->removeFromGroup();
     }
 
     ModelsVector models;
@@ -265,7 +265,7 @@ class ModelsPageBody : public Window
       if (button) {
         button->setPos(x, y);
         button->show();
-        lv_group_add_obj(lv_group_get_default(), button->getLvObj());
+        button->addToGroup(lv_group_get_default());
       } else {
         button = new ModelButton(
             this, {x, y, w, h}, model, [=]() { focusedModel = model; },
@@ -738,10 +738,9 @@ void ModelLabelsWindow::buildBody(Window *window)
   mdlselector = new ModelsPageBody(window, {MDLS_X, MDLS_Y, MDLS_W, MDLS_H});
   mdlselector->setCloseHandler([=]() { onCancel(); });
   mdlselector->setLblRefreshFunc([=]() { labelRefreshRequest(); });
-  auto mdl_obj = mdlselector->getLvObj();
-  lv_obj_set_style_max_width(mdl_obj, MDLS_W, LV_PART_MAIN);
-  lv_obj_set_style_max_height(mdl_obj, MDLS_H, LV_PART_MAIN);
-  etx_scrollbar(mdl_obj);
+  mdlselector->setStyleMaxWidth(MDLS_W, LV_PART_MAIN);
+  mdlselector->setStyleMaxHeight(MDLS_H, LV_PART_MAIN);
+  mdlselector->scrollbar();
 
   if (mdlselector->getSortOrder() == NO_SORT)
     mdlselector->setSortOrder(NAME_ASC);
@@ -750,8 +749,7 @@ void ModelLabelsWindow::buildBody(Window *window)
   lblselector =
       new ListBox(window, rect_t{LABELS_X, LABELS_Y, LABELS_WIDTH, LABELS_HEIGHT}, getLabels());
   lblselector->setSmallSelectMarker();
-  auto lbl_obj = lblselector->getLvObj();
-  etx_scrollbar(lbl_obj);
+  lblselector->scrollbar();
 
   lblselector->setColumnWidth(0, LABELS_WIDTH);
 

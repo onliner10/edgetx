@@ -215,36 +215,70 @@ class FlightModeBtn : public ListLineButton
 
   void delayedInit() override
   {
-    lv_obj_enable_style_refresh(false);
+    if (!withLive([&](LiveWindow& live) {
+          auto obj = live.lvobj();
+          lv_obj_enable_style_refresh(false);
 
-    check(isActive());
+          check(isActive());
 
-    fmID = etx_create(&fm_id_class, lvobj);
-    lv_obj_set_pos(fmID, FMID_X, FMID_Y);
-    char label[8];
-    getFlightModeString(label, index + 1);
-    lv_label_set_text(fmID, label);
+          fmID = etx_create(&fm_id_class, obj);
+          if (!requireLvObj(fmID)) {
+            lv_obj_enable_style_refresh(true);
+            return false;
+          }
+          lv_obj_set_pos(fmID, FMID_X, FMID_Y);
+          char label[8];
+          getFlightModeString(label, index + 1);
+          lv_label_set_text(fmID, label);
 
-    fmName = etx_create(&fm_name_class, lvobj);
-    lv_obj_set_pos(fmName, NAME_X, NAME_Y);
-    fmSwitch = etx_create(&fm_switch_class, lvobj);
-    lv_obj_set_pos(fmSwitch, SWTCH_X, SWTCH_Y);
+          fmName = etx_create(&fm_name_class, obj);
+          if (!requireLvObj(fmName)) {
+            lv_obj_enable_style_refresh(true);
+            return false;
+          }
+          lv_obj_set_pos(fmName, NAME_X, NAME_Y);
+          fmSwitch = etx_create(&fm_switch_class, obj);
+          if (!requireLvObj(fmSwitch)) {
+            lv_obj_enable_style_refresh(true);
+            return false;
+          }
+          lv_obj_set_pos(fmSwitch, SWTCH_X, SWTCH_Y);
 
-    for (int i = 0; i < keysGetMaxTrims() && i < MAX_FMTRIMS; i += 1) {
-      fmTrimMode[i] = etx_create(&fm_trim_mode_class, lvobj);
-      lv_obj_set_pos(fmTrimMode[i], TRIM_X + i * TRIM_W, TRIM_Y);
-      fmTrimValue[i] = etx_create(&fm_trim_value_class, lvobj);
-      lv_obj_set_pos(fmTrimValue[i], TRIM_X + i * TRIM_W, TRIM_Y + TRIM_H);
-    }
+          for (int i = 0; i < keysGetMaxTrims() && i < MAX_FMTRIMS; i += 1) {
+            fmTrimMode[i] = etx_create(&fm_trim_mode_class, obj);
+            if (!requireLvObj(fmTrimMode[i])) {
+              lv_obj_enable_style_refresh(true);
+              return false;
+            }
+            lv_obj_set_pos(fmTrimMode[i], TRIM_X + i * TRIM_W, TRIM_Y);
+            fmTrimValue[i] = etx_create(&fm_trim_value_class, obj);
+            if (!requireLvObj(fmTrimValue[i])) {
+              lv_obj_enable_style_refresh(true);
+              return false;
+            }
+            lv_obj_set_pos(fmTrimValue[i], TRIM_X + i * TRIM_W,
+                           TRIM_Y + TRIM_H);
+          }
 
-    fmFadeIn = etx_create(&fm_fade_class, lvobj);
-    lv_obj_set_pos(fmFadeIn, FADE_X, FADE_Y);
-    fmFadeOut = etx_create(&fm_fade_class, lvobj);
-    lv_obj_set_pos(fmFadeOut, FADE_X + FADE_W + PAD_TINY, FADE_Y);
-    lv_obj_update_layout(lvobj);
+          fmFadeIn = etx_create(&fm_fade_class, obj);
+          if (!requireLvObj(fmFadeIn)) {
+            lv_obj_enable_style_refresh(true);
+            return false;
+          }
+          lv_obj_set_pos(fmFadeIn, FADE_X, FADE_Y);
+          fmFadeOut = etx_create(&fm_fade_class, obj);
+          if (!requireLvObj(fmFadeOut)) {
+            lv_obj_enable_style_refresh(true);
+            return false;
+          }
+          lv_obj_set_pos(fmFadeOut, FADE_X + FADE_W + PAD_TINY, FADE_Y);
+          lv_obj_update_layout(obj);
 
-    lv_obj_enable_style_refresh(true);
-    lv_obj_refresh_style(lvobj, LV_PART_ANY, LV_STYLE_PROP_ANY);
+          lv_obj_enable_style_refresh(true);
+          lv_obj_refresh_style(obj, LV_PART_ANY, LV_STYLE_PROP_ANY);
+          return true;
+        }))
+      return;
 
     refresh();
   }
@@ -479,7 +513,7 @@ void ModelFlightModesPage::build(Window* form)
 
   for (int i = 0; i < MAX_FLIGHT_MODES; i++) {
     auto btn = new FlightModeBtn(form, i);
-    lv_obj_set_pos(btn->getLvObj(), PAD_SMALL, i * (FlightModeBtn::BTN_H + PAD_THREE) + PAD_SMALL);
+    btn->setPos(PAD_SMALL, i * (FlightModeBtn::BTN_H + PAD_THREE) + PAD_SMALL);
     btn->setWidth(ListLineButton::GRP_W);
 
     btn->setPressHandler([=]() {

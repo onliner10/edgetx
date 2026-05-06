@@ -44,7 +44,7 @@ bool CurveChoice::onLiveLongPress(Window::LiveWindow&)
 {
   if (modelCurvesEnabled()) {
     if (_getValue()) {
-      lv_obj_clear_state(lvobj, LV_STATE_PRESSED);
+      clearState(LV_STATE_PRESSED);
       ModelCurvesPage::pushEditCurve(abs(_getValue()) - 1, source);
     }
   }
@@ -56,9 +56,11 @@ CurveParam::CurveParam(Window* parent, const rect_t& rect, CurveRef* ref,
     Window(parent, rect), ref(ref)
 {
   padAll(PAD_TINY);
-  lv_obj_set_flex_flow(lvobj, LV_FLEX_FLOW_ROW_WRAP);
-  lv_obj_set_style_flex_cross_place(lvobj, LV_FLEX_ALIGN_CENTER, 0);
-  lv_obj_set_size(lvobj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+  setFlexFlow(LV_FLEX_FLOW_ROW_WRAP);
+  withLive([](LiveWindow& live) {
+    lv_obj_set_style_flex_cross_place(live.lvobj(), LV_FLEX_ALIGN_CENTER, 0);
+  });
+  setSize(LV_SIZE_CONTENT, LV_SIZE_CONTENT);
 
   new (std::nothrow) Choice(this, rect_t{}, STR_VCURVETYPE, 0, modelCurvesEnabled() ? CURVE_REF_CUSTOM : CURVE_REF_FUNC,
              GET_DEFAULT(ref->type), [=](int32_t newValue) {
@@ -140,8 +142,7 @@ void CurveParam::update()
   act_field->show();
   Messaging::send(Messaging::CURVE_UPDATE);
 
-  auto act_obj = act_field->getLvObj();
   if (has_focus) {
-    lv_group_focus_obj(act_obj);
+    act_field->focus();
   }
 }

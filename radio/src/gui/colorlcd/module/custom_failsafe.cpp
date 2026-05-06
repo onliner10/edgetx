@@ -34,8 +34,8 @@ class ChannelFailsafeBargraph : public Window
   ChannelFailsafeBargraph(Window* parent, const rect_t& rect, uint8_t channel) :
       Window(parent, rect), channel(channel)
   {
-    etx_obj_add_style(lvobj, styles->border_thin, LV_PART_MAIN);
-    etx_obj_add_style(lvobj, styles->border_color[COLOR_BLACK_INDEX], LV_PART_MAIN);
+    addStyle(styles->border_thin, LV_PART_MAIN);
+    addStyle(styles->border_color[COLOR_BLACK_INDEX], LV_PART_MAIN);
 
     outputsBar = new OutputChannelBar(this, {0, 1, width() - PAD_TABLE_H, ChannelBar::BAR_HEIGHT},
                                       channel, false, false);
@@ -165,8 +165,8 @@ class ChannelFSCombo : public Window
 
     setFlexLayout(LV_FLEX_FLOW_ROW, PAD_TINY, LV_SIZE_CONTENT);
 
-    lv_obj_set_style_pad_column(lvobj, PAD_TINY, 0);
-    lv_obj_set_style_flex_cross_place(lvobj, LV_FLEX_ALIGN_CENTER, 0);
+    setStylePadColumn(PAD_TINY, 0);
+    setStyleFlexCrossPlace(LV_FLEX_ALIGN_CENTER, 0);
 
     edit = new ChannelFailsafeEdit(this, ch, vmin, vmax);
     new TextButton(this, rect_t{}, LV_SYMBOL_SETTINGS, [=]() {
@@ -227,11 +227,11 @@ FailSafePage::FailSafePage(uint8_t moduleIdx) : Page(ICON_STATS_ANALOGS)
 
     // Channel value
     auto combo = new ChannelFSCombo(line, ch, -lim, lim);
-    lv_obj_add_event_cb(btn->getLvObj(), set_failsafe, LV_EVENT_CLICKED, combo);
+    btn->addLvEventCb(set_failsafe, LV_EVENT_CLICKED, combo);
 
     // Channel bargraph
     auto bar = new ChannelFailsafeBargraph(
         line, rect_t{0, 0, FS_BARGRAPH_WIDTH, EdgeTxStyles::UI_ELEMENT_HEIGHT}, ch);
-    lv_obj_set_style_grid_cell_x_align(bar->getLvObj(), LV_GRID_ALIGN_END, 0);
+    bar->setStyleGridCellXAlign(LV_GRID_ALIGN_END, 0);
   }
 }

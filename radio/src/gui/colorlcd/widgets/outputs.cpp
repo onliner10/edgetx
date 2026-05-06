@@ -51,10 +51,10 @@ class ChannelValue : public Window
 
   void delayedInit() override
   {
-    etx_obj_add_style(lvobj, styles->border_thin, LV_PART_MAIN);
-    etx_obj_add_style(lvobj,
-                      styles->border_color[compactTopBar ? COLOR_THEME_SECONDARY2_INDEX : COLOR_BLACK_INDEX],
-                      LV_PART_MAIN);
+    addStyle(styles->border_thin, LV_PART_MAIN);
+    addStyle(styles->border_color[compactTopBar ? COLOR_THEME_SECONDARY2_INDEX
+                                                : COLOR_BLACK_INDEX],
+             LV_PART_MAIN);
 
     padAll(PAD_ZERO);
 
@@ -62,34 +62,42 @@ class ChannelValue : public Window
     lv_style_set_width(&style, lv_pct(100));
     lv_style_set_height(&style, lv_pct(100));
 
-    bar = lv_obj_create(lvobj);
-    lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_clear_flag(bar, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_size(bar, 0, ROW_HEIGHT - 1);
-    etx_bg_color_from_flags(bar, barColor);
-
-    valueLabel = etx_label_create(lvobj, FONT_XS_INDEX);
-    etx_obj_add_style(valueLabel, styles->text_align_right, LV_PART_MAIN);
-    etx_txt_color_from_flags(valueLabel, txtColor);
-    lv_obj_add_style(valueLabel, &style, LV_PART_MAIN);
-    lv_label_set_long_mode(valueLabel, LV_LABEL_LONG_DOT);
-    lv_label_set_text(valueLabel, "");
-
-    chanLabel = etx_label_create(lvobj, FONT_XS_INDEX);
-    etx_obj_add_style(chanLabel, styles->text_align_left, LV_PART_MAIN);
-    etx_txt_color_from_flags(chanLabel, txtColor);
-    lv_label_set_long_mode(chanLabel, LV_LABEL_LONG_DOT);
-    lv_label_set_text(chanLabel, "");
-
-    chanHasName = g_model.limitData[channel].name[0] != 0;
-    setChannel();
-
     divPoints[0] = {(lv_coord_t)(width() / 2 - 1), 0};
     divPoints[1] = {(lv_coord_t)(width() / 2 - 1), ROW_HEIGHT - 1};
 
-    auto divLine = lv_line_create(lvobj);
-    lv_line_set_points(divLine, divPoints, 2);
-    etx_obj_add_style(divLine, styles->div_line, LV_PART_MAIN);
+    if (!withLive([&](LiveWindow& live) {
+          auto obj = lv_obj_create(live.lvobj());
+          if (!requireLvObj(bar, obj)) return false;
+          lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_PART_MAIN);
+          lv_obj_clear_flag(obj, LV_OBJ_FLAG_CLICKABLE);
+          lv_obj_set_size(obj, 0, ROW_HEIGHT - 1);
+          etx_bg_color_from_flags(obj, barColor);
+
+          obj = etx_label_create(live.lvobj(), FONT_XS_INDEX);
+          if (!requireLvObj(valueLabel, obj)) return false;
+          etx_obj_add_style(obj, styles->text_align_right, LV_PART_MAIN);
+          etx_txt_color_from_flags(obj, txtColor);
+          lv_obj_add_style(obj, &style, LV_PART_MAIN);
+          lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
+          lv_label_set_text(obj, "");
+
+          obj = etx_label_create(live.lvobj(), FONT_XS_INDEX);
+          if (!requireLvObj(chanLabel, obj)) return false;
+          etx_obj_add_style(obj, styles->text_align_left, LV_PART_MAIN);
+          etx_txt_color_from_flags(obj, txtColor);
+          lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
+          lv_label_set_text(obj, "");
+
+          auto divLine = lv_line_create(live.lvobj());
+          if (!requireLvObj(divLine)) return false;
+          lv_line_set_points(divLine, divPoints, 2);
+          etx_obj_add_style(divLine, styles->div_line, LV_PART_MAIN);
+          return true;
+        }))
+      return;
+
+    chanHasName = g_model.limitData[channel].name[0] != 0;
+    setChannel();
 
     refresh();
   }
@@ -103,7 +111,7 @@ class ChannelValue : public Window
     } else {
       getSourceString(s, MIXSRC_FIRST_CH + channel);
     }
-    lv_label_set_text(chanLabel, s);
+    chanLabel.with([&](lv_obj_t* obj) { lv_label_set_text(obj, s); });
   }
 
   void refresh()
@@ -124,7 +132,8 @@ class ChannelValue : public Window
 
         if (s != lastText) {
           lastText = s;
-          lv_label_set_text(valueLabel, s.c_str());
+          valueLabel.with(
+              [&](lv_obj_t* obj) { lv_label_set_text(obj, s.c_str()); });
         }
 
         const int lim = (g_model.extendedLimits ? (1024 * LIMIT_EXT_PERCENT / 100) : 1024);
@@ -137,8 +146,10 @@ class ChannelValue : public Window
           uint16_t fillW = abs(scaledValue);
           uint16_t x = value > 0 ? w / 2 : w / 2 - fillW + 1;
 
-          lv_obj_set_pos(bar, x, 0);
-          lv_obj_set_size(bar, fillW, ROW_HEIGHT - 1);
+          bar.with([&](lv_obj_t* obj) {
+            lv_obj_set_pos(obj, x, 0);
+            lv_obj_set_size(obj, fillW, ROW_HEIGHT - 1);
+          });
         }
       }
 
@@ -162,10 +173,10 @@ class ChannelValue : public Window
   std::string lastText;
   bool chanHasName = false;
   lv_style_t style;
-  lv_obj_t* valueLabel = nullptr;
-  lv_obj_t* chanLabel = nullptr;
+  RequiredLvObj valueLabel;
+  RequiredLvObj chanLabel;
   lv_point_t divPoints[2];
-  lv_obj_t* bar = nullptr;
+  RequiredLvObj bar;
   Messaging refreshMsg;
 };
 
@@ -179,11 +190,10 @@ class OutputsWidget : public TrackedWidget
     padAll(PAD_ZERO);
 
     lv_style_init(&style);
-    lv_obj_add_style(lvobj, &style, LV_PART_MAIN);
+    addStyle(&style, LV_PART_MAIN);
 
-    etx_obj_add_style(lvobj, styles->bg_opacity_transparent, LV_PART_MAIN);
-    etx_obj_add_style(lvobj, styles->bg_opacity_cover,
-                      LV_PART_MAIN | ETX_STATE_BG_FILL);
+    addStyle(styles->bg_opacity_transparent, LV_PART_MAIN);
+    addStyle(styles->bg_opacity_cover, LV_PART_MAIN | ETX_STATE_BG_FILL);
 
     update();
   }
@@ -193,13 +203,16 @@ class OutputsWidget : public TrackedWidget
     auto widgetData = getPersistentData();
 
     // get background color from options[3]
-    etx_bg_color_from_flags(lvobj, widgetData->options[3].value.unsignedValue);
+    withLive([&](LiveWindow& live) {
+      etx_bg_color_from_flags(live.lvobj(),
+                              widgetData->options[3].value.unsignedValue);
 
-    // Set background opacity from options[2]
-    if (widgetData->options[2].value.boolValue)
-      lv_obj_add_state(lvobj, ETX_STATE_BG_FILL);
-    else
-      lv_obj_clear_state(lvobj, ETX_STATE_BG_FILL);
+      // Set background opacity from options[2]
+      if (widgetData->options[2].value.boolValue)
+        lv_obj_add_state(live.lvobj(), ETX_STATE_BG_FILL);
+      else
+        lv_obj_clear_state(live.lvobj(), ETX_STATE_BG_FILL);
+    });
 
     bool compact = isCompactTopBarWidget();
     if ((!compact && (height() <= SHOW_MIN_H || width() <= SHOW_MIN_W)) ||

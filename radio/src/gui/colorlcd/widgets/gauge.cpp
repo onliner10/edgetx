@@ -36,27 +36,40 @@ class GaugeWidget : public TrackedWidget
   void delayedInit() override
   {
     // Gauge label
-    sourceText = new StaticText(this, {0, 0, LV_SIZE_CONTENT, 16}, "",
-                                COLOR_THEME_PRIMARY2_INDEX, FONT(XS));
-    lv_label_set_long_mode(sourceText->getLvObj(), LV_LABEL_LONG_DOT);
+    if (!initRequiredWindow(sourceText, this, rect_t{0, 0, LV_SIZE_CONTENT, 16},
+                            "", COLOR_THEME_PRIMARY2_INDEX, FONT(XS)))
+      return;
+    sourceText.withLive([](LiveWindow& live) {
+      lv_label_set_long_mode(live.lvobj(), LV_LABEL_LONG_DOT);
+    });
 
-    valueText = new DynamicNumber<int16_t>(
-        this, {0, 0, lv_pct(100), GUAGE_H}, [=]() { return getGuageValue(); },
-        COLOR_THEME_PRIMARY2_INDEX, FONT(XS) | CENTERED, "", "%");
-    lv_label_set_long_mode(valueText->getLvObj(), LV_LABEL_LONG_DOT);
-    etx_obj_add_style(valueText->getLvObj(), styles->text_align_right,
-                      LV_STATE_USER_1);
+    if (!initRequiredWindow(
+            valueText, this, rect_t{0, 0, lv_pct(100), GUAGE_H},
+            [=]() { return getGuageValue(); }, COLOR_THEME_PRIMARY2_INDEX,
+            FONT(XS) | CENTERED, "", "%"))
+      return;
+    valueText.withLive([](LiveWindow& live) {
+      lv_label_set_long_mode(live.lvobj(), LV_LABEL_LONG_DOT);
+      etx_obj_add_style(live.lvobj(), styles->text_align_right,
+                        LV_STATE_USER_1);
+    });
 
-    auto box = lv_obj_create(lvobj);
-    lv_obj_set_pos(box, 0, GUAGE_H);
-    lv_obj_set_size(box, lv_pct(100), GUAGE_H);
-    lv_obj_clear_flag(box, LV_OBJ_FLAG_CLICKABLE);
-    etx_solid_bg(box, COLOR_THEME_PRIMARY2_INDEX);
+    if (!withLive([&](LiveWindow& live) {
+          auto box = lv_obj_create(live.lvobj());
+          if (!requireLvObj(box)) return false;
+          lv_obj_set_pos(box, 0, GUAGE_H);
+          lv_obj_set_size(box, lv_pct(100), GUAGE_H);
+          lv_obj_clear_flag(box, LV_OBJ_FLAG_CLICKABLE);
+          etx_solid_bg(box, COLOR_THEME_PRIMARY2_INDEX);
 
-    bar = lv_obj_create(box);
-    lv_obj_set_pos(bar, 0, 0);
-    lv_obj_clear_flag(bar, LV_OBJ_FLAG_CLICKABLE);
-    etx_obj_add_style(bar, styles->bg_opacity_cover, LV_PART_MAIN);
+          auto obj = lv_obj_create(box);
+          if (!requireLvObj(bar, obj)) return false;
+          lv_obj_set_pos(obj, 0, 0);
+          lv_obj_clear_flag(obj, LV_OBJ_FLAG_CLICKABLE);
+          etx_obj_add_style(obj, styles->bg_opacity_cover, LV_PART_MAIN);
+          return true;
+        }))
+      return;
 
     update();
   }
@@ -86,23 +99,29 @@ class GaugeWidget : public TrackedWidget
     auto widgetData = getPersistentData();
 
     mixsrc_t index = widgetData->options[0].value.unsignedValue;
-    sourceText->setText(getSourceString(index));
     bool compact = isCompactTopBarWidget();
-    if (compact) {
-      sourceText->setRect({0, 0, width(), GUAGE_H});
-      etx_font(sourceText->getLvObj(), FONT_XXS_INDEX);
-    } else {
-      sourceText->setRect({0, 0, LV_SIZE_CONTENT, GUAGE_H});
-      etx_font(sourceText->getLvObj(), FONT_XS_INDEX);
-    }
-    etx_font(valueText->getLvObj(), FONT_XS_INDEX);
+    sourceText.with([&](StaticText& text) {
+      text.setText(getSourceString(index));
+      if (compact) {
+        text.setRect({0, 0, width(), GUAGE_H});
+        text.font(FONT_XXS_INDEX);
+      } else {
+        text.setRect({0, 0, LV_SIZE_CONTENT, GUAGE_H});
+        text.font(FONT_XS_INDEX);
+      }
+    });
 
-    if (compact || width() < ALIGN_MAX_W)
-      lv_obj_add_state(valueText->getLvObj(), LV_STATE_USER_1);
-    else
-      lv_obj_clear_state(valueText->getLvObj(), LV_STATE_USER_1);
+    valueText.with([&](DynamicNumber<int16_t>& text) {
+      text.font(FONT_XS_INDEX);
+      if (compact || width() < ALIGN_MAX_W)
+        text.addState(LV_STATE_USER_1);
+      else
+        text.clearState(LV_STATE_USER_1);
+    });
 
-    etx_bg_color_from_flags(bar, widgetData->options[3].value.unsignedValue);
+    bar.with([&](lv_obj_t* obj) {
+      etx_bg_color_from_flags(obj, widgetData->options[3].value.unsignedValue);
+    });
     lastValue = -10000;
     requireRefresh();
   }
@@ -111,9 +130,9 @@ class GaugeWidget : public TrackedWidget
 
  protected:
   int16_t lastValue = -10000;
-  StaticText* sourceText = nullptr;
-  DynamicNumber<int16_t>* valueText = nullptr;
-  lv_obj_t* bar = nullptr;
+  RequiredWindow<StaticText> sourceText;
+  RequiredWindow<DynamicNumber<int16_t>> valueText;
+  RequiredLvObj bar;
 
   uint32_t refreshKey() override
   {
@@ -129,7 +148,7 @@ class GaugeWidget : public TrackedWidget
       lastValue = newValue;
 
       lv_coord_t w = (width() * lastValue) / 100;
-      lv_obj_set_size(bar, w, GUAGE_H);
+      bar.with([&](lv_obj_t* obj) { lv_obj_set_size(obj, w, GUAGE_H); });
     }
   }
 

@@ -134,8 +134,8 @@ class PageGroupHeaderBase : public Window
 
  protected:
   uint8_t currentIndex = 0;
-  lv_obj_t* titleLabel = nullptr;
-  lv_obj_t* parentLabel = nullptr;
+  RequiredLvObj titleLabel;
+  OptionalLvObj parentLabel;
   HeaderIcon* hdrIcon = nullptr;
   std::vector<PageGroupItem*> pages;
   PageGroupBase* menu;

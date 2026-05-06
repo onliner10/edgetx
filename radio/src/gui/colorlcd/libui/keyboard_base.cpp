@@ -93,7 +93,8 @@ Keyboard::Keyboard(coord_t height, bool fullScreen) :
   hasTwoPageKeys = keyIsSupported(KEY_PAGEUP);
 #endif
 
-  withLive([&](lv_obj_t* obj) {
+  withLive([&](LiveWindow& live) {
+    auto obj = live.lvobj();
     lv_obj_set_parent(obj, lv_layer_top());  // the keyboard is always on top
 
     // use a separate group for the keyboard
@@ -138,7 +139,9 @@ void Keyboard::clearField(bool wasCancelled)
       [](lv_obj_t* keyboard) { lv_obj_add_flag(keyboard, LV_OBJ_FLAG_HIDDEN); });
 
   detach();
-  withLive([](lv_obj_t* obj) { lv_obj_set_parent(obj, lv_layer_top()); });
+  withLive([](LiveWindow& live) {
+    lv_obj_set_parent(live.lvobj(), lv_layer_top());
+  });
 
   if (fieldContainer &&
       fieldContainer->withLive([&](Window::LiveWindow& live) {
@@ -171,8 +174,7 @@ void Keyboard::hide(bool wasCancelled)
     auto keyboard = activeKeyboard;
     activeKeyboard = nullptr;
     keyboard->clearField(wasCancelled);
-    keyboard->withLive(
-        [](lv_obj_t* obj) { lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN); });
+    keyboard->addFlag(LV_OBJ_FLAG_HIDDEN);
   }
 }
 

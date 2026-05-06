@@ -214,10 +214,9 @@ struct CenterBeepsMatrix : public ButtonMatrix {
     uint8_t rows = ((btn_cnt - 1) / SW_BTNS) + 1;
     setHeight((rows * (EdgeTxStyles::UI_ELEMENT_HEIGHT + PAD_SMALL)) + PAD_SMALL);
 
-    lv_obj_set_style_pad_all(lvobj, PAD_SMALL, LV_PART_MAIN);
-
-    lv_obj_set_style_pad_row(lvobj, PAD_SMALL, LV_PART_MAIN);
-    lv_obj_set_style_pad_column(lvobj, PAD_SMALL, LV_PART_MAIN);
+    padAll(PAD_SMALL);
+    setStylePadRow(PAD_SMALL, LV_PART_MAIN);
+    setStylePadColumn(PAD_SMALL, LV_PART_MAIN);
   }
 
   void onPress(uint8_t btn_id)

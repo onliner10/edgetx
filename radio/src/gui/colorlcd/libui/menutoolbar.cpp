@@ -72,12 +72,13 @@ MenuToolbarButton::MenuToolbarButton(Window* parent, const rect_t& rect,
                                      const char* picto) :
     ButtonBase(parent, rect, nullptr, menu_button_create)
 {
-  withLive([](lv_obj_t* obj) {
-    lv_obj_add_flag(obj, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+  withLive([](LiveWindow& live) {
+    lv_obj_add_flag(live.lvobj(), LV_OBJ_FLAG_SCROLL_ON_FOCUS);
   });
 
-  withLive([](lv_obj_t* obj) {
-    lv_obj_add_event_cb(obj, toolbar_btn_defocus, LV_EVENT_DEFOCUSED, nullptr);
+  withLive([](LiveWindow& live) {
+    lv_obj_add_event_cb(live.lvobj(), toolbar_btn_defocus, LV_EVENT_DEFOCUSED,
+                        nullptr);
   });
 
   lv_obj_t* label = nullptr;

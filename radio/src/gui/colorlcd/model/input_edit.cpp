@@ -101,9 +101,8 @@ InputEditWindow::InputEditWindow(int8_t input, uint8_t index) :
   header->setTitle(STR_MENUINPUTS);
   headerSwitchName = header->setTitle2("");
 
-  etx_txt_color(headerSwitchName->getLvObj(), COLOR_THEME_ACTIVE_INDEX,
-                LV_STATE_USER_1);
-  etx_font(headerSwitchName->getLvObj(), FONT_BOLD_INDEX, LV_STATE_USER_1);
+  headerSwitchName->textColor(COLOR_THEME_ACTIVE_INDEX, LV_STATE_USER_1);
+  headerSwitchName->font(FONT_BOLD_INDEX, LV_STATE_USER_1);
 
   setTitle();
 
@@ -111,8 +110,7 @@ InputEditWindow::InputEditWindow(int8_t input, uint8_t index) :
   body->padAll(PAD_ZERO);
 
   auto box = new Window(body, rect_t{0, 0, body->width(), body->height() - INPUT_EDIT_CURVE_HEIGHT - PAD_TINY * 2});
-  auto box_obj = box->getLvObj();
-  etx_scrollbar(box_obj);
+  box->scrollbar();
   box->padAll(PAD_SMALL);
 
   auto form = new Window(box, rect_t{});
@@ -173,7 +171,7 @@ void InputEditWindow::buildBody(Window* form)
   line = form->newLine(grid);
   new StaticText(line, rect_t{}, STR_SOURCE);
   auto src = new InputSource(line, input);
-  lv_obj_set_style_grid_cell_x_align(src->getLvObj(), LV_GRID_ALIGN_STRETCH, 0);
+  src->setStyleGridCellXAlign(LV_GRID_ALIGN_STRETCH, 0);
 
   // Weight
   line = form->newLine(grid);
@@ -219,8 +217,7 @@ void InputEditWindow::buildBody(Window* form)
           updatePreview = true;
           SET_DIRTY();
         }, MIXSRC_FIRST, input->srcRaw);
-  lv_obj_set_style_grid_cell_x_align(param->getLvObj(), LV_GRID_ALIGN_STRETCH,
-                                     0);
+  param->setStyleGridCellXAlign(LV_GRID_ALIGN_STRETCH, 0);
 
   line = form->newLine(grid);
   line->padAll(PAD_LARGE);
@@ -229,7 +226,7 @@ void InputEditWindow::buildBody(Window* form)
         new InputEditAdvanced(this->input, index);
         return 0;
       });
-  lv_obj_set_width(btn->getLvObj(), lv_pct(100));
+  btn->setWidth(lv_pct(100));
 }
 
 void InputEditWindow::onLiveCheckEvents(Window::LiveWindow& live)
@@ -282,9 +279,9 @@ void InputEditWindow::onLiveCheckEvents(Window::LiveWindow& live)
   }
 
   if (lastActiveIndex == index) {
-    lv_obj_add_state(headerSwitchName->getLvObj(), LV_STATE_USER_1);
+    headerSwitchName->addState(LV_STATE_USER_1);
   } else {
-    lv_obj_clear_state(headerSwitchName->getLvObj(), LV_STATE_USER_1);
+    headerSwitchName->clearState(LV_STATE_USER_1);
   }
 
   if (updatePreview) {

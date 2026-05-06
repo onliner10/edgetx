@@ -54,7 +54,10 @@ void ColorList::onDrawEnd(uint16_t row, uint16_t col,
 
   auto box_h = getFontHeight(FONT(STD));
   auto box_w = 3 * box_h / 4;
-  lv_coord_t cell_right = lv_obj_get_style_pad_right(lvobj, LV_PART_ITEMS);
+  lv_coord_t cell_right = 0;
+  withLive([&](LiveWindow& live) {
+    cell_right = lv_obj_get_style_pad_right(live.lvobj(), LV_PART_ITEMS);
+  });
 
   coords.x2 = dsc->draw_area->x2 - cell_right;
   coords.x1 = coords.x2 - box_w;
@@ -108,11 +111,16 @@ ColorSwatch::ColorSwatch(Window *window, const rect_t &rect, uint32_t color) :
 
 void ColorSwatch::setColor(uint32_t colorEntry)
 {
-  lv_obj_set_style_bg_color(lvobj, makeLvColor(COLOR2FLAGS(colorEntry)),
-                            LV_PART_MAIN);
+  withLive([&](LiveWindow& live) {
+    lv_obj_set_style_bg_color(live.lvobj(), makeLvColor(COLOR2FLAGS(colorEntry)),
+                              LV_PART_MAIN);
+  });
 }
 
 void ColorSwatch::setColor(uint8_t r, uint8_t g, uint8_t b)
 {
-  lv_obj_set_style_bg_color(lvobj, lv_color_make(r, g, b), LV_PART_MAIN);
+  withLive([&](LiveWindow& live) {
+    lv_obj_set_style_bg_color(live.lvobj(), lv_color_make(r, g, b),
+                              LV_PART_MAIN);
+  });
 }

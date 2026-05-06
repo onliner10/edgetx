@@ -533,28 +533,41 @@ void StandaloneLuaWindow::showError(bool firstCall, const char* title, const cha
 {
   runFunction = LUA_REFNIL;
   hasError = true;
-  if (!errorModal) {
-    lv_obj_set_scroll_dir(lvobj, LV_DIR_NONE);
-    errorModal = lv_obj_create(lvobj);
-    lv_obj_set_pos(errorModal, lv_obj_get_scroll_x(lvobj), lv_obj_get_scroll_y(lvobj));
-    lv_obj_set_size(errorModal, LCD_W, LCD_H);
-    etx_bg_color(errorModal, COLOR_BLACK_INDEX);
-    etx_obj_add_style(errorModal, styles->bg_opacity_75, LV_PART_MAIN);
-    errorTitle = etx_label_create(errorModal, FONT_L_INDEX);
-    lv_obj_set_pos(errorTitle, ERR_TTL_X, ERR_TTL_Y);
-    lv_obj_set_size(errorTitle, LCD_W - ERR_TTL_X * 2, EdgeTxStyles::UI_ELEMENT_HEIGHT);
-    etx_txt_color(errorTitle, COLOR_THEME_PRIMARY2_INDEX);
-    etx_solid_bg(errorTitle, COLOR_THEME_SECONDARY1_INDEX);
-    etx_obj_add_style(errorTitle, styles->text_align_center, LV_PART_MAIN);
-    errorMsg = etx_label_create(errorModal);
-    lv_obj_set_pos(errorMsg, ERR_TTL_X, ERR_MSG_Y);
-    lv_obj_set_size(errorMsg, LCD_W - ERR_TTL_X * 2, LCD_H - ERR_MSG_HO);
-    lv_obj_set_style_pad_all(errorMsg, PAD_SMALL, LV_PART_MAIN);
-    etx_txt_color(errorMsg, COLOR_THEME_PRIMARY1_INDEX);
-    etx_solid_bg(errorMsg, COLOR_THEME_SECONDARY3_INDEX);
-    etx_obj_add_style(errorMsg, styles->text_align_center, LV_PART_MAIN);
+  if (!errorModal.isPresent()) {
+    if (!withLive([&](Window::LiveWindow& live) {
+          auto parent = live.lvobj();
+          lv_obj_set_scroll_dir(parent, LV_DIR_NONE);
+
+          auto modal = lv_obj_create(parent);
+          if (!requireLvObj(errorModal, modal)) return false;
+          lv_obj_set_pos(modal, lv_obj_get_scroll_x(parent),
+                         lv_obj_get_scroll_y(parent));
+          lv_obj_set_size(modal, LCD_W, LCD_H);
+          etx_bg_color(modal, COLOR_BLACK_INDEX);
+          etx_obj_add_style(modal, styles->bg_opacity_75, LV_PART_MAIN);
+
+          auto titleObj = etx_label_create(modal, FONT_L_INDEX);
+          if (!requireLvObj(errorTitle, titleObj)) return false;
+          lv_obj_set_pos(titleObj, ERR_TTL_X, ERR_TTL_Y);
+          lv_obj_set_size(titleObj, LCD_W - ERR_TTL_X * 2,
+                          EdgeTxStyles::UI_ELEMENT_HEIGHT);
+          etx_txt_color(titleObj, COLOR_THEME_PRIMARY2_INDEX);
+          etx_solid_bg(titleObj, COLOR_THEME_SECONDARY1_INDEX);
+          etx_obj_add_style(titleObj, styles->text_align_center, LV_PART_MAIN);
+
+          auto msgObj = etx_label_create(modal);
+          if (!requireLvObj(errorMsg, msgObj)) return false;
+          lv_obj_set_pos(msgObj, ERR_TTL_X, ERR_MSG_Y);
+          lv_obj_set_size(msgObj, LCD_W - ERR_TTL_X * 2, LCD_H - ERR_MSG_HO);
+          lv_obj_set_style_pad_all(msgObj, PAD_SMALL, LV_PART_MAIN);
+          etx_txt_color(msgObj, COLOR_THEME_PRIMARY1_INDEX);
+          etx_solid_bg(msgObj, COLOR_THEME_SECONDARY3_INDEX);
+          etx_obj_add_style(msgObj, styles->text_align_center, LV_PART_MAIN);
+          return true;
+        }))
+      return;
   }
 
-  lv_label_set_text(errorTitle, title);
-  lv_label_set_text(errorMsg, msg);
+  errorTitle.with([&](lv_obj_t* label) { lv_label_set_text(label, title); });
+  errorMsg.with([&](lv_obj_t* label) { lv_label_set_text(label, msg); });
 }

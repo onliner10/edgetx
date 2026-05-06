@@ -258,7 +258,6 @@ bool listLineButtonMissingFmBufferLeavesNoCanvasForTest()
 
     void onRefresh() override {}
     void updatePos(coord_t, coord_t) override {}
-    void swapLvglGroup(InputMixButtonBase*) override {}
 
     bool hasFlightModeCanvas() const { return fm_canvas != nullptr; }
     bool hasFlightModeBuffer() const { return fm_buffer != nullptr; }
@@ -287,7 +286,6 @@ bool listLineButtonLabelAllocationFailureFailsClosedForTest()
 
     void onRefresh() override {}
     void updatePos(coord_t, coord_t) override {}
-    void swapLvglGroup(InputMixButtonBase*) override {}
 
    protected:
     bool isActive() const override { return false; }
@@ -354,7 +352,6 @@ bool listLinePageLookupRequiresGroupAndLineForTest()
 
     void onRefresh() override {}
     void updatePos(coord_t, coord_t) override {}
-    void swapLvglGroup(InputMixButtonBase*) override {}
 
    protected:
     bool isActive() const override { return false; }
@@ -402,8 +399,6 @@ bool listLinePageLookupRequiresGroupAndLineForTest()
     }
 
    protected:
-    void addLineButton(uint8_t) override {}
-
     InputMixButtonBase* createLineButton(InputMixGroupBase*, uint8_t) override
     {
       return nullptr;
@@ -631,6 +626,33 @@ InputMixButtonBase* InputMixPageBase::getLineByIndex(uint8_t index)
   return nullptr;
 }
 
+void InputMixPageBase::bindPageWindow(Window* window)
+{
+  pageWindow = window;
+}
+
+void InputMixPageBase::rebuildFromModel(uint8_t focusIndex)
+{
+  if (!pageWindow) return;
+  _copyMode = 0;
+  _copySrc = nullptr;
+  requestedFocusIndex = focusIndex;
+  pageWindow->clear();
+  build(pageWindow);
+  requestedFocusIndex = NO_REQUESTED_FOCUS;
+}
+
+bool InputMixPageBase::shouldFocusLine(uint8_t index, bool& focusSet) const
+{
+  if (focusSet) return false;
+  if (requestedFocusIndex != NO_REQUESTED_FOCUS &&
+      requestedFocusIndex != index) {
+    return false;
+  }
+  focusSet = true;
+  return true;
+}
+
 void InputMixPageBase::removeLine(InputMixButtonBase* l)
 {
   auto line = std::find_if(lines.begin(), lines.end(),
@@ -641,47 +663,5 @@ void InputMixPageBase::removeLine(InputMixButtonBase* l)
   while (line != lines.end()) {
     (*line)->setIndex((*line)->getIndex() - 1);
     ++line;
-  }
-}
-
-void InputMixPageBase::addLineButton(mixsrc_t src, uint8_t index)
-{
-  InputMixGroupBase* group_w = getGroupBySrc(src);
-  if (!group_w) {
-    group_w = createGroup(form, src);
-    // insertion sort
-    groups.emplace_back(group_w);
-    auto g = groups.rbegin();
-    if (g != groups.rend()) {
-      auto g_prev = g;
-      ++g_prev;
-      while (g_prev != groups.rend()) {
-        if ((*g_prev)->getMixSrc() < (*g)->getMixSrc()) break;
-        lv_obj_swap((*g)->getLvObj(), (*g_prev)->getLvObj());
-        std::swap(*g, *g_prev);
-        ++g;
-        ++g_prev;
-      }
-    }
-  }
-
-  // create new line button
-  auto btn = createLineButton(group_w, index);
-  lv_group_focus_obj(btn->getLvObj());
-
-  // insertion sort for the focus group
-  auto l = lines.rbegin();
-  if (l != lines.rend()) {
-    auto l_prev = l;
-    ++l_prev;
-    while (l_prev != lines.rend()) {
-      if ((*l_prev)->getIndex() < (*l)->getIndex()) break;
-      (*l)->swapLvglGroup(*l_prev);
-      std::swap(*l, *l_prev);
-      // Inc index of elements after
-      (*l)->setIndex((*l)->getIndex() + 1);
-      ++l;
-      ++l_prev;
-    }
   }
 }

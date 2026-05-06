@@ -94,7 +94,9 @@ class FrskyOtaFlashDialog : public BaseDialog
   explicit FrskyOtaFlashDialog(const char* title) :
     BaseDialog(title, true)
   {
-    new StaticText(form, rect_t{}, STR_WAITING_FOR_RX);
+    form.with([](Window& formWindow) {
+      Window::makeLive<StaticText>(&formWindow, rect_t{}, STR_WAITING_FOR_RX);
+    });
   }
 
   void flash(const char * filename, ModuleIndex module)
@@ -224,7 +226,7 @@ void RadioSdManagerPage::build(Window * window)
 
   loading = new StaticText(box, {0, 0, LV_SIZE_CONTENT, LV_SIZE_CONTENT}, STR_LOADING);
   loading->hide();
-  lv_obj_center(loading->getLvObj());
+  loading->center();
 
   preview = new FilePreview(box, {0, 0, previewWidth, previewHeight});
 

@@ -117,8 +117,7 @@ void GVarNumberEdit::update()
   }
 
   if (has_focus) {
-    auto act_obj = act_field->getLvObj();
-    lv_group_focus_obj(act_obj);
+    act_field->focus();
   }
 }
 

@@ -273,42 +273,49 @@ class SensorButton : public ListLineButton
   {
     char s[20];
 
-    lv_obj_enable_style_refresh(false);
+    if (!withLive([&](LiveWindow& live) {
+          auto obj = live.lvobj();
+          lv_obj_enable_style_refresh(false);
 
-    numLabel = tsStyle.newNum(lvobj, index);
-    lv_obj_set_pos(numLabel, PAD_TINY, PAD_TINY);
+          numLabel = tsStyle.newNum(obj, index);
+          lv_obj_set_pos(numLabel, PAD_TINY, PAD_TINY);
 
-    TelemetrySensor* sensor = &g_model.telemetrySensors[index];
-    if (sensor->type == TELEM_TYPE_CUSTOM) {
-      sprintf(s, "ID: %d", sensor->instance);
+          TelemetrySensor* sensor = &g_model.telemetrySensors[index];
+          if (sensor->type == TELEM_TYPE_CUSTOM) {
+            sprintf(s, "ID: %d", sensor->instance);
 
-      idLabel = tsStyle.newId(lvobj, s);
-      lv_obj_set_pos(idLabel, PAD_TINY, TSStyle::ID_Y);
-    }
+            idLabel = tsStyle.newId(obj, s);
+            lv_obj_set_pos(idLabel, PAD_TINY, TSStyle::ID_Y);
+          }
 
-    setNumIdState();
+          setNumIdState();
 
-    strAppend(s, g_model.telemetrySensors[index].label, TELEM_LABEL_LEN);
-    lv_obj_t* nm = tsStyle.newName(lvobj, s);
-    lv_obj_set_pos(nm, TSStyle::NUM_W + PAD_SMALL, PAD_MEDIUM/2);
+          strAppend(s, g_model.telemetrySensors[index].label,
+                    TELEM_LABEL_LEN);
+          lv_obj_t* nm = tsStyle.newName(obj, s);
+          lv_obj_set_pos(nm, TSStyle::NUM_W + PAD_SMALL, PAD_MEDIUM / 2);
 
-    auto mask = getBuiltinIcon(ICON_DOT);
-    fresh = createFreshCanvas(lvobj);
-    if (fresh) {
-      lv_obj_set_pos(fresh, TSStyle::NUM_W + TSStyle::NAME_W + PAD_MEDIUM,
-                     PAD_LARGE);
-      lv_canvas_set_buffer(fresh, (void*)mask->data, mask->width, mask->height,
-                           LV_IMG_CF_ALPHA_8BIT);
-      lv_obj_add_flag(fresh, LV_OBJ_FLAG_HIDDEN);
-    }
+          auto mask = getBuiltinIcon(ICON_DOT);
+          fresh = createFreshCanvas(obj);
+          if (fresh) {
+            lv_obj_set_pos(fresh, TSStyle::NUM_W + TSStyle::NAME_W + PAD_MEDIUM,
+                           PAD_LARGE);
+            lv_canvas_set_buffer(fresh, (void*)mask->data, mask->width,
+                                 mask->height, LV_IMG_CF_ALPHA_8BIT);
+            lv_obj_add_flag(fresh, LV_OBJ_FLAG_HIDDEN);
+          }
 
-    valLabel = tsStyle.newValue(lvobj);
-    lv_obj_set_pos(valLabel, TSStyle::NUM_W + TSStyle::NAME_W + PAD_LARGE * 3, PAD_MEDIUM/2);
+          valLabel = tsStyle.newValue(obj);
+          lv_obj_set_pos(valLabel,
+                         TSStyle::NUM_W + TSStyle::NAME_W + PAD_LARGE * 3,
+                         PAD_MEDIUM / 2);
 
-    lv_obj_update_layout(lvobj);
+          lv_obj_update_layout(obj);
 
-    lv_obj_enable_style_refresh(true);
-    lv_obj_refresh_style(lvobj, LV_PART_ANY, LV_STYLE_PROP_ANY);
+          lv_obj_enable_style_refresh(true);
+          lv_obj_refresh_style(obj, LV_PART_ANY, LV_STYLE_PROP_ANY);
+        }))
+      return;
   }
 
   void onRefresh() override
@@ -458,8 +465,8 @@ class SensorEditWindow : public SubPage
 
     headerValue = header->setTitle2(title2);
 
-    etx_txt_color(headerValue->getLvObj(), COLOR_THEME_WARNING_INDEX,
-                  ETX_STATE_VALUE_STALE_WARN);
+    headerValue->textColor(COLOR_THEME_WARNING_INDEX,
+                           ETX_STATE_VALUE_STALE_WARN);
   }
 
   void onLiveCheckEvents(LiveWindow& live) override
@@ -471,11 +478,11 @@ class SensorEditWindow : public SubPage
       // update at least every 200ms
       lastRefresh = now;
 
-      lv_obj_clear_state(headerValue->getLvObj(), ETX_STATE_VALUE_STALE_WARN);
+      headerValue->clearState(ETX_STATE_VALUE_STALE_WARN);
 
       if (telemetryItem.isAvailable()) {
         if (telemetryItem.isOld())
-          lv_obj_add_state(headerValue->getLvObj(), ETX_STATE_VALUE_STALE_WARN);
+          headerValue->addState(ETX_STATE_VALUE_STALE_WARN);
         std::string title2 =
             STR_SENSOR + std::to_string(index + 1) + " = " +
             getSensorCustomValue(
@@ -886,7 +893,7 @@ void ModelTelemetryPage::buildSensorList(int8_t focusSensorIndex)
         return 0;
       });
       if (focusSensorIndex == idx) {
-        lv_group_focus_obj(button->getLvObj());
+        button->focus();
         didFocus = true;
       }
     }
@@ -894,9 +901,9 @@ void ModelTelemetryPage::buildSensorList(int8_t focusSensorIndex)
 
   if (!didFocus) {
     if (first && !allowNewSensors)
-      lv_group_focus_obj(first->getLvObj());
+      first->focus();
     else
-      lv_group_focus_obj(discover->getLvObj());
+      discover->focus();
   }
 
   uint8_t sensorsCount = getTelemetrySensorsCount();
@@ -938,8 +945,8 @@ void ModelTelemetryPage::build(Window* window)
       return 0;
     }
   });
-  lv_obj_set_grid_cell(discover->getLvObj(), LV_GRID_ALIGN_STRETCH, 0, 1,
-                       LV_GRID_ALIGN_CENTER, 0, 1);
+  discover->setGridCell(LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_CENTER, 0,
+                        1);
   discover->check(allowNewSensors);
 
   // New sensor button
@@ -952,8 +959,7 @@ void ModelTelemetryPage::build(Window* window)
           POPUP_WARNING(STR_TELEMETRYFULL);
         return 0;
       });
-  lv_obj_set_grid_cell(b->getLvObj(), LV_GRID_ALIGN_STRETCH, 1, 1,
-                       LV_GRID_ALIGN_CENTER, 0, 1);
+  b->setGridCell(LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_CENTER, 0, 1);
 
 #if TWOCOLBUTTONS
   line = window->newLine(grid4);
@@ -971,11 +977,11 @@ void ModelTelemetryPage::build(Window* window)
       });
 #if TWOCOLBUTTONS
   deleteAll->setWidth((LCD_W - 16) / 2);
-  lv_obj_set_grid_cell(deleteAll->getLvObj(), LV_GRID_ALIGN_CENTER, 0, 2,
-                       LV_GRID_ALIGN_CENTER, 0, 1);
+  deleteAll->setGridCell(LV_GRID_ALIGN_CENTER, 0, 2, LV_GRID_ALIGN_CENTER, 0,
+                         1);
 #else
-  lv_obj_set_grid_cell(deleteAll->getLvObj(), LV_GRID_ALIGN_STRETCH, 2, 1,
-                       LV_GRID_ALIGN_CENTER, 0, 1);
+  deleteAll->setGridCell(LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_CENTER, 0,
+                         1);
 #endif
 
   FlexGridLayout grid(col_dsc, row_dsc, PAD_TINY);

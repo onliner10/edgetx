@@ -348,11 +348,14 @@ void FunctionSwitchesBase::addQRCode()
 
   new StaticText(box, rect_t{}, STR_MORE_INFO);
 
-  auto qr = lv_qrcode_create(box->getLvObj(), 150,
-                             makeLvColor(COLOR_THEME_SECONDARY1),
-                             makeLvColor(COLOR_THEME_SECONDARY3));
-  lv_qrcode_update(qr, edgetx_fs_manual_url, strlen(edgetx_fs_manual_url));
-  lv_obj_set_pos(qr, (LCD_W - 150) / 2, EdgeTxStyles::STD_FONT_HEIGHT);
+  box->withLive([](Window::LiveWindow& live) {
+    auto qr = lv_qrcode_create(live.lvobj(), 150,
+                               makeLvColor(COLOR_THEME_SECONDARY1),
+                               makeLvColor(COLOR_THEME_SECONDARY3));
+    if (!qr) return;
+    lv_qrcode_update(qr, edgetx_fs_manual_url, strlen(edgetx_fs_manual_url));
+    lv_obj_set_pos(qr, (LCD_W - 150) / 2, EdgeTxStyles::STD_FONT_HEIGHT);
+  });
 #endif
 }
 

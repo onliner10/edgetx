@@ -49,43 +49,79 @@ class OutputLineButton : public ListLineButton
 
   void delayedInit() override
   {
-    lv_obj_enable_style_refresh(false);
+    if (!withLive([&](LiveWindow& live) {
+          auto obj = live.lvobj();
+          lv_obj_enable_style_refresh(false);
 
-    source = etx_label_create(lvobj);
-    lv_obj_set_pos(source, SRC_X, SRC_Y);
-    lv_obj_set_size(source, SRC_W, SRC_H);
+          source = etx_label_create(obj);
+          if (!requireLvObj(source)) {
+            lv_obj_enable_style_refresh(true);
+            return false;
+          }
+          lv_obj_set_pos(source, SRC_X, SRC_Y);
+          lv_obj_set_size(source, SRC_W, SRC_H);
 
 #if !NARROW_LAYOUT
-    etx_font(source, FONT_XS_INDEX, ETX_STATE_NAME_FONT_SMALL);
-    lv_obj_set_style_pad_top(source, -PAD_TINY, ETX_STATE_NAME_FONT_SMALL);
-    lv_obj_set_style_text_line_space(source, -PAD_THREE, ETX_STATE_NAME_FONT_SMALL);
+          etx_font(source, FONT_XS_INDEX, ETX_STATE_NAME_FONT_SMALL);
+          lv_obj_set_style_pad_top(source, -PAD_TINY,
+                                   ETX_STATE_NAME_FONT_SMALL);
+          lv_obj_set_style_text_line_space(source, -PAD_THREE,
+                                           ETX_STATE_NAME_FONT_SMALL);
 #endif
 
-    min = etx_label_create(lvobj);
-    etx_obj_add_style(min, styles->text_align_right, LV_PART_MAIN);
-    etx_font(min, FONT_BOLD_INDEX, ETX_STATE_MINMAX_BOLD);
-    lv_obj_set_pos(min, MIN_X, MIN_Y);
-    lv_obj_set_size(min, MIN_W, EdgeTxStyles::STD_FONT_HEIGHT);
+          min = etx_label_create(obj);
+          if (!requireLvObj(min)) {
+            lv_obj_enable_style_refresh(true);
+            return false;
+          }
+          etx_obj_add_style(min, styles->text_align_right, LV_PART_MAIN);
+          etx_font(min, FONT_BOLD_INDEX, ETX_STATE_MINMAX_BOLD);
+          lv_obj_set_pos(min, MIN_X, MIN_Y);
+          lv_obj_set_size(min, MIN_W, EdgeTxStyles::STD_FONT_HEIGHT);
 
-    max = etx_label_create(lvobj);
-    etx_obj_add_style(max, styles->text_align_right, LV_PART_MAIN);
-    etx_font(max, FONT_BOLD_INDEX, ETX_STATE_MINMAX_BOLD);
-    lv_obj_set_pos(max, MAX_X, MAX_Y);
-    lv_obj_set_size(max, MAX_W, EdgeTxStyles::STD_FONT_HEIGHT);
+          max = etx_label_create(obj);
+          if (!requireLvObj(max)) {
+            lv_obj_enable_style_refresh(true);
+            return false;
+          }
+          etx_obj_add_style(max, styles->text_align_right, LV_PART_MAIN);
+          etx_font(max, FONT_BOLD_INDEX, ETX_STATE_MINMAX_BOLD);
+          lv_obj_set_pos(max, MAX_X, MAX_Y);
+          lv_obj_set_size(max, MAX_W, EdgeTxStyles::STD_FONT_HEIGHT);
 
-    offset = etx_label_create(lvobj);
-    etx_obj_add_style(offset, styles->text_align_right, LV_PART_MAIN);
-    lv_obj_set_pos(offset, OFF_X, OFF_Y);
-    lv_obj_set_size(offset, OFF_W, EdgeTxStyles::STD_FONT_HEIGHT);
+          offset = etx_label_create(obj);
+          if (!requireLvObj(offset)) {
+            lv_obj_enable_style_refresh(true);
+            return false;
+          }
+          etx_obj_add_style(offset, styles->text_align_right, LV_PART_MAIN);
+          lv_obj_set_pos(offset, OFF_X, OFF_Y);
+          lv_obj_set_size(offset, OFF_W, EdgeTxStyles::STD_FONT_HEIGHT);
 
-    center = etx_label_create(lvobj);
-    etx_obj_add_style(center, styles->text_align_right, LV_PART_MAIN);
-    lv_obj_set_pos(center, CTR_X, CTR_Y);
-    lv_obj_set_size(center, CTR_W, EdgeTxStyles::STD_FONT_HEIGHT);
+          center = etx_label_create(obj);
+          if (!requireLvObj(center)) {
+            lv_obj_enable_style_refresh(true);
+            return false;
+          }
+          etx_obj_add_style(center, styles->text_align_right, LV_PART_MAIN);
+          lv_obj_set_pos(center, CTR_X, CTR_Y);
+          lv_obj_set_size(center, CTR_W, EdgeTxStyles::STD_FONT_HEIGHT);
 
-    revert = lv_img_create(lvobj);
-    lv_img_set_src(revert, LV_SYMBOL_SHUFFLE);
-    lv_obj_set_pos(revert, REV_X, REV_Y);
+          revert = lv_img_create(obj);
+          if (!requireLvObj(revert)) {
+            lv_obj_enable_style_refresh(true);
+            return false;
+          }
+          lv_img_set_src(revert, LV_SYMBOL_SHUFFLE);
+          lv_obj_set_pos(revert, REV_X, REV_Y);
+
+          lv_obj_update_layout(obj);
+
+          lv_obj_enable_style_refresh(true);
+          lv_obj_refresh_style(obj, LV_PART_ANY, LV_STYLE_PROP_ANY);
+          return true;
+        }))
+      return;
 
     curve =
         new StaticIcon(this, CRV_X, CRV_Y, ICON_TEXTLINE_CURVE, COLOR_THEME_SECONDARY1_INDEX);
@@ -94,11 +130,6 @@ class OutputLineButton : public ListLineButton
                                index, false, false);
 
     checkEvents();
-
-    lv_obj_update_layout(lvobj);
-
-    lv_obj_enable_style_refresh(true);
-    lv_obj_refresh_style(lvobj, LV_PART_ANY, LV_STYLE_PROP_ANY);
 
     refresh();
   }
@@ -241,7 +272,8 @@ void ModelOutputsPage::build(Window* window)
   for (uint8_t ch = 0; ch < MAX_OUTPUT_CHANNELS; ch++) {
     // Channel settings
     auto btn = new OutputLineButton(window, ch);
-    lv_obj_set_pos(btn->getLvObj(), TRIMB_X, TRIMB_Y + (ch * (OutputLineButton::CH_LINE_H + PAD_TINY)));
+    btn->setPos(TRIMB_X,
+                TRIMB_Y + (ch * (OutputLineButton::CH_LINE_H + PAD_TINY)));
     btn->setWidth(TRIMB_W);
 
     LimitData* output = limitAddress(ch);

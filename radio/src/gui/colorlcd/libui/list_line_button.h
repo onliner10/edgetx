@@ -61,7 +61,6 @@ class InputMixButtonBase : public ListLineButton
 
   void updateHeight();
   virtual void updatePos(coord_t x, coord_t y) = 0;
-  virtual void swapLvglGroup(InputMixButtonBase* line2) = 0;
 
   void onLoadedCheckEvents(LiveWindow& live) override;
 
@@ -144,8 +143,14 @@ class InputMixPageBase : public PageGroupItem
   uint8_t _copyMode = 0;
   std::list<InputMixGroupBase*> groups;
 
-  virtual void addLineButton(uint8_t index) = 0;
-  void addLineButton(mixsrc_t src, uint8_t index);
+  static constexpr uint8_t NO_REQUESTED_FOCUS = UINT8_MAX;
+
+  Window* pageWindow = nullptr;
+  uint8_t requestedFocusIndex = NO_REQUESTED_FOCUS;
+
+  void bindPageWindow(Window* window);
+  void rebuildFromModel(uint8_t focusIndex = NO_REQUESTED_FOCUS);
+  bool shouldFocusLine(uint8_t index, bool& focusSet) const;
 
   InputMixButtonBase* getLineByIndex(uint8_t index);
   InputMixGroupBase* getGroupBySrc(mixsrc_t src);

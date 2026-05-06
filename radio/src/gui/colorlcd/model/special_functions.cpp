@@ -91,33 +91,58 @@ FunctionLineButton::FunctionLineButton(Window *parent, const rect_t &rect,
 
 void FunctionLineButton::delayedInit()
 {
-  lv_obj_enable_style_refresh(false);
+  if (!withLive([&](LiveWindow& live) {
+        auto obj = live.lvobj();
+        lv_obj_enable_style_refresh(false);
 
-  sfName = etx_label_create(lvobj);
-  lv_obj_set_pos(sfName, NM_X, NM_Y);
-  lv_obj_set_size(sfName, NM_W, EdgeTxStyles::STD_FONT_HEIGHT);
+        sfName = etx_label_create(obj);
+        if (!requireLvObj(sfName)) {
+          lv_obj_enable_style_refresh(true);
+          return false;
+        }
+        lv_obj_set_pos(sfName, NM_X, NM_Y);
+        lv_obj_set_size(sfName, NM_W, EdgeTxStyles::STD_FONT_HEIGHT);
 
-  sfSwitch = etx_label_create(lvobj);
-  lv_obj_set_pos(sfSwitch, SW_X, SW_Y);
-  lv_obj_set_size(sfSwitch, SW_W, EdgeTxStyles::STD_FONT_HEIGHT);
+        sfSwitch = etx_label_create(obj);
+        if (!requireLvObj(sfSwitch)) {
+          lv_obj_enable_style_refresh(true);
+          return false;
+        }
+        lv_obj_set_pos(sfSwitch, SW_X, SW_Y);
+        lv_obj_set_size(sfSwitch, SW_W, EdgeTxStyles::STD_FONT_HEIGHT);
 
-  sfFunc = etx_label_create(lvobj);
-  lv_obj_set_pos(sfFunc, FN_X, FN_Y);
-  lv_obj_set_size(sfFunc, FN_W, EdgeTxStyles::STD_FONT_HEIGHT);
+        sfFunc = etx_label_create(obj);
+        if (!requireLvObj(sfFunc)) {
+          lv_obj_enable_style_refresh(true);
+          return false;
+        }
+        lv_obj_set_pos(sfFunc, FN_X, FN_Y);
+        lv_obj_set_size(sfFunc, FN_W, EdgeTxStyles::STD_FONT_HEIGHT);
 
-  sfRepeat = etx_label_create(lvobj);
-  lv_obj_set_pos(sfRepeat, RP_X, RP_Y);
-  lv_obj_set_size(sfRepeat, RP_W, EdgeTxStyles::STD_FONT_HEIGHT);
+        sfRepeat = etx_label_create(obj);
+        if (!requireLvObj(sfRepeat)) {
+          lv_obj_enable_style_refresh(true);
+          return false;
+        }
+        lv_obj_set_pos(sfRepeat, RP_X, RP_Y);
+        lv_obj_set_size(sfRepeat, RP_W, EdgeTxStyles::STD_FONT_HEIGHT);
 
-  sfEnable = sf_enable_state_create(lvobj);
-  lv_obj_clear_flag(sfEnable, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_set_user_data(sfEnable, this);
-  lv_obj_set_pos(sfEnable, EN_X, EN_Y);
+        sfEnable = sf_enable_state_create(obj);
+        if (!requireLvObj(sfEnable)) {
+          lv_obj_enable_style_refresh(true);
+          return false;
+        }
+        lv_obj_clear_flag(sfEnable, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_user_data(sfEnable, this);
+        lv_obj_set_pos(sfEnable, EN_X, EN_Y);
 
-  lv_obj_update_layout(lvobj);
+        lv_obj_update_layout(obj);
 
-  lv_obj_enable_style_refresh(true);
-  lv_obj_refresh_style(lvobj, LV_PART_ANY, LV_STYLE_PROP_ANY);
+        lv_obj_enable_style_refresh(true);
+        lv_obj_refresh_style(obj, LV_PART_ANY, LV_STYLE_PROP_ANY);
+        return true;
+      }))
+    return;
 
   refresh();
 }
@@ -305,9 +330,9 @@ void FunctionEditPage::onLiveCheckEvents(Window::LiveWindow& live)
   Page::onLiveCheckEvents(live);
   if (active != isActive()) {
     if (isActive()) {
-      lv_obj_add_state(headerSF->getLvObj(), ETX_STATE_SF_ACTIVE);
+      headerSF->addState(ETX_STATE_SF_ACTIVE);
     } else {
-      lv_obj_clear_state(headerSF->getLvObj(), ETX_STATE_SF_ACTIVE);
+      headerSF->clearState(ETX_STATE_SF_ACTIVE);
     }
     active = isActive();
   }
@@ -319,9 +344,8 @@ void FunctionEditPage::buildHeader(Window *window, const char *title,
   header->setTitle(title);
   headerSF = header->setTitle2(prefix + std::to_string(index + 1));
 
-  etx_txt_color(headerSF->getLvObj(), COLOR_THEME_ACTIVE_INDEX,
-                ETX_STATE_SF_ACTIVE);
-  etx_font(headerSF->getLvObj(), FONT_BOLD_INDEX, ETX_STATE_SF_ACTIVE);
+  headerSF->textColor(COLOR_THEME_ACTIVE_INDEX, ETX_STATE_SF_ACTIVE);
+  headerSF->font(FONT_BOLD_INDEX, ETX_STATE_SF_ACTIVE);
 }
 
 void FunctionEditPage::addSourceChoice(FormLine *line, const char *title,
@@ -812,11 +836,11 @@ void FunctionsPage::build(Window *window)
       auto button = functionButton(
           window, rect_t{0, 0, window->width() - PAD_LARGE - PAD_SMALL, SF_BUTTON_H}, i);
 
-      lv_obj_set_grid_cell(button->getLvObj(), LV_GRID_ALIGN_CENTER, 0, 1,
-                           LV_GRID_ALIGN_CENTER, 0, 1);
+      button->setGridCell(LV_GRID_ALIGN_CENTER, 0, 1, LV_GRID_ALIGN_CENTER, 0,
+                          1);
 
       if (focusIndex == i) {
-        lv_group_focus_obj(button->getLvObj());
+        button->focus();
       }
 
       button->setFocusHandler([=](bool hasFocus) {
@@ -898,7 +922,7 @@ void FunctionsPage::build(Window *window)
 
       button->setLongPressHandler([=]() -> uint8_t {
         if (addButton) {
-          lv_group_focus_obj(addButton->getLvObj());
+          addButton->focus();
           plusPopup(window);
         }
         return 0;
