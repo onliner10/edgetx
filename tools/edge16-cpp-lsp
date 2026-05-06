@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  tools/edge16-cpp-lsp setup [tx16s|tx16smk3]
+  tools/edge16-cpp-lsp check [source-file]
+
+Generate and verify the compile_commands.json used by clangd/Serena.
+Run this through the project flake, for example:
+
+  nix develop -c tools/edge16-cpp-lsp setup tx16s
+EOF
+}
+
+setup_compile_commands() {
+  local target="${1:-tx16s}"
+  local build_dir="${EDGE16_CPP_LSP_BUILD_DIR:-${repo_root}/build/cpp-lsp/${target}}"
+  local build_options
+
+  # shellcheck source=tools/build-common.sh
+  source "${repo_root}/tools/build-common.sh"
+
+  BUILD_OPTIONS="-DCMAKE_BUILD_TYPE=Debug -DCMAKE_RULE_MESSAGES=OFF -Wno-dev "
+  BUILD_OPTIONS+="-DEdgeTX_SUPERBUILD=OFF -DNATIVE_BUILD=OFF "
+  BUILD_OPTIONS+="-DCMAKE_TOOLCHAIN_FILE=${repo_root}/cmake/toolchain/arm-none-eabi.cmake "
+  BUILD_OPTIONS+="-DDISABLE_COMPANION=ON "
+
+  if ! get_target_build_options "${target}"; then
+    exit 1
+  fi
+
+  read -r -a build_options <<< "${BUILD_OPTIONS}"
+
+  cmake -S "${repo_root}" -B "${build_dir}" -G "${CMAKE_GENERATOR:-Ninja}" "${build_options[@]}"
+  ln -sfn "build/cpp-lsp/${target}/compile_commands.json" "${repo_root}/compile_commands.json"
+
+  echo "compile_commands.json -> build/cpp-lsp/${target}/compile_commands.json"
+}
+
+check_clangd() {
+  local source_file="${1:-radio/src/crc.cpp}"
+
+  if [[ ! -e "${repo_root}/compile_commands.json" ]]; then
+    echo "compile_commands.json is missing; run: nix develop -c tools/edge16-cpp-lsp setup tx16s" >&2
+    exit 1
+  fi
+
+  edge16-clangd --log=error --check="${repo_root}/${source_file}"
+}
+
+case "${1:-}" in
+  setup)
+    shift
+    setup_compile_commands "$@"
+    ;;
+  check)
+    shift
+    check_clangd "$@"
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac

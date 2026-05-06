@@ -3,8 +3,10 @@
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   inputs.nixpkgs-25_05.url = "github:NixOS/nixpkgs/nixos-25.05";
+  inputs.serena.url = "github:oraios/serena";
+  inputs.serena.inputs.nixpkgs.follows = "nixpkgs";
 
-  outputs = { self, nixpkgs, nixpkgs-25_05 }:
+  outputs = { self, nixpkgs, nixpkgs-25_05, serena }:
     let
       systems = [ "x86_64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
@@ -25,6 +27,11 @@
             ps."typing-extensions"
           ]);
           sdl3 = pkgs.sdl3;
+          edge16Clangd = pkgs.writeShellScriptBin "edge16-clangd" ''
+            exec ${llvm.clang-unwrapped}/bin/clangd \
+              --query-driver="${armPkgs.gcc-arm-embedded}/bin/arm-none-eabi-*" \
+              "$@"
+          '';
         in
         {
           default = pkgs.mkShell {
@@ -35,7 +42,9 @@
               pkgs.ninja
               pkgs.pkg-config
               pkgs.uv
+              serena.packages.${system}.serena
               python
+              edge16Clangd
             ];
 
             nativeBuildInputs = [
