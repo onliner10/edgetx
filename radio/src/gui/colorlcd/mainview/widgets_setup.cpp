@@ -48,6 +48,7 @@ SetupWidgetsPageSlot::SetupWidgetsPageSlot(Window* parent, const rect_t& rect,
       Menu::open([this](Menu& menu) {
         menu.addLine(STR_SELECT_WIDGET, [this]() { addNewWidget(); });
         auto widget = this->container->getWidget(this->slot.asUnsigned());
+        if (!widget) return;
         if (widget->hasOptions())
           menu.addLine(STR_WIDGET_SETTINGS,
                        [=]() { new (std::nothrow) WidgetSettings(widget); });
