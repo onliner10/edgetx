@@ -28,6 +28,7 @@
 #include <unistd.h>
 
 bool builtinIconAllocationFailureLeavesDrawableMaskForTest();
+bool builtinIconInvalidIdLeavesDrawableMaskForTest();
 bool bitmapBufferCanvasCreateFailureKeepsDataForTest();
 bool bitmapBufferResizeAllocationFailurePreventsLvglOverreadForTest();
 bool lz4BitmapBufferAllocationFailureInvalidatesBufferForTest();
@@ -64,6 +65,22 @@ TEST(ColorBitmapBuffer, BuiltinIconAllocationFailureLeavesDrawableMask)
   if (pid == 0) {
     alarm(2);
     _exit(builtinIconAllocationFailureLeavesDrawableMaskForTest() ? 0 : 1);
+  }
+
+  int status = 0;
+  ASSERT_EQ(waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status)) << "child process did not exit normally";
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(ColorBitmapBuffer, BuiltinIconInvalidIdLeavesDrawableMask)
+{
+  const pid_t pid = fork();
+  ASSERT_GE(pid, 0);
+
+  if (pid == 0) {
+    alarm(2);
+    _exit(builtinIconInvalidIdLeavesDrawableMaskForTest() ? 0 : 1);
   }
 
   int status = 0;

@@ -589,19 +589,31 @@ static const MaskBitmap* emptyBuiltinIcon()
 
 const MaskBitmap* getBuiltinIcon(EdgeTxIcon id)
 {
-  if (id < 0 || id >= EDGETX_ICONS_COUNT) return emptyBuiltinIcon();
+  const auto index = static_cast<unsigned>(id);
+  if (index >= static_cast<unsigned>(EDGETX_ICONS_COUNT))
+    return emptyBuiltinIcon();
 
   // Icons are stored LZ4 compressed and de-compresssed on first use
-  if (_builtinIconsDecompressed[id] == nullptr) {
-    _builtinIconsDecompressed[id] =
-        _decompressed_mask(_builtinIcons[id].lz4_compressed_bitmap);
+  if (_builtinIconsDecompressed[index] == nullptr) {
+    _builtinIconsDecompressed[index] =
+        _decompressed_mask(_builtinIcons[index].lz4_compressed_bitmap);
   }
 
-  return _builtinIconsDecompressed[id] ? _builtinIconsDecompressed[id]
-                                       : emptyBuiltinIcon();
+  return _builtinIconsDecompressed[index] ? _builtinIconsDecompressed[index]
+                                          : emptyBuiltinIcon();
 }
 
 #if defined(SIMU)
+bool builtinIconInvalidIdLeavesDrawableMaskForTest()
+{
+  auto negative = getBuiltinIcon(static_cast<EdgeTxIcon>(-1));
+  auto sentinel = getBuiltinIcon(EDGETX_ICONS_COUNT);
+
+  return negative->width == 1 && negative->height == 1 &&
+         negative->data[0] == 0 && sentinel->width == 1 &&
+         sentinel->height == 1 && sentinel->data[0] == 0;
+}
+
 bool builtinIconAllocationFailureLeavesDrawableMaskForTest()
 {
   const auto id = ICON_BTN_PREV;
