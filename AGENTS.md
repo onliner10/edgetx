@@ -37,6 +37,24 @@ Common traps:
 - Do not assume one storage-warning skip is enough. Use `edgetx_skip_storage_warning_if_present`.
 - Do not claim a navigation path works unless the tree changed and at least one screenshot or pixel diff confirms the visual state changed.
 
+## Repeated UI Invariant Analysis
+
+Use the AST-based repeated invariant checker when reviewing UI branches for scattered guard logic or repeated predicates. It uses libclang, so run it through Nix and make sure a native compile database exists first, for example with `nix develop -c tools/ui-harness/edgetx-ui build tx16s`.
+
+Default branch-changed scan:
+
+```sh
+nix develop -c python3 tools/check-repeated-if-invariants.py
+```
+
+Folder or file scan:
+
+```sh
+nix develop -c python3 tools/check-repeated-if-invariants.py radio/src/gui/colorlcd/libui
+```
+
+The checker scans real C/C++ `if` statements, decomposes compound conditions into predicate atoms, and reports repeated full conditions, repeated atoms, predicate calls, null/boolean variables, and semantic families such as LVGL object lifetime or window event availability. It is not limited to early-return guards; repeated predicates around `emitEvent`, state mutation, LVGL calls, and other side effects are also reported with the body action shown as context. By default it reports repeats that cross file boundaries and separates production from tests to avoid noise. Use `--show-local` when Bob is explicitly reviewing duplication inside one file.
+
 ## Before Commit
 
 Run the CI-equivalent safety sweep before committing firmware, simulator, build-system, or docs changes. Use Nix for every command; do not rely on host tools. Use 24 threads locally via `CMAKE_BUILD_PARALLEL_LEVEL=24`, `--threads=24`, `--jobs 24`, or `-j 24` where the tool supports it.
