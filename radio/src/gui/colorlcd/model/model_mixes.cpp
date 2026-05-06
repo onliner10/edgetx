@@ -179,7 +179,7 @@ class MixGroup : public InputMixGroupBase
   {
     adjustHeight();
 
-    lv_obj_set_pos(label, PAD_TINY, -1);
+    label.with([](lv_obj_t* obj) { lv_obj_set_pos(obj, PAD_TINY, -1); });
 
     lv_obj_t* chText = nullptr;
     if (idx >= MIXSRC_FIRST_CH && idx <= MIXSRC_LAST_CH &&

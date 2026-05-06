@@ -112,20 +112,21 @@ class TextButton : public ButtonBase
 
   void setFont(FontIndex font)
   {
-    if (label) etx_font(label, font);
+    label.with([&](lv_obj_t* obj) { etx_font(obj, font); });
   }
 
   void setWrap()
   {
-    if (!label) return;
-    lv_obj_set_width(label, lv_pct(100));
-    etx_obj_add_style(label, styles->text_align_center, LV_PART_MAIN);
-    lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
+    label.with([](lv_obj_t* obj) {
+      lv_obj_set_width(obj, lv_pct(100));
+      etx_obj_add_style(obj, styles->text_align_center, LV_PART_MAIN);
+      lv_label_set_long_mode(obj, LV_LABEL_LONG_WRAP);
+    });
   }
 
  protected:
   std::string text;
-  lv_obj_t* label = nullptr;
+  RequiredLvObj label;
 };
 
 class IconButton : public ButtonBase
@@ -158,20 +159,20 @@ class MomentaryButton : public FormField
   {
     if (value != text) {
       text = std::move(value);
-      if (label) lv_label_set_text(label, text.c_str());
+      label.with([&](lv_obj_t* obj) { lv_label_set_text(obj, text.c_str()); });
     }
   }
 
   void setFont(FontIndex font)
   {
-    if (label) etx_font(label, font);
+    label.with([&](lv_obj_t* obj) { etx_font(obj, font); });
   }
 
  protected:
   std::function<void(void)> pressHandler;
   std::function<void(void)> releaseHandler;
   std::string text;
-  lv_obj_t* label = nullptr;
+  RequiredLvObj label;
 
   bool onLiveCustomEvent(LiveWindow& live, lv_event_t* event) override;
 };

@@ -125,42 +125,43 @@ void SwitchChoice::openMenu()
 {
   setEditMode(true);  // this needs to be done first before menu is created.
 
-  auto menu = new (std::nothrow) Menu();
-  if (!menu) return;
-  if (menuTitle) menu->setTitle(menuTitle);
+  Menu::open([&](Menu& menu) {
+    auto menuPtr = &menu;
+    if (menuTitle) menu.setTitle(menuTitle);
 
-  inverted = _getValue() < 0;
-  inMenu = true;
+    inverted = _getValue() < 0;
+    inMenu = true;
 
-  auto tb = new (std::nothrow) SwitchChoiceMenuToolbar(this, menu);
-  if (tb) menu->setToolbar(tb);
+    auto tb = new (std::nothrow) SwitchChoiceMenuToolbar(this, menuPtr);
+    if (tb) menu.setToolbar(tb);
 
-  menu->setLongPressHandler([=]() { if (tb) tb->invertChoice(); });
+    menu.setLongPressHandler([=]() { if (tb) tb->invertChoice(); });
 
 #if defined(AUTOSWITCH)
-  menu->setWaitHandler([=]() {
-    swsrc_t val = 0;
-    swsrc_t swtch = getMovedSwitch();
-    if (swtch) {
-      div_t info = switchInfo(swtch);
-      if (IS_CONFIG_TOGGLE(info.quot)) {
-        if (info.rem != 0) {
-          val = (val == swtch ? swtch - 2 : swtch);
+    menu.setWaitHandler([=]() {
+      swsrc_t val = 0;
+      swsrc_t swtch = getMovedSwitch();
+      if (swtch) {
+        div_t info = switchInfo(swtch);
+        if (IS_CONFIG_TOGGLE(info.quot)) {
+          if (info.rem != 0) {
+            val = (val == swtch ? swtch - 2 : swtch);
+          }
+        } else {
+          val = swtch;
         }
-      } else {
-        val = swtch;
+        if (val && (!isValueAvailable || isValueAvailable(val))) {
+          if (tb) tb->resetFilter();
+          menuPtr->select(getIndexFromValue(val));
+        }
       }
-      if (val && (!isValueAvailable || isValueAvailable(val))) {
-        if (tb) tb->resetFilter();
-        menu->select(getIndexFromValue(val));
-      }
-    }
-  });
+    });
 #endif
 
-  // fillMenu(menu); - called by MenuToolbar
+    // fillMenu(menu); - called by MenuToolbar
 
-  menu->setCloseHandler([=]() { setEditMode(false); });
+    menu.setCloseHandler([=]() { setEditMode(false); });
+  });
 }
 
 SwitchChoice::SwitchChoice(Window* parent, const rect_t& rect, int vmin,

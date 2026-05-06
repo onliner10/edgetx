@@ -3026,20 +3026,21 @@ void LvglWidgetMenu::clearRefs(lua_State* L)
 
 void LvglWidgetMenu::build(lua_State* L)
 {
-  auto menu = new (std::nothrow) Menu();
-  if (!menu) return;
-  if (!title.txt.empty()) menu->setTitle(title.txt);
+  Menu::open([&](Menu& menu) {
+    if (!title.txt.empty()) menu.setTitle(title.txt);
 
-  for (size_t i = 0; i < values.size(); i += 1) {
-    menu->addLine(values[i], [=]() { pcallSetIntVal(L, setFunction, i + 1); });
-  }
+    for (size_t i = 0; i < values.size(); i += 1) {
+      menu.addLine(values[i],
+                   [=]() { pcallSetIntVal(L, setFunction, i + 1); });
+    }
 
-  int selected = pcallGetIntVal(L, getFunction) - 1;
-  if (selected >= 0) {
-    menu->select(selected);
-  }
+    int selected = pcallGetIntVal(L, getFunction) - 1;
+    if (selected >= 0) {
+      menu.select(selected);
+    }
 
-  window = menu;
+    window = &menu;
+  });
 }
 
 //-----------------------------------------------------------------------------

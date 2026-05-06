@@ -147,9 +147,10 @@ TextEdit::TextEdit(Window* parent, const rect_t& rect, char* text,
 {
   if (rect.w == 0) setWidth(EdgeTxStyles::EDIT_FLD_WIDTH);
 
-  if (!label) return;
   update();
-  lv_obj_align(label, LV_ALIGN_OUT_LEFT_MID, 0, PAD_TINY);
+  label.with([](lv_obj_t* obj) {
+    lv_obj_align(obj, LV_ALIGN_OUT_LEFT_MID, 0, PAD_TINY);
+  });
 }
 
 void TextEdit::update()

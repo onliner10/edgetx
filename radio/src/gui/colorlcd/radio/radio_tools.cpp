@@ -223,9 +223,11 @@ struct ToolButton : public TextButton {
     setWidth(TOOLS_BTN_W);
     setHeight(TOOLS_BTN_H);
 
-    lv_obj_set_width(label, lv_pct(100));
-    etx_obj_add_style(label, styles->text_align_center, LV_PART_MAIN);
-    lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
+    label.with([](lv_obj_t* obj) {
+      lv_obj_set_width(obj, lv_pct(100));
+      etx_obj_add_style(obj, styles->text_align_center, LV_PART_MAIN);
+      lv_label_set_long_mode(obj, LV_LABEL_LONG_WRAP);
+    });
   }
 
   static LAYOUT_ORIENTATION(TOOLS_BTN_W, (LCD_W - PAD_LARGE * 3) / 3, (LCD_W - PAD_LARGE * 2) / 2)

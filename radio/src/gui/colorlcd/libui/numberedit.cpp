@@ -255,8 +255,6 @@ NumberEdit::NumberEdit(Window* parent, const rect_t& rect, int vmin, int vmax,
     vmin(vmin),
     vmax(vmax)
 {
-  if (!label) return;
-
   if (parent) {
     const char* title = parent->getFormFieldTitle();
     if (title) editTitle = title;
@@ -270,12 +268,14 @@ NumberEdit::NumberEdit(Window* parent, const rect_t& rect, int vmin, int vmax,
   padLeft(PAD_MEDIUM);
   padRight(PAD_SMALL);
 
-  lv_obj_set_width(label, LV_PCT(100));
+  label.with([&](lv_obj_t* obj) {
+    lv_obj_set_width(obj, LV_PCT(100));
 
-  if (textFlags & CENTERED)
-    etx_obj_add_style(label, styles->text_align_center, LV_PART_MAIN);
-  else
-    etx_obj_add_style(label, styles->text_align_right, LV_PART_MAIN);
+    if (textFlags & CENTERED)
+      etx_obj_add_style(obj, styles->text_align_center, LV_PART_MAIN);
+    else
+      etx_obj_add_style(obj, styles->text_align_right, LV_PART_MAIN);
+  });
 
   update();
 }

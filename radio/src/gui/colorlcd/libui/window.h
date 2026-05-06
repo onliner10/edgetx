@@ -51,6 +51,38 @@ constexpr WindowFlags NO_FORCED_SCROLL = 1u << 4u;
 
 //-----------------------------------------------------------------------------
 
+class RequiredLvObj
+{
+ public:
+  RequiredLvObj() = default;
+
+  bool isPresent() const { return obj_ != nullptr; }
+  bool isPresentForTest() const { return isPresent(); }
+  lv_obj_t* getForTest() const { return obj_; }
+
+  template <typename Fn>
+  bool with(Fn&& fn) const
+  {
+    if (!obj_) return false;
+    using Result = std::invoke_result_t<Fn, lv_obj_t*>;
+    if constexpr (std::is_void_v<Result>) {
+      fn(obj_);
+      return true;
+    } else {
+      return static_cast<bool>(fn(obj_));
+    }
+  }
+
+ private:
+  friend class Window;
+
+  void reset(lv_obj_t* obj) { obj_ = obj; }
+
+  lv_obj_t* obj_ = nullptr;
+};
+
+//-----------------------------------------------------------------------------
+
 class Window
 {
  private:
@@ -341,6 +373,18 @@ class Window
       target = create(live.lvobj());
       if (!requireLvObj(target)) return false;
       init(target);
+      return true;
+    });
+  }
+
+  template <typename Create, typename Init>
+  bool initRequiredLvObj(RequiredLvObj& target, Create&& create, Init&& init)
+  {
+    return withLive([&](LiveWindow& live) {
+      lv_obj_t* obj = create(live.lvobj());
+      if (!requireLvObj(obj)) return false;
+      target.reset(obj);
+      init(obj);
       return true;
     });
   }

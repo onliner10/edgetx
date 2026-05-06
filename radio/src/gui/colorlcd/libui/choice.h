@@ -59,7 +59,7 @@ class ChoiceBase : public FormField
   static LAYOUT_VAL_SCALED(ICON_W, 18)
 
  protected:
-  lv_obj_t *label;
+  RequiredLvObj label;
   coord_t popupWidth = 0;
   int vmin = 0;
   int vmax = 0;

@@ -86,21 +86,22 @@ class LayoutChoice : public Button
  protected:
   void onLivePress(LiveWindow&) override
   {
-    auto menu = new (std::nothrow) Menu();
-    if (!menu) return;
-    for (auto layout : LayoutFactory::getRegisteredLayouts()) {
-      menu->addLine(layout->getBitmap(), layout->getName(),
-                    [=]() { if (setValue) setValue(layout); update(); });
-    }
+    Menu::open([&](Menu& menu) {
+      auto menuPtr = &menu;
+      for (auto layout : LayoutFactory::getRegisteredLayouts()) {
+        menu.addLine(layout->getBitmap(), layout->getName(),
+                     [=]() { if (setValue) setValue(layout); update(); });
+      }
 
-    auto it =
-        std::find(LayoutFactory::getRegisteredLayouts().begin(),
-                  LayoutFactory::getRegisteredLayouts().end(), getValue());
-    menu->select(
-        std::distance(LayoutFactory::getRegisteredLayouts().begin(), it));
+      auto it =
+          std::find(LayoutFactory::getRegisteredLayouts().begin(),
+                    LayoutFactory::getRegisteredLayouts().end(), getValue());
+      menu.select(
+          std::distance(LayoutFactory::getRegisteredLayouts().begin(), it));
 
-    menu->setCloseHandler([=]() {
-      menu->withLive([&](Window::LiveWindow&) { update(); });
+      menu.setCloseHandler([=]() {
+        menuPtr->withLive([&](Window::LiveWindow&) { update(); });
+      });
     });
   }
 

@@ -141,7 +141,7 @@ void TextButton::setText(std::string value)
 {
   if (value != text) {
     text = std::move(value);
-    if (label) lv_label_set_text(label, text.c_str());
+    label.with([&](lv_obj_t* obj) { lv_label_set_text(obj, text.c_str()); });
   }
 }
 

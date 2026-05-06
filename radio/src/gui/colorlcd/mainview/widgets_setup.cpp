@@ -45,24 +45,24 @@ SetupWidgetsPageSlot::SetupWidgetsPageSlot(Window* parent, const rect_t& rect,
   setPressHandler([this]() -> uint8_t {
     if (!this->container) return 0;
     if (this->container->getWidget(this->slot.asUnsigned())) {
-      Menu* menu = new (std::nothrow) Menu();
-      if (!menu) return 0;
-      menu->addLine(STR_SELECT_WIDGET,
-                    [this]() { addNewWidget(); });
-      auto widget = this->container->getWidget(this->slot.asUnsigned());
-      if (widget->hasOptions())
-        menu->addLine(STR_WIDGET_SETTINGS,
-                      [=]() { new (std::nothrow) WidgetSettings(widget); });
-      if (this->container->canMoveWidget(this->slot, WidgetMoveDirection::Left))
-        menu->addLine(STR_MOVE_LEFT,
-                      [this]() { moveWidget(WidgetMoveDirection::Left); });
-      if (this->container->canMoveWidget(this->slot, WidgetMoveDirection::Right))
-        menu->addLine(STR_MOVE_RIGHT,
-                      [this]() { moveWidget(WidgetMoveDirection::Right); });
-      menu->addLine(STR_REMOVE_WIDGET,
-                    [this]() {
-                      this->container->removeWidget(this->slot.asUnsigned());
-                    });
+      Menu::open([this](Menu& menu) {
+        menu.addLine(STR_SELECT_WIDGET, [this]() { addNewWidget(); });
+        auto widget = this->container->getWidget(this->slot.asUnsigned());
+        if (widget->hasOptions())
+          menu.addLine(STR_WIDGET_SETTINGS,
+                       [=]() { new (std::nothrow) WidgetSettings(widget); });
+        if (this->container->canMoveWidget(this->slot,
+                                           WidgetMoveDirection::Left))
+          menu.addLine(STR_MOVE_LEFT,
+                       [this]() { moveWidget(WidgetMoveDirection::Left); });
+        if (this->container->canMoveWidget(this->slot,
+                                           WidgetMoveDirection::Right))
+          menu.addLine(STR_MOVE_RIGHT,
+                       [this]() { moveWidget(WidgetMoveDirection::Right); });
+        menu.addLine(STR_REMOVE_WIDGET, [this]() {
+          this->container->removeWidget(this->slot.asUnsigned());
+        });
+      });
     } else {
       addNewWidget();
     }
@@ -127,29 +127,28 @@ void SetupWidgetsPageSlot::addNewWidget()
   auto w = container->getWidget(slot.asUnsigned());
   if (w) cur = w->getFactory()->getDisplayName();
 
-  Menu* menu = new (std::nothrow) Menu();
-  if (!menu) return;
-  menu->setTitle(STR_SELECT_WIDGET);
-  int selected = -1;
-  int index = 0;
-  for (const auto& registered : WidgetFactory::getRegisteredWidgets()) {
-    auto factory = &registered.get();
-    if (strcmp(factory->getName(), "Radio Info") == 0) continue;
-    auto selectedSlot = slot;
-    auto selectedContainer = container;
-    menu->addLine(factory->getDisplayName(), [=]() {
-      selectedContainer->createWidget(selectedSlot.asUnsigned(), factory);
-      auto widget = selectedContainer->getWidget(selectedSlot.asUnsigned());
-      if (widget && widget->hasOptions())
-        new (std::nothrow) WidgetSettings(widget);
-    });
-    if (cur && strcmp(cur, factory->getDisplayName()) == 0)
-      selected = index;
-    index += 1;
-  }
+  Menu::open([&](Menu& menu) {
+    menu.setTitle(STR_SELECT_WIDGET);
+    int selected = -1;
+    int index = 0;
+    for (const auto& registered : WidgetFactory::getRegisteredWidgets()) {
+      auto factory = &registered.get();
+      if (strcmp(factory->getName(), "Radio Info") == 0) continue;
+      auto selectedSlot = slot;
+      auto selectedContainer = container;
+      menu.addLine(factory->getDisplayName(), [=]() {
+        selectedContainer->createWidget(selectedSlot.asUnsigned(), factory);
+        auto widget = selectedContainer->getWidget(selectedSlot.asUnsigned());
+        if (widget && widget->hasOptions())
+          new (std::nothrow) WidgetSettings(widget);
+      });
+      if (cur && strcmp(cur, factory->getDisplayName()) == 0)
+        selected = index;
+      index += 1;
+    }
 
-  if (selected >= 0)
-    menu->select(selected);
+    if (selected >= 0) menu.select(selected);
+  });
 }
 
 void SetupWidgetsPageSlot::moveWidget(WidgetMoveDirection direction)

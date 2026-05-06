@@ -196,7 +196,7 @@ class InputGroup : public InputMixGroupBase
   {
     adjustHeight();
 
-    lv_obj_set_pos(label, PAD_TINY, PAD_SMALL);
+    label.with([](lv_obj_t* obj) { lv_obj_set_pos(obj, PAD_TINY, PAD_SMALL); });
 
     refresh();
   }

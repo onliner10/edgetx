@@ -287,16 +287,16 @@ void Widget::openMenu()
   }
 
   if (hasOptions() || isMainViewWidget()) {
-    Menu* menu = new (std::nothrow) Menu();
-    if (!menu) return;
-    menu->setTitle(getFactory()->getDisplayName());
-    if (isMainViewWidget()) {
-      menu->addLine(STR_WIDGET_FULLSCREEN, [&]() { setFullscreen(true); });
-    }
-    if (hasOptions()) {
-      menu->addLine(STR_WIDGET_SETTINGS,
-                    [=]() { new (std::nothrow) WidgetSettings(this); });
-    }
+    Menu::open([&](Menu& menu) {
+      menu.setTitle(getFactory()->getDisplayName());
+      if (isMainViewWidget()) {
+        menu.addLine(STR_WIDGET_FULLSCREEN, [&]() { setFullscreen(true); });
+      }
+      if (hasOptions()) {
+        menu.addLine(STR_WIDGET_SETTINGS,
+                     [=]() { new (std::nothrow) WidgetSettings(this); });
+      }
+    });
   }
 }
 

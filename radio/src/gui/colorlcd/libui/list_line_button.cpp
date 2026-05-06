@@ -98,10 +98,22 @@ InputMixButtonBase::~InputMixButtonBase()
   if (fm_buffer) free(fm_buffer);
 }
 
-bool InputMixButtonBase::ensureLineLabel(lv_obj_t*& label, coord_t x, coord_t y,
-                                         coord_t w, coord_t h)
+static void setLineLabelText(RequiredLvObj& label, const char* text,
+                             coord_t width)
 {
-  if (label) return true;
+  label.with([&](lv_obj_t* obj) {
+    if (getTextWidth(text, 0, FONT(STD)) > width)
+      lv_obj_add_state(obj, LV_STATE_USER_1);
+    else
+      lv_obj_clear_state(obj, LV_STATE_USER_1);
+    lv_label_set_text(obj, text);
+  });
+}
+
+bool InputMixButtonBase::ensureLineLabel(RequiredLvObj& label, coord_t x,
+                                         coord_t y, coord_t w, coord_t h)
+{
+  if (label.isPresent()) return true;
 
   return initRequiredLvObj(label, list_line_label_create, [&](lv_obj_t* obj) {
     lv_obj_set_pos(obj, x, y);
@@ -116,12 +128,7 @@ void InputMixButtonBase::setWeight(gvar_t value, gvar_t min, gvar_t max)
 
   char s[32];
   getValueOrSrcVarString(s, sizeof(s), value, 0, "%");
-  if (getTextWidth(s, 0, FONT(STD)) > WGT_W)
-    lv_obj_add_state(weight, LV_STATE_USER_1);
-  else
-    lv_obj_clear_state(weight, LV_STATE_USER_1);
-
-  lv_label_set_text(weight, s);
+  setLineLabelText(weight, s, WGT_W);
 }
 
 void InputMixButtonBase::setSource(mixsrc_t idx)
@@ -129,24 +136,14 @@ void InputMixButtonBase::setSource(mixsrc_t idx)
   if (!ensureLineLabel(source, SRC_X, SRC_Y, SRC_W, SRC_H)) return;
 
   char* s = getSourceString(idx);
-  if (getTextWidth(s, 0, FONT(STD)) > SRC_W)
-    lv_obj_add_state(source, LV_STATE_USER_1);
-  else
-    lv_obj_clear_state(source, LV_STATE_USER_1);
-
-  lv_label_set_text(source, s);
+  setLineLabelText(source, s, SRC_W);
 }
 
 void InputMixButtonBase::setOpts(const char* s)
 {
   if (!ensureLineLabel(opts, OPT_X, OPT_Y, OPT_W, OPT_H)) return;
 
-  if (getTextWidth(s, 0, FONT(STD)) > OPT_W)
-    lv_obj_add_state(opts, LV_STATE_USER_1);
-  else
-    lv_obj_clear_state(opts, LV_STATE_USER_1);
-
-  lv_label_set_text(opts, s);
+  setLineLabelText(opts, s, OPT_W);
 }
 
 void InputMixButtonBase::setFlightModes(uint16_t modes)
@@ -443,14 +440,8 @@ bool InputMixGroupBase::removeLine(InputMixButtonBase* line)
 
 void InputMixGroupBase::refresh()
 {
-  if (!label) return;
-
   char* s = getSourceString(idx);
-  if (getTextWidth(s, 0, FONT(STD)) > InputMixButtonBase::LN_X - PAD_TINY)
-    lv_obj_add_state(label, LV_STATE_USER_1);
-  else
-    lv_obj_clear_state(label, LV_STATE_USER_1);
-  lv_label_set_text(label, s);
+  setLineLabelText(label, s, InputMixButtonBase::LN_X - PAD_TINY);
 }
 
 int InputMixGroupBase::getLineNumber(uint8_t index)

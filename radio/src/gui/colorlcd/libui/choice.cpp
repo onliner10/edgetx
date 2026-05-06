@@ -140,17 +140,18 @@ void ChoiceBase::update(Window::LiveWindow&)
   int v = _getValue();
   if (v != currentValue) {
     currentValue = v;
-    if (!label) return;
     std::string s = getLabelText();
-    if (width() > 0) {
-      int w = width() - (type == CHOICE_TYPE_DROPOWN ? ICON_W - 2 : ICON_W) -
-              PAD_TINY * 3;
-      if (getTextWidth(s.c_str(), 0, FONT(STD)) > w)
-        lv_obj_add_state(label, LV_STATE_USER_1);
-      else
-        lv_obj_clear_state(label, LV_STATE_USER_1);
-    }
-    lv_label_set_text(label, s.c_str());
+    label.with([&](lv_obj_t* obj) {
+      if (width() > 0) {
+        int w = width() - (type == CHOICE_TYPE_DROPOWN ? ICON_W - 2 : ICON_W) -
+                PAD_TINY * 3;
+        if (getTextWidth(s.c_str(), 0, FONT(STD)) > w)
+          lv_obj_add_state(obj, LV_STATE_USER_1);
+        else
+          lv_obj_clear_state(obj, LV_STATE_USER_1);
+      }
+      lv_label_set_text(obj, s.c_str());
+    });
   }
 }
 

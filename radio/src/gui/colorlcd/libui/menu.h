@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <new>
+
 #include "modal_window.h"
 
 class MaskBitmap;
@@ -29,6 +31,15 @@ class Menu : public ModalWindow
 {
  public:
   explicit Menu(bool multiple = false, coord_t popupWidth = 0);
+
+  template <typename Fn>
+  static bool open(Fn&& build, bool multiple = false, coord_t popupWidth = 0)
+  {
+    auto menu = new (std::nothrow) Menu(multiple, popupWidth);
+    if (!menu) return false;
+    build(*menu);
+    return true;
+  }
 
 #if defined(DEBUG_WINDOWS)
   std::string getName() const override { return "Menu"; }

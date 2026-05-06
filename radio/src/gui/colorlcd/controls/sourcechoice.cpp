@@ -172,41 +172,42 @@ void SourceChoice::openMenu()
   inverted = getIntValue() < 0;
   inMenu = true;
 
-  auto menu = new (std::nothrow) Menu();
-  if (!menu) return;
-  if (menuTitle) menu->setTitle(menuTitle);
+  Menu::open([&](Menu& menu) {
+    auto menuPtr = &menu;
+    if (menuTitle) menu.setTitle(menuTitle);
 
-  auto tb = new (std::nothrow) SourceChoiceMenuToolbar(this, menu);
-  if (tb) menu->setToolbar(tb);
+    auto tb = new (std::nothrow) SourceChoiceMenuToolbar(this, menuPtr);
+    if (tb) menu.setToolbar(tb);
 
-  if (canInvert)
-    menu->setLongPressHandler([=]() { if (tb) tb->invertChoice(); });
+    if (canInvert)
+      menu.setLongPressHandler([=]() { if (tb) tb->invertChoice(); });
 
 #if defined(AUTOSOURCE)
-  menu->setWaitHandler([=]() {
-    int16_t val = getMovedSource(vmin);
-    if (val) {
-      if (tb) tb->resetFilter();
-      menu->select(getIndexFromValue(val));
-    }
+    menu.setWaitHandler([=]() {
+      int16_t val = getMovedSource(vmin);
+      if (val) {
+        if (tb) tb->resetFilter();
+        menuPtr->select(getIndexFromValue(val));
+      }
 #if defined(AUTOSWITCH)
-    else {
-      swsrc_t swtch = abs(getMovedSwitch());
-      if (swtch && !IS_SWITCH_MULTIPOS(swtch)) {
-        val = switchToMix(swtch);
-        if (val && (val >= vmin) && (val <= vmax)) {
-          if (tb) tb->resetFilter();
-          menu->select(getIndexFromValue(val));
+      else {
+        swsrc_t swtch = abs(getMovedSwitch());
+        if (swtch && !IS_SWITCH_MULTIPOS(swtch)) {
+          val = switchToMix(swtch);
+          if (val && (val >= vmin) && (val <= vmax)) {
+            if (tb) tb->resetFilter();
+            menuPtr->select(getIndexFromValue(val));
+          }
         }
       }
-    }
 #endif
+    });
+#endif
+
+    // fillMenu(menu); - called by MenuToolbar
+
+    menu.setCloseHandler([=]() { setEditMode(false); });
   });
-#endif
-
-  // fillMenu(menu); - called by MenuToolbar
-
-  menu->setCloseHandler([=]() { setEditMode(false); });
 }
 
 SourceChoice::SourceChoice(Window *parent, const rect_t &rect, int16_t vmin,
