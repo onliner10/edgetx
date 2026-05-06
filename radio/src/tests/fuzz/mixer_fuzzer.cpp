@@ -10,6 +10,7 @@
 #include <cstring>
 
 #include "edgetx.h"
+#include "curves.h"
 #include "hal/adc_driver.h"
 #include "hal/switch_driver.h"
 #if defined(COLORLCD)
@@ -107,6 +108,7 @@ void resetRadioState()
   logicalSwitchesReset();
 
   setModelDefaults();
+  loadCurves();
   for (int i = 0; i < switchGetMaxAllSwitches(); i++) {
     g_eeGeneral.switchSetType(i, i == 5 ? SWITCH_2POS : SWITCH_3POS);
   }
