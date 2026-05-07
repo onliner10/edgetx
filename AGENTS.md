@@ -34,7 +34,13 @@ command = "nix"
 args = ["develop", "<repo>", "-c", "<repo>/tools/edge16-serena-mcp"]
 ```
 
-When the MCP server is available, prefer Serena symbol tools for C/C++ navigation and cross-reference questions: `find_symbol`, `find_referencing_symbols`, `find_declaration`, `get_symbols_overview`, and diagnostics. If references look stale or new files are missing, rerun `tools/edge16-cpp-lsp setup` and restart the MCP server.
+When the MCP server is available, **always prefer Serena semantic tools over grep/glob for C/C++**. Clangd has a fully indexed view of the codebase (clang-21, 4000+ translation units), giving accurate symbol-level results grep cannot match. Use:
+- `find_symbol` / `find_referencing_symbols` / `find_declaration` — for type-aware symbol searches instead of text-based grep
+- `get_symbols_overview` — to understand a file's structure without reading it all
+- `search_for_pattern` — as a Serena-backed fallback when you need substring matching in code or non-code files; still prefer this over raw grep
+- `get_diagnostics_for_file` — for **fast feedback on errors and warnings** before asking to build. Call this proactively to catch compile errors, unused includes, and clang-tidy-style issues without leaving the editor.
+
+If references look stale or new files are missing, rerun `tools/edge16-cpp-lsp setup` and restart the MCP server.
 
 ## Simulator UI Harness
 

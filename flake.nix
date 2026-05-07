@@ -30,6 +30,7 @@
           sdl3 = pkgs.sdl3;
           edge16Clangd = pkgs.writeShellScriptBin "edge16-clangd" ''
             exec ${llvm.clang-unwrapped}/bin/clangd \
+              -j=24 \
               --query-driver="${armPkgs.gcc-arm-embedded}/bin/arm-none-eabi-*" \
               "$@"
           '';
