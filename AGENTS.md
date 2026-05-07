@@ -38,6 +38,10 @@ When the MCP server is available, prefer Serena symbol tools for C/C++ navigatio
 
 ## Simulator UI Harness
 
+An MCP server is registered in `opencode.json` providing MCP tools for interactive simulator testing (edgetx_start_simulator, edgetx_click, edgetx_ui_tree, edgetx_screenshot, etc.). See `opencode.json` at the repo root for the server command.
+
+In code review / stateless contexts where MCP tools are not available, use `HarnessService` from `tools/ui-harness/edgetx_ui/core.py` directly (same backend).
+
 For exploratory simulator UI testing, prefer a persistent `tools/ui-harness/edgetx-mcp` session over one-off JSON flows. JSON flows are replay artifacts after a path is understood; they are not the best discovery tool.
 
 Use this workflow:

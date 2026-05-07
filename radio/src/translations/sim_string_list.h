@@ -168,7 +168,8 @@
 #define STR_TIMER_SOURCE currentLangStrings->STR_TIMER_SOURCE
 #define STR_USE_THEME_COLOR currentLangStrings->STR_USE_THEME_COLOR
 #define STR_WIDGET_GAUGE currentLangStrings->STR_WIDGET_GAUGE
-#define STR_WIDGET_MODELBMP currentLangStrings->STR_WIDGET_MODELBMP
+#define STR_WIDGET_MODEL_IMAGE currentLangStrings->STR_WIDGET_MODEL_IMAGE
+#define STR_WIDGET_MODEL_NAME currentLangStrings->STR_WIDGET_MODEL_NAME
 #define STR_WIDGET_OUTPUTS currentLangStrings->STR_WIDGET_OUTPUTS
 #define STR_WIDGET_SIZE currentLangStrings->STR_WIDGET_SIZE
 #define STR_WIDGET_TEXT currentLangStrings->STR_WIDGET_TEXT

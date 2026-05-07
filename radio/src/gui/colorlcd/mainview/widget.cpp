@@ -516,6 +516,10 @@ const WidgetFactory* WidgetFactory::getWidgetFactory(const char* name)
 {
   if (!name) return nullptr;
 
+  if (!strcmp(name, "ModelBmp")) {
+    name = "ModelName";
+  }
+
   for (const auto& registered : getRegisteredWidgets()) {
     const auto& factory = registered.get();
     if (!strcmp(name, factory.getName())) {
