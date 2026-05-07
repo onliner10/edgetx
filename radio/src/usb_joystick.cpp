@@ -161,7 +161,7 @@ int usbJoystickExtMode() { return g_model.usbJoystickExtMode; }
 
 int usbJoystickActive()
 {
-  return (usbPlugged() && getSelectedUsbMode() == USB_JOYSTICK_MODE);
+  return (usbIsPlugged() && getSelectedUsbMode() == USB_JOYSTICK_MODE);
 }
 
 int usbJoystickSettingsChanged()

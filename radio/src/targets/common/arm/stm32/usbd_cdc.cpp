@@ -19,6 +19,8 @@
  * GNU General Public License for more details.
  */
 
+#include "hal/usb_driver.h"
+
 extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
@@ -261,7 +263,10 @@ static int8_t VCP_StartOfFrame_FS()
     /* Reset the frame counter */
     FrameCount = 0;
 
-    /* Check the data to be sent through IN pipe */
+    /* Guard against use-after-deinit: bail if USB device has been stopped.
+       Called from SOF interrupt context, so we use the atomic flag. */
+    if (!usbStarted()) return USBD_OK;
+
     USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef*)hUsbDevice.pClassData;
 
     if (hcdc->TxState != 0)
@@ -355,6 +360,10 @@ void usbSerialPutc(void*, uint8_t c)
   */
 static int8_t VCP_Receive_FS(uint8_t* Buf, uint32_t *Len)
 {
+  // Guard against use-after-deinit: bail if USB device has been stopped.
+  // Called from USB OUT endpoint ISR context.
+  if (!usbStarted()) return USBD_OK;
+
   auto _rxCb = receiveDataCb;
   // auto _ctx = receiveDataCbCtx;
 
@@ -364,8 +373,6 @@ static int8_t VCP_Receive_FS(uint8_t* Buf, uint32_t *Len)
   USBD_CDC_ReceivePacket(&hUsbDevice);
   return USBD_OK;
 }
-
-#include "hal/usb_driver.h"
 
 uint32_t usbSerialBaudRate(void*)
 {

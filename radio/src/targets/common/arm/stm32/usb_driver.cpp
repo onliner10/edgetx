@@ -48,6 +48,12 @@ extern "C" {
 #include "hal.h"
 #include "debug.h"
 
+#if !defined(BOOT)
+#include "os/task.h"
+
+#include <atomic>
+#endif
+
 #if defined(USE_USB_HS)
   #define DEVICE_ID DEVICE_HS
 #else
@@ -66,19 +72,94 @@ static const USBD_DFU_MediaTypeDef* _dfu_media[USBD_DFU_MAX_ITF_NUM] = {nullptr}
 #define DEFAULT_USB_MODE USB_UNSELECTED_MODE;
 #endif
 
-static bool usbDriverStarted = false;
-static usbMode selectedUsbMode = DEFAULT_USB_MODE;
+namespace {
+
+#if !defined(BOOT)
+mutex_handle_t usbDriverMutex;
+
+class UsbDriverCriticalSection
+{
+ public:
+  UsbDriverCriticalSection()
+  {
+    if (scheduler_is_running()) locked = mutex_lock(&usbDriverMutex);
+  }
+
+  ~UsbDriverCriticalSection()
+  {
+    if (locked) mutex_unlock(&usbDriverMutex);
+  }
+
+  UsbDriverCriticalSection(const UsbDriverCriticalSection&) = delete;
+  UsbDriverCriticalSection& operator=(const UsbDriverCriticalSection&) = delete;
+
+ private:
+  bool locked = false;
+};
+
+std::atomic_bool usbDriverStarted{false};
+
+// Cached debounced USB VBUS state. Written by usbPlugged() (main task only),
+// read by usbIsPlugged() (any context). Single-writer, multiple-reader.
+std::atomic<bool> usbPluggedCached{false};
+
+bool usbDriverIsStarted()
+{
+  return usbDriverStarted.load(std::memory_order_acquire);
+}
+
+void setUsbDriverStarted(bool started)
+{
+  usbDriverStarted.store(started, std::memory_order_release);
+}
+#else
+class UsbDriverCriticalSection
+{
+ public:
+  UsbDriverCriticalSection() = default;
+  UsbDriverCriticalSection(const UsbDriverCriticalSection&) = delete;
+  UsbDriverCriticalSection& operator=(const UsbDriverCriticalSection&) = delete;
+};
+
+bool usbDriverStarted = false;
+
+bool usbDriverIsStarted()
+{
+  return usbDriverStarted;
+}
+
+void setUsbDriverStarted(bool started)
+{
+  usbDriverStarted = started;
+}
+#endif
+
+}  // namespace
+
+#if !defined(BOOT)
+static std::atomic<int> selectedUsbMode{USB_UNSELECTED_MODE};
+#else
+static usbMode selectedUsbMode = USB_MASS_STORAGE_MODE;
+#endif
 
 USBD_HandleTypeDef hUsbDevice;
 
 int getSelectedUsbMode()
 {
+#if !defined(BOOT)
+  return selectedUsbMode.load(std::memory_order_relaxed);
+#else
   return selectedUsbMode;
+#endif
 }
 
 void setSelectedUsbMode(int mode)
 {
+#if !defined(BOOT)
+  selectedUsbMode.store(mode, std::memory_order_relaxed);
+#else
   selectedUsbMode = usbMode(mode);
+#endif
 }
 
 #if defined(USB_GPIO_VBUS)
@@ -100,6 +181,10 @@ int usbPlugged()
     debouncedState = state;
   else
     lastState = state;
+
+#if !defined(BOOT)
+  usbPluggedCached.store(debouncedState != 0, std::memory_order_release);
+#endif
 
   return debouncedState;
 }
@@ -123,6 +208,10 @@ extern "C" void OTG_FS_IRQHandler()
 
 void usbInit()
 {
+#if !defined(BOOT)
+  mutex_create(&usbDriverMutex);
+#endif
+
 #if defined(STM32H7)
   HAL_PWREx_EnableUSBVoltageDetector();
 #endif
@@ -151,7 +240,7 @@ void usbInit()
 #endif
 #endif
 
-  usbDriverStarted = false;
+  setUsbDriverStarted(false);
 }
 
 extern void usbInitLUNs();
@@ -162,6 +251,13 @@ extern USBD_DFU_MediaTypeDef USBD_DFU_MEDIA_fops;
 
 void usbStart()
 {
+  [[maybe_unused]] UsbDriverCriticalSection lock;
+
+  // USBD_Init re-enables the NVIC OTG IRQ via HAL_PCD_MspInit.  SOF and RX
+  // callbacks may fire once the device connects, but usbStarted() is false
+  // until USBD_Start succeeds, so ISR guards in VCP_StartOfFrame_FS and
+  // VCP_Receive_FS will bail safely.
+  setUsbDriverStarted(false);
   USBD_Init(&hUsbDevice, &FS_Desc, DEVICE_ID);
   switch (getSelectedUsbMode()) {
     case USB_MASS_STORAGE_MODE:
@@ -205,20 +301,52 @@ void usbStart()
   }
 
   if (USBD_Start(&hUsbDevice) == USBD_OK) {
-    usbDriverStarted = true;
+    setUsbDriverStarted(true);
   }
 }
 
 void usbStop()
 {
-  usbDriverStarted = false;
+  [[maybe_unused]] UsbDriverCriticalSection lock;
+  if (!usbDriverIsStarted()) return;
+  setUsbDriverStarted(false);
+
+  // Disable the USB OTG interrupt before teardown to prevent ISR callbacks
+  // (SOF, RX, etc.) from accessing hUsbDevice after we begin deinit.  The
+  // atomic usbStarted() guard in VCP_StartOfFrame_FS provides an additional
+  // defence-in-depth check, but NVIC masking closes the entire TOCTOU window.
+  // HAL_PCD_MspDeInit inside USBD_DeInit also calls NVIC_DisableIRQ, so this
+  // is deliberately redundant — the IRQ must be quiescent before deinit starts.
+#if defined(USE_USB_HS)
+  NVIC_DisableIRQ(OTG_HS_IRQn);
+#else
+  NVIC_DisableIRQ(OTG_FS_IRQn);
+#endif
+  __DSB();
+  __ISB();
+
   USBD_DeInit(&hUsbDevice);
+
+#if defined(USE_USB_HS)
+  NVIC_ClearPendingIRQ(OTG_HS_IRQn);
+#else
+  NVIC_ClearPendingIRQ(OTG_FS_IRQn);
+#endif
 }
 
 
 bool usbStarted()
 {
-  return usbDriverStarted;
+  return usbDriverIsStarted();
+}
+
+bool usbIsPlugged()
+{
+#if !defined(BOOT)
+  return usbPluggedCached.load(std::memory_order_acquire);
+#else
+  return usbPlugged() != 0;
+#endif
 }
 
 #if defined(BOOT)
@@ -236,17 +364,62 @@ int usbRegisterDFUMedia(const void* dfu_media)
 #endif //  !defined(FIRMWARE_QSPI)
 #else // !BOOT
 
+namespace {
+
+bool usbJoystickCanSendReportLocked(const UsbDriverCriticalSection&)
+{
+  return usbDriverIsStarted() && usbIsPlugged() &&
+         getSelectedUsbMode() == USB_JOYSTICK_MODE;
+}
+
+uint8_t usbJoystickSendReportLocked(const UsbDriverCriticalSection& lock,
+                                    uint8_t* report, uint16_t len)
+{
+  if (!usbJoystickCanSendReportLocked(lock)) return USBD_FAIL;
+  return USBD_HID_SendReport(&hUsbDevice, report, len);
+}
+
+}  // namespace
+
 #if defined(USBJ_EX)
 extern "C" void delay_ms(uint32_t count);
 void usbJoystickRestart()
 {
-  if (!usbDriverStarted || getSelectedUsbMode() != USB_JOYSTICK_MODE) return;
+  {
+    [[maybe_unused]] UsbDriverCriticalSection lock;
+    if (!usbDriverIsStarted() || getSelectedUsbMode() != USB_JOYSTICK_MODE) return;
+    setUsbDriverStarted(false);
 
-  USBD_DeInit(&hUsbDevice);
+    // Disable USB OTG interrupt before teardown (see usbStop() for rationale).
+#if defined(USE_USB_HS)
+    NVIC_DisableIRQ(OTG_HS_IRQn);
+#else
+    NVIC_DisableIRQ(OTG_FS_IRQn);
+#endif
+    __DSB();
+    __ISB();
+
+    USBD_DeInit(&hUsbDevice);
+
+#if defined(USE_USB_HS)
+    NVIC_ClearPendingIRQ(OTG_HS_IRQn);
+#else
+    NVIC_ClearPendingIRQ(OTG_FS_IRQn);
+#endif
+  }
+  // Mutex released during delay. Mixer task won't send (usbDriverIsStarted is false).
+  // usbStop() won't double-deinit (it checks usbDriverIsStarted).
   delay_ms(100);
-  USBD_Init(&hUsbDevice, &FS_Desc, DEVICE_ID);
-  USBD_RegisterClass(&hUsbDevice, &USBD_HID);
-  USBD_Start(&hUsbDevice);
+  {
+    [[maybe_unused]] UsbDriverCriticalSection lock;
+    if (usbDriverIsStarted()) return;
+    // USBD_Init re-enables the NVIC OTG IRQ via HAL_PCD_MspInit.
+    USBD_Init(&hUsbDevice, &FS_Desc, DEVICE_ID);
+    USBD_RegisterClass(&hUsbDevice, &USBD_HID);
+    if (USBD_Start(&hUsbDevice) == USBD_OK) {
+      setUsbDriverStarted(true);
+    }
+  }
 }
 #endif
 
@@ -260,6 +433,9 @@ void usbJoystickRestart()
 */
 void usbJoystickUpdate()
 {
+  [[maybe_unused]] UsbDriverCriticalSection lock;
+  if (!usbJoystickCanSendReportLocked(lock)) return;
+
 #if !defined(USBJ_EX)
    static uint8_t HID_Buffer[HID_IN_PACKET];
 
@@ -285,10 +461,10 @@ void usbJoystickUpdate()
      HID_Buffer[i*2 +3] = static_cast<uint8_t>(value & 0xFF);
      HID_Buffer[i*2 +4] = static_cast<uint8_t>(value >> 8);
    }
-   USBD_HID_SendReport(&hUsbDevice, HID_Buffer, HID_IN_PACKET);
+   usbJoystickSendReportLocked(lock, HID_Buffer, HID_IN_PACKET);
 #else
   usbReport_t ret = usbReport();
-  USBD_HID_SendReport(&hUsbDevice, ret.ptr, ret.size);
+  usbJoystickSendReportLocked(lock, ret.ptr, ret.size);
 #endif
 }
 #endif

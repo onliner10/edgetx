@@ -1,5 +1,5 @@
 /*
-* Copyright (C) EdgeTX
+ * Copyright (C) EdgeTX
  *
  * Based on code named
  *   opentx - https://github.com/opentx/opentx
@@ -19,24 +19,20 @@
  * GNU General Public License for more details.
  */
 
-#include "usb_driver.h"
+#include "gtests.h"
+#include "hal/usb_driver.h"
 
-bool usbPluggedInStorageMode()
+TEST(USBDriver, JoystickReportsDisabledAfterDisconnect)
 {
-  return usbPlugged() && getSelectedUsbMode() == USB_MASS_STORAGE_MODE;
+  ASSERT_FALSE(usbPlugged());
+  ASSERT_FALSE(usbIsPlugged());
+  ASSERT_EQ(USB_JOYSTICK_MODE, getSelectedUsbMode());
+
+  EXPECT_FALSE(usbJoystickReportsEnabled());
 }
 
-bool usbPluggedInJoystickMode()
+TEST(USBDriver, IsPluggedReturnsFalseInSimulator)
 {
-  return usbIsPlugged() && getSelectedUsbMode() == USB_JOYSTICK_MODE;
-}
-
-bool usbJoystickReportsEnabled()
-{
-  return usbStarted() && usbPluggedInJoystickMode();
-}
-
-bool usbPluggedInVCPMode()
-{
-  return usbPlugged() && getSelectedUsbMode() == USB_SERIAL_MODE;
+  EXPECT_FALSE(usbIsPlugged());
+  EXPECT_FALSE(usbStarted());
 }

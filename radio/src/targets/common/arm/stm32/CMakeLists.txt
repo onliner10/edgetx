@@ -74,6 +74,8 @@ if(NOT NATIVE_BUILD)
     ${STM32_DRIVER_DIR}/usbd_hid_joystick.c
   )
 
+  target_compile_definitions(stm32usb_device_fw PRIVATE FREE_RTOS)
+
   if(DEBUG OR CLI OR USB_SERIAL)
     target_compile_options(stm32usb_device_fw PRIVATE -DUSB_SERIAL)
   endif()

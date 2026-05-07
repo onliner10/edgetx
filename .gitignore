@@ -6,6 +6,15 @@
 /doc/
 /build*/
 /cmake-build-*/
+/.ninja_log
+/.ninja_deps
+/CMakeCache.txt
+/CMakeFiles/
+/build.ninja
+/cmake_install.cmake
+/native/
+/native-prefix/
+/arm-none-eabi-prefix/
 /*.bin
 /*.uf2
 /*.elf

@@ -194,7 +194,7 @@ void mixerTask()
       DEBUG_TIMER_STOP(debugTimerMixer);
 
 #if defined(STM32) && !defined(SIMU)
-      if (getSelectedUsbMode() == USB_JOYSTICK_MODE) {
+      if (usbJoystickReportsEnabled()) {
         usbJoystickUpdate();
       }
 #endif

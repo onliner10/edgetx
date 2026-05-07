@@ -46,6 +46,7 @@ enum usbMode {
 #define CTRL_LINE_STATE_RTS (1 << 1)
 
 int  usbPlugged();
+bool usbIsPlugged();
 void usbInit();
 void usbStart();
 void usbStop();
@@ -53,6 +54,7 @@ bool usbStarted();
 bool usbPluggedInStorageMode();
 bool usbPluggedInJoystickMode();
 bool usbPluggedInVCPMode();
+bool usbJoystickReportsEnabled();
 
 EXTERN_C(int getSelectedUsbMode());
 void setSelectedUsbMode(int mode);

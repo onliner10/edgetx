@@ -350,6 +350,8 @@ uint32_t readTrims()
 }
 
 int usbPlugged() { return false; }
+bool usbIsPlugged() { return false; }
+bool usbStarted() { return false; }
 int getSelectedUsbMode() { return USB_JOYSTICK_MODE; }
 void setSelectedUsbMode(int mode) {}
 void delay_ms(uint32_t ms) { }
