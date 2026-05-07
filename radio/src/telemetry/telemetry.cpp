@@ -42,7 +42,6 @@
 #include "spektrum.h"
 
 #include <atomic>
-#include <cstdint>
 
 #if defined(NATIVE_THREADS)
   #include <thread>
@@ -83,10 +82,8 @@ static rxStatStruct rxStat;
 
 telemetry_buffer _telemetry_rx_buffer[NUM_MODULES];
 
-static mutex_handle_t telemetryDataMutex;
+static recursive_mutex_handle_t telemetryDataMutex;
 static std::atomic<uint8_t> telemetryDataMutexState{0};
-static std::atomic<uintptr_t> telemetryDataMutexOwner{0};
-static uint32_t telemetryDataMutexDepth = 0;
 
 namespace {
 
@@ -107,22 +104,6 @@ void telemetryDataMutexWait()
 #endif
 }
 
-uintptr_t telemetryDataCurrentOwner()
-{
-#if defined(NATIVE_THREADS)
-  static thread_local uint8_t threadToken;
-  return reinterpret_cast<uintptr_t>(&threadToken);
-#elif defined(FREE_RTOS)
-  if (scheduler_is_running()) {
-    TaskHandle_t task = xTaskGetCurrentTaskHandle();
-    if (task) {
-      return reinterpret_cast<uintptr_t>(task);
-    }
-  }
-#endif
-  return 1;
-}
-
 }  // namespace
 
 void telemetryInit()
@@ -137,7 +118,7 @@ void telemetryInit()
   if (telemetryDataMutexState.compare_exchange_strong(
           expected, TELEMETRY_DATA_MUTEX_INITIALIZING,
           std::memory_order_acq_rel, std::memory_order_acquire)) {
-    mutex_create(&telemetryDataMutex);
+    recursive_mutex_create(&telemetryDataMutex);
     telemetryDataMutexState.store(TELEMETRY_DATA_MUTEX_READY,
                                   std::memory_order_release);
     return;
@@ -152,50 +133,18 @@ void telemetryInit()
 void telemetryDataLock()
 {
   telemetryInit();
-
-  uintptr_t owner = telemetryDataCurrentOwner();
-  if (telemetryDataMutexOwner.load(std::memory_order_acquire) == owner) {
-    telemetryDataMutexDepth++;
-    return;
-  }
-
-  mutex_lock(&telemetryDataMutex);
-  telemetryDataMutexDepth = 1;
-  telemetryDataMutexOwner.store(owner, std::memory_order_release);
+  recursive_mutex_lock(&telemetryDataMutex);
 }
 
 bool telemetryDataTryLock()
 {
   telemetryInit();
-
-  uintptr_t owner = telemetryDataCurrentOwner();
-  if (telemetryDataMutexOwner.load(std::memory_order_acquire) == owner) {
-    telemetryDataMutexDepth++;
-    return true;
-  }
-
-  if (!mutex_trylock(&telemetryDataMutex)) {
-    return false;
-  }
-
-  telemetryDataMutexDepth = 1;
-  telemetryDataMutexOwner.store(owner, std::memory_order_release);
-  return true;
+  return recursive_mutex_trylock(&telemetryDataMutex);
 }
 
 void telemetryDataUnlock()
 {
-  uintptr_t owner = telemetryDataCurrentOwner();
-  if (telemetryDataMutexOwner.load(std::memory_order_acquire) != owner) {
-    return;
-  }
-
-  if (--telemetryDataMutexDepth > 0) {
-    return;
-  }
-
-  telemetryDataMutexOwner.store(0, std::memory_order_release);
-  mutex_unlock(&telemetryDataMutex);
+  recursive_mutex_unlock(&telemetryDataMutex);
 }
 
 static void clearTelemetryRxBuffers()

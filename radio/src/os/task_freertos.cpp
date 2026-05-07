@@ -68,3 +68,29 @@ static inline bool _lock_mutex(mutex_handle_t* h, TickType_t xTickToWait)
 bool mutex_lock(mutex_handle_t* h) ETX_NO_THREAD_SAFETY_ANALYSIS { return _lock_mutex(h, portMAX_DELAY); }
 bool mutex_trylock(mutex_handle_t* h) ETX_NO_THREAD_SAFETY_ANALYSIS { return _lock_mutex(h, (TickType_t)0); }
 void mutex_unlock(mutex_handle_t* h) ETX_NO_THREAD_SAFETY_ANALYSIS { xSemaphoreGive(h->_rtos_handle); }
+
+void recursive_mutex_create(recursive_mutex_handle_t* h)
+{
+  h->_rtos_handle = xSemaphoreCreateRecursiveMutexStatic(&h->_mutex_struct);
+}
+
+static inline bool _lock_recursive_mutex(recursive_mutex_handle_t* h,
+                                         TickType_t xTickToWait)
+{
+  return xSemaphoreTakeRecursive(h->_rtos_handle, xTickToWait) == pdTRUE;
+}
+
+bool recursive_mutex_lock(recursive_mutex_handle_t* h) ETX_NO_THREAD_SAFETY_ANALYSIS
+{
+  return _lock_recursive_mutex(h, portMAX_DELAY);
+}
+
+bool recursive_mutex_trylock(recursive_mutex_handle_t* h) ETX_NO_THREAD_SAFETY_ANALYSIS
+{
+  return _lock_recursive_mutex(h, (TickType_t)0);
+}
+
+void recursive_mutex_unlock(recursive_mutex_handle_t* h) ETX_NO_THREAD_SAFETY_ANALYSIS
+{
+  xSemaphoreGiveRecursive(h->_rtos_handle);
+}

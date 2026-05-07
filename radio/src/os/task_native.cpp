@@ -161,3 +161,27 @@ bool mutex_trylock(mutex_handle_t* h) ETX_NO_THREAD_SAFETY_ANALYSIS
   if (!h) return false;
   return h->try_lock();
 }
+
+void recursive_mutex_create(recursive_mutex_handle_t* h)
+{
+  (void)h;
+}
+
+bool recursive_mutex_lock(recursive_mutex_handle_t* h) ETX_NO_THREAD_SAFETY_ANALYSIS
+{
+  if (!h) return false;
+  h->lock();
+  return true;
+}
+
+void recursive_mutex_unlock(recursive_mutex_handle_t* h) ETX_NO_THREAD_SAFETY_ANALYSIS
+{
+  if (!h) return;
+  h->unlock();
+}
+
+bool recursive_mutex_trylock(recursive_mutex_handle_t* h) ETX_NO_THREAD_SAFETY_ANALYSIS
+{
+  if (!h) return false;
+  return h->try_lock();
+}

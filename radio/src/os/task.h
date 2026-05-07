@@ -46,6 +46,12 @@ bool mutex_lock(mutex_handle_t* h) ETX_TRY_ACQUIRE(true, h);
 void mutex_unlock(mutex_handle_t* h) ETX_RELEASE(h);
 bool mutex_trylock(mutex_handle_t* h) ETX_TRY_ACQUIRE(true, h);
 
+void recursive_mutex_create(recursive_mutex_handle_t* h);
+bool recursive_mutex_lock(recursive_mutex_handle_t* h)
+    ETX_TRY_ACQUIRE(true, h);
+void recursive_mutex_unlock(recursive_mutex_handle_t* h) ETX_RELEASE(h);
+bool recursive_mutex_trylock(recursive_mutex_handle_t* h)
+    ETX_TRY_ACQUIRE(true, h);
 
 // this helper class is only to be used on the stack and never to be shared outside the scope where it was created
 /* example usage

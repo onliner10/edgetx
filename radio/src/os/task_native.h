@@ -24,9 +24,9 @@
 #include "time_native.h"
 #include "thread_annotations.h"
 
-#include <thread>
 #include <mutex>
 #include <memory>
+#include <thread>
 
 #define TASK_DEFINE_STACK(name, size) void* name
 
@@ -38,6 +38,9 @@ struct task_handle_t {
 };
 
 struct ETX_CAPABILITY("mutex") mutex_handle_t : public std::mutex {
+};
+
+struct ETX_CAPABILITY("mutex") recursive_mutex_handle_t : public std::recursive_mutex {
 };
 
 bool task_running();
