@@ -8,6 +8,7 @@ dependencies = [
   "lz4",
   "pillow",
   "pydantic",
+  "pyserial",
   "typing-extensions",
 ]
 
