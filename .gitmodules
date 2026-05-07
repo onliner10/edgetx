@@ -10,8 +10,8 @@
     url = https://github.com/nothings/stb.git
 [submodule "radio/src/thirdparty/lvgl"]
 	path = radio/src/thirdparty/lvgl
-    url = https://github.com/EdgeTX/lvgl.git
-    branch = release/v8.2
+    url = https://github.com/onliner10/lvgl.git
+    branch = edge16/v8.4-patched
 [submodule "radio/src/thirdparty/uf2"]
 	path = radio/src/thirdparty/uf2
 	url = https://github.com/microsoft/uf2.git
