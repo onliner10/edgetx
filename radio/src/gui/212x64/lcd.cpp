@@ -154,9 +154,9 @@ void drawTelemetryTopBar()
     TimerData *timer =  &g_model.timers[0];
     int32_t val = 0;
     if (g_model.timers[0].showElapsed)
-      val = timer->start - timersStates[0].val;
+      val = timer->start - getTimerStateValue(0);
     else
-      val = timersStates[0].val;
+      val = getTimerStateValue(0);
     LcdFlags att = (val < 0 ? BLINK : 0) | TIMEHOUR;
     drawTimer(18*FW, 0, val, att, att);
     lcdDrawText(18*FW, 0, "T1:", RIGHT);
@@ -165,9 +165,9 @@ void drawTelemetryTopBar()
     TimerData *timer =  &g_model.timers[1];
     int32_t val = 0;
     if (g_model.timers[1].showElapsed)
-      val = timer->start - timersStates[1].val;
+      val = timer->start - getTimerStateValue(1);
     else
-      val = timersStates[1].val;
+      val = getTimerStateValue(1);
     LcdFlags att = (val < 0 ? BLINK : 0) | TIMEHOUR;
     drawTimer(28*FW, 0, val, att, att);
     lcdDrawText(28*FW, 0, "T2:", RIGHT);

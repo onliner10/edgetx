@@ -106,8 +106,7 @@ class ValueWidget : public TrackedWidget
           telemetryItems[(field - MIXSRC_FIRST_TELEM) / 3];
       key.add(telemetryItem.isAvailable()).add(telemetryItem.isOld());
     } else if (field >= MIXSRC_FIRST_TIMER && field <= MIXSRC_LAST_TIMER) {
-      TimerState& timerState = timersStates[field - MIXSRC_FIRST_TIMER];
-      key.add((int32_t)timerState.val);
+      key.add((int32_t)getTimerStateValue(field - MIXSRC_FIRST_TIMER));
     }
 
     return key.value();
@@ -151,8 +150,7 @@ class ValueWidget : public TrackedWidget
 
       // Check for disabled or warning color states
       if (field >= MIXSRC_FIRST_TIMER && field <= MIXSRC_LAST_TIMER) {
-        TimerState& timerState = timersStates[field - MIXSRC_FIRST_TIMER];
-        if (timerState.val < 0) {
+        if (getTimerStateValue(field - MIXSRC_FIRST_TIMER) < 0) {
           // Set warning color
           label.with([](lv_obj_t* obj) {
             lv_obj_add_state(obj, ETX_STATE_TIMER_ELAPSED);
@@ -186,10 +184,9 @@ class ValueWidget : public TrackedWidget
         timerOptions.options = SHOW_TIME;
         valueTxt = getTimerString(tme, timerOptions);
       } else if (field >= MIXSRC_FIRST_TIMER && field <= MIXSRC_LAST_TIMER) {
-        TimerState& timerState = timersStates[field - MIXSRC_FIRST_TIMER];
         TimerOptions timerOptions;
         timerOptions.options = SHOW_TIMER;
-        valueTxt = getTimerString(abs(timerState.val), timerOptions);
+        valueTxt = getTimerString(abs(getTimerStateValue(field - MIXSRC_FIRST_TIMER)), timerOptions);
       } else if (field >= MIXSRC_FIRST_TELEM) {
         std::string getSensorCustomValue(uint8_t sensor, int32_t value,
                                          LcdFlags flags);

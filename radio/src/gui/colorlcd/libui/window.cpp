@@ -746,12 +746,14 @@ void Window::deleteLater()
 
   TRACE_WINDOWS("Delete %p %s", this, getWindowDebugString().c_str());
 
+  auto handler = std::move(closeHandler);
+
   detach();
   deleteChildren();
 
   popLayer();
 
-  if (closeHandler) closeHandler();
+  if (handler) handler();
 
   Window::trash.push_back(this);
 

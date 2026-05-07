@@ -48,15 +48,15 @@
 #endif
 
 #if defined(AUDIO)
-uint8_t currentSpeakerVolume = 255;
-uint8_t requiredSpeakerVolume = 255;
+std::atomic<uint8_t> currentSpeakerVolume{255};
+std::atomic<uint8_t> requiredSpeakerVolume{255};
 #if defined(AUDIO_HP_DETECT_PIN)
 bool hpDetected = false;
 #endif
 #endif
 
-uint8_t currentBacklightBright = 0;
-uint8_t requiredBacklightBright = 0;
+std::atomic<uint8_t> currentBacklightBright{0};
+std::atomic<uint8_t> requiredBacklightBright{0};
 uint8_t mainRequestFlags = 0;
 
 static bool _usbDisabled = false;
@@ -249,10 +249,11 @@ void checkSpeakerVolume()
   }
 #endif
 #if defined(AUDIO)
-  if (currentSpeakerVolume != requiredSpeakerVolume) {
-    currentSpeakerVolume = requiredSpeakerVolume;
+  uint8_t volume = requiredSpeakerVolume.load(std::memory_order_relaxed);
+  if (currentSpeakerVolume.load(std::memory_order_relaxed) != volume) {
+    currentSpeakerVolume.store(volume, std::memory_order_relaxed);
 #if !defined(SOFTWARE_VOLUME)
-    audioSetVolume(currentSpeakerVolume);
+    audioSetVolume(volume);
 #endif
   }
 #endif
@@ -364,9 +365,7 @@ void guiMain(event_t evt)
   static uint32_t lastLuaTime = 0;
   uint16_t interval = (lastLuaTime == 0 ? 0 : (t0 - lastLuaTime));
   lastLuaTime = t0;
-  if (interval > maxLuaInterval) {
-    maxLuaInterval = interval;
-  }
+  updateMaxLuaInterval(interval);
 
   luaDoGc(lsWidgets, false);
 
@@ -374,10 +373,7 @@ void guiMain(event_t evt)
   luaTask(false);
   DEBUG_TIMER_STOP(debugTimerLua);
 
-  t0 = get_tmr10ms() - t0;
-  if (t0 > maxLuaDuration) {
-    maxLuaDuration = t0;
-  }
+  updateMaxLuaDuration(get_tmr10ms() - t0);
 #endif
 
   bool mainViewRequested = (mainRequestFlags & (1u << REQUEST_MAIN_VIEW));
@@ -449,18 +445,13 @@ void guiMain(event_t evt)
   static uint32_t lastLuaTime = 0;
   uint16_t interval = (lastLuaTime == 0 ? 0 : (t0 - lastLuaTime));
   lastLuaTime = t0;
-  if (interval > maxLuaInterval) {
-    maxLuaInterval = interval;
-  }
+  updateMaxLuaInterval(interval);
 
   // run Lua scripts that don't use LCD (to use CPU time while LCD DMA is
   // running)
   luaTask(false);
 
-  t0 = get_tmr10ms() - t0;
-  if (t0 > maxLuaDuration) {
-    maxLuaDuration = t0;
-  }
+  updateMaxLuaDuration(get_tmr10ms() - t0);
 #endif  // #if defined(LUA)
 
   // wait for LCD DMA to finish before continuing, because code from this point
@@ -614,7 +605,7 @@ void perMain()
 #if defined(PCBX9E) && !defined(SIMU)
   toplcdRefreshStart();
   setTopFirstTimer(getValue(MIXSRC_FIRST_TIMER + g_model.toplcdTimer));
-  setTopSecondTimer(g_eeGeneral.globalTimer + sessionTimer);
+  setTopSecondTimer(g_eeGeneral.globalTimer + getSessionTimer());
   setTopRssi(TELEMETRY_RSSI());
   setTopBatteryValue(g_vbat100mV);
   setTopBatteryState(GET_TXBATT_BARS(10), IS_TXBATT_WARNING());

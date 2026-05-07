@@ -269,7 +269,7 @@ in 2038.
 #if defined(RTCLOCK)
 static int luaGetRtcTime(lua_State * L)
 {
-  lua_pushinteger(L, g_rtcTime);
+  lua_pushinteger(L, rtcGetTimestamp());
   return 1;
 }
 #endif
@@ -1799,10 +1799,10 @@ Returns radio timers
 static int luaGetGlobalTimer(lua_State * L)
 {
   lua_newtable(L);
-  lua_pushtableinteger(L, "total", g_eeGeneral.globalTimer + sessionTimer);
-  lua_pushtableinteger(L, "session", sessionTimer);
-  lua_pushtableinteger(L, "throttle", s_timeCumThr);
-  lua_pushtableinteger(L, "throttlepct", s_timeCum16ThrP/16);
+  lua_pushtableinteger(L, "total", g_eeGeneral.globalTimer + getSessionTimer());
+  lua_pushtableinteger(L, "session", getSessionTimer());
+  lua_pushtableinteger(L, "throttle", getThrottleRuntime());
+  lua_pushtableinteger(L, "throttlepct", getThrottlePercentRuntime()/16);
   return 1;
 }
 
@@ -2215,7 +2215,7 @@ static int luaGetUsage(lua_State * L)
     lua_pushinteger(L, instructionsPercent);
   }
 #else
-  lua_pushinteger(L, 100 * maxLuaDuration / LUA_TASK_PERIOD_TICKS);
+  lua_pushinteger(L, 100 * getMaxLuaDuration() / LUA_TASK_PERIOD_TICKS);
 #endif
   return 1;
 }
@@ -2251,22 +2251,22 @@ static int luaResetGlobalTimer(lua_State * L)
   const char * option = luaL_optlstring(L, 1, "total", &length);
   if (!strcmp(option, "all")) {
     g_eeGeneral.globalTimer = 0;
-    sessionTimer = 0;
-    s_timeCumThr = 0;
-    s_timeCum16ThrP = 0;
+    setSessionTimer(0);
+    setThrottleRuntime(0);
+    setThrottlePercentRuntime(0);
   }
   else if (!strcmp(option, "total")) {
     g_eeGeneral.globalTimer = 0;
-    sessionTimer = 0;
+    setSessionTimer(0);
   }
   else if (!strcmp(option, "session")) {
-    sessionTimer = 0;
+    setSessionTimer(0);
   }
   else if (!strcmp(option, "throttle")) {
-    s_timeCumThr = 0;
+    setThrottleRuntime(0);
   }
   else if (!strcmp(option, "throttlepct")) {
-    s_timeCum16ThrP = 0;
+    setThrottlePercentRuntime(0);
   }
   storageDirty(EE_GENERAL);
   return 0;

@@ -28,9 +28,28 @@
 #include "getset_helpers.h"
 #include "mixes.h"
 #include "numberedit.h"
+#include "tasks/mixer_task.h"
 #include "toggleswitch.h"
 
 #define SET_DIRTY() storageDirty(EE_MODEL)
+#define SET_MIXER_DEFAULT(value)              \
+  [=](int32_t newValue) {                     \
+    MixerTaskLockGuard lock;                  \
+    value = newValue;                         \
+    SET_DIRTY();                              \
+  }
+#define SET_MIXER_VALUE(value, _newValue)     \
+  [=](int32_t newValue) {                     \
+    MixerTaskLockGuard lock;                  \
+    value = _newValue;                        \
+    SET_DIRTY();                              \
+  }
+#define SET_MIXER_INVERTED(value)             \
+  [=](uint8_t newValue) {                     \
+    MixerTaskLockGuard lock;                  \
+    value = !newValue;                        \
+    SET_DIRTY();                              \
+  }
 
 MixEditAdvanced::MixEditAdvanced(int8_t channel, uint8_t index) :
     Page(ICON_MODEL_MIXER, PAD_MEDIUM), channel(channel), index(index)
@@ -65,11 +84,12 @@ void MixEditAdvanced::buildBody(Window* form)
   FormLine* line;
 
   // Multiplex
-  if (index > 0 && mixAddress(index - 1)->destCh == channel) {
-    line = form->newLine(grid);
-    new StaticText(line, rect_t{}, STR_MULTPX);
-    new Choice(line, rect_t{}, STR_VMLTPX, 0, 2, GET_SET_DEFAULT(mix->mltpx));
-  }
+	  if (index > 0 && mixAddress(index - 1)->destCh == channel) {
+	    line = form->newLine(grid);
+	    new StaticText(line, rect_t{}, STR_MULTPX);
+	    new Choice(line, rect_t{}, STR_VMLTPX, 0, 2,
+	               GET_DEFAULT(mix->mltpx), SET_MIXER_DEFAULT(mix->mltpx));
+	  }
 
   // Flight modes
   if (modelFMEnabled()) {
@@ -78,15 +98,17 @@ void MixEditAdvanced::buildBody(Window* form)
     new FMMatrix<MixData>(line, rect_t{}, mix);
   }
 
-  // Trim
-  line = form->newLine(grid);
-  new StaticText(line, rect_t{}, STR_TRIM);
-  new ToggleSwitch(line, rect_t{}, GET_SET_INVERTED(mix->carryTrim));
+	  // Trim
+	  line = form->newLine(grid);
+	  new StaticText(line, rect_t{}, STR_TRIM);
+	  new ToggleSwitch(line, rect_t{}, GET_INVERTED(mix->carryTrim),
+	                   SET_MIXER_INVERTED(mix->carryTrim));
 
-  // Warning
-  new StaticText(line, rect_t{}, STR_MIXWARNING);
-  auto edit = new NumberEdit(line, rect_t{}, 0, 3,
-                             GET_SET_DEFAULT(mix->mixWarn));
+	  // Warning
+	  new StaticText(line, rect_t{}, STR_MIXWARNING);
+	  auto edit = new NumberEdit(line, rect_t{}, 0, 3,
+	                             GET_DEFAULT(mix->mixWarn),
+	                             SET_MIXER_DEFAULT(mix->mixWarn));
   edit->setZeroText(STR_OFF);
 
   // Delay up/down precision
@@ -96,17 +118,20 @@ void MixEditAdvanced::buildBody(Window* form)
   line = form->newLine(grid);
   new StaticText(line, rect_t{}, STR_MIX_DELAY_PREC);
   new Choice(line, rect_t{}, &STR_VPREC[1], 0, 1,
-             GET_DEFAULT(mix->delayPrec),
-             [=](int newValue) {
-              mix->delayPrec = newValue;
-              delayUp->clearTextFlag(PREC2);
-              delayUp->setTextFlag(mix->delayPrec ? PREC2 : PREC1);
-              delayUp->update();
-              delayDn->clearTextFlag(PREC2);
-              delayDn->setTextFlag(mix->delayPrec ? PREC2 : PREC1);
-              delayDn->update();
-              SET_DIRTY();
-             });
+	             GET_DEFAULT(mix->delayPrec),
+	             [=](int newValue) {
+	              {
+	                MixerTaskLockGuard lock;
+	                mix->delayPrec = newValue;
+	              }
+	              delayUp->clearTextFlag(PREC2);
+	              delayUp->setTextFlag(newValue ? PREC2 : PREC1);
+	              delayUp->update();
+	              delayDn->clearTextFlag(PREC2);
+	              delayDn->setTextFlag(newValue ? PREC2 : PREC1);
+	              delayDn->update();
+	              SET_DIRTY();
+	             });
 #if !NARROW_LAYOUT
   grid.setColSpan(1);
 #endif
@@ -114,16 +139,18 @@ void MixEditAdvanced::buildBody(Window* form)
   // Delay up
   line = form->newLine(grid);
   new StaticText(line, rect_t{}, STR_DELAYUP);
-  delayUp = new NumberEdit(line, rect_t{}, 0, DELAY_MAX,
-                           GET_DEFAULT(mix->delayUp),
-                           SET_VALUE(mix->delayUp, newValue), mix->delayPrec ? PREC2 : PREC1);
+	  delayUp = new NumberEdit(line, rect_t{}, 0, DELAY_MAX,
+	                           GET_DEFAULT(mix->delayUp),
+	                           SET_MIXER_VALUE(mix->delayUp, newValue),
+	                           mix->delayPrec ? PREC2 : PREC1);
   delayUp->setSuffix("s");
 
   // Delay down
   new StaticText(line, rect_t{}, STR_DELAYDOWN);
-  delayDn = new NumberEdit(line, rect_t{}, 0, DELAY_MAX,
-                           GET_DEFAULT(mix->delayDown),
-                           SET_VALUE(mix->delayDown, newValue), mix->delayPrec ? PREC2 : PREC1);
+	  delayDn = new NumberEdit(line, rect_t{}, 0, DELAY_MAX,
+	                           GET_DEFAULT(mix->delayDown),
+	                           SET_MIXER_VALUE(mix->delayDown, newValue),
+	                           mix->delayPrec ? PREC2 : PREC1);
   delayDn->setSuffix("s");
 
   // Slow up/down precision
@@ -133,17 +160,20 @@ void MixEditAdvanced::buildBody(Window* form)
   line = form->newLine(grid);
   new StaticText(line, rect_t{}, STR_MIX_SLOW_PREC);
   new Choice(line, rect_t{}, &STR_VPREC[1], 0, 1,
-             GET_DEFAULT(mix->speedPrec),
-             [=](int newValue) {
-              mix->speedPrec = newValue;
-              slowUp->clearTextFlag(PREC2);
-              slowUp->setTextFlag(mix->speedPrec ? PREC2 : PREC1);
-              slowUp->update();
-              slowDn->clearTextFlag(PREC2);
-              slowDn->setTextFlag(mix->speedPrec ? PREC2 : PREC1);
-              slowDn->update();
-              SET_DIRTY();
-             });
+	             GET_DEFAULT(mix->speedPrec),
+	             [=](int newValue) {
+	              {
+	                MixerTaskLockGuard lock;
+	                mix->speedPrec = newValue;
+	              }
+	              slowUp->clearTextFlag(PREC2);
+	              slowUp->setTextFlag(newValue ? PREC2 : PREC1);
+	              slowUp->update();
+	              slowDn->clearTextFlag(PREC2);
+	              slowDn->setTextFlag(newValue ? PREC2 : PREC1);
+	              slowDn->update();
+	              SET_DIRTY();
+	             });
 #if !NARROW_LAYOUT
   grid.setColSpan(1);
 #endif
@@ -151,13 +181,15 @@ void MixEditAdvanced::buildBody(Window* form)
   // Slow up
   line = form->newLine(grid);
   new StaticText(line, rect_t{}, STR_SLOWUP);
-  slowUp = new NumberEdit(line, rect_t{}, 0, DELAY_MAX, GET_DEFAULT(mix->speedUp),
-                          SET_VALUE(mix->speedUp, newValue), mix->speedPrec ? PREC2 : PREC1);
+	  slowUp = new NumberEdit(line, rect_t{}, 0, DELAY_MAX, GET_DEFAULT(mix->speedUp),
+	                          SET_MIXER_VALUE(mix->speedUp, newValue),
+	                          mix->speedPrec ? PREC2 : PREC1);
   slowUp->setSuffix("s");
 
   // Slow down
   new StaticText(line, rect_t{}, STR_SLOWDOWN);
-  slowDn = new NumberEdit(line, rect_t{}, 0, DELAY_MAX, GET_DEFAULT(mix->speedDown),
-                          SET_VALUE(mix->speedDown, newValue), mix->speedPrec ? PREC2 : PREC1);
+	  slowDn = new NumberEdit(line, rect_t{}, 0, DELAY_MAX, GET_DEFAULT(mix->speedDown),
+	                          SET_MIXER_VALUE(mix->speedDown, newValue),
+	                          mix->speedPrec ? PREC2 : PREC1);
   slowDn->setSuffix("s");
 }

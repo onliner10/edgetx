@@ -30,8 +30,6 @@
 #define TIME_T_MIN      (-LONG_MAX)
 #define TIME_T_MAX      (LONG_MAX)
 
-#define SET_LOAD_DATETIME(x)  { rtcSetTime(x); g_rtcTime = gmktime(x); }
-
 typedef long int gtime_t;
 
 struct gtm
@@ -48,6 +46,38 @@ struct gtm
 
 extern gtime_t g_rtcTime;
 extern uint8_t g_ms100; // global to allow time set function to reset to zero
+
+static inline gtime_t rtcGetTimestamp()
+{
+  return __atomic_load_n(&g_rtcTime, __ATOMIC_RELAXED);
+}
+
+static inline void rtcSetTimestamp(gtime_t value)
+{
+  __atomic_store_n(&g_rtcTime, value, __ATOMIC_RELAXED);
+}
+
+static inline gtime_t rtcAddTimestamp(gtime_t value)
+{
+  return __atomic_add_fetch(&g_rtcTime, value, __ATOMIC_RELAXED);
+}
+
+static inline uint8_t rtcGetMs100()
+{
+  return __atomic_load_n(&g_ms100, __ATOMIC_RELAXED);
+}
+
+static inline void rtcSetMs100(uint8_t value)
+{
+  __atomic_store_n(&g_ms100, value, __ATOMIC_RELAXED);
+}
+
+static inline uint8_t rtcIncrementMs100()
+{
+  return __atomic_add_fetch(&g_ms100, 1, __ATOMIC_RELAXED);
+}
+
+#define SET_LOAD_DATETIME(x)  { rtcSetTime(x); rtcSetTimestamp(gmktime(x)); }
 
 bool rtcIsValid();
 void rtcInit();

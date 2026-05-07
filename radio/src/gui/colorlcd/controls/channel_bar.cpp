@@ -127,7 +127,7 @@ void ChannelBar::onLiveCheckEvents(Window::LiveWindow& live)
 MixerChannelBar::MixerChannelBar(Window* parent, const rect_t& rect,
                                  uint8_t channel) :
     ChannelBar(
-        parent, rect, channel, [=] { return ex_chans[channel]; },
+        parent, rect, channel, [=] { return getRawChannelOutput(channel); },
         COLOR_THEME_FOCUS_INDEX)
 {
 }
@@ -138,7 +138,7 @@ OutputChannelBar::OutputChannelBar(Window* parent, const rect_t& rect,
                                    uint8_t channel, bool editColor,
                                    bool drawLimits) :
     ChannelBar(
-        parent, rect, channel, [=] { return channelOutputs[channel]; },
+        parent, rect, channel, [=] { return getChannelOutput(channel); },
         COLOR_THEME_ACTIVE_INDEX),
     drawLimits(drawLimits)
 {
@@ -289,8 +289,8 @@ ComboChannelBar::ComboChannelBar(Window* parent, const rect_t& rect,
       {width() - ChannelBar::VAL_W, 0, ChannelBar::VAL_W, ChannelBar::VAL_H},
       [=] {
         if (g_eeGeneral.ppmunit == PPM_US)
-          return calcRESXto100(channelOutputs[channel]);
-        return PPM_CH_CENTER(channel) + channelOutputs[channel] / 2;
+          return calcRESXto100(getChannelOutput(channel));
+        return PPM_CH_CENTER(channel) + getChannelOutput(channel) / 2;
       },
       txtColIdx, FONT(XS) | RIGHT, "", suffix);
 
@@ -299,7 +299,8 @@ ComboChannelBar::ComboChannelBar(Window* parent, const rect_t& rect,
   overrideIcon = new (std::nothrow)
       StaticIcon(this, 0, PAD_SMALL, ICON_CHAN_MONITOR_LOCKED, txtColIdx);
   if (overrideIcon)
-    overrideIcon->show(safetyCh[channel] != OVERRIDE_CHANNEL_UNDEFINED);
+    overrideIcon->show(getSafetyChannel(channel) !=
+                       OVERRIDE_CHANNEL_UNDEFINED);
 #endif
 
   // Channel reverted icon
@@ -316,6 +317,7 @@ void ComboChannelBar::onLiveCheckEvents(Window::LiveWindow& live)
   Window::onLiveCheckEvents(live);
 
   if (overrideIcon)
-    overrideIcon->show(safetyCh[channel] != OVERRIDE_CHANNEL_UNDEFINED);
+    overrideIcon->show(getSafetyChannel(channel) !=
+                       OVERRIDE_CHANNEL_UNDEFINED);
 }
 #endif

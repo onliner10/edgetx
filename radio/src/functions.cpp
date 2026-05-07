@@ -36,9 +36,9 @@ void switchToRadio() {};
 void switchToVideo() {};
 #endif
 #endif
-CustomFunctionsContext modelFunctionsContext = { 0 };
+CustomFunctionsContext modelFunctionsContext;
 
-CustomFunctionsContext globalFunctionsContext = { 0 };
+CustomFunctionsContext globalFunctionsContext;
 
 #if defined(DEBUG)
 /*
@@ -153,6 +153,8 @@ void evalFunctions(CustomFunctionData * functions, CustomFunctionsContext & func
 {
   MASK_FUNC_TYPE newActiveFunctions  = 0;
   MASK_CFN_TYPE  newActiveSwitches = 0;
+  const MASK_CFN_TYPE activeSwitches =
+      functionsContext.activeSwitches.load(std::memory_order_relaxed);
 #if defined(FUNCTION_SWITCHES)
   g_model.cfsResetSFState();
 #endif
@@ -162,7 +164,7 @@ void evalFunctions(CustomFunctionData * functions, CustomFunctionsContext & func
 
 #if defined(OVERRIDE_CHANNEL_FUNCTION)
   for (uint8_t i=0; i<MAX_OUTPUT_CHANNELS; i++) {
-    safetyCh[i] = OVERRIDE_CHANNEL_UNDEFINED;
+    setSafetyChannel(i, OVERRIDE_CHANNEL_UNDEFINED);
   }
 #endif
 
@@ -192,7 +194,7 @@ void evalFunctions(CustomFunctionData * functions, CustomFunctionsContext & func
           case FUNC_OVERRIDE_CHANNEL: {
             uint8_t channel = CFN_CH_INDEX(cfn);
             if (channel < MAX_OUTPUT_CHANNELS) {
-              safetyCh[channel] = CFN_PARAM(cfn);
+              setSafetyChannel(channel, CFN_PARAM(cfn));
             } else {
               TRACE("Invalid override channel! Disabling...");
               cfn->active = false;
@@ -229,7 +231,7 @@ void evalFunctions(CustomFunctionData * functions, CustomFunctionsContext & func
                 timerReset(CFN_PARAM(cfn));
                 break;
               case FUNC_RESET_FLIGHT:
-                if (!(functionsContext.activeSwitches & switch_mask)) {
+                if (!(activeSwitches & switch_mask)) {
                   mainRequestFlags |=
                       (1 << REQUEST_FLIGHT_RESET);  // on systems with threads
                                                     // flightReset() must not be
@@ -304,7 +306,7 @@ void evalFunctions(CustomFunctionData * functions, CustomFunctionsContext & func
                                                            param)),
                        mixerCurrentFlightMode);
             } else if (mode == FUNC_ADJUST_GVAR_INCDEC) {
-              if (!(functionsContext.activeSwitches & switch_mask)) {
+              if (!(activeSwitches & switch_mask)) {
                 SET_GVAR(gvar,
                          limit<int16_t>(MODEL_GVAR_MIN(gvar),
                                         GVAR_VALUE(gvar,
@@ -427,7 +429,7 @@ void evalFunctions(CustomFunctionData * functions, CustomFunctionsContext & func
           }
 
           case FUNC_SCREENSHOT:
-            if (!(functionsContext.activeSwitches & switch_mask)) {
+            if (!(activeSwitches & switch_mask)) {
               mainRequestFlags |= (1u << REQUEST_SCREENSHOT);
             }
             break;
@@ -490,7 +492,7 @@ void evalFunctions(CustomFunctionData * functions, CustomFunctionsContext & func
 #endif
         functionsContext.lastFunctionTime[i] = 0;
 #if defined(DANGEROUS_MODULE_FUNCTIONS)
-        if (functionsContext.activeSwitches & switch_mask) {
+        if (activeSwitches & switch_mask) {
           switch (CFN_FUNC(cfn)) {
             case FUNC_RANGECHECK:
             case FUNC_BIND:
@@ -513,8 +515,10 @@ void evalFunctions(CustomFunctionData * functions, CustomFunctionsContext & func
     switchToRadio();
 #endif
 
-  functionsContext.activeSwitches   = newActiveSwitches;
-  functionsContext.activeFunctions  = newActiveFunctions;
+  functionsContext.activeSwitches.store(newActiveSwitches,
+                                        std::memory_order_relaxed);
+  functionsContext.activeFunctions.store(newActiveFunctions,
+                                         std::memory_order_relaxed);
 }
 
 const char* funcGetLabel(uint8_t func)

@@ -117,7 +117,7 @@ class ChannelValue : public Window
   void refresh()
   {
     runWhenLoaded([&]() {
-      int16_t value = channelOutputs[channel];
+      int16_t value = getChannelOutput(channel);
 
       if (value != lastValue) {
         lastValue = value;
@@ -275,7 +275,7 @@ class OutputsWidget : public TrackedWidget
        .add((bool)g_model.extendedLimits);
 
     for (uint8_t channel = first; channel <= last; channel += 1) {
-      key.add((int32_t)channelOutputs[channel - 1])
+      key.add((int32_t)getChannelOutput(channel - 1))
          .addBytes(g_model.limitData[channel - 1].name, LEN_CHANNEL_NAME);
     }
 

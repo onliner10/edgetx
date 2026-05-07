@@ -95,11 +95,13 @@ class LayoutChoice : public Button
                      [=]() { if (setValue) setValue(layout); update(); });
       }
 
-      auto it =
-          std::find(LayoutFactory::getRegisteredLayouts().begin(),
-                    LayoutFactory::getRegisteredLayouts().end(), getValue());
-      menu.select(
-          std::distance(LayoutFactory::getRegisteredLayouts().begin(), it));
+      auto current = getValue ? getValue() : nullptr;
+      auto it = std::find(LayoutFactory::getRegisteredLayouts().begin(),
+                          LayoutFactory::getRegisteredLayouts().end(), current);
+      if (it != LayoutFactory::getRegisteredLayouts().end()) {
+        menu.select(
+            std::distance(LayoutFactory::getRegisteredLayouts().begin(), it));
+      }
 
       menu.setCloseHandler([=]() {
         menuPtr->withLive([&](Window::LiveWindow&) { update(); });
@@ -152,6 +154,16 @@ bool screenSetupLayoutChoiceCanvasCreateFailureFailsClosedForTest()
 }
 #endif
 
+static Layout* getCustomLayout(unsigned index)
+{
+  if (index >= MAX_CUSTOM_SCREENS) return nullptr;
+
+  auto screen = customScreens[index];
+  if (!screen || !screen->isLayout()) return nullptr;
+
+  return (Layout*)screen;
+}
+
 #if LANDSCAPE
 static const lv_coord_t line_col_dsc[] = {LV_GRID_FR(2), LV_GRID_FR(1),
                                           LV_GRID_FR(2), LV_GRID_TEMPLATE_LAST};
@@ -183,23 +195,24 @@ void ScreenSetupPage::build(Window* window)
   // Dynamic options window...
   LayoutChoice::LayoutFactoryGetter getFactory =
       [=]() -> const LayoutFactory* {
-    auto layout = customScreens[customScreenIndex];
-    if (!layout->isLayout()) return nullptr;
-    return ((Layout*)layout)->getFactory();
+    auto layout = getCustomLayout(customScreenIndex);
+    return layout ? layout->getFactory() : nullptr;
   };
 
   LayoutChoice::LayoutFactorySetter setLayout =
       [=](const LayoutFactory* factory) {
+        if (!factory) return;
+
         // delete any options potentially accessing
         // the old custom screen before re-creating it
         clearLayoutOptions();
 
         // If screen is not App Mode then save option values
         auto layoutData = g_model.getScreenLayoutData(customScreenIndex);
-        auto layout = (Layout*)customScreens[customScreenIndex];
+        auto layout = getCustomLayout(customScreenIndex);
         bool restoreOptions = false;
         bool hasTopbar = true, hasFM = true, hasSliders = true, hasTrims = true, isMirrored = false;
-        if (!layout->isAppMode()) {
+        if (layout && !layout->isAppMode()) {
           hasTopbar = layoutData->options[LAYOUT_OPTION_TOPBAR].value.boolValue;
           hasFM = layoutData->options[LAYOUT_OPTION_FM].value.boolValue;
           hasSliders = layoutData->options[LAYOUT_OPTION_SLIDERS].value.boolValue;
@@ -211,8 +224,8 @@ void ScreenSetupPage::build(Window* window)
         factory->createCustomScreen(customScreenIndex);
 
         // If new screen is not App Mode then restore saved option values
-        layout = (Layout*)customScreens[customScreenIndex];
-        if (restoreOptions && !layout->isAppMode()) {
+        layout = getCustomLayout(customScreenIndex);
+        if (restoreOptions && layout && !layout->isAppMode()) {
           layoutData->options[LAYOUT_OPTION_TOPBAR].value.boolValue = hasTopbar;
           layoutData->options[LAYOUT_OPTION_FM].value.boolValue = hasFM;
           layoutData->options[LAYOUT_OPTION_SLIDERS].value.boolValue = hasSliders;
@@ -294,10 +307,10 @@ void ScreenSetupPage::buildLayoutOptions()
   layoutOptions->setFlexLayout();
 
   // Layout options...
-  auto layout = customScreens[customScreenIndex];
-  if (!layout->isLayout()) return;
+  auto layout = getCustomLayout(customScreenIndex);
+  if (!layout) return;
 
-  auto factory = ((Layout*)layout)->getFactory();
+  auto factory = layout->getFactory();
   if (!factory) return;
 
   int index = 0;

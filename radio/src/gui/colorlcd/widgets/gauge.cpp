@@ -77,10 +77,12 @@ class GaugeWidget : public TrackedWidget
   int16_t getGuageValue()
   {
     auto widgetData = getPersistentData();
+    if (!widgetData) return 0;
 
     mixsrc_t index = widgetData->options[0].value.unsignedValue;
     int32_t min = widgetData->options[1].value.signedValue;
     int32_t max = widgetData->options[2].value.signedValue;
+    if (min == max) return 0;
 
     int32_t value = getValue(index);
 
@@ -97,6 +99,7 @@ class GaugeWidget : public TrackedWidget
   void onUpdate() override
   {
     auto widgetData = getPersistentData();
+    if (!widgetData) return;
 
     mixsrc_t index = widgetData->options[0].value.unsignedValue;
     bool compact = isCompactTopBarWidget();

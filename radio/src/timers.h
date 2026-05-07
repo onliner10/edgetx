@@ -45,6 +45,16 @@ struct TimerState {
 
 #if defined(TIMERS)
 extern TimerState timersStates[TIMERS];
+
+inline tmrval_t getTimerStateValue(uint8_t idx)
+{
+  return __atomic_load_n(&timersStates[idx].val, __ATOMIC_RELAXED);
+}
+
+inline void setTimerStateValue(uint8_t idx, tmrval_t value)
+{
+  __atomic_store_n(&timersStates[idx].val, value, __ATOMIC_RELAXED);
+}
 #endif
 
 void timerReset(uint8_t idx);

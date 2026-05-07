@@ -136,14 +136,14 @@ class ThemePersistance
 
     inline ThemeFile* getCurrentTheme()
     {
-      if (currentTheme < (int)themes.size())
+      if (currentTheme >= 0 && currentTheme < (int)themes.size())
         return themes[currentTheme];
       return nullptr;
     }
 
     inline ThemeFile* getThemeByIndex(int index)
     {
-      if (index < (int) themes.size())
+      if (index >= 0 && index < (int) themes.size())
         return themes[index];
       return nullptr;
     }

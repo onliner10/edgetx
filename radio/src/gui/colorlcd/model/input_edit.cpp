@@ -31,9 +31,16 @@
 #include "input_source.h"
 #include "source_numberedit.h"
 #include "switchchoice.h"
+#include "tasks/mixer_task.h"
 #include "textedit.h"
 
 #define SET_DIRTY() storageDirty(EE_MODEL)
+#define SET_INPUT_VALUE(value, _newValue)     \
+  [=](int32_t newValue) {                     \
+    MixerTaskLockGuard lock;                  \
+    value = _newValue;                        \
+    SET_DIRTY();                              \
+  }
 
 #if LANDSCAPE
 static const lv_coord_t col_dsc[] = {LV_GRID_FR(3), LV_GRID_FR(8),
@@ -63,20 +70,23 @@ class InputEditAdvanced : public Page
     new StaticText(line, rect_t{}, STR_SIDE);
     new Choice(
         line, rect_t{}, STR_VCURVEFUNC, 1, 3,
-        [=]() -> int16_t { return 4 - input->mode; },
-        [=](int16_t newValue) {
-          input->mode = 4 - newValue;
-          Messaging::send(Messaging::CURVE_UPDATE);
-          SET_DIRTY();
-        });
+	        [=]() -> int16_t { return 4 - input->mode; },
+	        [=](int16_t newValue) {
+	          {
+	            MixerTaskLockGuard lock;
+	            input->mode = 4 - newValue;
+	          }
+	          Messaging::send(Messaging::CURVE_UPDATE);
+	          SET_DIRTY();
+	        });
 
     // Trim
     line = body->newLine(grid);
     new StaticText(line, rect_t{}, STR_TRIM);
-    const auto trimLast = TRIM_OFF + keysGetMaxTrims() - 1;
-    auto c = new Choice(line, rect_t{}, -TRIM_OFF, trimLast,
-                        GET_VALUE(-input->trimSource),
-                        SET_VALUE(input->trimSource, -newValue));
+	    const auto trimLast = TRIM_OFF + keysGetMaxTrims() - 1;
+	    auto c = new Choice(line, rect_t{}, -TRIM_OFF, trimLast,
+	                        GET_VALUE(-input->trimSource),
+	                        SET_INPUT_VALUE(input->trimSource, -newValue));
 
     uint16_t srcRaw = input->srcRaw;
     c->setAvailableHandler([=](int value) {
@@ -177,46 +187,58 @@ void InputEditWindow::buildBody(Window* form)
   line = form->newLine(grid);
   new StaticText(line, rect_t{}, STR_WEIGHT);
   auto gvar =
-      new SourceNumberEdit(line, -100, 100, GET_DEFAULT(input->weight),
-                           [=](int32_t newValue) {
-                             input->weight = newValue;
-                             updatePreview = true;
-                             SET_DIRTY();
-                           }, MIXSRC_FIRST);
+	      new SourceNumberEdit(line, -100, 100, GET_DEFAULT(input->weight),
+	                           [=](int32_t newValue) {
+	                             {
+	                               MixerTaskLockGuard lock;
+	                               input->weight = newValue;
+	                             }
+	                             updatePreview = true;
+	                             SET_DIRTY();
+	                           }, MIXSRC_FIRST);
   gvar->setSuffix("%");
 
   // Offset
   line = form->newLine(grid);
   new StaticText(line, rect_t{}, STR_OFFSET);
-  gvar = new SourceNumberEdit(line, -100, 100,
-                              GET_DEFAULT(input->offset), [=](int32_t newValue) {
-                                input->offset = newValue;
-                                updatePreview = true;
-                                SET_DIRTY();
-                              }, MIXSRC_FIRST);
+	  gvar = new SourceNumberEdit(line, -100, 100,
+	                              GET_DEFAULT(input->offset), [=](int32_t newValue) {
+	                                {
+	                                  MixerTaskLockGuard lock;
+	                                  input->offset = newValue;
+	                                }
+	                                updatePreview = true;
+	                                SET_DIRTY();
+	                              }, MIXSRC_FIRST);
   gvar->setSuffix("%");
 
   // Switch
   line = form->newLine(grid);
   new StaticText(line, rect_t{}, STR_SWITCH);
   new SwitchChoice(line, rect_t{}, SWSRC_FIRST_IN_MIXES, SWSRC_LAST_IN_MIXES,
-                   GET_DEFAULT(input->swtch),
-                   [=](int newValue) {
-                     input->swtch = newValue;
-                     updatePreview = true;
-                     SET_DIRTY();
-                   });
+	                   GET_DEFAULT(input->swtch),
+	                   [=](int newValue) {
+	                     {
+	                       MixerTaskLockGuard lock;
+	                       input->swtch = newValue;
+	                     }
+	                     updatePreview = true;
+	                     SET_DIRTY();
+	                   });
 
   // Curve
   line = form->newLine(grid);
   new StaticText(line, rect_t{}, STR_CURVE);
   auto param =
       new CurveParam(line, rect_t{}, &input->curve,
-        [=](int32_t newValue) {
-          input->curve.value = newValue;
-          updatePreview = true;
-          SET_DIRTY();
-        }, MIXSRC_FIRST, input->srcRaw);
+	        [=](int32_t newValue) {
+	          {
+	            MixerTaskLockGuard lock;
+	            input->curve.value = newValue;
+	          }
+	          updatePreview = true;
+	          SET_DIRTY();
+	        }, MIXSRC_FIRST, input->srcRaw);
   param->setStyleGridCellXAlign(LV_GRID_ALIGN_STRETCH, 0);
 
   line = form->newLine(grid);

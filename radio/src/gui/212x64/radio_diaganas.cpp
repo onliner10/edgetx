@@ -81,9 +81,11 @@ void menuRadioDiagAnalogs(event_t event)
 #if defined(JITTER_MEASURE)
     lcdDrawNumber(x+10*FW-1, y, rawJitter[i].get(), RIGHT);
     lcdDrawNumber(x+13*FW-1, y, avgJitter[i].get(), RIGHT);
-    lcdDrawNumber(x+17*FW-1, y, (int16_t)calibratedAnalogs[i]*25/256, RIGHT);
+    lcdDrawNumber(x + 17 * FW - 1, y,
+                  getCalibratedAnalog(i) * 25 / 256, RIGHT);
 #else
-    lcdDrawNumber(x+10*FW-1, y, (int16_t)calibratedAnalogs[i]*25/256, RIGHT);
+    lcdDrawNumber(x + 10 * FW - 1, y,
+                  getCalibratedAnalog(i) * 25 / 256, RIGHT);
 #endif
   }
 

@@ -54,7 +54,7 @@ void menuStatisticsView(event_t event)
       killEvents(event);
       g_eeGeneral.globalTimer = 0;
       storageDirty(EE_GENERAL);
-      sessionTimer = 0;
+      setSessionTimer(0);
       break;
 
     case EVT_KEY_BREAK(KEY_EXIT):
@@ -64,23 +64,24 @@ void menuStatisticsView(event_t event)
 
   // Session and Total timers
   lcdDrawText(STATS_1ST_COLUMN, FH*1+1, "SES", BOLD);
-  drawTimer(STATS_1ST_COLUMN + STATS_LABEL_WIDTH, FH*1+1, sessionTimer);
+  drawTimer(STATS_1ST_COLUMN + STATS_LABEL_WIDTH, FH*1+1, getSessionTimer());
   lcdDrawText(STATS_1ST_COLUMN, FH*2+1, "TOT", BOLD);
-  drawTimer(STATS_1ST_COLUMN + STATS_LABEL_WIDTH, FH*2+1, g_eeGeneral.globalTimer + sessionTimer, TIMEHOUR, 0);
+  drawTimer(STATS_1ST_COLUMN + STATS_LABEL_WIDTH, FH*2+1, g_eeGeneral.globalTimer + getSessionTimer(), TIMEHOUR, 0);
 
   // Throttle special timers
   lcdDrawText(STATS_2ND_COLUMN, FH*0+1, "THR", BOLD);
-  drawTimer(STATS_2ND_COLUMN + STATS_LABEL_WIDTH, FH*0+1, s_timeCumThr);
+  drawTimer(STATS_2ND_COLUMN + STATS_LABEL_WIDTH, FH*0+1, getThrottleRuntime());
   lcdDrawText(STATS_2ND_COLUMN, FH*1+1, "TH%", BOLD);
-  drawTimer(STATS_2ND_COLUMN + STATS_LABEL_WIDTH, FH*1+1, s_timeCum16ThrP/16);
+  drawTimer(STATS_2ND_COLUMN + STATS_LABEL_WIDTH, FH*1+1, getThrottlePercentRuntime()/16);
 
   // Timers
   for (int i=0; i<TIMERS; i++) {
     drawStringWithIndex(STATS_3RD_COLUMN, FH*i+1, "TM", i+1, BOLD);
-    if (timersStates[i].val > 3600)
-      drawTimer(STATS_3RD_COLUMN + STATS_LABEL_WIDTH, FH*i+1, timersStates[i].val, TIMEHOUR, 0);
+    tmrval_t timerValue = getTimerStateValue(i);
+    if (timerValue > 3600)
+      drawTimer(STATS_3RD_COLUMN + STATS_LABEL_WIDTH, FH*i+1, timerValue, TIMEHOUR, 0);
     else
-      drawTimer(STATS_3RD_COLUMN + STATS_LABEL_WIDTH, FH*i+1, timersStates[i].val);
+      drawTimer(STATS_3RD_COLUMN + STATS_LABEL_WIDTH, FH*i+1, timerValue);
   }
 
 #if defined(THRTRACE)
@@ -124,16 +125,15 @@ void menuStatisticsDebug(event_t event)
     case EVT_KEY_LONG(KEY_ENTER):
       killEvents(event);
       g_eeGeneral.globalTimer = 0;
-      sessionTimer = 0;
+      setSessionTimer(0);
       storageDirty(EE_GENERAL);
       break;
 
     case EVT_KEY_BREAK(KEY_ENTER):
 #if defined(LUA)
-      maxLuaInterval = 0;
-      maxLuaDuration = 0;
+      resetMaxLuaStats();
 #endif
-      maxMixerDuration  = 0;
+      resetMaxMixerDuration();
       break;
 
     case EVT_KEY_BREAK(KEY_PLUS):
@@ -177,14 +177,14 @@ void menuStatisticsDebug(event_t event)
 #if defined(LUA)
   lcdDrawTextAlignedLeft(y, STR_LUA_SCRIPTS_LABEL);
   lcdDrawText(MENU_DEBUG_COL1_OFS, y+1, STR_DURATION_MS, SMLSIZE);
-  lcdDrawNumber(lcdLastRightPos, y, 10*maxLuaDuration, LEFT);
+  lcdDrawNumber(lcdLastRightPos, y, 10 * getMaxLuaDuration(), LEFT);
   lcdDrawText(lcdLastRightPos+2, y+1, STR_INTERVAL_MS, SMLSIZE);
-  lcdDrawNumber(lcdLastRightPos, y, 10*maxLuaInterval, LEFT);
+  lcdDrawNumber(lcdLastRightPos, y, 10 * getMaxLuaInterval(), LEFT);
   y += FH;
 #endif
 
   lcdDrawTextAlignedLeft(y, STR_TMIXMAXMS);
-  lcdDrawNumber(MENU_DEBUG_COL1_OFS, y, DURATION_MS_PREC2(maxMixerDuration), PREC2|LEFT);
+  lcdDrawNumber(MENU_DEBUG_COL1_OFS, y, DURATION_MS_PREC2(getMaxMixerDuration()), PREC2|LEFT);
   lcdDrawText(lcdLastRightPos, y, STR_MS);
   y += FH;
 

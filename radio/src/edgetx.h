@@ -21,6 +21,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <stdlib.h>
 #include "definitions.h"
 #include "edgetx_types.h"
@@ -149,19 +150,64 @@ void memswap(void * a, void * b, uint8_t size);
 #define MASK_CFN_TYPE  uint64_t  // current max = 64 customizable switches
 #define MASK_FUNC_TYPE uint32_t  // current max = 32 functions
 
+template <typename T>
+class AtomicU64Snapshot {
+  static_assert(sizeof(T) == sizeof(uint64_t),
+                "AtomicU64Snapshot requires a 64-bit mask type");
+
+ public:
+  T load(std::memory_order = std::memory_order_relaxed) const
+  {
+    for (uint8_t i = 0; i < 4; i++) {
+      uint32_t seqStart = sequence.load(std::memory_order_acquire);
+      uint32_t lowPart = low.load(std::memory_order_relaxed);
+      uint32_t highPart = high.load(std::memory_order_relaxed);
+      uint32_t seqEnd = sequence.load(std::memory_order_acquire);
+      if (seqStart == seqEnd && !(seqEnd & 1u)) {
+        return join(lowPart, highPart);
+      }
+    }
+
+    return join(low.load(std::memory_order_relaxed),
+                high.load(std::memory_order_relaxed));
+  }
+
+  void store(T value, std::memory_order = std::memory_order_relaxed)
+  {
+    uint64_t raw = static_cast<uint64_t>(value);
+    sequence.fetch_add(1u, std::memory_order_acq_rel);
+    low.store(static_cast<uint32_t>(raw), std::memory_order_relaxed);
+    high.store(static_cast<uint32_t>(raw >> 32), std::memory_order_relaxed);
+    sequence.fetch_add(1u, std::memory_order_release);
+  }
+
+ private:
+  static T join(uint32_t lowPart, uint32_t highPart)
+  {
+    return static_cast<T>((static_cast<uint64_t>(highPart) << 32) | lowPart);
+  }
+
+  std::atomic<uint32_t> sequence{0};
+  std::atomic<uint32_t> low{0};
+  std::atomic<uint32_t> high{0};
+};
+
 struct CustomFunctionsContext {
-  MASK_FUNC_TYPE activeFunctions;
-  MASK_CFN_TYPE  activeSwitches;
+  std::atomic<MASK_FUNC_TYPE> activeFunctions{0};
+  AtomicU64Snapshot<MASK_CFN_TYPE> activeSwitches;
   tmr10ms_t lastFunctionTime[MAX_SPECIAL_FUNCTIONS];
 
   inline bool isFunctionActive(uint8_t func)
   {
-    return activeFunctions & ((MASK_FUNC_TYPE)1 << func);
+    return activeFunctions.load(std::memory_order_relaxed) &
+           ((MASK_FUNC_TYPE)1 << func);
   }
 
   void reset()
   {
-    memclear(this, sizeof(*this));
+    activeFunctions.store(0, std::memory_order_relaxed);
+    activeSwitches.store(0, std::memory_order_relaxed);
+    memclear(lastFunctionTime, sizeof(lastFunctionTime));
   }
 };
 
@@ -289,7 +335,7 @@ enum PerOutMode {
   e_perout_mode_noinput = e_perout_mode_notrainer+e_perout_mode_notrims+e_perout_mode_nosticks
 };
 
-extern uint8_t mixerCurrentFlightMode;
+extern std::atomic<uint8_t> mixerCurrentFlightMode;
 extern uint8_t lastFlightMode;
 extern uint8_t flightModeTransitionLast;
 
@@ -302,7 +348,7 @@ void doMixerCalculations();
 void doMixerPeriodicUpdates();
 
 void checkTrims();
-extern uint8_t currentBacklightBright;
+extern std::atomic<uint8_t> currentBacklightBright;
 void perMain();
 
 getvalue_t getValue(mixsrc_t i, bool* valid = nullptr);
@@ -346,9 +392,9 @@ void flightReset(uint8_t check=true);
   extern uint8_t  s_cnt_10s;
   extern uint16_t s_cnt_samples_thr_10s;
   extern uint16_t s_sum_samples_thr_10s;
-  #define RESET_THR_TRACE() s_traceWr = s_cnt_10s = s_cnt_samples_thr_10s = s_sum_samples_thr_10s = s_timeCum16ThrP = s_timeCumThr = 0
+  #define RESET_THR_TRACE() do { s_traceWr = s_cnt_10s = s_cnt_samples_thr_10s = s_sum_samples_thr_10s = 0; setThrottlePercentRuntime(0); setThrottleRuntime(0); } while (0)
 #else
-  #define RESET_THR_TRACE() s_timeCum16ThrP = s_timeCumThr = 0
+  #define RESET_THR_TRACE() do { setThrottlePercentRuntime(0); setThrottleRuntime(0); } while (0)
 #endif
 
 void checkLowEEPROM();
@@ -438,12 +484,12 @@ void moveTrimsToOffsets();
 
 inline bool isExpoActive(uint8_t expo)
 {
-  return mixState[expo].activeExpo;
+  return mixStateActiveExpos[expo].load(std::memory_order_relaxed);
 }
 
 inline bool isMixActive(uint8_t mix)
 {
-  return mixState[mix].activeMix;
+  return mixStateActiveMixes[mix].load(std::memory_order_relaxed);
 }
 
 enum FunctionsActive {

@@ -23,6 +23,7 @@
 
 #include "edgetx.h"
 #include "etx_lv_theme.h"
+#include "tasks/mixer_task.h"
 
 template <class T>
 FMMatrix<T>::FMMatrix(Window* parent, const rect_t& r, T* input) :
@@ -53,7 +54,10 @@ template <class T>
 void FMMatrix<T>::onPress(uint8_t btn_id)
 {
   if (btn_id >= MAX_FLIGHT_MODES) return;
-  BFBIT_FLIP(input->flightModes, bfBit<uint32_t>(btn_id));
+  {
+    MixerTaskLockGuard lock;
+    BFBIT_FLIP(input->flightModes, bfBit<uint32_t>(btn_id));
+  }
   setTextAndState(btn_id);
   storageDirty(EE_MODEL);
 }

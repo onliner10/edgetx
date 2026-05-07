@@ -18,8 +18,9 @@
 
 #pragma once
 
-#include <vector>
 #include <climits>
+#include <memory>
+#include <vector>
 
 #include "form.h"
 
@@ -87,10 +88,11 @@ class Choice : public ChoiceBase
          int vmin, int vmax, std::function<int()> _getValue,
          std::function<void(int)> _setValue = nullptr,
          const char *title = nullptr);
-  Choice(Window *parent, const rect_t &rect, const char *const values[],
-         int vmin, int vmax, std::function<int()> _getValue,
-         std::function<void(int)> _setValue = nullptr,
-         const char *title = nullptr);
+	  Choice(Window *parent, const rect_t &rect, const char *const values[],
+	         int vmin, int vmax, std::function<int()> _getValue,
+	         std::function<void(int)> _setValue = nullptr,
+	         const char *title = nullptr);
+	  ~Choice() override { lifetimeToken.reset(); }
 
 #if defined(DEBUG_WINDOWS)
   std::string getName() const override { return "Choice"; }
@@ -171,10 +173,13 @@ class Choice : public ChoiceBase
   int selectedIx0 = 0;
 
   std::vector<std::string> values;
-  std::function<bool(int)> isValueAvailable;
-  std::function<void(Menu *, int, int &)> fillMenuHandler;
+	  std::function<bool(int)> isValueAvailable;
+	  std::function<void(Menu *, int, int &)> fillMenuHandler;
+	  Menu* activeMenu = nullptr;
+	  std::shared_ptr<bool> lifetimeToken = std::make_shared<bool>(true);
 
-  std::string getLabelText() override;
+	  std::string getLabelText() override;
+  void onDelete() override;
 
   virtual void openMenu();
 };

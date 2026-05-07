@@ -544,12 +544,18 @@ void ThemeSetupPage::displayThemeMenu(Window *window, ThemePersistance *tp)
   });
 
   // you can't delete the default theme or the currently active theme
-  if (listBox->getSelected() != 0 &&
-      listBox->getSelected() != tp->getThemeIndex()) {
+  auto selectedThemeIndex = listBox->getSelected();
+  auto selectedTheme = tp->getThemeByIndex(selectedThemeIndex);
+  if (selectedTheme && selectedThemeIndex != 0 &&
+      selectedThemeIndex != tp->getThemeIndex()) {
     menu->addLine(STR_DELETE, [=]() {
-      new ConfirmDialog(STR_DELETE_THEME,
-          tp->getThemeByIndex(listBox->getSelected())->getName().c_str(), [=] {
-            tp->deleteThemeByIndex(listBox->getSelected());
+      auto theme = tp->getThemeByIndex(listBox->getSelected());
+      if (!theme) return;
+
+      new ConfirmDialog(STR_DELETE_THEME, theme->getName().c_str(), [=] {
+            auto deleteIndex = listBox->getSelected();
+            if (!tp->getThemeByIndex(deleteIndex)) return;
+            tp->deleteThemeByIndex(deleteIndex);
             listBox->setNames(tp->getNames());
             currentTheme = min<int>(currentTheme, tp->getNames().size() - 1);
             listBox->setSelected(currentTheme);

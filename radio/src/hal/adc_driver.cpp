@@ -242,18 +242,20 @@ void adcCalibStore()
 uint16_t getAnalogValue(uint8_t index)
 {
   if (index >= MAX_ANALOG_INPUTS) return 0;
+  const uint16_t value =
+      __atomic_load_n(&adcValues[index], __ATOMIC_RELAXED);
 #if defined(SIXPOS_SWITCH_INDEX) && !defined(SIMU)
   if (index == SIXPOS_SWITCH_INDEX)
-    return getSixPosAnalogValue(adcValues[index]);
+    return getSixPosAnalogValue(value);
   else
 #endif
-  return adcValues[index];
+  return value;
 }
 
 void setAnalogValue(uint8_t index, uint16_t value)
 {
   if (index >= MAX_ANALOG_INPUTS) return;
-  adcValues[index] = value;
+  __atomic_store_n(&adcValues[index], value, __ATOMIC_RELAXED);
 }
 
 uint16_t* getAnalogValues()
@@ -265,10 +267,20 @@ uint16_t* getAnalogValues()
 uint32_t s_anaFilt[MAX_ANALOG_INPUTS];
 
 #define ANALOG_MULTIPLIER (1 << ANALOG_SCALE)
-#define ANA_FILT(chan)    (s_anaFilt[chan] / (JITTER_ALPHA * ANALOG_MULTIPLIER))
+#define ANA_FILT(chan)    (getFilteredAnalog(chan) / (JITTER_ALPHA * ANALOG_MULTIPLIER))
 #if (JITTER_ALPHA * ANALOG_MULTIPLIER > 32)
   #error "JITTER_FILTER_STRENGTH and ANALOG_SCALE are too big, their summ should be <= 5 !!!"
 #endif
+
+static uint32_t getFilteredAnalog(uint8_t chan)
+{
+  return __atomic_load_n(&s_anaFilt[chan], __ATOMIC_RELAXED);
+}
+
+static void setFilteredAnalog(uint8_t chan, uint32_t value)
+{
+  __atomic_store_n(&s_anaFilt[chan], value, __ATOMIC_RELAXED);
+}
 
 uint16_t anaIn(uint8_t chan)
 {
@@ -279,13 +291,13 @@ uint16_t anaIn(uint8_t chan)
 uint32_t anaIn_diag(uint8_t chan)
 {
   if (chan >= MAX_ANALOG_INPUTS) return 0;
-  return s_anaFilt[chan] / JITTER_ALPHA;
+  return getFilteredAnalog(chan) / JITTER_ALPHA;
 }
 
 void anaSetFiltered(uint8_t chan, uint16_t val)
 {
   val += RESX;
-  s_anaFilt[chan] = val * (JITTER_ALPHA * ANALOG_MULTIPLIER);
+  setFilteredAnalog(chan, val * (JITTER_ALPHA * ANALOG_MULTIPLIER));
 }
 
 void anaResetFiltered()
@@ -468,18 +480,21 @@ void getADC()
     }
 
     // Apply filtering
-    s_anaFilt[x] = apply_low_pass_filter(v, s_anaFilt[x], x < max_mains);
+    uint32_t filtered =
+        apply_low_pass_filter(v, getFilteredAnalog(x), x < max_mains);
 
     if (is_multipos) {
 #if defined(SIMU)
-      s_anaFilt[x] = apply_multipos_simu(s_anaFilt[x]);
+      filtered = apply_multipos_simu(filtered);
 #else
       const auto* calib = (const StepsCalibData*)&g_eeGeneral.calib[x];
       if (IS_MULTIPOS_CALIBRATED(calib)) {
-        s_anaFilt[x] = apply_multipos(calib, s_anaFilt[x]);
+        filtered = apply_multipos(calib, filtered);
       }
 #endif
     }
+
+    setFilteredAnalog(x, filtered);
 
 #if defined(JITTER_MEASURE)
     if (JITTER_MEASURE_ACTIVE()) {

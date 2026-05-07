@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include <atomic>
+
 #include "dataconstants.h"
 #include "myeeprom.h"
 
@@ -29,11 +31,11 @@
 #include "frsky.h"
 #include "io/frsky_sport.h"
 
-extern uint8_t telemetryStreaming; // >0 (true) == data is streaming in. 0 = no data detected for some time
+extern std::atomic<uint8_t> telemetryStreaming; // >0 (true) == data is streaming in. 0 = no data detected for some time
 
 inline bool TELEMETRY_STREAMING()
 {
-  return telemetryStreaming > 0;
+  return telemetryStreaming.load(std::memory_order_acquire) > 0;
 }
 
 enum TelemetryStates {
@@ -41,7 +43,40 @@ enum TelemetryStates {
   TELEMETRY_OK,
   TELEMETRY_KO
 };
-extern uint8_t telemetryState;
+extern std::atomic<uint8_t> telemetryState;
+
+void telemetryInit();
+void telemetryDataLock();
+bool telemetryDataTryLock();
+void telemetryDataUnlock();
+
+class TelemetryDataLock
+{
+  public:
+    TelemetryDataLock() { telemetryDataLock(); }
+    ~TelemetryDataLock() { telemetryDataUnlock(); }
+
+    TelemetryDataLock(const TelemetryDataLock&) = delete;
+    TelemetryDataLock& operator=(const TelemetryDataLock&) = delete;
+};
+
+class TelemetryDataTryLock
+{
+  public:
+    TelemetryDataTryLock() : locked(telemetryDataTryLock()) {}
+    ~TelemetryDataTryLock()
+    {
+      if (locked) telemetryDataUnlock();
+    }
+
+    explicit operator bool() const { return locked; }
+
+    TelemetryDataTryLock(const TelemetryDataTryLock&) = delete;
+    TelemetryDataTryLock& operator=(const TelemetryDataTryLock&) = delete;
+
+  private:
+    bool locked;
+};
 
 constexpr uint8_t TELEMETRY_TIMEOUT10ms = 100; // 1 second
 

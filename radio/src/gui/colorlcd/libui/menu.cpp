@@ -217,10 +217,11 @@ class MenuBody : public TableField
           lines[row]->onPress();
         }
       } else {
+        auto onPress = lines[row]->onPress;
         // delete menu first to avoid
         // focus issues with onPress()
         menu->deleteLater();
-        lines[row]->onPress();
+        if (onPress) onPress();
       }
     }
   }

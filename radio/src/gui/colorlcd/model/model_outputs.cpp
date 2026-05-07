@@ -225,11 +225,11 @@ class OutputLineButton : public ListLineButton
 
   void onLoadedCheckEvents(LiveWindow& live) override
   {
-    int newValue = channelOutputs[index];
+    int newValue = getChannelOutput(index);
     if (value != newValue) {
       value = newValue;
 
-      int chanVal = calcRESXto100(ex_chans[index]);
+      int chanVal = calcRESXto100(getRawChannelOutput(index));
 
       if (chanVal < -DEADBAND) {
         lv_obj_add_state(min, ETX_STATE_MINMAX_BOLD);

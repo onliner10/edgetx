@@ -357,6 +357,17 @@ void PageGroupBase::onLiveCheckEvents(Window::LiveWindow& live)
   }
 }
 
+void PageGroupBase::onDelete()
+{
+  // Body controls can hold handlers that reference the current PageGroupItem.
+  // Drop them before the header releases the page objects.
+  body.with([](Window& body) { body.clear(); });
+  if (currentTab) {
+    currentTab->cleanup();
+    currentTab = nullptr;
+  }
+}
+
 void PageGroupBase::onLiveClicked(LiveWindow&) { Keyboard::hide(false); }
 
 void PageGroupBase::onCancel()

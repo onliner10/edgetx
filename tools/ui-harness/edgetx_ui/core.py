@@ -282,17 +282,19 @@ class SdlAutomationSession:
             if not chunk:
                 break
             buffer += chunk.decode("utf-8", errors="replace")
+            response = parse_json_response_line(buffer)
+            if response is not None:
+                if not response.get("ok", False):
+                    raise HarnessError(response.get("error", "simulator command failed"))
+                return response
+            if '{"ok"' in buffer:
+                continue
             while "\n" in buffer:
                 line, buffer = buffer.split("\n", 1)
                 line = line.strip()
                 if not line:
                     continue
                 recent_lines.append(line)
-                if line.startswith("{") and line.endswith("}"):
-                    response = json.loads(line)
-                    if not response.get("ok", False):
-                        raise HarnessError(response.get("error", "simulator command failed"))
-                    return response
         tail = "\n".join(recent_lines)
         if tail:
             raise HarnessError(
@@ -433,6 +435,21 @@ def normalize_key(key: str) -> str:
     if normalized not in KEYS:
         raise HarnessError(f"unknown key `{key}`; expected one of {', '.join(sorted(KEYS))}")
     return normalized
+
+
+def parse_json_response_line(line: str) -> dict[str, Any] | None:
+    start = line.find('{"ok"')
+    if start < 0:
+        start = line.find("{")
+    if start < 0:
+        return None
+
+    try:
+        response, _ = json.JSONDecoder(strict=False).raw_decode(line[start:])
+    except json.JSONDecodeError:
+        return None
+
+    return response if isinstance(response, dict) else None
 
 
 def normalize_selector(selector: dict[str, Any] | str) -> dict[str, Any]:

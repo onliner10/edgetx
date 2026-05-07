@@ -103,6 +103,10 @@ void resetRadioState()
   memset(ex_chans, 0, sizeof(ex_chans));
   memset(act, 0, sizeof(act));
   memset(mixState, 0, sizeof(mixState));
+  for (uint8_t i = 0; i < MAX_MIXERS; i++) {
+    mixStateActiveExpos[i].store(false, std::memory_order_relaxed);
+    mixStateActiveMixes[i].store(false, std::memory_order_relaxed);
+  }
   mixerCurrentFlightMode = lastFlightMode = 0;
   lastAct = 0;
   logicalSwitchesReset();

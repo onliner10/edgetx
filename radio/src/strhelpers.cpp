@@ -337,6 +337,11 @@ char *getCurveString(char *dest, int idx)
     idx = -idx;
   }
 
+  if (idx < 1 || idx > MAX_CURVES) {
+    strAppendStringWithIndex(s, STR_CV, idx);
+    return dest;
+  }
+
   if (g_model.curves[idx - 1].name[0])
     strAppend(s, g_model.curves[idx - 1].name, LEN_CURVE_NAME);
   else

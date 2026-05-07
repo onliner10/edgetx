@@ -323,7 +323,7 @@ void menuRadioSetup(event_t event)
         }
         if (attr && menuHorizontalPosition < 0) lcdDrawFilledRect(RADIO_SETUP_2ND_COLUMN, y, LCD_W-RADIO_SETUP_2ND_COLUMN-MENUS_SCROLLBAR_WIDTH, 8);
         if (attr && checkIncDec_Ret) {
-          g_rtcTime = gmktime(&t); // update local timestamp and get wday calculated
+          rtcSetTimestamp(gmktime(&t)); // update local timestamp and get wday calculated
         }
         break;
 
@@ -349,7 +349,7 @@ void menuRadioSetup(event_t event)
         }
         if (attr && menuHorizontalPosition < 0) lcdDrawFilledRect(RADIO_SETUP_2ND_COLUMN, y, LCD_W-RADIO_SETUP_2ND_COLUMN-MENUS_SCROLLBAR_WIDTH, 8);
         if (attr && checkIncDec_Ret) {
-          g_rtcTime = gmktime(&t); // update local timestamp and get wday calculated
+          rtcSetTimestamp(gmktime(&t)); // update local timestamp and get wday calculated
         }
         break;
 #endif

@@ -28,6 +28,7 @@
 #include "timers_driver.h"
 #include "hal/abnormal_reboot.h"
 #include "hal/watchdog_driver.h"
+#include "telemetry/telemetry.h"
 
 #include "tasks.h"
 #include "tasks/mixer_task.h"
@@ -112,17 +113,10 @@ static void pumpAdaptiveLvglUntilMenuDeadline(uint32_t cycleStart)
 bool perMainEnabled = true;
 #endif
 
-static void timer10msStart();
-
 static void menusTask()
 {
-#if defined(SIMU)
-  timer10msStart();
-#endif
-
-  edgeTxInit();
-
   mixerTaskInit();
+  edgeTxInit();
 
 #if defined(SIMU)
   simuStartupComplete();
@@ -222,7 +216,7 @@ static void _timer_10ms_cb(timer_handle_t* h)
   per10ms();
 }
 
-static void timer10msStart()
+void timer10msStart()
 {
   if (!timer_is_created(&_timer10ms)) {
     timer_create(&_timer10ms, _timer_10ms_cb, "10ms", 10, true);
@@ -253,6 +247,7 @@ static void timer1msStart()
 void tasksStart()
 {
   mutex_create(&audioMutex);
+  telemetryInit();
 
 #if defined(CLI) && !defined(SIMU)
   cliStart();

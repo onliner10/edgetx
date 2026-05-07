@@ -69,11 +69,11 @@ OutputEditWindow::OutputEditWindow(uint8_t channel) :
 
 void OutputEditWindow::onLiveCheckEvents(Window::LiveWindow& live)
 {
-  int newValue = channelOutputs[channel];
+  int newValue = getChannelOutput(channel);
   if (value != newValue) {
     value = newValue;
 
-    int chanVal = calcRESXto100(ex_chans[channel]);
+    int chanVal = calcRESXto100(getRawChannelOutput(channel));
 
     if (chanVal < -DEADBAND) {
       minText->addState(ETX_STATE_MINMAX_HIGHLIGHT);

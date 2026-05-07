@@ -44,7 +44,7 @@ void timerReset(uint8_t idx)
 
   TimerState & timerState = timersStates[idx];
   timerState.state = TMR_OFF; // is changed to RUNNING dep from mode
-  timerState.val = g_model.timers[idx].start;
+  setTimerStateValue(idx, g_model.timers[idx].start);
   timerState.val_10ms = 0 ;
 }
 
@@ -54,7 +54,7 @@ void timerSet(int idx, int val)
 
   TimerState & timerState = timersStates[idx];
   timerState.state = TMR_OFF; // is changed to RUNNING dep from mode
-  timerState.val = val;
+  setTimerStateValue(idx, val);
   timerState.val_10ms = 0 ;
 }
 
@@ -62,7 +62,7 @@ void restoreTimers()
 {
   for (uint8_t i=0; i<TIMERS; i++) {
     if (g_model.timers[i].persistent) {
-      timersStates[i].val = g_model.timers[i].value;
+      setTimerStateValue(i, g_model.timers[i].value);
     }
   }
 }
@@ -71,9 +71,9 @@ void saveTimers()
 {
   for (uint8_t i=0; i<TIMERS; i++) {
     if (g_model.timers[i].persistent) {
-      TimerState *timerState = &timersStates[i];
-      if (g_model.timers[i].value != (uint16_t)timerState->val) {
-        g_model.timers[i].value = timerState->val;
+      tmrval_t timerValue = getTimerStateValue(i);
+      if (g_model.timers[i].value != (uint16_t)timerValue) {
+        g_model.timers[i].value = timerValue;
         storageDirty(EE_MODEL);
       }
     }
@@ -112,11 +112,12 @@ void evalTimers(int16_t throttle, uint8_t tick10ms)
       }
 
       if ((timerState->val_10ms += tick10ms) >= 100) {
-        if (timerState->val == TIMER_MAX) break;
-        if (timerState->val == TIMER_MIN) break;
+        tmrval_t currentTimerVal = getTimerStateValue(i);
+        if (currentTimerVal == TIMER_MAX) break;
+        if (currentTimerVal == TIMER_MIN) break;
 
         timerState->val_10ms -= 100;
-        tmrval_t newTimerVal = timerState->val;
+        tmrval_t newTimerVal = currentTimerVal;
         if (timerStart) newTimerVal = timerStart - newTimerVal;
 
         if (timerMode == TMRMODE_START) {
@@ -177,8 +178,8 @@ void evalTimers(int16_t throttle, uint8_t tick10ms)
         // if counting backwards - display backwards
         if (timerStart) newTimerVal = timerStart - newTimerVal;
 
-        if (newTimerVal != timerState->val) {
-          timerState->val = newTimerVal;
+        if (newTimerVal != currentTimerVal) {
+          setTimerStateValue(i, newTimerVal);
           if (timerState->state == TMR_RUNNING) {
             if (g_model.timers[i].countdownBeep && g_model.timers[i].start) {
               AUDIO_TIMER_COUNTDOWN(i, newTimerVal);

@@ -32,36 +32,50 @@
 #include "topbar.h"
 
 #include <new>
+#include <utility>
 
 SetupWidgetsPageSlot::SetupWidgetsPageSlot(Window* parent, const rect_t& rect,
                                            WidgetsContainer* container,
                                            uint8_t slotIndex,
-                                           SetupTopBarWidgetsPage* topBarSetupPage) :
+                                           SetupTopBarWidgetsPage* topBarSetupPage,
+                                           ContainerProvider containerProvider) :
     ButtonBase(parent, rect),
     container(container),
+    containerProvider(std::move(containerProvider)),
     topBarSetupPage(topBarSetupPage),
     slot(WidgetSlotIndex{slotIndex})
 {
   setPressHandler([this]() -> uint8_t {
-    if (!this->container) return 0;
-    if (this->container->getWidget(this->slot.asUnsigned())) {
+    auto container = currentContainer();
+    if (!container) return 0;
+
+    if (container->getWidget(this->slot.asUnsigned())) {
       Menu::open([this](Menu& menu) {
         menu.addLine(STR_SELECT_WIDGET, [this]() { addNewWidget(); });
-        auto widget = this->container->getWidget(this->slot.asUnsigned());
+
+        auto container = currentContainer();
+        if (!container) return;
+
+        auto widget = container->getWidget(this->slot.asUnsigned());
         if (!widget) return;
+
         if (widget->hasOptions())
-          menu.addLine(STR_WIDGET_SETTINGS,
-                       [=]() { new (std::nothrow) WidgetSettings(widget); });
-        if (this->container->canMoveWidget(this->slot,
-                                           WidgetMoveDirection::Left))
+          menu.addLine(STR_WIDGET_SETTINGS, [this]() {
+            auto container = currentContainer();
+            if (!container) return;
+            auto widget = container->getWidget(this->slot.asUnsigned());
+            if (widget && widget->hasOptions())
+              new (std::nothrow) WidgetSettings(widget);
+          });
+        if (container->canMoveWidget(this->slot, WidgetMoveDirection::Left))
           menu.addLine(STR_MOVE_LEFT,
                        [this]() { moveWidget(WidgetMoveDirection::Left); });
-        if (this->container->canMoveWidget(this->slot,
-                                           WidgetMoveDirection::Right))
+        if (container->canMoveWidget(this->slot, WidgetMoveDirection::Right))
           menu.addLine(STR_MOVE_RIGHT,
                        [this]() { moveWidget(WidgetMoveDirection::Right); });
         menu.addLine(STR_REMOVE_WIDGET, [this]() {
-          this->container->removeWidget(this->slot.asUnsigned());
+          auto container = currentContainer();
+          if (container) container->removeWidget(this->slot.asUnsigned());
         });
       });
     } else {
@@ -96,6 +110,13 @@ SetupWidgetsPageSlot::SetupWidgetsPageSlot(Window* parent, const rect_t& rect,
   setFocusHandler([=](bool) { setFocusState(); });
 }
 
+WidgetsContainer* SetupWidgetsPageSlot::currentContainer() const
+{
+  if (containerProvider) return containerProvider();
+
+  return container;
+}
+
 void SetupWidgetsPageSlot::setSlotRect(const rect_t& rect)
 {
   setRect(rect);
@@ -125,7 +146,9 @@ void SetupWidgetsPageSlot::setFocusState()
 
 void SetupWidgetsPageSlot::addNewWidget()
 {
+  auto container = currentContainer();
   if (!container) return;
+
   const char* cur = nullptr;
   auto w = container->getWidget(slot.asUnsigned());
   if (w) cur = w->getFactory()->getDisplayName();
@@ -138,8 +161,10 @@ void SetupWidgetsPageSlot::addNewWidget()
       auto factory = &registered.get();
       if (strcmp(factory->getName(), "Radio Info") == 0) continue;
       auto selectedSlot = slot;
-      auto selectedContainer = container;
       menu.addLine(factory->getDisplayName(), [=]() {
+        auto selectedContainer = currentContainer();
+        if (!selectedContainer) return;
+
         selectedContainer->createWidget(selectedSlot.asUnsigned(), factory);
         auto widget = selectedContainer->getWidget(selectedSlot.asUnsigned());
         if (widget && widget->hasOptions())
@@ -156,6 +181,7 @@ void SetupWidgetsPageSlot::addNewWidget()
 
 void SetupWidgetsPageSlot::moveWidget(WidgetMoveDirection direction)
 {
+  auto container = currentContainer();
   if (!container) return;
 
   WidgetMoveResult moveResult = container->moveWidget(slot, direction);
@@ -185,7 +211,11 @@ SetupWidgetsPage::SetupWidgetsPage(uint8_t customScreenIdx) :
   for (unsigned i = 0; i < screen->getZonesCount(); i++) {
     auto rect = screen->getZone(i);
     auto widget_container = customScreens[customScreenIdx];
-    auto slot = new (std::nothrow) SetupWidgetsPageSlot(this, rect, widget_container, i);
+    auto slot = new (std::nothrow) SetupWidgetsPageSlot(
+        this, rect, widget_container, i, nullptr,
+        [customScreenIdx]() -> WidgetsContainer* {
+          return customScreens[customScreenIdx];
+        });
     if (i == 0) firstSlot = slot;
   }
   if (firstSlot) firstSlot->focus();

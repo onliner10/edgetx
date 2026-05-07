@@ -19,6 +19,8 @@
  * GNU General Public License for more details.
  */
 
+#pragma once
+
 #include "os/task.h"
 
 // needed by the mixer scheduler
@@ -69,3 +71,12 @@ void mixerTaskUnlock();
 // returns true if the lock could be acquired
 bool mixerTaskTryLock();
 
+class MixerTaskLockGuard
+{
+ public:
+  MixerTaskLockGuard() { mixerTaskLock(); }
+  ~MixerTaskLockGuard() { mixerTaskUnlock(); }
+
+  MixerTaskLockGuard(const MixerTaskLockGuard&) = delete;
+  MixerTaskLockGuard& operator=(const MixerTaskLockGuard&) = delete;
+};

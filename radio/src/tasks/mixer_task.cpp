@@ -31,6 +31,8 @@
 
 #include "hal/watchdog_driver.h"
 
+#include <atomic>
+
 #if defined(HALL_SYNC) && !defined(SIMU)
 #include "stm32_gpio.h"
 #include "hal/gpio.h"
@@ -50,8 +52,8 @@ static mutex_handle_t mixerMutex;
 // The mixer will start in 'paused' mode
 // and start working properly once
 // mixerTaskStart() has been called.
-static bool _mixer_started = false;
-static bool _mixer_running = false;
+static std::atomic<bool> _mixer_started = false;
+static std::atomic<bool> _mixer_running = false;
 
 void mixerTaskLock()
 {
@@ -80,25 +82,25 @@ void mixerTaskInit()
 
 bool mixerTaskStarted()
 {
-  return _mixer_started;
+  return _mixer_started.load(std::memory_order_relaxed);
 }
 
 void mixerTaskStart()
 {
-  _mixer_started = true;
-  _mixer_running = true;
+  _mixer_started.store(true, std::memory_order_relaxed);
+  _mixer_running.store(true, std::memory_order_relaxed);
 }
 
 void mixerTaskStop()
 {
   mixerTaskLock();
-  _mixer_running = false;
+  _mixer_running.store(false, std::memory_order_relaxed);
   mixerTaskUnlock();
 }
 
 bool mixerTaskRunning()
 {
-  return _mixer_running;
+  return _mixer_running.load(std::memory_order_relaxed);
 }
 
 volatile uint16_t timeForcePowerOffPressed = 0;
@@ -173,7 +175,7 @@ void mixerTask()
     }
 #endif
 
-    if (_mixer_running) {
+    if (_mixer_running.load(std::memory_order_relaxed)) {
 
       uint32_t t0 = timersGetUsTick();
 
@@ -201,9 +203,7 @@ void mixerTask()
       // so let's do it here.
       WDG_RESET();
 
-      t0 = timersGetUsTick() - t0;
-      if (t0 > maxMixerDuration)
-        maxMixerDuration = t0;
+      updateMaxMixerDuration(timersGetUsTick() - t0);
     }
   }
 }

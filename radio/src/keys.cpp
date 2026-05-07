@@ -28,6 +28,8 @@
 #include "hal/rotary_encoder.h"
 #include "dataconstants.h"
 
+#include <atomic>
+
 #if !defined(BOOT) && (defined(USE_HATS_AS_KEYS) || defined(PCBXLITE))
 #include "edgetx.h"
 #endif
@@ -63,24 +65,25 @@
 #define KFLAG_LONG_PRESS            2
 
 // global last event
-event_t s_evt;
-event_t s_trim_evt;
+static std::atomic<event_t> s_evt{0};
+static std::atomic<event_t> s_trim_evt{0};
 
-InactivityData inactivity = {0};
+InactivityData inactivity;
 
 class Key
 {
  private:
-  uint8_t m_vals = 0;
-  uint8_t m_cnt = 0;
-  uint8_t m_state = 0;
-  uint8_t m_flags = 0;
+  std::atomic<uint8_t> m_vals{0};
+  std::atomic<uint8_t> m_cnt{0};
+  std::atomic<uint8_t> m_state{0};
+  std::atomic<uint8_t> m_flags{0};
 
  public:
   event_t input(bool val);
-  bool pressed() const { return (m_vals & FILTER_MASK) == FILTER_MASK; }
+  bool pressed() const { return (m_vals.load(std::memory_order_relaxed) & FILTER_MASK) == FILTER_MASK; }
   void pauseEvents();
   void killEvents();
+  void reset();
 };
 
 event_t Key::input(bool val)
@@ -88,56 +91,60 @@ event_t Key::input(bool val)
   event_t evt = 0;
 
   // store new value in the bits that hold the key state history (used for debounce)
-  uint8_t t_vals = m_vals ;
+  uint8_t t_vals = m_vals.load(std::memory_order_relaxed);
   t_vals <<= 1 ;
   if (val) t_vals |= 1;
-  m_vals = t_vals ;
+  m_vals.store(t_vals, std::memory_order_relaxed);
 
-  m_cnt++;
+  uint8_t cnt = m_cnt.load(std::memory_order_relaxed) + 1;
+  m_cnt.store(cnt, std::memory_order_relaxed);
 
-  if ((m_state || m_flags) && m_vals == 0) {
+  uint8_t state = m_state.load(std::memory_order_relaxed);
+  uint8_t flags = m_flags.load(std::memory_order_relaxed);
+
+  if ((state || flags) && t_vals == 0) {
     // key is released
 #if defined(COLORLCD)
-    if ((m_flags & (KFLAG_KILLED)) == 0) {
-      evt = (m_flags & KFLAG_LONG_PRESS) ? _MSK_KEY_LONG_BRK : _MSK_KEY_BREAK;
+    if ((flags & (KFLAG_KILLED)) == 0) {
+      evt = (flags & KFLAG_LONG_PRESS) ? _MSK_KEY_LONG_BRK : _MSK_KEY_BREAK;
     }
 #else
-    if ((m_flags & (KFLAG_KILLED)) == 0) {
+    if ((flags & (KFLAG_KILLED)) == 0) {
       evt = _MSK_KEY_BREAK;
     }
 #endif
-    m_state = KSTATE_OFF;
-    m_cnt = 0;
-    m_flags = 0;
+    m_state.store(KSTATE_OFF, std::memory_order_relaxed);
+    m_cnt.store(0, std::memory_order_relaxed);
+    m_flags.store(0, std::memory_order_relaxed);
     return evt;
   }
 
-  if (m_flags & KFLAG_KILLED) return evt;
+  if (flags & KFLAG_KILLED) return evt;
 
-  switch (m_state) {
+  switch (state) {
     case KSTATE_OFF:
-      if (m_vals == FILTER_MASK) {
-        m_state = KSTATE_START;
-        m_cnt = 0;
+      if (t_vals == FILTER_MASK) {
+        m_state.store(KSTATE_START, std::memory_order_relaxed);
+        m_cnt.store(0, std::memory_order_relaxed);
       }
       break;
 
     case KSTATE_START:
       evt = _MSK_KEY_FIRST;
-      inactivity.counter = 0;
-      m_state = KSTATE_RPTDELAY;
-      m_cnt = 0;
+      inactivity.counter.store(0, std::memory_order_relaxed);
+      m_state.store(KSTATE_RPTDELAY, std::memory_order_relaxed);
+      m_cnt.store(0, std::memory_order_relaxed);
       break;
 
     case KSTATE_RPTDELAY: // gruvin: delay state before first key repeat
-      if (m_cnt == KEY_LONG_DELAY) {
+      if (cnt == KEY_LONG_DELAY) {
         // generate long key press
         evt = _MSK_KEY_LONG;
-        m_flags |= KFLAG_LONG_PRESS;
+        m_flags.fetch_or(KFLAG_LONG_PRESS, std::memory_order_relaxed);
       }
-      if (m_cnt == KEY_REPEAT_DELAY) {
-        m_state = 16;
-        m_cnt = 0;
+      if (cnt == KEY_REPEAT_DELAY) {
+        m_state.store(16, std::memory_order_relaxed);
+        m_cnt.store(0, std::memory_order_relaxed);
       }
       break;
 
@@ -145,22 +152,24 @@ event_t Key::input(bool val)
     case 8:
     case 4:
     case 2:
-      if (m_cnt >= KEY_REPEAT_TRIGGER) { //3 6 12 24 48 pulses in every 480ms
-        m_state >>= 1;
-        m_cnt = 0;
+      if (cnt >= KEY_REPEAT_TRIGGER) { //3 6 12 24 48 pulses in every 480ms
+        state >>= 1;
+        m_state.store(state, std::memory_order_relaxed);
+        cnt = 0;
+        m_cnt.store(cnt, std::memory_order_relaxed);
       }
       [[fallthrough]];
     case 1:
-      if ((m_cnt & (m_state - 1)) == 0) {
+      if ((cnt & (state - 1)) == 0) {
         // this produces repeat events that at first repeat slowly and then increase in speed
         evt = _MSK_KEY_REPT;
       }
       break;
 
     case KSTATE_PAUSE: //pause repeat events
-      if (m_cnt >= KEY_REPEAT_PAUSE_DELAY) {
-        m_state = 8;
-        m_cnt = 0;
+      if (cnt >= KEY_REPEAT_PAUSE_DELAY) {
+        m_state.store(8, std::memory_order_relaxed);
+        m_cnt.store(0, std::memory_order_relaxed);
       }
       break;
   }
@@ -170,14 +179,22 @@ event_t Key::input(bool val)
 
 void Key::pauseEvents()
 {
-  m_state = KSTATE_PAUSE;
-  m_cnt = 0;
+  m_state.store(KSTATE_PAUSE, std::memory_order_relaxed);
+  m_cnt.store(0, std::memory_order_relaxed);
 }
 
 void Key::killEvents()
 {
-  if (m_state)
-    m_flags |= KFLAG_KILLED;
+  if (m_state.load(std::memory_order_relaxed))
+    m_flags.fetch_or(KFLAG_KILLED, std::memory_order_relaxed);
+}
+
+void Key::reset()
+{
+  m_vals.store(0, std::memory_order_relaxed);
+  m_cnt.store(0, std::memory_order_relaxed);
+  m_state.store(KSTATE_OFF, std::memory_order_relaxed);
+  m_flags.store(0, std::memory_order_relaxed);
 }
 
 static Key keys[MAX_KEYS];
@@ -189,31 +206,27 @@ static Key trim_keys[MAX_TRIMS * 2];
  */
 bool isEvent()
 {
-  return s_evt != 0;
+  return s_evt.load(std::memory_order_relaxed) != 0;
 }
 
 void pushEvent(event_t evt)
 {
-  s_evt = evt;
+  s_evt.store(evt, std::memory_order_relaxed);
 }
 
 event_t getEvent()
 {
-  auto event = s_evt;
-  s_evt = 0;
-  return event;
+  return s_evt.exchange(0, std::memory_order_relaxed);
 }
 
 void pushTrimEvent(event_t evt)
 {
-  s_trim_evt = evt;
+  s_trim_evt.store(evt, std::memory_order_relaxed);
 }
 
 event_t getTrimEvent()
 {
-  auto event = s_trim_evt;
-  s_trim_evt = 0;
-  return event;
+  return s_trim_evt.exchange(0, std::memory_order_relaxed);
 }
 
 // Introduce a slight delay in the key repeat sequence
@@ -272,7 +285,9 @@ bool waitKeysReleased()
 #endif
   }
 
-  memclear(keys, sizeof(keys));
+  for (auto &key: keys) {
+    key.reset();
+  }
   pushEvent(0);
   return true;
 }

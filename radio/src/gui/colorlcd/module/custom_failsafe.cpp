@@ -148,7 +148,7 @@ class ChannelFailsafeEdit : public NumberEdit
 
   void copyChannel()
   {
-    g_model.failsafeChannels[channel] = channelOutputs[channel];
+    g_model.failsafeChannels[channel] = getChannelOutput(channel);
     update();
   }
 };

@@ -26,7 +26,7 @@ RTC_HandleTypeDef rtc = {};
 
 void rtcSetTime(const struct gtm * t)
 {
-  g_ms100 = 0; // start of next second begins now
+  rtcSetMs100(0); // start of next second begins now
 
   RTC_TimeTypeDef RTC_TimeStruct = {};
   RTC_DateTypeDef RTC_DateStruct = {};
@@ -112,7 +112,7 @@ void rtcInit()
 
   struct gtm utm;
   rtcGetTime(&utm);
-  g_rtcTime = gmktime(&utm);
+  rtcSetTimestamp(gmktime(&utm));
 #endif
 
 #if defined(RTC_BACKUP_RAM) && !defined(BOOT)

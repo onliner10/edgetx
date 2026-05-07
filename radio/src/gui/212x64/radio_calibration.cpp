@@ -39,7 +39,7 @@ void drawPotsBars()
        i < max_pots; x += BAR_SPACING, i++) {
     if (IS_POT_SLIDER_AVAILABLE(i)) {
       // calculate once per loop
-      auto v = calibratedAnalogs[offset + i] + RESX;
+      auto v = getCalibratedAnalog(offset + i) + RESX;
       uint8_t len = (v * BAR_HEIGHT / (RESX * 2)) + 1l;
       V_BAR(x, LCD_H - 8, len);
       lcdDrawText(x - 2, LCD_H - 6, getPotLabel(i), TINSIZE);

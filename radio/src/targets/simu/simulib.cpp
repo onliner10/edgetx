@@ -156,9 +156,9 @@ void simuStart(bool tests)
     gti.tm_year = timeinfo->tm_year;
     gti.tm_wday = timeinfo->tm_wday;
     gti.tm_yday = timeinfo->tm_yday;
-    g_rtcTime = gmktime(&gti);
+    rtcSetTimestamp(gmktime(&gti));
   } else {
-    g_rtcTime = rawtime;
+    rtcSetTimestamp(rawtime);
   }
 #endif
 

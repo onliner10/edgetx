@@ -34,9 +34,16 @@
 #include "source_numberedit.h"
 #include "sourcechoice.h"
 #include "switchchoice.h"
+#include "tasks/mixer_task.h"
 #include "textedit.h"
 
 #define SET_DIRTY() storageDirty(EE_MODEL)
+#define SET_MIXER_DEFAULT(value)              \
+  [=](int32_t newValue) {                     \
+    MixerTaskLockGuard lock;                  \
+    value = newValue;                         \
+    SET_DIRTY();                              \
+  }
 
 class MixerEditStatusBar : public Window
 {
@@ -106,30 +113,38 @@ void MixEditWindow::buildBody(Window *form)
   line = form->newLine(grid);
   new StaticText(line, rect_t{}, STR_SOURCE);
   new SourceChoice(line, rect_t{}, 0, MIXSRC_LAST,
-                   GET_SET_DEFAULT(mix->srcRaw), true);
+	                   GET_DEFAULT(mix->srcRaw),
+	                   SET_MIXER_DEFAULT(mix->srcRaw), true);
 
   // Weight
   line = form->newLine(grid);
   new StaticText(line, rect_t{}, STR_WEIGHT);
   auto svar = new SourceNumberEdit(line, MIX_WEIGHT_MIN, MIX_WEIGHT_MAX,
-                                   GET_SET_DEFAULT(mix->weight), MIXSRC_FIRST);
+	                                   GET_DEFAULT(mix->weight),
+	                                   SET_MIXER_DEFAULT(mix->weight),
+	                                   MIXSRC_FIRST);
   svar->setSuffix("%");
 
   // Offset
   new StaticText(line, rect_t{}, STR_OFFSET);
   auto gvar = new SourceNumberEdit(line, MIX_OFFSET_MIN, MIX_OFFSET_MAX,
-                                   GET_SET_DEFAULT(mix->offset), MIXSRC_FIRST);
+	                                   GET_DEFAULT(mix->offset),
+	                                   SET_MIXER_DEFAULT(mix->offset),
+	                                   MIXSRC_FIRST);
   gvar->setSuffix("%");
 
   // Switch
   line = form->newLine(grid);
   new StaticText(line, rect_t{}, STR_SWITCH);
   new SwitchChoice(line, rect_t{}, SWSRC_FIRST_IN_MIXES, SWSRC_LAST_IN_MIXES,
-                   GET_SET_DEFAULT(mix->swtch));
+	                   GET_DEFAULT(mix->swtch),
+	                   SET_MIXER_DEFAULT(mix->swtch));
 
   // Curve
   new StaticText(line, rect_t{}, STR_CURVE);
-  new CurveParam(line, rect_t{}, &mix->curve, SET_DEFAULT(mix->curve.value), MIXSRC_FIRST, mix->srcRaw);
+  new CurveParam(line, rect_t{}, &mix->curve,
+                 SET_MIXER_DEFAULT(mix->curve.value), MIXSRC_FIRST,
+                 mix->srcRaw);
 
   line = form->newLine(grid);
   line->padAll(PAD_LARGE);
