@@ -112,6 +112,24 @@ TEST(FrSky, TelemetryValueWithMinAveraging)
   }
 }
 
+TEST(FrSky, SetTelemetryValueReentersTelemetryDataLock)
+{
+  MODEL_RESET();
+  TELEMETRY_RESET();
+  allowNewSensors = true;
+
+  int index = -1;
+  {
+    TelemetryDataLock telemetryLock;
+    index = setTelemetryValue(PROTOCOL_TELEMETRY_FRSKY_D, D_RSSI_ID, 0, 0, 42,
+                              UNIT_RAW, 0);
+  }
+
+  ASSERT_GE(index, 0);
+  EXPECT_EQ(g_model.telemetrySensors[index].id, D_RSSI_ID);
+  EXPECT_EQ(telemetryItems[index].value, 42);
+}
+
 TEST(FrSky, shortUserPacketDoesNotReadPastFrame)
 {
   GuardedFrSkyDFrame frame(4);
