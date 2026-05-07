@@ -22,6 +22,7 @@
             ps.pillow
             ps.pydantic
             ps.pyelftools
+            ps.pyserial
             ps."typing-extensions"
           ]);
           sdl3 = pkgs.sdl3;
@@ -29,6 +30,7 @@
         {
           default = pkgs.mkShell {
             packages = [
+              pkgs.arduino-cli
               pkgs.cmake
               armPkgs.gcc-arm-embedded
               pkgs.git
