@@ -505,8 +505,7 @@ int setTelemetryValue(TelemetryProtocol protocol, uint16_t id, uint8_t subId,
                       uint8_t instance, T value, uint32_t unit = 0,
                       uint32_t prec = 0)
 {
-  TelemetryDataTryLock telemetryLock;
-  if (!telemetryLock) return -1;
+  TelemetryDataLock telemetryLock;
 
   bool sensorFound = false;
 

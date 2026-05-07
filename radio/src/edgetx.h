@@ -158,18 +158,19 @@ class AtomicU64Snapshot {
  public:
   T load(std::memory_order = std::memory_order_relaxed) const
   {
-    for (uint8_t i = 0; i < 4; i++) {
+    for (;;) {
       uint32_t seqStart = sequence.load(std::memory_order_acquire);
+      if (seqStart & 1u) {
+        continue;
+      }
+
       uint32_t lowPart = low.load(std::memory_order_relaxed);
       uint32_t highPart = high.load(std::memory_order_relaxed);
       uint32_t seqEnd = sequence.load(std::memory_order_acquire);
-      if (seqStart == seqEnd && !(seqEnd & 1u)) {
+      if (seqStart == seqEnd) {
         return join(lowPart, highPart);
       }
     }
-
-    return join(low.load(std::memory_order_relaxed),
-                high.load(std::memory_order_relaxed));
   }
 
   void store(T value, std::memory_order = std::memory_order_relaxed)

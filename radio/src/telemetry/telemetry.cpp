@@ -22,6 +22,7 @@
 #include "edgetx.h"
 #include "multi.h"
 #include "os/async.h"
+#include "os/sleep.h"
 #include "os/task.h"
 #include "os/timer.h"
 #include "pulses/afhds3.h"
@@ -41,6 +42,11 @@
 #include "spektrum.h"
 
 #include <atomic>
+#include <cstdint>
+
+#if defined(NATIVE_THREADS)
+  #include <thread>
+#endif
 
 #if defined(CROSSFIRE)
   #include "crossfire.h"
@@ -78,30 +84,117 @@ static rxStatStruct rxStat;
 telemetry_buffer _telemetry_rx_buffer[NUM_MODULES];
 
 static mutex_handle_t telemetryDataMutex;
-static bool telemetryDataMutexCreated = false;
+static std::atomic<uint8_t> telemetryDataMutexState{0};
+static std::atomic<uintptr_t> telemetryDataMutexOwner{0};
+static uint32_t telemetryDataMutexDepth = 0;
+
+namespace {
+
+enum TelemetryDataMutexState : uint8_t {
+  TELEMETRY_DATA_MUTEX_UNINITIALIZED,
+  TELEMETRY_DATA_MUTEX_INITIALIZING,
+  TELEMETRY_DATA_MUTEX_READY,
+};
+
+void telemetryDataMutexWait()
+{
+#if defined(NATIVE_THREADS)
+  std::this_thread::yield();
+#elif defined(FREE_RTOS)
+  if (scheduler_is_running()) {
+    sleep_ms(1);
+  }
+#endif
+}
+
+uintptr_t telemetryDataCurrentOwner()
+{
+#if defined(NATIVE_THREADS)
+  static thread_local uint8_t threadToken;
+  return reinterpret_cast<uintptr_t>(&threadToken);
+#elif defined(FREE_RTOS)
+  if (scheduler_is_running()) {
+    TaskHandle_t task = xTaskGetCurrentTaskHandle();
+    if (task) {
+      return reinterpret_cast<uintptr_t>(task);
+    }
+  }
+#endif
+  return 1;
+}
+
+}  // namespace
 
 void telemetryInit()
 {
-  if (!telemetryDataMutexCreated) {
+  uint8_t state =
+      telemetryDataMutexState.load(std::memory_order_acquire);
+  if (state == TELEMETRY_DATA_MUTEX_READY) {
+    return;
+  }
+
+  uint8_t expected = TELEMETRY_DATA_MUTEX_UNINITIALIZED;
+  if (telemetryDataMutexState.compare_exchange_strong(
+          expected, TELEMETRY_DATA_MUTEX_INITIALIZING,
+          std::memory_order_acq_rel, std::memory_order_acquire)) {
     mutex_create(&telemetryDataMutex);
-    telemetryDataMutexCreated = true;
+    telemetryDataMutexState.store(TELEMETRY_DATA_MUTEX_READY,
+                                  std::memory_order_release);
+    return;
+  }
+
+  while (telemetryDataMutexState.load(std::memory_order_acquire) !=
+         TELEMETRY_DATA_MUTEX_READY) {
+    telemetryDataMutexWait();
   }
 }
 
 void telemetryDataLock()
 {
   telemetryInit();
+
+  uintptr_t owner = telemetryDataCurrentOwner();
+  if (telemetryDataMutexOwner.load(std::memory_order_acquire) == owner) {
+    telemetryDataMutexDepth++;
+    return;
+  }
+
   mutex_lock(&telemetryDataMutex);
+  telemetryDataMutexDepth = 1;
+  telemetryDataMutexOwner.store(owner, std::memory_order_release);
 }
 
 bool telemetryDataTryLock()
 {
   telemetryInit();
-  return mutex_trylock(&telemetryDataMutex);
+
+  uintptr_t owner = telemetryDataCurrentOwner();
+  if (telemetryDataMutexOwner.load(std::memory_order_acquire) == owner) {
+    telemetryDataMutexDepth++;
+    return true;
+  }
+
+  if (!mutex_trylock(&telemetryDataMutex)) {
+    return false;
+  }
+
+  telemetryDataMutexDepth = 1;
+  telemetryDataMutexOwner.store(owner, std::memory_order_release);
+  return true;
 }
 
 void telemetryDataUnlock()
 {
+  uintptr_t owner = telemetryDataCurrentOwner();
+  if (telemetryDataMutexOwner.load(std::memory_order_acquire) != owner) {
+    return;
+  }
+
+  if (--telemetryDataMutexDepth > 0) {
+    return;
+  }
+
+  telemetryDataMutexOwner.store(0, std::memory_order_release);
   mutex_unlock(&telemetryDataMutex);
 }
 
