@@ -184,7 +184,7 @@ void postModelLoad(bool alarms)
     // Load the default topbar as an ordered list: flexible model identity on
     // the left, then flight-critical status on the right.
     if (!g_eeGeneral.getTopbarData()->hasWidget(0)) {
-      g_eeGeneral.getTopbarData()->setWidgetName(0, "ModelBmp");
+      g_eeGeneral.getTopbarData()->setWidgetName(0, "ModelName");
       storageDirty(EE_GENERAL);
     }
     if (!g_eeGeneral.getTopbarData()->hasWidget(1)) {

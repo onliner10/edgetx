@@ -2320,7 +2320,7 @@ void ModelData::initTopBar()
   int zones = RadioLayout::topBarZones();
 
   if (zones > 0) {
-    topBarData.zones[0].widgetName = "ModelBmp";
+    topBarData.zones[0].widgetName = "ModelName";
   }
 
   if (zones > 1) {

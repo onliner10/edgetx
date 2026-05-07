@@ -134,7 +134,7 @@ void LayoutFactory::loadDefaultLayout()
     //
     // TODO:
     // -> attach a few default widgets
-    //    - ModelBmp
+    //    - ModelName
     //    - Timer
     //    - ???
     //

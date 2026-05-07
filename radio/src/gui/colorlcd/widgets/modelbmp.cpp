@@ -28,11 +28,23 @@
 
 #define ETX_STATE_BG_FILL LV_STATE_USER_1
 
-class ModelBitmapWidget : public TrackedWidget
+static void copyModelName(char* dest)
+{
+  strAppend(dest, g_model.header.name, LEN_MODEL_NAME);
+}
+
+static std::string modelBitmapPath()
+{
+  char filename[LEN_BITMAP_NAME + 1];
+  strAppend(filename, g_model.header.bitmap, LEN_BITMAP_NAME);
+  return std::string(BITMAPS_PATH PATH_SEPARATOR) + filename;
+}
+
+class ModelNameWidget : public TrackedWidget
 {
  public:
-  ModelBitmapWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
-                    WidgetLocation location) :
+  ModelNameWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
+                  WidgetLocation location) :
       TrackedWidget(factory, parent, rect, location, LoadMode::Delayed)
   {
     addStyle(styles->bg_opacity_transparent, LV_PART_MAIN);
@@ -47,41 +59,32 @@ class ModelBitmapWidget : public TrackedWidget
     });
     label.with([](StaticText& text) { text.hide(); });
 
-    if (!initRequiredWindow(image, this, rect_t{0, 0, width(), height()})) return;
-    image.with([](StaticBitmap& bitmap) { bitmap.hide(); });
-
     foreground();
   }
 
   uint32_t refreshKey() override
   {
     WidgetRefreshKey key;
-    key.addBytes(g_model.header.name, LEN_MODEL_NAME)
-       .add(getHash());
+    key.addBytes(g_model.header.name, LEN_MODEL_NAME);
     return key.value();
   }
 
   void refresh() override
   {
     char s[LEN_MODEL_NAME + 1];
-    strAppend(s, g_model.header.name, LEN_MODEL_NAME);
+    copyModelName(s);
     bool textChanged = label.valueOr(true, [&](StaticText& text) {
       bool changed = text.getText() != s;
       if (changed) text.setText(s);
       return changed;
     });
 
-    if (textChanged || getHash() != deps_hash) {
-      update();
-    }
+    if (textChanged) update();
   }
 
   void onUpdate() override
   {
     auto widgetData = getPersistentData();
-
-    bool hasBitmap = g_model.header.bitmap[0] != '\0';
-    isLarge = rect.h >= LARGE_H && rect.w >= LARGE_W;
 
     // set font colour from options[0], if use theme color option off
     label.withLive([&](LiveWindow& live) {
@@ -96,8 +99,7 @@ class ModelBitmapWidget : public TrackedWidget
       }
     });
 
-    coord_t labelHeight = isLarge && hasBitmap ? LARGE_IMG_H : height();
-    rect_t labelRect = {0, 0, width(), labelHeight};
+    rect_t labelRect = {0, 0, width(), height()};
     FontIndex font = responsiveTextFont(labelRect.h);
     label.withLive([&](LiveWindow& live) {
       layoutTextLabel(live.lvobj(), labelRect, font);
@@ -115,58 +117,86 @@ class ModelBitmapWidget : public TrackedWidget
         lv_obj_clear_state(live.lvobj(), ETX_STATE_BG_FILL);
     });
 
+    label.with([](StaticText& text) { text.show(); });
+  }
+
+  static const WidgetOption options[];
+
+ protected:
+  RequiredWindow<StaticText> label;
+};
+
+class ModelImageWidget : public TrackedWidget
+{
+ public:
+  ModelImageWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
+                   WidgetLocation location) :
+      TrackedWidget(factory, parent, rect, location, LoadMode::Delayed)
+  {
+    addStyle(styles->bg_opacity_transparent, LV_PART_MAIN);
+  }
+
+  void delayedInit() override
+  {
+    if (!initRequiredWindow(image, this, rect_t{0, 0, width(), height()})) return;
+    image.with([](StaticBitmap& bitmap) { bitmap.hide(); });
+
+    foreground();
+  }
+
+  uint32_t refreshKey() override
+  {
+    WidgetRefreshKey key;
+    key.add(getHash());
+    return key.value();
+  }
+
+  void refresh() override
+  {
+    update();
+  }
+
+  void onUpdate() override
+  {
     coord_t w = width();
-    coord_t h = height() - (isLarge && hasBitmap ? LARGE_IMG_H : 0);
+    coord_t h = height();
     bool sizeChg = image.valueOr(true, [&](StaticBitmap& bitmap) {
       return w != bitmap.width() || h != bitmap.height();
     });
 
     if (sizeChg)
       image.with([&](StaticBitmap& bitmap) {
-        bitmap.setRect({0, isLarge && hasBitmap ? LARGE_IMG_H : 0, w, h});
+        bitmap.setRect({0, 0, w, h});
       });
 
-    bool hasImage = image.valueOr(false,
-                                  [](StaticBitmap& bitmap) { return bitmap.hasImage(); });
-    if (!hasImage || deps_hash != getHash() || sizeChg) {
+    if (deps_hash != getHash() || sizeChg) {
       if (g_model.header.bitmap[0]) {
-        char filename[LEN_BITMAP_NAME + 1];
-        strAppend(filename, g_model.header.bitmap, LEN_BITMAP_NAME);
-        std::string fullpath =
-            std::string(BITMAPS_PATH PATH_SEPARATOR) + filename;
-
-        image.with([&](StaticBitmap& bitmap) { bitmap.setSource(fullpath.c_str()); });
+        auto fullpath = modelBitmapPath();
+        image.with([&](StaticBitmap& bitmap) {
+          bitmap.clearSource();
+          bitmap.setSource(fullpath.c_str());
+        });
       } else {
         image.with([](StaticBitmap& bitmap) { bitmap.clearSource(); });
       }
       deps_hash = getHash();
     }
 
-    hasImage = image.valueOr(false,
-                             [](StaticBitmap& bitmap) { return bitmap.hasImage(); });
+    bool hasImage = image.valueOr(false,
+                                  [](StaticBitmap& bitmap) { return bitmap.hasImage(); });
     image.with([&](StaticBitmap& bitmap) { bitmap.show(hasImage); });
-
-    label.with([&](StaticText& text) { text.show(isLarge || !hasImage); });
   }
 
   static const WidgetOption options[];
 
  protected:
-  bool isLarge = false;
   uint32_t deps_hash = 0;
-  RequiredWindow<StaticText> label;
   RequiredWindow<StaticBitmap> image;
 
   uint32_t getHash() { return hash(g_model.header.bitmap, LEN_BITMAP_NAME); }
-
-  static LAYOUT_VAL_SCALED(LARGE_W, 120)
-  static LAYOUT_VAL_SCALED(LARGE_H, 96)
-  static LAYOUT_VAL_SCALED(LARGE_LBL_X, 5)
-  static LAYOUT_VAL_SCALED(LARGE_LBL_Y, 5)
-  static LAYOUT_VAL_SCALED(LARGE_IMG_H, 38)
 };
 
-const WidgetOption ModelBitmapWidget::options[] = {
+const WidgetOption ModelNameWidget::options[] = {
     {STR_COLOR, WidgetOption::Color, COLOR2FLAGS(COLOR_THEME_SECONDARY1_INDEX)},
     {"", WidgetOption::TextSize, FONT_STD_INDEX},
     {STR_FILL_BACKGROUND, WidgetOption::Bool, false},
@@ -174,5 +204,10 @@ const WidgetOption ModelBitmapWidget::options[] = {
     {STR_USE_THEME_COLOR, WidgetOption::Bool, true},
     {nullptr, WidgetOption::Bool}};
 
-BaseWidgetFactory<ModelBitmapWidget> modelBitmapWidget(
-    "ModelBmp", ModelBitmapWidget::options, STR_WIDGET_MODELBMP);
+const WidgetOption ModelImageWidget::options[] = {{nullptr, WidgetOption::Bool}};
+
+BaseWidgetFactory<ModelNameWidget> modelNameWidget(
+    "ModelName", ModelNameWidget::options, STR_WIDGET_MODEL_NAME);
+
+BaseWidgetFactory<ModelImageWidget> modelImageWidget(
+    "ModelImage", ModelImageWidget::options, STR_WIDGET_MODEL_IMAGE);
