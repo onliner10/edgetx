@@ -23,6 +23,14 @@
 
 #include <atomic>
 #include <stdlib.h>
+
+#if defined(NATIVE_THREADS)
+  #include <mutex>
+#elif defined(FREE_RTOS)
+  #include <FreeRTOS/include/FreeRTOS.h>
+  #include <FreeRTOS/include/task.h>
+#endif
+
 #include "definitions.h"
 #include "edgetx_types.h"
 #include "edgetx_helpers.h"
@@ -158,39 +166,52 @@ class AtomicU64Snapshot {
  public:
   T load(std::memory_order = std::memory_order_relaxed) const
   {
-    for (;;) {
-      uint32_t seqStart = sequence.load(std::memory_order_acquire);
-      if (seqStart & 1u) {
-        continue;
-      }
-
-      uint32_t lowPart = low.load(std::memory_order_relaxed);
-      uint32_t highPart = high.load(std::memory_order_relaxed);
-      uint32_t seqEnd = sequence.load(std::memory_order_acquire);
-      if (seqStart == seqEnd) {
-        return join(lowPart, highPart);
-      }
-    }
+    SnapshotGuard guard(*this);
+    return value;
   }
 
-  void store(T value, std::memory_order = std::memory_order_relaxed)
+  void store(T newValue, std::memory_order = std::memory_order_relaxed)
   {
-    uint64_t raw = static_cast<uint64_t>(value);
-    sequence.fetch_add(1u, std::memory_order_acq_rel);
-    low.store(static_cast<uint32_t>(raw), std::memory_order_relaxed);
-    high.store(static_cast<uint32_t>(raw >> 32), std::memory_order_relaxed);
-    sequence.fetch_add(1u, std::memory_order_release);
+    SnapshotGuard guard(*this);
+    value = newValue;
   }
 
  private:
-  static T join(uint32_t lowPart, uint32_t highPart)
-  {
-    return static_cast<T>((static_cast<uint64_t>(highPart) << 32) | lowPart);
-  }
+  class SnapshotGuard {
+   public:
+#if defined(NATIVE_THREADS)
+    explicit SnapshotGuard(const AtomicU64Snapshot& snapshot):
+      mutex(snapshot.mutex)
+    {
+      mutex.lock();
+    }
 
-  std::atomic<uint32_t> sequence{0};
-  std::atomic<uint32_t> low{0};
-  std::atomic<uint32_t> high{0};
+    ~SnapshotGuard() { mutex.unlock(); }
+#elif defined(FREE_RTOS)
+    explicit SnapshotGuard(const AtomicU64Snapshot&)
+    {
+      taskENTER_CRITICAL();
+    }
+
+    ~SnapshotGuard() { taskEXIT_CRITICAL(); }
+#else
+    explicit SnapshotGuard(const AtomicU64Snapshot&) {}
+    ~SnapshotGuard() = default;
+#endif
+
+    SnapshotGuard(const SnapshotGuard&) = delete;
+    SnapshotGuard& operator=(const SnapshotGuard&) = delete;
+
+   private:
+#if defined(NATIVE_THREADS)
+    std::mutex& mutex;
+#endif
+  };
+
+  T value = 0;
+#if defined(NATIVE_THREADS)
+  mutable std::mutex mutex;
+#endif
 };
 
 struct CustomFunctionsContext {

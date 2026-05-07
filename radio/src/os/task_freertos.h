@@ -41,4 +41,9 @@ struct ETX_CAPABILITY("mutex") mutex_handle_t {
   StaticSemaphore_t _mutex_struct;
 };
 
+struct ETX_CAPABILITY("mutex") recursive_mutex_handle_t {
+  SemaphoreHandle_t _rtos_handle;
+  StaticSemaphore_t _mutex_struct;
+};
+
 static inline bool task_running() { return true; }
