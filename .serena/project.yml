@@ -59,7 +59,7 @@ ignore_all_files_in_gitignore: true
 ls_specific_settings:
   cpp:
     ls_path: edge16-clangd
-    compile_commands_dir: .serena
+    compile_commands_dir: .
 
 # list of additional paths to ignore in this project.
 # Same syntax as gitignore, so you can use * and **.
