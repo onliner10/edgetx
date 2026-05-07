@@ -14,7 +14,20 @@ from typing import Any
 from .png import convert_ppm_to_png
 
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+def _resolve_repo_root() -> Path:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, check=False,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return Path(result.stdout.strip())
+    except Exception:
+        pass
+    return Path(__file__).resolve().parents[3]
+
+
+REPO_ROOT = _resolve_repo_root()
 
 
 @dataclass(frozen=True)
