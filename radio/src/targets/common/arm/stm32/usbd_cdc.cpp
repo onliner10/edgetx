@@ -19,8 +19,6 @@
  * GNU General Public License for more details.
  */
 
-#include "hal/usb_driver.h"
-
 extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
@@ -106,6 +104,8 @@ USBD_CDC_ItfTypeDef USBD_Interface_fops =
 };
 
 }   // extern "C"
+
+#include "hal/usb_driver.h"
 
 static void (*receiveDataCb)(uint8_t*, uint32_t) = nullptr;
 // static void* receiveDataCbCtx;
