@@ -211,6 +211,40 @@ extern uint16_t maxLuaDuration;
 extern uint8_t instructionsPercent;
 #define LUA_TASK_PERIOD_TICKS                5   // 50 ms
 
+inline uint16_t getMaxLuaInterval()
+{
+  return __atomic_load_n(&maxLuaInterval, __ATOMIC_RELAXED);
+}
+
+inline uint16_t getMaxLuaDuration()
+{
+  return __atomic_load_n(&maxLuaDuration, __ATOMIC_RELAXED);
+}
+
+inline void resetMaxLuaStats()
+{
+  __atomic_store_n(&maxLuaInterval, 0, __ATOMIC_RELAXED);
+  __atomic_store_n(&maxLuaDuration, 0, __ATOMIC_RELAXED);
+}
+
+inline void updateMaxLuaInterval(uint16_t value)
+{
+  uint16_t current = getMaxLuaInterval();
+  while (value > current &&
+         !__atomic_compare_exchange_n(&maxLuaInterval, &current, value, false,
+                                      __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
+  }
+}
+
+inline void updateMaxLuaDuration(uint16_t value)
+{
+  uint16_t current = getMaxLuaDuration();
+  while (value > current &&
+         !__atomic_compare_exchange_n(&maxLuaDuration, &current, value, false,
+                                      __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
+  }
+}
+
 struct LuaField {
   uint16_t id;
   char name[20];

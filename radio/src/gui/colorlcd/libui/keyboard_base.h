@@ -28,8 +28,9 @@ class Keyboard : public NavWindow
   explicit Keyboard(coord_t height, bool fullScreen = false);
   ~Keyboard();
 
-  void clearField(bool wasCancelled);
+  void clearField(bool wasCancelled, bool notifyField = true);
   static void hide(bool wasCancelled);
+  static void detachField(FormField* field);
 
   static Keyboard* keyboardWindow() { return activeKeyboard; }
 

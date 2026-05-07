@@ -262,11 +262,15 @@ ColorPicker::ColorPicker(Window* parent, const rect_t& rect,
 void ColorPicker::onLiveClicked(Window::LiveWindow&)
 {
   updateColor(getValue());
+  auto lifetime = std::weak_ptr<bool>(lifetimeToken);
+  auto applyValue = setValue;
   new (std::nothrow) ColorEditorPopup(
       color,
-      [=](uint32_t c) {
-        setValue(c);
-        updateColor(c);
+      [lifetime, picker = this, applyValue = std::move(applyValue)](uint32_t c) {
+        auto alive = lifetime.lock();
+        if (!alive) return;
+        if (applyValue) applyValue(c);
+        picker->updateColor(c);
       },
       format);
 }

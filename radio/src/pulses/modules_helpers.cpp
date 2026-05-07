@@ -20,6 +20,7 @@
  */
 
 #include "edgetx.h"
+#include "tasks/mixer_task.h"
 
 #if defined(EXTERNAL_ANTENNA)
 bool isExternalAntennaEnabled()
@@ -116,6 +117,8 @@ uint8_t getMaxRxNum(uint8_t idx)
 
 void setModuleType(uint8_t moduleIdx, uint8_t moduleType)
 {
+  bool restartDsmp = false;
+  mixerTaskLock();
   ModuleData & moduleData = g_model.moduleData[moduleIdx];
   memclear(&moduleData, sizeof(ModuleData));
   moduleData.type = moduleType;
@@ -130,9 +133,14 @@ void setModuleType(uint8_t moduleIdx, uint8_t moduleType)
   else if (moduleData.type == MODULE_TYPE_FLYSKY_AFHDS3) {
     resetAfhds3Options(moduleIdx);
   } 
-  else if (moduleData.type == MODULE_TYPE_LEMON_DSMP) {
-    restartModule(moduleIdx);  // Restart DSMP when switching to it (example PPM->DSMP)
-  }
+  else if (moduleData.type == MODULE_TYPE_LEMON_DSMP)
+    restartDsmp = true;
   else
     resetAccessAuthenticationCount();
+  mixerTaskUnlock();
+
+  if (restartDsmp) {
+    // Restart DSMP when switching to it (example PPM->DSMP).
+    restartModule(moduleIdx);
+  }
 }

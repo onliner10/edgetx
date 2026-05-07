@@ -321,7 +321,7 @@ void menuRadioSetup(event_t event)
           }
         }
         if (attr && checkIncDec_Ret) {
-          g_rtcTime = gmktime(&t); // update local timestamp and get wday calculated
+          rtcSetTimestamp(gmktime(&t)); // update local timestamp and get wday calculated
         }
         break;
 
@@ -347,7 +347,7 @@ void menuRadioSetup(event_t event)
           }
         }
         if (attr && checkIncDec_Ret) {
-          g_rtcTime = gmktime(&t); // update local timestamp and get wday calculated
+          rtcSetTimestamp(gmktime(&t)); // update local timestamp and get wday calculated
         }
         break;
 #endif

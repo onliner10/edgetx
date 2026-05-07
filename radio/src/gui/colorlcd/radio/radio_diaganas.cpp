@@ -94,7 +94,7 @@ class AnaViewWindow : public Window
       new StaticText(line, rect_t{}, s);
 
       auto lbl = new DynamicNumber<int16_t>(line, rect_t{},
-          [=]() { return calibratedAnalogs[i] * 25 / 256; },
+          [=]() { return getCalibratedAnalog(i) * 25 / 256; },
           COLOR_THEME_PRIMARY1_INDEX, RIGHT);
 
       lbl = new DynamicNumber<int16_t>(line, rect_t{},

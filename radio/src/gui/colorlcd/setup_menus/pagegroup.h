@@ -179,6 +179,7 @@ class PageGroupBase : public NavWindow
   EdgeTxIcon icon;
   Messaging quickMenuMsg;
 
+  void onDelete() override;
   void onLiveCheckEvents(LiveWindow& live) override;
 
 #if defined(HARDWARE_KEYS)

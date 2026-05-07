@@ -32,6 +32,8 @@
 #include "inactivity_timer.h"
 #include "tasks/mixer_task.h"
 
+#include <atomic>
+
 #if defined(RADIO_GX12)
 #include "targets/taranis/gx12/bsp_io.h"
 #endif
@@ -73,17 +75,18 @@ CircularBuffer<uint8_t, 8> luaSetStickySwitchBuffer;
 #define LS_LAST_VALUE(fm, idx) lswFm[fm].lsw[idx].lastValue
 
 tmr10ms_t switchesMidposStart[MAX_SWITCHES];
-uint64_t  switchesPos = 0;
+AtomicU64Snapshot<uint64_t> switchesPos;
 
 static_assert(sizeof(uint64_t) * 8 >= ((MAX_SWITCHES - 1) / 2) + 1,
               "MAX_SWITCHES too big for uint64_t position state");
 
 tmr10ms_t potsLastposStart[MAX_POTS];
-uint8_t   potsPos[MAX_POTS];
+std::atomic<uint8_t> potsPos[MAX_POTS];
 
-#define SWITCH_POSITION(sw) (switchesPos & ((MASK_CFN_TYPE)1 << (sw)))
-#define POT_POSITION(sw)                            \
-  ((potsPos[(sw) / XPOTS_MULTIPOS_COUNT] & 0x0f) == \
+#define SWITCH_POSITION(sw) \
+  (switchesPos.load(std::memory_order_relaxed) & ((MASK_CFN_TYPE)1 << (sw)))
+#define POT_POSITION(sw)                                                    \
+  ((potsPos[(sw) / XPOTS_MULTIPOS_COUNT].load(std::memory_order_relaxed) & 0x0f) == \
    ((sw) % XPOTS_MULTIPOS_COUNT))
 
 #if defined(FUNCTION_SWITCHES)
@@ -371,7 +374,8 @@ static uint64_t checkSwitchPosition(uint8_t idx, bool startup)
       result = ((MASK_CFN_TYPE)1 << index);
       switchesMidposStart[idx] = 0;
     } else {
-      result = (switchesPos & ((MASK_CFN_TYPE)0x7 << index));
+      result = (switchesPos.load(std::memory_order_relaxed) &
+                ((MASK_CFN_TYPE)0x7 << index));
       if (!switchesMidposStart[idx]) {
         switchesMidposStart[idx] = get_tmr10ms();
       }
@@ -379,7 +383,7 @@ static uint64_t checkSwitchPosition(uint8_t idx, bool startup)
     break;
   }
 
-  if (!(switchesPos & result)) {
+  if (!(switchesPos.load(std::memory_order_relaxed) & result)) {
     PLAY_SWITCH_MOVED(index);
   }
 
@@ -394,7 +398,7 @@ void getSwitchesPosition(bool startup)
     newPos |= checkSwitchPosition(i, startup);
   }
 
-  switchesPos = newPos;
+  switchesPos.store(newPos, std::memory_order_relaxed);
 
   auto max_pots = adcGetMaxInputs(ADC_INPUT_FLEX);
   auto offset = adcGetInputOffset(ADC_INPUT_FLEX);
@@ -412,19 +416,21 @@ void getSwitchesPosition(bool startup)
 #endif
         uint16_t step = divOr(2 * RESX, count, 0);
         uint8_t pos = divOr(anaIn(analog_idx), step, 0);
-        uint8_t previousPos = potsPos[i] >> 4;
-        uint8_t previousStoredPos = potsPos[i] & 0x0F;
+        uint8_t previousPotPos = potsPos[i].load(std::memory_order_relaxed);
+        uint8_t previousPos = previousPotPos >> 4;
+        uint8_t previousStoredPos = previousPotPos & 0x0F;
         if (startup) {
-          potsPos[i] = (pos << 4) | pos;
+          potsPos[i].store((pos << 4) | pos, std::memory_order_relaxed);
         }
         else if (pos != previousPos) {
           potsLastposStart[i] = get_tmr10ms();
-          potsPos[i] = (pos << 4) | previousStoredPos;
+          potsPos[i].store((pos << 4) | previousStoredPos,
+                           std::memory_order_relaxed);
         } else if (g_eeGeneral.switchesDelay == SWITCHES_DELAY_NONE ||
                    (tmr10ms_t)(get_tmr10ms() - potsLastposStart[i]) >
                        SWITCHES_DELAY()) {
           potsLastposStart[i] = 0;
-          potsPos[i] = (pos << 4) | pos;
+          potsPos[i].store((pos << 4) | pos, std::memory_order_relaxed);
           if (previousStoredPos != pos) {
             PLAY_SWITCH_MOVED(SWSRC_LAST_SWITCH + i * XPOTS_MULTIPOS_COUNT + pos);
           }
@@ -464,7 +470,7 @@ getvalue_t getValueForLogicalSwitch(mixsrc_t i)
 {
   getvalue_t result = getValue(i);
   if (i>=MIXSRC_FIRST_INPUT && i<=MIXSRC_LAST_INPUT) {
-    int8_t trimIdx = virtualInputsTrims[i-MIXSRC_FIRST_INPUT];
+    int8_t trimIdx = getVirtualInputTrim(i - MIXSRC_FIRST_INPUT);
     if (trimIdx >= 0) {
       int16_t trim = trims[trimIdx];
       if (trimIdx == inputMappingConvertMode(inputMappingGetThrottle()) && g_model.throttleReversed)
@@ -742,7 +748,7 @@ bool getSwitch(swsrc_t swtch, uint8_t flags)
     result = trimDown(idx);
   }
   else if (cs_idx == SWSRC_RADIO_ACTIVITY) {
-    result = (inactivity.counter < 2);
+    result = (inactivity.counter.load(std::memory_order_relaxed) < 2);
   }
   else if (cs_idx == SWSRC_TRAINER_CONNECTED) {
     result = isTrainerConnected();
@@ -778,7 +784,7 @@ bool getSwitch(swsrc_t swtch, uint8_t flags)
 uint8_t getXPotPosition(uint8_t idx)
 {
   if (idx >= MAX_POTS || !IS_POT_MULTIPOS(idx)) return 0;
-  return potsPos[idx] & 0x0F;
+  return potsPos[idx].load(std::memory_order_relaxed) & 0x0F;
 }
 
 
@@ -858,7 +864,7 @@ swsrc_t getMovedSwitch()
       if (IS_MULTIPOS_CALIBRATED(calib)) {
         uint8_t count = calib->count;
 #endif
-        uint8_t prev = potsPos[i] & 0x0F;
+        uint8_t prev = potsPos[i].load(std::memory_order_relaxed) & 0x0F;
         uint16_t step = divOr(2 * RESX, count, 0);
         uint8_t next = divOr(anaIn(MAX_STICKS + i), step, 0);
         if (prev != next) {

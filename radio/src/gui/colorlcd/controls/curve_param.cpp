@@ -27,6 +27,7 @@
 #include "gvar_numberedit.h"
 #include "model_curves.h"
 #include "source_numberedit.h"
+#include "tasks/mixer_task.h"
 
 #include <new>
 
@@ -63,12 +64,15 @@ CurveParam::CurveParam(Window* parent, const rect_t& rect, CurveRef* ref,
   setSize(LV_SIZE_CONTENT, LV_SIZE_CONTENT);
 
   new (std::nothrow) Choice(this, rect_t{}, STR_VCURVETYPE, 0, modelCurvesEnabled() ? CURVE_REF_CUSTOM : CURVE_REF_FUNC,
-             GET_DEFAULT(ref->type), [=](int32_t newValue) {
-               ref->type = newValue;
-               ref->value = 0;
-               SET_DIRTY();
-               update();
-             });
+	             GET_DEFAULT(ref->type), [=](int32_t newValue) {
+	               {
+	                 MixerTaskLockGuard lock;
+	                 ref->type = newValue;
+	                 ref->value = 0;
+	               }
+	               SET_DIRTY();
+	               update();
+	             });
 
   // CURVE_REF_DIFF
   // CURVE_REF_EXPO

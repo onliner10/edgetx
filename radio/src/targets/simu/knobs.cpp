@@ -40,6 +40,8 @@ struct knob {
        const char *format, ImGuiKnobFlags flags)
   {
     radius = _radius;
+    value_changed = false;
+    const DataType previous_value = *p_value;
     t = ((float)*p_value - v_min) / (v_max - v_min);
     auto screen_pos = ImGui::GetCursorScreenPos();
 
@@ -60,7 +62,7 @@ struct knob {
       float alpha = atan2f(mp.x - center.x, center.y - mp.y) + angle_mid;
       alpha = ImClamp(alpha, angle_min, angle_max);
       float ratio = (alpha - angle_min) / (angle_max - angle_min);
-      switch(data_type){
+      switch (data_type) {
       case ImGuiDataType_Float:
         *p_value = ImGui::ScaleValueFromRatioT<ImS32, ImS32, float>(
             data_type, ratio, v_min, v_max, false, 0.0f, 0.0f);
@@ -69,8 +71,10 @@ struct knob {
         *p_value = ImGui::ScaleValueFromRatioT<float, float, float>(
             data_type, ratio, v_min, v_max, false, 0.0f, 0.0f);
         break;
-      default: break;
+      default:
+        break;
       }
+      value_changed = *p_value != previous_value;
     }
   }
 

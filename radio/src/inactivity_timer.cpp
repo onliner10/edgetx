@@ -46,7 +46,7 @@ void inactivityTimerReset(ActivitySource src)
     resetBacklightTimeout();
   }
   
-  inactivity.counter = 0;
+  inactivity.counter.store(0, std::memory_order_relaxed);
 }
 
 #define INAC_STICKS_SHIFT   7
@@ -54,7 +54,7 @@ void inactivityTimerReset(ActivitySource src)
 
 static inline int8_t inactivity_diff(uint8_t sum)
 {
-  return abs((int8_t)(sum - inactivity.sum));
+  return abs((int8_t)(sum - inactivity.sum.load(std::memory_order_relaxed)));
 }
 
 bool inactivityCheckInputs()
@@ -84,7 +84,7 @@ bool inactivityCheckInputs()
 #endif
 
   if (inactivity_diff(sum) > 1) {
-    inactivity.sum = sum;
+    inactivity.sum.store(sum, std::memory_order_relaxed);
     return true;
   } else {
     return false;

@@ -65,6 +65,10 @@ extern task_handle_t cliTaskId;
 
 void tasksStart();
 
+#if defined(SIMU)
+void timer10msStart();
+#endif
+
 extern volatile uint16_t timeForcePowerOffPressed;
 inline void resetForcePowerOffRequest()
 {

@@ -174,9 +174,10 @@ class QuickSubMenu
     if (mainDef->subMenuItems[n].pageAction == PAGE_CREATE) {
       quickMenu->getTopMenu()->clearFocus();
       int pgIdx = getPageNumber(n);
-      if (quickMenu->getPageGroup() && quickMenu->getPageGroup()->hasSubMenu(mainDef->subMenuItems[n].qmPage)) {
+      auto pageGroup = Window::pageGroup();
+      if (pageGroup && pageGroup->hasSubMenu(mainDef->subMenuItems[n].qmPage)) {
         quickMenu->onSelect(false);
-        quickMenu->getPageGroup()->setCurrentTab(pgIdx);
+        pageGroup->setCurrentTab(pgIdx);
       } else {
         quickMenu->onSelect(true);
         auto pg = new PageGroup(mainDef->icon, STR_VAL(mainDef->title), mainDef->subMenuItems);

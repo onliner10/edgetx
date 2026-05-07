@@ -132,11 +132,13 @@ void Keyboard::onDelete()
   if (activeKeyboard == this) hide(false);
 }
 
-void Keyboard::clearField(bool wasCancelled)
+void Keyboard::clearField(bool wasCancelled, bool notifyField)
 {
   TRACE("CLEAR FIELD");
-  keyboardObj.with(
-      [](lv_obj_t* keyboard) { lv_obj_add_flag(keyboard, LV_OBJ_FLAG_HIDDEN); });
+  keyboardObj.with([](lv_obj_t* keyboard) {
+    lv_keyboard_set_textarea(keyboard, nullptr);
+    lv_obj_add_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+  });
 
   detach();
   withLive([](LiveWindow& live) {
@@ -157,7 +159,7 @@ void Keyboard::clearField(bool wasCancelled)
     });
 
     if (!wasCancelled) field->setEditMode(false);
-    field->changeEnd();
+    if (notifyField) field->changeEnd();
     field = nullptr;
 
     if (fieldGroup) {
@@ -166,6 +168,16 @@ void Keyboard::clearField(bool wasCancelled)
       fieldGroup = nullptr;
     }
   }
+}
+
+void Keyboard::detachField(FormField* field)
+{
+  if (!activeKeyboard || activeKeyboard->field != field) return;
+
+  auto keyboard = activeKeyboard;
+  activeKeyboard = nullptr;
+  keyboard->clearField(true, false);
+  keyboard->addFlag(LV_OBJ_FLAG_HIDDEN);
 }
 
 void Keyboard::hide(bool wasCancelled)

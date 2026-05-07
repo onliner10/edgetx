@@ -94,7 +94,7 @@ static bool active_until_pending(uint32_t now, uint32_t activeUntil)
 
 static void reset_inactivity()
 {
-  inactivity.counter = 0;
+  inactivity.counter.store(0, std::memory_order_relaxed);
   if (g_eeGeneral.backlightMode & e_backlight_mode_keys) {     
     resetBacklightTimeout();
   }

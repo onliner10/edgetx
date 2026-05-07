@@ -19,6 +19,7 @@
 #include "form.h"
 
 #include "etx_lv_theme.h"
+#include "keyboard_base.h"
 
 void FlexGridLayout::apply(Window& w)
 {
@@ -83,6 +84,7 @@ void FormField::onCancel()
 
 void FormField::onDelete()
 {
+  Keyboard::detachField(this);
   if (isEditMode()) setEditMode(false);
 }
 

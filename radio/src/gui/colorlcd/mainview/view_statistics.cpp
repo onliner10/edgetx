@@ -159,13 +159,13 @@ void StatisticsViewPage::build(Window* window)
   // Session data
   new (std::nothrow) StaticText(line, rect_t{}, STR_SESSION);
   new (std::nothrow) DynamicText(
-      line, rect_t{}, [] { return getTimerString(sessionTimer); });
+      line, rect_t{}, [] { return getTimerString(getSessionTimer()); });
 
   // Battery data
   new (std::nothrow) StaticText(line, rect_t{}, STR_BATT_LABEL);
   new (std::nothrow) DynamicText(
       line, rect_t{},
-      [] { return getTimerString(g_eeGeneral.globalTimer + sessionTimer); });
+      [] { return getTimerString(g_eeGeneral.globalTimer + getSessionTimer()); });
 
   line = window->newLine(grid);
   line->padAll(PAD_ZERO);
@@ -173,12 +173,12 @@ void StatisticsViewPage::build(Window* window)
   // Throttle
   new (std::nothrow) StaticText(line, rect_t{}, STR_THROTTLE_LABEL);
   new (std::nothrow) DynamicText(
-      line, rect_t{}, [] { return getTimerString(s_timeCumThr); });
+      line, rect_t{}, [] { return getTimerString(getThrottleRuntime()); });
 
   // Throttle %  data
   new (std::nothrow) StaticText(line, rect_t{}, STR_THROTTLE_PERCENT_LABEL);
   new (std::nothrow) DynamicText(
-      line, rect_t{}, [] { return getTimerString(s_timeCum16ThrP / 16); });
+      line, rect_t{}, [] { return getTimerString(getThrottlePercentRuntime() / 16); });
 
   line = window->newLine(grid);
   line->padAll(PAD_ZERO);
@@ -187,7 +187,7 @@ void StatisticsViewPage::build(Window* window)
   new (std::nothrow) StaticText(line, rect_t{}, STR_TIMER_LABEL);
   for (int i = 0; i < TIMERS; i += 1)
     new (std::nothrow) DynamicText(
-        line, rect_t{}, [=] { return getTimerString(timersStates[i].val); });
+        line, rect_t{}, [=] { return getTimerString(getTimerStateValue(i)); });
 
   line = window->newLine(grid);
   line->padAll(PAD_ZERO);
@@ -209,9 +209,9 @@ void StatisticsViewPage::build(Window* window)
                                     STR_MENUTORESET, [=]() -> uint8_t {
                                       g_eeGeneral.globalTimer = 0;
                                       storageDirty(EE_GENERAL);
-                                      sessionTimer = 0;
-                                      s_timeCumThr = 0;
-                                      s_timeCum16ThrP = 0;
+                                      setSessionTimer(0);
+                                      setThrottleRuntime(0);
+                                      setThrottlePercentRuntime(0);
                                       s_traceWr = 0;
                                       return 0;
                                     });
@@ -245,7 +245,7 @@ void DebugViewPage::build(Window* window)
   static std::string pad_STR_PERIOD = std::string(STR_PERIOD) + ": ";
   new (std::nothrow) StaticText(line, rect_t{}, STR_TMIXMAXMS);
   new (std::nothrow) DynamicNumber<uint16_t>(
-      line, rect_t{}, [] { return DURATION_MS_PREC2(maxMixerDuration); },
+      line, rect_t{}, [] { return DURATION_MS_PREC2(getMaxMixerDuration()); },
       COLOR_THEME_PRIMARY1_INDEX, PREC2, nullptr, pad_STR_MS.c_str());
 
   new (std::nothrow) DynamicNumber<uint16_t>(
@@ -275,10 +275,10 @@ void DebugViewPage::build(Window* window)
 #endif
   new (std::nothrow) DebugInfoNumber<uint16_t>(
       line, rect_t{0, 0, DBG_B_WIDTH, DBG_B_HEIGHT},
-      [] { return 10 * maxLuaDuration; }, STR_DURATION_MS);
+      [] { return 10 * getMaxLuaDuration(); }, STR_DURATION_MS);
   new (std::nothrow) DebugInfoNumber<uint16_t>(
       line, rect_t{0, 0, DBG_B_WIDTH, DBG_B_HEIGHT},
-      [] { return 10 * maxLuaInterval; }, STR_INTERVAL_MS);
+      [] { return 10 * getMaxLuaInterval(); }, STR_INTERVAL_MS);
 
   line = window->newLine(grid);
   line->padAll(PAD_ZERO);
@@ -375,10 +375,9 @@ void DebugViewPage::build(Window* window)
   auto btn =
       new (std::nothrow) TextButton(line, rect_t{0, 0, 0, RST_BTN_H},
                                     STR_MENUTORESET, [=]() -> uint8_t {
-                                      maxMixerDuration = 0;
+                                      resetMaxMixerDuration();
 #if defined(LUA)
-                                      maxLuaInterval = 0;
-                                      maxLuaDuration = 0;
+                                      resetMaxLuaStats();
 #endif
                                       return 0;
                                     });

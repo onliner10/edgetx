@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "button.h"
 #include "color_editor.h"
 
@@ -30,6 +32,7 @@ class ColorPicker : public Button
   std::function<uint32_t()> getValue;
   std::function<void(uint32_t)> setValue;
   std::function<void(uint32_t)> preview;
+  std::shared_ptr<bool> lifetimeToken = std::make_shared<bool>(true);
   COLOR_EDITOR_FMT format;
 
   void updateColor(uint32_t c);

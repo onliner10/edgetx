@@ -124,13 +124,13 @@ class TimerWidget : public TrackedWidget
     auto widgetData = getPersistentData();
     uint32_t index = widgetData->options[0].value.unsignedValue;
     TimerData& timerData = g_model.timers[index];
-    TimerState& timerState = timersStates[index];
+    tmrval_t timerValue = getTimerStateValue(index);
 
     WidgetRefreshKey key;
     key.add((uint32_t)index)
        .add((uint32_t)timerData.start)
        .add((bool)timerData.showElapsed)
-       .add((int32_t)timerState.val);
+       .add((int32_t)timerValue);
     return key.value();
   }
 
@@ -140,10 +140,10 @@ class TimerWidget : public TrackedWidget
 
     uint32_t index = widgetData->options[0].value.unsignedValue;
     TimerData& timerData = g_model.timers[index];
-    TimerState& timerState = timersStates[index];
+    tmrval_t timerValue = getTimerStateValue(index);
 
-    if (lastValue != timerState.val || lastStartValue != timerData.start) {
-      lastValue = timerState.val;
+    if (lastValue != timerValue || lastStartValue != timerData.start) {
+      lastValue = timerValue;
       lastStartValue = timerData.start;
 
       if (lastStartValue && lastValue > 0) {

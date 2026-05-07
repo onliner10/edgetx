@@ -442,7 +442,8 @@ uint8_t g_ms100 = 0; // global to allow time set function to reset to zero
 
 void gettime(struct gtm * tm)
 {
-  filltm(&g_rtcTime, tm); // create a struct tm date/time structure from global unix time stamp
+  gtime_t rtcTime = rtcGetTimestamp();
+  filltm(&rtcTime, tm); // create a struct tm date/time structure from global unix time stamp
 }
 
 void rtcGetTime(struct gtm * t);
@@ -472,19 +473,20 @@ uint8_t rtcAdjust(uint16_t year, uint8_t mon, uint8_t day, uint8_t hour, uint8_t
     t.tm_min  = min;
     t.tm_sec  = sec;
     gtime_t newTime = gmktime(&t) + timezoneOffsetSeconds(g_eeGeneral.timezone, g_eeGeneral.timezoneMinutes);
-    gtime_t diff = (g_rtcTime > newTime) ? (g_rtcTime - newTime) : (newTime - g_rtcTime);
+    gtime_t rtcTime = rtcGetTimestamp();
+    gtime_t diff = (rtcTime > newTime) ? (rtcTime - newTime) : (newTime - rtcTime);
 
 #if defined(DEBUG) && defined (PCBTARANIS)
     struct gtm utm;
     rtcGetTime(&utm);
-    gtime_t rtcTime = gmktime(&utm);
-    TRACE("rtc: %d, grtc: %d, gps: %d, diff: %d, ", rtcTime, g_rtcTime, newTime, diff);
+    gtime_t hardwareRtcTime = gmktime(&utm);
+    TRACE("rtc: %d, grtc: %d, gps: %d, diff: %d, ", hardwareRtcTime, rtcTime, newTime, diff);
 #endif
 
     if (diff > RTC_ADJUST_TRESHOLD) {
       // convert newTime to struct gtm and set RTC clock
       filltm(&newTime, &t);
-      g_rtcTime = gmktime(&t); // update local timestamp and get wday calculated
+      rtcSetTimestamp(gmktime(&t)); // update local timestamp and get wday calculated
       rtcSetTime(&t);
       TRACE("RTC clock adjusted to %04d-%02d-%02d %02d:%02d:%02d", year, mon, day, hour, min, sec);
       // TODO perhaps some kind of audio notification ???

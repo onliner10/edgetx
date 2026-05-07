@@ -24,6 +24,7 @@
 #include "sdcard_common.h"
 #include "modelslist.h"
 #include "model_init.h"
+#include "telemetry/telemetry.h"
 
 #include "hal/abnormal_reboot.h"
 
@@ -73,7 +74,10 @@ void storageFormat()
   sdCheckAndCreateDirectory(RADIO_PATH);
   sdCheckAndCreateDirectory(MODELS_PATH);
   generalDefault();
-  setModelDefaults();
+  {
+    TelemetryDataLock telemetryLock;
+    setModelDefaults();
+  }
 }
 
 void storageCheck(bool immediately)
@@ -160,7 +164,10 @@ const char * createModel()
 
   int index = findNextFileIndex(filename, LEN_MODEL_FILENAME, MODELS_PATH);
   if (index > 0) {
-    setModelDefaults(index);
+    {
+      TelemetryDataLock telemetryLock;
+      setModelDefaults(index);
+    }
     memcpy(g_eeGeneral.currModelFilename, filename, sizeof(g_eeGeneral.currModelFilename));
 
     storageDirty(EE_GENERAL);
@@ -178,16 +185,20 @@ const char* loadModel(const char* filename, bool alarms, const char* filePath)
 {
   preModelLoad();
 
-  const char* error = readModel(filename, (uint8_t*)&g_model, sizeof(g_model), filePath);
-  if (error) {
-    TRACE("loadModel error=%s", error);
+  const char* error = nullptr;
+  {
+    TelemetryDataLock telemetryLock;
+    error = readModel(filename, (uint8_t*)&g_model, sizeof(g_model), filePath);
+    if (error) {
+      TRACE("loadModel error=%s", error);
 
-    // just get some clean memory state in "g_model"
-    // so the mixer can run safely
-    memset(&g_model, 0, sizeof(g_model));
-    applyDefaultTemplate();
+      // just get some clean memory state in "g_model"
+      // so the mixer can run safely
+      memset(&g_model, 0, sizeof(g_model));
+      applyDefaultTemplate();
 
-    storageCheck(true);
+      storageCheck(true);
+    }
   }
 
   postModelLoad(error ? false : alarms);

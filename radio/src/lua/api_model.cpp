@@ -310,7 +310,7 @@ static int luaModelGetTimer(lua_State *L)
     lua_newtable(L);
     lua_pushtableinteger(L, "mode", timer.mode);
     lua_pushtableinteger(L, "start", timer.start);
-    lua_pushtableinteger(L, "value", timersStates[idx].val);
+    lua_pushtableinteger(L, "value", getTimerStateValue(idx));
     lua_pushtableinteger(L, "countdownBeep", timer.countdownBeep);
     lua_pushtableboolean(L, "minuteBeep", timer.minuteBeep);
     lua_pushtableinteger(L, "persistent", timer.persistent);
@@ -357,7 +357,7 @@ static int luaModelSetTimer(lua_State *L)
         timer.start = luaL_checkinteger(L, -1);
       }
       else if (!strcmp(key, "value")) {
-        timersStates[idx].val = luaL_checkinteger(L, -1);
+        setTimerStateValue(idx, luaL_checkinteger(L, -1));
       }
       else if (!strcmp(key, "countdownBeep")) {
         timer.countdownBeep = luaL_checkinteger(L, -1);

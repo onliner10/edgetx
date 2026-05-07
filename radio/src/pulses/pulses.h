@@ -26,6 +26,8 @@
 #include "pulses_common.h"
 #include "hal/module_driver.h"
 
+#include <atomic>
+
 #if defined(PXX2)
 #include "pxx2.h"
 #include "pxx2_ota.h"
@@ -64,13 +66,12 @@
 
 typedef void (* ModuleCallback)();
 
-PACK(struct ModuleState {
-  uint8_t protocol;
-  uint8_t mode:4;
-  uint8_t forced_off:1;
-  uint8_t settings_updated:1;
-  uint8_t spare:2;
-  uint16_t counter;
+struct ModuleState {
+  std::atomic<uint8_t> protocol;
+  std::atomic<uint8_t> mode;
+  std::atomic<uint8_t> forced_off;
+  std::atomic<uint8_t> settings_updated;
+  std::atomic<uint16_t> counter;
 
 #if defined(PXX2)
   // PXX specific items
@@ -91,7 +92,7 @@ PACK(struct ModuleState {
   void readReceiverSettings(ReceiverSettings * destination);
   void writeReceiverSettings(ReceiverSettings * source);
 #endif
-});
+};
 
 extern ModuleState moduleState[NUM_MODULES];
 

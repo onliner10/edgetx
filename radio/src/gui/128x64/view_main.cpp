@@ -114,7 +114,7 @@ void drawPotsBars()
     if (IS_POT_SLIDER_AVAILABLE(i)) {
       coord_t x = xstart + (j % cols) * 5;
       coord_t y = lines == 1 ? (LCD_H - 8) : j >= cols ? (LCD_H - 8) : (LCD_H - 8 - BAR_HEIGHT / 2 - 1);
-      auto v = calibratedAnalogs[offset + i] + RESX;
+      auto v = getCalibratedAnalog(offset + i) + RESX;
       uint8_t len = (v * (BAR_HEIGHT - (lines - 1)) / (RESX * 2 * lines)) + 1l;
       V_BAR(x, y, len);
       j++;
@@ -125,22 +125,22 @@ void drawPotsBars()
 void doMainScreenGraphics()
 {
 #if defined(SURFACE_RADIO)
-  drawWheel(RBOX_CENTERX, calibratedAnalogs[ADC_MAIN_ST]);
-  drawThrottle(LBOX_CENTERX, calibratedAnalogs[ADC_MAIN_TH]);
+  drawWheel(RBOX_CENTERX, getCalibratedAnalog(ADC_MAIN_ST));
+  drawThrottle(LBOX_CENTERX, getCalibratedAnalog(ADC_MAIN_TH));
 #else
-  int16_t calibStickVert = calibratedAnalogs[ADC_MAIN_LV];
+  int16_t calibStickVert = getCalibratedAnalog(ADC_MAIN_LV);
   if (g_model.throttleReversed &&
       inputMappingConvertMode(ADC_MAIN_LV) == inputMappingGetThrottle()) {
     calibStickVert = -calibStickVert;
   }
-  drawStick(LBOX_CENTERX, calibratedAnalogs[ADC_MAIN_LH], calibStickVert);
+  drawStick(LBOX_CENTERX, getCalibratedAnalog(ADC_MAIN_LH), calibStickVert);
 
-  calibStickVert = calibratedAnalogs[ADC_MAIN_RV];
+  calibStickVert = getCalibratedAnalog(ADC_MAIN_RV);
   if (g_model.throttleReversed &&
       inputMappingConvertMode(ADC_MAIN_RV) == inputMappingGetThrottle()) {
     calibStickVert = -calibStickVert;
   }
-  drawStick(RBOX_CENTERX, calibratedAnalogs[ADC_MAIN_RH], calibStickVert);
+  drawStick(RBOX_CENTERX, getCalibratedAnalog(ADC_MAIN_RH), calibStickVert);
 #endif
 
   drawPotsBars();

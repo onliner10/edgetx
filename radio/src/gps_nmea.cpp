@@ -161,8 +161,9 @@ bool gpsNewFrameNMEA(char c)
         else {
           // turn off this frame (do this only once a second)
           static gtime_t lastGpsCmdSent = 0;
-          if (string[0] == 'G' && g_rtcTime != lastGpsCmdSent) {
-            lastGpsCmdSent = g_rtcTime;
+          gtime_t rtcTime = rtcGetTimestamp();
+          if (string[0] == 'G' && rtcTime != lastGpsCmdSent) {
+            lastGpsCmdSent = rtcTime;
             char cmd[] = "$PUBX,40,GSV,0,0,0,0";
             cmd[9]  = string[2];
             cmd[10] = string[3];

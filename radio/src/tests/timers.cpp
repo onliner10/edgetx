@@ -54,7 +54,7 @@ void initModelTimer(uint32_t idx, uint8_t mode, int16_t start = 0)
     evalTimers(throttle, 1);
   }
   TEST_AB_EQUAL(timersStates[idx].state, state);
-  TEST_AB_EQUAL(timersStates[idx].val, value);
+  TEST_AB_EQUAL(getTimerStateValue(idx), value);
   return ::testing::AssertionSuccess();
 }
 

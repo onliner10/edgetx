@@ -24,8 +24,8 @@
 
 bool setBindProtocolSelection()
 {
-  int16_t xPos = calibratedAnalogs[ADC_MAIN_LH];
-  int16_t yPos = calibratedAnalogs[ADC_MAIN_LV];
+  int16_t xPos = getCalibratedAnalog(ADC_MAIN_LH);
+  int16_t yPos = getCalibratedAnalog(ADC_MAIN_LV);
 
   // Center: D8
   if (abs(xPos) < 50 && abs(yPos) < 50) {

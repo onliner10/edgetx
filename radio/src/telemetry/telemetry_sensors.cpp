@@ -471,6 +471,8 @@ void TelemetryItem::eval(const TelemetrySensor & sensor)
 
 void delTelemetryIndex(uint8_t index)
 {
+  TelemetryDataLock telemetryLock;
+
   memclear(&g_model.telemetrySensors[index], sizeof(TelemetrySensor));
   telemetryItems[index].clear();
   storageDirty(EE_MODEL);
@@ -503,6 +505,9 @@ int setTelemetryValue(TelemetryProtocol protocol, uint16_t id, uint8_t subId,
                       uint8_t instance, T value, uint32_t unit = 0,
                       uint32_t prec = 0)
 {
+  TelemetryDataTryLock telemetryLock;
+  if (!telemetryLock) return -1;
+
   bool sensorFound = false;
 
   for (int index = 0; index < MAX_TELEMETRY_SENSORS; index++) {

@@ -1073,7 +1073,7 @@ int cliSet(const char **argv)
       t.tm_min = minute;
       t.tm_sec = second;
       // update local timestamp and get wday calculated
-      g_rtcTime = gmktime(&t);
+      rtcSetTimestamp(gmktime(&t));
       rtcSetTime(&t);
     } else {
       cliSerialPrint("%s: Invalid arguments \"%s\" \"%s\"", argv[0], argv[1],
@@ -1480,7 +1480,7 @@ int cliDisplay(const char ** argv)
   else if (!strcmp(argv[1], "rtc")) {
     struct gtm utm;
     gettime(&utm);
-    cliSerialPrint("rtc = %4d-%02d-%02d %02d:%02d:%02d.%02d0", utm.tm_year+TM_YEAR_BASE, utm.tm_mon+1, utm.tm_mday, utm.tm_hour, utm.tm_min, utm.tm_sec, g_ms100);
+    cliSerialPrint("rtc = %4d-%02d-%02d %02d:%02d:%02d.%02d0", utm.tm_year+TM_YEAR_BASE, utm.tm_mon+1, utm.tm_mday, utm.tm_hour, utm.tm_min, utm.tm_sec, rtcGetMs100());
   }
   else if (!strcmp(argv[1], "uid")) {
     char str[LEN_CPU_UID+1];

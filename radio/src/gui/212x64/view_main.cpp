@@ -93,19 +93,19 @@ static bool isAsteriskDisplayed() {
 
 void doMainScreenGraphics()
 {
-  int16_t calibStickVert = calibratedAnalogs[ADC_MAIN_LV];
+  int16_t calibStickVert = getCalibratedAnalog(ADC_MAIN_LV);
   if (g_model.throttleReversed &&
       inputMappingConvertMode(ADC_MAIN_LV) == inputMappingGetThrottle()) {
     calibStickVert = -calibStickVert;
   }
-  drawStick(LBOX_CENTERX, calibratedAnalogs[ADC_MAIN_LH], calibStickVert);
+  drawStick(LBOX_CENTERX, getCalibratedAnalog(ADC_MAIN_LH), calibStickVert);
 
-  calibStickVert = calibratedAnalogs[ADC_MAIN_RV];
+  calibStickVert = getCalibratedAnalog(ADC_MAIN_RV);
   if (g_model.throttleReversed &&
       inputMappingConvertMode(ADC_MAIN_RV) == inputMappingGetThrottle()) {
     calibStickVert = -calibStickVert;
   }
-  drawStick(RBOX_CENTERX, calibratedAnalogs[ADC_MAIN_RH], calibStickVert);
+  drawStick(RBOX_CENTERX, getCalibratedAnalog(ADC_MAIN_RH), calibStickVert);
 }
 
 void displayTrims(uint8_t phase)
@@ -223,7 +223,8 @@ void drawSliders()
 
     // calculate once per loop
     y += LCD_H / 2 - 4;
-    y -= ((calibratedAnalogs[offset + i] + RESX) * (LCD_H / 2 - 4) / (RESX * 2));
+    y -= ((getCalibratedAnalog(offset + i) + RESX) * (LCD_H / 2 - 4) /
+          (RESX * 2));
     lcdDrawSolidVerticalLine(x - 1, y, 2);
     lcdDrawSolidVerticalLine(x + 2, y, 2);
   }
@@ -352,8 +353,8 @@ void displayTimers()
   // Main and Second timer
   for (unsigned int i=0; i<2; i++) {
     if (g_model.timers[i].mode) {
-      TimerState & timerState = timersStates[i];
       TimerData & timerData = g_model.timers[i];
+      tmrval_t timerValue = getTimerStateValue(i);
       uint8_t y = TIMERS_Y + i*TIMERS_H;
       if (ZLEN(timerData.name) > 0) {
         lcdDrawSizedText(TIMERS_X, y-7, timerData.name, LEN_TIMER_NAME, SMLSIZE);
@@ -361,15 +362,15 @@ void displayTimers()
       else {
         lcdDrawTextAtIndex(TIMERS_X, y-7, STR_VTMRMODES, timerData.mode, SMLSIZE);
       }
-      int val = timerState.val;
+      int val = timerValue;
       if (timerData.start && timerData.showElapsed &&
-          timerData.start != timerState.val)
-        val = (int)timerData.start - (int)timerState.val;
+          timerData.start != timerValue)
+        val = (int)timerData.start - (int)timerValue;
       drawTimer(TIMERS_X, y, val, TIMEHOUR|MIDSIZE|LEFT, TIMEHOUR|MIDSIZE|LEFT);
       if (timerData.persistent) {
         lcdDrawChar(TIMERS_R, y-7, 'P', SMLSIZE);
       }
-      if (timerState.val < 0) {
+      if (timerValue < 0) {
         if (BLINK_ON_PHASE) {
           lcdDrawFilledRect(TIMERS_X-7, y-8, 60, 20);
         }

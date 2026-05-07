@@ -256,12 +256,12 @@ void getModuleSyncStatusString(uint8_t moduleIdx, char * statusText)
 
 ModuleSettingsMode getModuleMode(int moduleIndex)
 {
-  return (ModuleSettingsMode)moduleState[moduleIndex].mode;
+  return (ModuleSettingsMode)moduleState[moduleIndex].mode.load(std::memory_order_relaxed);
 }
 
 void setModuleMode(int moduleIndex, ModuleSettingsMode mode)
 {
-  moduleState[moduleIndex].mode = mode;
+  moduleState[moduleIndex].mode.store(mode, std::memory_order_relaxed);
 }
 
 uint8_t getModuleType(uint8_t module)
@@ -502,15 +502,19 @@ void pulsesStopModule(uint8_t module)
 {
   if (module >= MAX_MODULES) return;
 
+  mixerTaskLock();
   while(telemetryIsPolling()) {
     // In case the telemetry timer is currently polling the port,
     // we give the timer task a chance to run and finish the polling.
+    mixerTaskUnlock();
     sleep_ms(1);
+    mixerTaskLock();
   }
   _deinit_module(module);
 
   auto& proto = moduleState[module].protocol;
   proto = PROTOCOL_CHANNELS_NONE;
+  mixerTaskUnlock();
 }
 
 static bool _handle_async_restart(uint8_t module)

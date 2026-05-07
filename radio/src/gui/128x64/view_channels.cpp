@@ -83,7 +83,7 @@ void menuChannelsViewCommon(event_t event)
       // Properties
 #if defined(OVERRIDE_CHANNEL_FUNCTION)
       if (phase == 1) {
-        if (safetyCh[ch] != OVERRIDE_CHANNEL_UNDEFINED)
+        if (getSafetyChannel(ch) != OVERRIDE_CHANNEL_UNDEFINED)
           lcdDrawText(LCD_W + 1, y + 1, "OVR", TINSIZE | RIGHT);
         else
           phase = 0;

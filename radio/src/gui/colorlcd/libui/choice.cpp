@@ -268,11 +268,31 @@ void Choice::openMenu()
   setEditMode(true);  // this needs to be done first before menu is created.
 
   auto menu = new Menu(false, popupWidth);
+  activeMenu = menu;
   if (menuTitle) menu->setTitle(menuTitle);
 
   fillMenu(menu);
 
-  menu->setCloseHandler([=]() { setEditMode(false); });
+  std::weak_ptr<bool> lifetime(lifetimeToken);
+  auto choice = this;
+  menu->setCloseHandler([choice, lifetime]() {
+    auto alive = lifetime.lock();
+    if (!alive) return;
+    choice->activeMenu = nullptr;
+    choice->setEditMode(false);
+  });
+}
+
+void Choice::onDelete()
+{
+  lifetimeToken.reset();
+  auto menu = activeMenu;
+  activeMenu = nullptr;
+  if (menu) {
+    menu->setCloseHandler({});
+    menu->deleteLater();
+  }
+  ChoiceBase::onDelete();
 }
 
 #if defined(SIMU)

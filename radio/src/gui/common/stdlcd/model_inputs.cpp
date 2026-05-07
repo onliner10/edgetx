@@ -377,7 +377,7 @@ void menuModelExposAll(event_t event)
   // Value
   uint8_t index = expoAddress(s_currIdx)->chn;
   if (!s_currCh) {
-    lcdDrawNumber(127, 2, calcRESXto1000(anas[index]), PREC1|TINSIZE|RIGHT);
+    lcdDrawNumber(127, 2, calcRESXto1000(getInputValue(index)), PREC1|TINSIZE|RIGHT);
   }
 #endif
   
@@ -386,7 +386,7 @@ void menuModelExposAll(event_t event)
 #if LCD_DEPTH > 1
   // Gauge
   if (!s_currCh) {
-    drawGauge(127, 1, 58, 6, anas[index], 1024);
+    drawGauge(127, 1, 58, 6, getInputValue(index), 1024);
   }
 #endif
   

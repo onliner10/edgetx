@@ -21,6 +21,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <inttypes.h>
 #include "edgetx_types.h"
 
@@ -204,8 +205,8 @@ void setTransposeHatsForLUA(bool val);
 
 struct InactivityData
 {
-  uint16_t counter;
-  uint8_t  sum;
+  std::atomic<uint16_t> counter{0};
+  std::atomic<uint8_t> sum{0};
 };
 
 extern InactivityData inactivity;

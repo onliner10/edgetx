@@ -24,6 +24,8 @@
 #include "button.h"
 #include "widgets_container.h"
 
+#include <functional>
+
 class ScreenMenu;
 class SetupTopBarWidgetsPage;
 
@@ -63,13 +65,17 @@ class SetupWidgetsPage : public NavWindow
 class SetupWidgetsPageSlot : public ButtonBase
 {
  public:
+  typedef std::function<WidgetsContainer*()> ContainerProvider;
+
   SetupWidgetsPageSlot(Window* parent, const rect_t& rect,
                        WidgetsContainer* container, uint8_t slotIndex,
-                       SetupTopBarWidgetsPage* topBarSetupPage = nullptr);
+                       SetupTopBarWidgetsPage* topBarSetupPage = nullptr,
+                       ContainerProvider containerProvider = nullptr);
   void setSlotRect(const rect_t& rect);
 
  protected:
   WidgetsContainer* container = nullptr;
+  ContainerProvider containerProvider;
   SetupTopBarWidgetsPage* topBarSetupPage = nullptr;
   WidgetSlotIndex slot;
   bool openSettings = false;
@@ -79,6 +85,7 @@ class SetupWidgetsPageSlot : public ButtonBase
 
   void setFocusState();
   void updateBorder();
+  WidgetsContainer* currentContainer() const;
 
   void addNewWidget();
   void moveWidget(WidgetMoveDirection direction);

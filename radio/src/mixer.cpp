@@ -50,6 +50,8 @@ BeepANACenter bpanaCenter = 0;
 
 int32_t act [MAX_MIXERS] = {0};
 MixState mixState [MAX_MIXERS];
+std::atomic<uint8_t> mixStateActiveExpos[MAX_MIXERS] = {};
+std::atomic<uint8_t> mixStateActiveMixes[MAX_MIXERS] = {};
 
 uint8_t mixWarning;
 
@@ -183,12 +185,29 @@ int expo(int x, int k)
   return neg ? -y : y;
 }
 
-void applyExpos(int16_t * anas, uint8_t mode, int16_t ovwrIdx, int16_t ovwrValue)
+static void setExpoValue(int16_t * values, uint8_t index, int16_t value)
+{
+  if (values == anas) {
+    setInputValue(index, value);
+  } else {
+    values[index] = value;
+  }
+}
+
+static void setExpoTrimSource(int16_t * values, uint8_t index, int8_t value)
+{
+  if (values == anas) {
+    setVirtualInputTrim(index, value);
+  }
+}
+
+void applyExpos(int16_t * values, uint8_t mode, int16_t ovwrIdx, int16_t ovwrValue)
 {
   int8_t cur_chn = -1;
 
   for (uint8_t i=0; i<MAX_EXPOS; i++) {
-    if (mode == e_perout_mode_normal) mixState[i].activeExpo = false;
+    if (mode == e_perout_mode_normal)
+      mixStateActiveExpos[i].store(false, std::memory_order_relaxed);
     ExpoData * ed = expoAddress(i);
     mixsrc_t srcRaw = ed->srcRaw;
     mixsrc_t src = abs(srcRaw);
@@ -212,7 +231,8 @@ void applyExpos(int16_t * anas, uint8_t mode, int16_t ovwrIdx, int16_t ovwrValue
         v = limit<int32_t>(-1024, v, 1024);
       }
       if (EXPO_MODE_ENABLE(ed, v)) {
-        if (mode == e_perout_mode_normal) mixState[i].activeExpo = true;
+        if (mode == e_perout_mode_normal)
+          mixStateActiveExpos[i].store(true, std::memory_order_relaxed);
         cur_chn = ed->chn;
 
         //========== CURVE=================
@@ -230,16 +250,16 @@ void applyExpos(int16_t * anas, uint8_t mode, int16_t ovwrIdx, int16_t ovwrValue
 
         //========== TRIMS ================
         if (ed->trimSource < TRIM_ON)
-          virtualInputsTrims[cur_chn] = -ed->trimSource - 1;
+          setExpoTrimSource(values, cur_chn, -ed->trimSource - 1);
         else if (ed->trimSource == TRIM_ON && src >= MIXSRC_FIRST_STICK &&
                  src <= MIXSRC_LAST_STICK)
-          virtualInputsTrims[cur_chn] = src - MIXSRC_FIRST_STICK;
+          setExpoTrimSource(values, cur_chn, src - MIXSRC_FIRST_STICK);
         else
-          virtualInputsTrims[cur_chn] = -1;
+          setExpoTrimSource(values, cur_chn, -1);
         // if (srcRaw < 0) v = -v;
-        anas[cur_chn] = v;
+        setExpoValue(values, cur_chn, v);
       } else {
-        anas[ed->chn] = 0;
+        setExpoValue(values, ed->chn, 0);
       }
     }
   }
@@ -267,9 +287,10 @@ void applyExpos(int16_t * anas, uint8_t mode, int16_t ovwrIdx, int16_t ovwrValue
 int16_t applyLimits(uint8_t channel, int32_t value)
 {
 #if defined(OVERRIDE_CHANNEL_FUNCTION)
-  if (safetyCh[channel] != OVERRIDE_CHANNEL_UNDEFINED) {
+  safetych_t safetyChannel = getSafetyChannel(channel);
+  if (safetyChannel != OVERRIDE_CHANNEL_UNDEFINED) {
     // safety channel available for channel check
-    return calc100toRESX(safetyCh[channel]);
+    return calc100toRESX(safetyChannel);
   }
 #endif
 
@@ -355,7 +376,7 @@ getvalue_t _getValue(mixsrc_t i, bool* valid)
     return 0;
   }
   else if (i <= MIXSRC_LAST_INPUT) {
-    return anas[i - MIXSRC_FIRST_INPUT];
+    return getInputValue(i - MIXSRC_FIRST_INPUT);
   }
 #if defined(LUA_INPUTS)
   else if (i <= MIXSRC_LAST_LUA) {
@@ -375,7 +396,7 @@ getvalue_t _getValue(mixsrc_t i, bool* valid)
       if (valid != nullptr) *valid = false;
       return 0;
     }
-    return calibratedAnalogs[inputMappingConvertMode(i)];
+    return getCalibratedAnalog(inputMappingConvertMode(i));
   }
   else if (i <= MIXSRC_LAST_POT) {
     i -= MIXSRC_FIRST_POT;
@@ -383,7 +404,7 @@ getvalue_t _getValue(mixsrc_t i, bool* valid)
       if (valid != nullptr) *valid = false;
       return 0;
     }
-    return calibratedAnalogs[i + adcGetInputOffset(ADC_INPUT_FLEX)];
+    return getCalibratedAnalog(i + adcGetInputOffset(ADC_INPUT_FLEX));
   }
 
 #if defined(IMU)
@@ -511,13 +532,13 @@ getvalue_t _getValue(mixsrc_t i, bool* valid)
   } else if (i < MIXSRC_FIRST_TIMER) {
     // TX_TIME + SPARES
 #if defined(RTCLOCK)
-    return (g_rtcTime % SECS_PER_DAY) / 60; // number of minutes from midnight
+    return (rtcGetTimestamp() % SECS_PER_DAY) / 60; // number of minutes from midnight
 #else
     if (valid != nullptr) *valid = false;
     return 0;
 #endif
   } else if (i <= MIXSRC_LAST_TIMER) {
-    return timersStates[i - MIXSRC_FIRST_TIMER].val;
+    return getTimerStateValue(i - MIXSRC_FIRST_TIMER);
   }
 
   else if (i <= MIXSRC_LAST_TELEM) {
@@ -598,7 +619,7 @@ void evalInputs(uint8_t mode)
 
     BeepANACenter mask = (BeepANACenter)1 << ch; // TODO
 
-    calibratedAnalogs[i] = v; // for show in expo
+    setCalibratedAnalog(i, v); // for show in expo
 
     // filtering for center beep
     uint8_t tmp = (uint16_t)abs(v) / 16;
@@ -642,7 +663,7 @@ void evalInputs(uint8_t mode)
           }
         }
       }
-      calibratedAnalogs[i] = v;
+      setCalibratedAnalog(i, v);
     }
   }
 
@@ -713,7 +734,7 @@ int getSourceTrimOrigin(int source)
   if (source >= MIXSRC_FIRST_STICK && source <= MIXSRC_LAST_STICK)
     return source - MIXSRC_FIRST_STICK;
   else if (source >= MIXSRC_FIRST_INPUT && source <= MIXSRC_LAST_INPUT)
-    return virtualInputsTrims[source - MIXSRC_FIRST_INPUT];
+    return getVirtualInputTrim(source - MIXSRC_FIRST_INPUT);
   else
     return -1;
 }
@@ -754,7 +775,7 @@ static inline bitfield_channels_t upper_channels_mask(uint16_t ch)
   return ~(channel_bit(ch)) + 1;
 }
 
-uint8_t mixerCurrentFlightMode;
+std::atomic<uint8_t> mixerCurrentFlightMode{0};
 
 void evalFlightModeMixes(uint8_t mode, uint8_t tick10ms)
 {
@@ -840,7 +861,7 @@ void evalFlightModeMixes(uint8_t mode, uint8_t tick10ms)
   bitfield_channels_t dirtyChannels = all_channels_dirty;
 
   // Calculate locally and then copy to mixState array - prevent UI seeing phantom values while calculating
-  bool activeMixes[MAX_MIXERS];
+  bool activeMixes[MAX_MIXERS] = {};
 
   do {
     bitfield_channels_t passDirtyChannels = 0;
@@ -1129,8 +1150,10 @@ void evalFlightModeMixes(uint8_t mode, uint8_t tick10ms)
 
   } while (++pass < 5 && dirtyChannels);
 
-  for (uint8_t i=0; i<MAX_MIXERS; i++)
-    mixState[i].activeMix = activeMixes[i];
+  if (mode == e_perout_mode_normal) {
+    for (uint8_t i=0; i<MAX_MIXERS; i++)
+      mixStateActiveMixes[i].store(activeMixes[i], std::memory_order_relaxed);
+  }
 
   mixWarning = lv_mixWarning;
 }
@@ -1228,7 +1251,7 @@ void evalMixes(uint8_t tick10ms)
 #if defined(OVERRIDE_CHANNEL_FUNCTION)
     if (!radioGFEnabled() && !modelSFEnabled()) {
       for (uint8_t i = 0; i < MAX_OUTPUT_CHANNELS; i++) {
-        safetyCh[i] = OVERRIDE_CHANNEL_UNDEFINED;
+        setSafetyChannel(i, OVERRIDE_CHANNEL_UNDEFINED);
       }
     }
 #endif
@@ -1262,11 +1285,11 @@ void evalMixes(uint8_t tick10ms)
     // this limits based on v original values and min=-1024, max=1024  RESX=1024
     int32_t q = (flightModesFade ? divOr(sum_chans512[i], weight, 0) << 4 : chans[i]);
 
-    ex_chans[i] = q / 256;
+    setRawChannelOutput(i, q / 256);
 
     int16_t value = applyLimits(i, q);  // applyLimits will remove the 256 100% basis
 
-    channelOutputs[i] = value;  // copy consistent word to int-level
+    setChannelOutput(i, value);  // copy consistent word to int-level
   }
 
   if (tick10ms && flightModesFade) {
@@ -1328,7 +1351,7 @@ void doMixerPeriodicUpdates()
 
     if (thrTraceSrc > MAX_POTS) {
       uint8_t ch = thrTraceSrc - MAX_POTS - 1;
-      val = channelOutputs[ch];
+      val = getChannelOutput(ch);
 
       LimitData * lim = limitAddress(ch);
       int16_t gModelMax = LIMIT_MAX_RESX(lim);
@@ -1355,7 +1378,11 @@ void doMixerPeriodicUpdates()
         val=0;  // prevent val be negative, which would corrupt throttle trace and timers; could occur if safetyswitch is smaller than limits
     }
     else {
-      val = RESX + calibratedAnalogs[thrTraceSrc == 0 ? inputMappingConvertMode(inputMappingGetThrottle()) : thrTraceSrc + MAX_STICKS - 1];
+      val = RESX +
+            getCalibratedAnalog(thrTraceSrc == 0
+                                    ? inputMappingConvertMode(
+                                          inputMappingGetThrottle())
+                                    : thrTraceSrc + MAX_STICKS - 1);
     }
 
     // calibrate it (resolution increased by factor 4)
@@ -1386,21 +1413,24 @@ void doMixerPeriodicUpdates()
 
       if (s_cnt_1s >= 10) { // 1sec
         s_cnt_1s -= 10;
-        sessionTimer += 1;
-        inactivity.counter++;
-        if ((((uint8_t)inactivity.counter) & 0x07) == 0x01 && g_eeGeneral.inactivityTimer && inactivity.counter > ((uint16_t)g_eeGeneral.inactivityTimer * 60))
+        uint16_t currentSessionTimer = addSessionTimer(1);
+        uint16_t inactivityCounter =
+            inactivity.counter.fetch_add(1, std::memory_order_relaxed) + 1;
+        if ((((uint8_t)inactivityCounter) & 0x07) == 0x01 &&
+            g_eeGeneral.inactivityTimer &&
+            inactivityCounter > ((uint16_t)g_eeGeneral.inactivityTimer * 60))
           AUDIO_INACTIVITY();
 
 #if defined(AUDIO)
-        if (mixWarning & 1) if ((sessionTimer&0x03)==0) AUDIO_MIX_WARNING(1);
-        if (mixWarning & 2) if ((sessionTimer&0x03)==1) AUDIO_MIX_WARNING(2);
-        if (mixWarning & 4) if ((sessionTimer&0x03)==2) AUDIO_MIX_WARNING(3);
+        if (mixWarning & 1) if ((currentSessionTimer&0x03)==0) AUDIO_MIX_WARNING(1);
+        if (mixWarning & 2) if ((currentSessionTimer&0x03)==1) AUDIO_MIX_WARNING(2);
+        if (mixWarning & 4) if ((currentSessionTimer&0x03)==2) AUDIO_MIX_WARNING(3);
 #endif
 
         val = divOr(s_sum_samples_thr_1s, s_cnt_samples_thr_1s, 0);
-        s_timeCum16ThrP += (val>>3);  // s_timeCum16ThrP would overrun if we would store throttle value with higher accuracy; therefore stay with 16 steps
+        addThrottlePercentRuntime(val>>3);  // s_timeCum16ThrP would overrun if we would store throttle value with higher accuracy; therefore stay with 16 steps
         if (val)
-          s_timeCumThr += 1;
+          addThrottleRuntime(1);
         s_sum_samples_thr_1s >>= 2;  // correct better accuracy now, because trace graph can show this information; in case thrtrace is not active, the compile should remove this
 
 #if defined(THRTRACE)

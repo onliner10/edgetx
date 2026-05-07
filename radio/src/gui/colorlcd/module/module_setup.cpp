@@ -576,40 +576,30 @@ class ModuleSubTypeChoice : public Choice
  public:
   ModuleSubTypeChoice(Window* parent, uint8_t moduleIdx) :
       Choice(parent, rect_t{}, 0, 0,
-            [=]() { return getSubTypeValue(); },
-            [=](int32_t newValue) { setSubTypeValue(newValue); }),
+            [moduleIdx]() { return getSubTypeValue(moduleIdx); },
+            [moduleIdx](int32_t newValue) {
+              setSubTypeValue(moduleIdx, newValue);
+            }),
       moduleIdx(moduleIdx)
   {
   }
 
-  int getSubTypeValue()
+  static int getSubTypeValue(uint8_t moduleIdx)
   {
-    if (isModuleXJT(moduleIdx) || isModuleDSM2(moduleIdx) ||
-        isModuleR9MNonAccess(moduleIdx) || isModuleSBUS(moduleIdx)
-#if defined(PPM)
-        || isModulePPM(moduleIdx)
-#endif
-#if defined(PXX2)
-        || isModuleISRM(moduleIdx)
-#endif
-    ) {
+    if (!isValidModuleIndex(moduleIdx)) return 0;
+
+    if (usesModuleSubType(moduleIdx)) {
       return g_model.moduleData[moduleIdx].subType;
     } else {
       return g_model.moduleData[moduleIdx].multi.rfProtocol;
     }
   }
 
-  void setSubTypeValue(int32_t newValue)
+  static void setSubTypeValue(uint8_t moduleIdx, int32_t newValue)
   {
-    if (isModuleXJT(moduleIdx) || isModuleDSM2(moduleIdx) ||
-        isModuleR9MNonAccess(moduleIdx) || isModuleSBUS(moduleIdx)
-#if defined(PPM)
-        || isModulePPM(moduleIdx)
-#endif
-#if defined(PXX2)
-        || isModuleISRM(moduleIdx)
-#endif
-    ) {
+    if (!isValidModuleIndex(moduleIdx)) return;
+
+    if (usesModuleSubType(moduleIdx)) {
       if (isModuleXJT(moduleIdx)) {
         g_model.moduleData[moduleIdx].channelsStart = 0;
         g_model.moduleData[moduleIdx].channelsCount = defaultModuleChannels_M8(moduleIdx);
@@ -638,6 +628,11 @@ class ModuleSubTypeChoice : public Choice
 
   void updateLayout()
   {
+    if (!isValidModuleIndex(moduleIdx)) {
+      hide();
+      return;
+    }
+
     if (isModuleXJT(moduleIdx)) {
       setMin(MODULE_SUBTYPE_PXX1_ACCST_D16);
       setMax(MODULE_SUBTYPE_PXX1_LAST);
@@ -706,6 +701,11 @@ class ModuleSubTypeChoice : public Choice
 
   void openMenu() override
   {
+    if (!isValidModuleIndex(moduleIdx)) {
+      setEditMode(false);
+      return;
+    }
+
 #if defined(MULTIMODULE)
     if (isModuleMultimodule(moduleIdx)) {
       auto menu = new Menu();
@@ -734,6 +734,27 @@ class ModuleSubTypeChoice : public Choice
   }
 
  protected:
+  static bool isValidModuleIndex(uint8_t moduleIdx)
+  {
+    return moduleIdx < NUM_MODULES;
+  }
+
+  static bool usesModuleSubType(uint8_t moduleIdx)
+  {
+    if (!isValidModuleIndex(moduleIdx)) return false;
+
+    bool usesSubType = isModuleXJT(moduleIdx) || isModuleDSM2(moduleIdx) ||
+                       isModuleR9MNonAccess(moduleIdx) ||
+                       isModuleSBUS(moduleIdx);
+#if defined(PPM)
+    usesSubType = usesSubType || isModulePPM(moduleIdx);
+#endif
+#if defined(PXX2)
+    usesSubType = usesSubType || isModuleISRM(moduleIdx);
+#endif
+    return usesSubType;
+  }
+
   uint8_t moduleIdx;
 };
 

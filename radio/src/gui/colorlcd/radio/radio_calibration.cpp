@@ -57,8 +57,8 @@ class StickCalibrationWindow : public Window
 
   void onLiveCheckEvents(LiveWindow& live) override
   {
-    int32_t x = calibratedAnalogs[stickX];
-    int32_t y = calibratedAnalogs[stickY];
+    int32_t x = getCalibratedAnalog(stickX);
+    int32_t y = getCalibratedAnalog(stickY);
     coord_t dx = width() / 2 - CAL_CTR + (CAL_SIZ / 2 * x) / RESX;
     coord_t dy = height() / 2 - CAL_CTR - (CAL_SIZ / 2 * y) / RESX;
     calibStick->setPos(dx, dy);

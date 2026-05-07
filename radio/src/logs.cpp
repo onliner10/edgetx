@@ -270,11 +270,12 @@ void logsWrite()
       {
         static struct gtm utm;
         static gtime_t lastRtcTime = 0;
-        if (g_rtcTime != lastRtcTime) {
-          lastRtcTime = g_rtcTime;
+        gtime_t rtcTime = rtcGetTimestamp();
+        if (rtcTime != lastRtcTime) {
+          lastRtcTime = rtcTime;
           gettime(&utm);
         }
-        f_printf(&g_oLogFile, "%4d-%02d-%02d,%02d:%02d:%02d.%02d0,", utm.tm_year+TM_YEAR_BASE, utm.tm_mon+1, utm.tm_mday, utm.tm_hour, utm.tm_min, utm.tm_sec, g_ms100);
+        f_printf(&g_oLogFile, "%4d-%02d-%02d,%02d:%02d:%02d.%02d0,", utm.tm_year+TM_YEAR_BASE, utm.tm_mon+1, utm.tm_mday, utm.tm_hour, utm.tm_min, utm.tm_sec, rtcGetMs100());
       }
 #else
       f_printf(&g_oLogFile, "%d,", tmr10ms);
@@ -329,7 +330,8 @@ void logsWrite()
       auto offset = adcGetInputOffset(ADC_INPUT_MAIN);
 
       for (uint8_t i = 0; i < n_inputs; i++) {
-        f_printf(&g_oLogFile, "%d,", calibratedAnalogs[inputMappingConvertMode(offset + i)]);
+        f_printf(&g_oLogFile, "%d,",
+                 getCalibratedAnalog(inputMappingConvertMode(offset + i)));
       }
 
       n_inputs = adcGetMaxInputs(ADC_INPUT_FLEX);
@@ -337,7 +339,7 @@ void logsWrite()
 
       for (uint8_t i = 0; i < n_inputs; i++) {
         if (IS_POT_AVAILABLE(i))
-          f_printf(&g_oLogFile, "%d,", calibratedAnalogs[offset + i]);
+          f_printf(&g_oLogFile, "%d,", getCalibratedAnalog(offset + i));
       }
 
       for (uint8_t i = 0; i < switchGetMaxAllSwitches(); i++) {
@@ -349,7 +351,8 @@ void logsWrite()
                getLogicalSwitchesStates(0));
 
       for (uint8_t channel = 0; channel < MAX_OUTPUT_CHANNELS; channel++) {
-        f_printf(&g_oLogFile, "%d,", PPM_CENTER+channelOutputs[channel]/2); // in us
+        f_printf(&g_oLogFile, "%d,",
+                 PPM_CENTER + getChannelOutput(channel) / 2); // in us
       }
 
       div_t qr = div(g_vbat100mV, 10);

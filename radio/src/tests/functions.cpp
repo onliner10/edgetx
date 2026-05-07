@@ -100,12 +100,13 @@ TEST_F(SpecialFunctionsTest, InvalidSetTimerDoesNotCrash)
 TEST_F(SpecialFunctionsTest, StartupVolumeUsesConfiguredSourceBeforeWarnings)
 {
   g_eeGeneral.volumeSrc = MIXSRC_FIRST_POT;
-  currentSpeakerVolume = requiredSpeakerVolume = VOLUME_LEVEL_MAX;
+  requiredSpeakerVolume.store(VOLUME_LEVEL_MAX, std::memory_order_relaxed);
+  currentSpeakerVolume.store(VOLUME_LEVEL_MAX, std::memory_order_relaxed);
 
   applyStartupSpeakerVolume();
 
-  EXPECT_EQ(0, currentSpeakerVolume);
-  EXPECT_EQ(0, requiredSpeakerVolume);
+  EXPECT_EQ(0, currentSpeakerVolume.load(std::memory_order_relaxed));
+  EXPECT_EQ(0, requiredSpeakerVolume.load(std::memory_order_relaxed));
 }
 #endif
 

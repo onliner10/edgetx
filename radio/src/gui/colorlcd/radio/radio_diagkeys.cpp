@@ -102,9 +102,9 @@ class RadioKeyDiagsWindow : public Window
 
   ~RadioKeyDiagsWindow()
   {
-    delete keyValues;
-    delete switchValues;
-    delete trimValues;
+    delete[] keyValues;
+    delete[] switchValues;
+    delete[] trimValues;
   }
 
   void addKeys(Window *form)

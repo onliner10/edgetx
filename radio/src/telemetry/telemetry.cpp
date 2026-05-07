@@ -22,10 +22,12 @@
 #include "edgetx.h"
 #include "multi.h"
 #include "os/async.h"
+#include "os/task.h"
 #include "os/timer.h"
 #include "pulses/afhds3.h"
 #include "pulses/flysky.h"
 #include "mixer_scheduler.h"
+#include "tasks/mixer_task.h"
 #include "io/multi_protolist.h"
 #include "hal/module_port.h"
 
@@ -67,13 +69,41 @@ struct telemetry_buffer {
   uint8_t length;
 };
 
-uint8_t telemetryStreaming = 0;
-uint8_t telemetryState = TELEMETRY_INIT;
+std::atomic<uint8_t> telemetryStreaming{0};
+std::atomic<uint8_t> telemetryState{TELEMETRY_INIT};
 
 TelemetryData telemetryData;
 static rxStatStruct rxStat;
 
 telemetry_buffer _telemetry_rx_buffer[NUM_MODULES];
+
+static mutex_handle_t telemetryDataMutex;
+static bool telemetryDataMutexCreated = false;
+
+void telemetryInit()
+{
+  if (!telemetryDataMutexCreated) {
+    mutex_create(&telemetryDataMutex);
+    telemetryDataMutexCreated = true;
+  }
+}
+
+void telemetryDataLock()
+{
+  telemetryInit();
+  mutex_lock(&telemetryDataMutex);
+}
+
+bool telemetryDataTryLock()
+{
+  telemetryInit();
+  return mutex_trylock(&telemetryDataMutex);
+}
+
+void telemetryDataUnlock()
+{
+  mutex_unlock(&telemetryDataMutex);
+}
 
 static void clearTelemetryRxBuffers()
 {
@@ -225,6 +255,7 @@ static AsyncExclusiveFlag _poll_frame_queued[NUM_MODULES];
 static void _poll_frame(void *pvParameter1, uint32_t ulParameter2)
 {
   TelemetryPollingGuard polling;
+  MixerTaskLockGuard mixerLock;
 
   auto drv = (const etx_proto_driver_t*)pvParameter1;
   auto module = (uint8_t)ulParameter2;
@@ -308,11 +339,17 @@ static inline void pollTelemetry(uint8_t module, const etx_proto_driver_t* drv, 
 
 void telemetryWakeup()
 {
-  TelemetryPollingGuard polling;
-  for (uint8_t i = 0; i < MAX_MODULES; i++) {
-    auto mod = pulsesGetModuleDriver(i);
-    if (!mod) continue;
-    pollTelemetry(i, mod->drv, mod->ctx);
+  TelemetryDataTryLock telemetryLock;
+  if (!telemetryLock) return;
+
+  {
+    TelemetryPollingGuard polling;
+    MixerTaskLockGuard mixerLock;
+    for (uint8_t i = 0; i < MAX_MODULES; i++) {
+      auto mod = pulsesGetModuleDriver(i);
+      if (!mod) continue;
+      pollTelemetry(i, mod->drv, mod->ctx);
+    }
   }
 
   for (int i = 0; i < MAX_TELEMETRY_SENSORS; i++) {
@@ -406,8 +443,12 @@ void telemetryWakeup()
 
 void telemetryInterrupt10ms()
 {
-  if (telemetryStreaming > 0) {
-    bool tick160ms = (telemetryStreaming & 0x0F) == 0;
+  TelemetryDataTryLock telemetryLock;
+  if (!telemetryLock) return;
+
+  uint8_t streaming = telemetryStreaming.load(std::memory_order_acquire);
+  if (streaming > 0) {
+    bool tick160ms = (streaming & 0x0F) == 0;
     for (int i=0; i<MAX_TELEMETRY_SENSORS; i++) {
       const TelemetrySensor & sensor = g_model.telemetrySensors[i];
       if (sensor.type == TELEM_TYPE_CALCULATED) {
@@ -417,7 +458,11 @@ void telemetryInterrupt10ms()
         telemetryItems[i].timeout--;
       }
     }
-    telemetryStreaming--;
+    while (streaming > 0 &&
+           !telemetryStreaming.compare_exchange_weak(
+               streaming, streaming - 1, std::memory_order_acq_rel,
+               std::memory_order_acquire)) {
+    }
   }
   else {
 #if !defined(SIMU)
@@ -433,6 +478,8 @@ void telemetryInterrupt10ms()
 
 void telemetryReset()
 {
+  TelemetryDataLock telemetryLock;
+
   telemetryData.clear();
 
   for (auto & telemetryItem : telemetryItems) {
@@ -454,7 +501,7 @@ void logTelemetryWriteStart()
     gettime(&utm);
     f_printf(&g_telemetryFile, "\r\n%4d-%02d-%02d,%02d:%02d:%02d.%02d0:",
              utm.tm_year + TM_YEAR_BASE, utm.tm_mon + 1, utm.tm_mday,
-             utm.tm_hour, utm.tm_min, utm.tm_sec, g_ms100);
+             utm.tm_hour, utm.tm_min, utm.tm_sec, rtcGetMs100());
     lastTime = newTime;
   }
 }

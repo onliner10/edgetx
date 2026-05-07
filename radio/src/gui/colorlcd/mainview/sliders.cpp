@@ -210,7 +210,7 @@ void MainViewSlider::onLiveCheckEvents(Window::LiveWindow& live)
 {
   Window::onLiveCheckEvents(live);
 
-  int16_t newValue = calibratedAnalogs[potIdx];
+  int16_t newValue = getCalibratedAnalog(potIdx);
   if (value != newValue) {
     value = newValue;
     setPos();

@@ -205,9 +205,9 @@ void per10ms()
 
 #if defined(RTCLOCK)
   /* Update global Date/Time every 100 per10ms cycles */
-  if (++g_ms100 == 100) {
-    g_rtcTime++;   // inc global unix timestamp one second
-    g_ms100 = 0;
+  if (rtcIncrementMs100() == 100) {
+    rtcAddTimestamp(1);   // inc global unix timestamp one second
+    rtcSetMs100(0);
   }
 #endif
 
@@ -478,7 +478,7 @@ int8_t getMovedSource(uint8_t min)
   static int16_t inputsStates[MAX_INPUTS];
   if (min <= MIXSRC_FIRST_INPUT) {
     for (uint8_t i = 0; i < MAX_INPUTS; i++) {
-      if (abs(anas[i] - inputsStates[i]) > MULTIPOS_STEP_SIZE) {
+      if (abs(getInputValue(i) - inputsStates[i]) > MULTIPOS_STEP_SIZE) {
         if (!isInputRecursive(i)) {
           result = MIXSRC_FIRST_INPUT + i;
           break;
@@ -500,7 +500,8 @@ int8_t getMovedSource(uint8_t min)
   static int16_t sourcesStates[MAX_ANALOG_INPUTS];
   if (result == 0) {
     for (uint8_t i = 0; i < MAX_ANALOG_INPUTS; i++) {
-      if (abs(calibratedAnalogs[i] - sourcesStates[i]) > MULTIPOS_STEP_SIZE) {
+      if (abs(getCalibratedAnalog(i) - sourcesStates[i]) >
+          MULTIPOS_STEP_SIZE) {
         auto offset = adcGetInputOffset(ADC_INPUT_FLEX);
         if (i >= offset) {
           result = MIXSRC_FIRST_POT + i - offset;
@@ -518,8 +519,12 @@ int8_t getMovedSource(uint8_t min)
   }
 
   if (result || recent) {
-    memcpy(inputsStates, anas, sizeof(inputsStates));
-    memcpy(sourcesStates, calibratedAnalogs, sizeof(sourcesStates));
+    for (uint8_t i = 0; i < MAX_INPUTS; i++) {
+      inputsStates[i] = getInputValue(i);
+    }
+    for (uint8_t i = 0; i < MAX_ANALOG_INPUTS; i++) {
+      sourcesStates[i] = getCalibratedAnalog(i);
+    }
 	for (uint8_t i = 0; i < MAX_TRIMS; i++) trimStates[i] = getTrimValue(mixerCurrentFlightMode, i);
   }
 
@@ -636,9 +641,10 @@ void calcVolumeValue(int16_t source)
 #if defined(AUDIO)
 static void setSpeakerVolume(uint8_t volume)
 {
-  currentSpeakerVolume = requiredSpeakerVolume = volume;
+  requiredSpeakerVolume.store(volume, std::memory_order_relaxed);
+  currentSpeakerVolume.store(volume, std::memory_order_relaxed);
 #if !defined(SOFTWARE_VOLUME)
-  audioSetVolume(currentSpeakerVolume);
+  audioSetVolume(volume);
 #endif
 }
 
@@ -720,7 +726,9 @@ void checkBacklight()
         backlightOn = !backlightOn;
       }
       if (backlightOn) {
-        currentBacklightBright = requiredBacklightBright;
+        currentBacklightBright.store(
+            requiredBacklightBright.load(std::memory_order_relaxed),
+            std::memory_order_relaxed);
         BACKLIGHT_ENABLE();
       } else {
         BACKLIGHT_DISABLE();
@@ -1070,7 +1078,7 @@ void checkTrims()
     trim_t tmode = getRawTrimValue(mixerCurrentFlightMode, idx);
 
     trimsDisplayTimer = 200; // 2 seconds
-    trimsDisplayMask |= (1<<idx);
+    trimsDisplayMask.fetch_or((1 << idx), std::memory_order_relaxed);
 
 #if defined(GVARS)
     if (TRIM_REUSED(idx)) {
@@ -1166,16 +1174,16 @@ void checkTrims()
 }
 
 uint8_t g_vbat100mV = 0;
-uint16_t lightOffCounter;
-uint8_t flashCounter = 0;
+std::atomic<uint16_t> lightOffCounter{0};
+std::atomic<uint8_t> flashCounter{0};
 
 uint16_t sessionTimer;
 uint16_t s_timeCumThr;    // THR in 1/16 sec
 uint16_t s_timeCum16ThrP; // THR% in 1/16 sec
 
-uint8_t trimsCheckTimer = 0;
-uint8_t trimsDisplayTimer = 0;
-uint8_t trimsDisplayMask = 0;
+std::atomic<uint8_t> trimsCheckTimer = 0;
+std::atomic<uint8_t> trimsDisplayTimer = 0;
+std::atomic<uint8_t> trimsDisplayMask = 0;
 
 void flightReset(uint8_t check)
 {
@@ -1237,9 +1245,9 @@ void edgeTxClose(uint8_t shutdown)
 
   storageFlushCurrentModel();
 
-  if (sessionTimer > 0) {
-    g_eeGeneral.globalTimer += sessionTimer;
-    sessionTimer = 0;
+  uint16_t elapsedSession = exchangeSessionTimer(0);
+  if (elapsedSession > 0) {
+    g_eeGeneral.globalTimer += elapsedSession;
     storageDirty(EE_GENERAL);
   }
 
@@ -1309,7 +1317,9 @@ void instantTrim()
 {
   int16_t anas_0[MAX_INPUTS];
   evalInputs(e_perout_mode_notrainer | e_perout_mode_nosticks);
-  memcpy(anas_0, anas, sizeof(anas_0));
+  for (uint8_t i = 0; i < MAX_INPUTS; i++) {
+    anas_0[i] = getInputValue(i);
+  }
 
   evalInputs(e_perout_mode_notrainer);
 
@@ -1329,7 +1339,7 @@ void instantTrim()
             // only default trims will be taken into account
             continue;
           }
-          auto newDelta = anas[expo->chn] - anas_0[expo->chn];
+          auto newDelta = getInputValue(expo->chn) - anas_0[expo->chn];
           if (addTrim && delta != newDelta) {
             // avoid 2 different delta values
             addTrim = false;
@@ -1354,7 +1364,7 @@ void instantTrim()
 void copySticksToOffset(uint8_t ch)
 {
   mixerTaskStop();
-  int32_t zero = (int32_t)channelOutputs[ch];
+  int32_t zero = (int32_t)getChannelOutput(ch);
 
   evalFlightModeMixes(e_perout_mode_nosticks+e_perout_mode_notrainer, 0);
   int32_t val = chans[ch];
@@ -1560,7 +1570,9 @@ void edgeTxInit()
   lcdSetContrast();
 #endif
 
-  currentBacklightBright = requiredBacklightBright = g_eeGeneral.getBrightness();
+  const uint8_t startupBrightness = g_eeGeneral.getBrightness();
+  requiredBacklightBright.store(startupBrightness, std::memory_order_relaxed);
+  currentBacklightBright.store(startupBrightness, std::memory_order_relaxed);
   BACKLIGHT_ENABLE(); // we start the backlight during the startup animation
 
 #if defined(STARTUP_ANIMATION)
@@ -1658,6 +1670,10 @@ void edgeTxInit()
     // on Tx start turn the light on
     resetBacklightTimeout();
   }
+
+#if defined(SIMU)
+  timer10msStart();
+#endif
 
   if (!UNEXPECTED_SHUTDOWN()) {
 
@@ -1833,8 +1849,11 @@ bool pwrOffDueToInactivity()
       isTrainerValid())
     lastConnectedTime = currentTime;
 
+  const uint16_t inactivityCounter =
+      inactivity.counter.load(std::memory_order_relaxed);
+
   bool inactivityShutdown =
-      inactivityLimit && inactivity.counter > 60u * inactivityLimit &&
+      inactivityLimit && inactivityCounter > 60u * inactivityLimit &&
       (currentTime - lastConnectedTime) / 100u > 60u * inactivityLimit;
 
   return inactivityShutdown;

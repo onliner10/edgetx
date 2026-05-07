@@ -28,8 +28,23 @@
 #include "textedit.h"
 #include "timeedit.h"
 #include "toggleswitch.h"
+#include "tasks/mixer_task.h"
 
 #define SET_DIRTY() storageDirty(EE_MODEL)
+
+#define SET_TIMER_DEFAULT(value) \
+  [=](int32_t newValue) {        \
+    MixerTaskLockGuard lock;     \
+    value = newValue;            \
+    SET_DIRTY();                 \
+  }
+
+#define SET_TIMER_WITH_OFFSET(value, offset) \
+  [=](int32_t newValue) {                    \
+    MixerTaskLockGuard lock;                 \
+    value = newValue - offset;               \
+    SET_DIRTY();                             \
+  }
 
 TimerWindow::TimerWindow(uint8_t timer) :
   SubPage(ICON_STATS_TIMERS, STR_MAIN_MENU_MODEL_SETTINGS, (std::string(STR_TIMER) + std::to_string(timer + 1)).c_str())
@@ -48,23 +63,26 @@ TimerWindow::TimerWindow(uint8_t timer) :
   setupLine(STR_MODE,
     [=](Window* parent, coord_t x, coord_t y) {
       new Choice(parent, {x, y, 0, 0}, STR_TIMER_MODES, 0, TMRMODE_MAX,
-                GET_SET_DEFAULT(p_timer->mode));
+                GET_DEFAULT(p_timer->mode), SET_TIMER_DEFAULT(p_timer->mode));
     });
 
   // Timer switch
   setupLine(STR_SWITCH,
     [=](Window* parent, coord_t x, coord_t y) {
       new SwitchChoice(parent, rect_t{x, y, 0, 0}, SWSRC_FIRST, SWSRC_LAST,
-                       GET_SET_DEFAULT(p_timer->swtch));
+                       GET_DEFAULT(p_timer->swtch), SET_TIMER_DEFAULT(p_timer->swtch));
     });
 
   // Timer start value
   setupLine(STR_START,
     [=](Window* parent, coord_t x, coord_t y) {
       auto timerValue = new TimeEdit(parent, {x, y, 0, 0}, 0, TIMER_MAX,
-                                GET_DEFAULT(p_timer->start), [=](int newValue) {
-                                  p_timer->start = newValue;
-                                  timerSet(timer, newValue);
+	                                GET_DEFAULT(p_timer->start), [=](int newValue) {
+	                                  {
+	                                    MixerTaskLockGuard lock;
+	                                    p_timer->start = newValue;
+	                                    timerSet(timer, newValue);
+	                                  }
                                   timerDirLine->show(newValue > 0);
                                   SET_DIRTY();
                                 });
@@ -75,14 +93,16 @@ TimerWindow::TimerWindow(uint8_t timer) :
   timerDirLine = setupLine(STR_LIMITS_HEADERS_DIRECTION,
     [=](Window* parent, coord_t x, coord_t y) {
       new Choice(parent, {x, y, 0, 0}, STR_TIMER_DIR, 0, 1,
-                 GET_SET_DEFAULT(p_timer->showElapsed));
+                 GET_DEFAULT(p_timer->showElapsed),
+                 SET_TIMER_DEFAULT(p_timer->showElapsed));
     });
   timerDirLine->show(p_timer->start> 0);
 
   // Timer minute beep
   setupLine(STR_MINUTEBEEP,
     [=](Window* parent, coord_t x, coord_t y) {
-      new ToggleSwitch(parent, {x, y, 0, 0}, GET_SET_DEFAULT(p_timer->minuteBeep));
+      new ToggleSwitch(parent, {x, y, 0, 0}, GET_DEFAULT(p_timer->minuteBeep),
+                       SET_TIMER_DEFAULT(p_timer->minuteBeep));
     });
 
   // Timer countdown
@@ -97,13 +117,16 @@ TimerWindow::TimerWindow(uint8_t timer) :
             }
             return (value);
           },
-          [=](int value) {
-            if (value > COUNTDOWN_NON_HAPTIC_LAST + 1) {
-              p_timer->extraHaptic = 1;
-              p_timer->countdownBeep = value - (COUNTDOWN_NON_HAPTIC_LAST + 1);
-            } else {
-              p_timer->extraHaptic = 0;
-              p_timer->countdownBeep = value;
+	          [=](int value) {
+	            {
+	              MixerTaskLockGuard lock;
+	              if (value > COUNTDOWN_NON_HAPTIC_LAST + 1) {
+                p_timer->extraHaptic = 1;
+                p_timer->countdownBeep = value - (COUNTDOWN_NON_HAPTIC_LAST + 1);
+              } else {
+                p_timer->extraHaptic = 0;
+                p_timer->countdownBeep = value;
+              }
             }
             SET_DIRTY();
             TRACE("value=%d\tcountdownBeep = %d\textraHaptic = %d", value,
@@ -111,13 +134,15 @@ TimerWindow::TimerWindow(uint8_t timer) :
           });
 
       new Choice(parent, {x + COUNTDOWN_VAL_XO, y + COUNTDOWN_VAL_YO, 0, 0}, STR_COUNTDOWNVALUES, 0, 3,
-                GET_SET_WITH_OFFSET(p_timer->countdownStart, 2));
+                GET_VALUE_WITH_OFFSET(p_timer->countdownStart, 2),
+                SET_TIMER_WITH_OFFSET(p_timer->countdownStart, 2));
     }, COUNTDOWN_LBL_YO);
 
   // Timer persistent
   setupLine(STR_PERSISTENT,
     [=](Window* parent, coord_t x, coord_t y) {
       new Choice(parent, {x, y, 0, 0}, STR_VPERSISTENT, 0, 2,
-                GET_SET_DEFAULT(p_timer->persistent));
+                GET_DEFAULT(p_timer->persistent),
+                SET_TIMER_DEFAULT(p_timer->persistent));
     });
 }
