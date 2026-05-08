@@ -21,10 +21,16 @@ set(LVGL_SOURCES_MINIMAL
   draw/sw/lv_draw_sw_polygon.c
   draw/sw/lv_draw_sw_rect.c
   draw/sw/lv_draw_sw_transform.c
+)
 
-  # STM32 specific
-  draw/stm32_dma2d/lv_gpu_stm32_dma2d.c
+# STM32 DMA2D hardware accelerator (firmware only — contains ARM-specific code)
+if(NOT NATIVE_BUILD)
+  list(APPEND LVGL_SOURCES_MINIMAL
+    draw/stm32_dma2d/lv_gpu_stm32_dma2d.c
+  )
+endif()
 
+list(APPEND LVGL_SOURCES_MINIMAL
   font/lv_font.c
   font/lv_font_fmt_txt.c
 
