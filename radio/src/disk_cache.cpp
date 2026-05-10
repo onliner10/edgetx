@@ -122,6 +122,7 @@ void DiskCache::initialize(const diskio_driver_t* drv)
 {
   blocks = _cache_blocks;
   diskDrv = drv;
+  sectors = 0;
 }
 
 void DiskCache::clear()
@@ -130,6 +131,7 @@ void DiskCache::clear()
   stats.noHits = 0;
   stats.noMisses = 0;
   stats.noWrites = 0;
+  sectors = 0;
   for (int n = 0; n < DISK_CACHE_BLOCKS_NUM; ++n) {
     blocks[n].free();
   }

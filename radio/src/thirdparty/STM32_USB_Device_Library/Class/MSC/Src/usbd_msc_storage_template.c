@@ -55,6 +55,10 @@ int8_t STORAGE_Write(uint8_t lun, uint8_t *buf, uint32_t blk_addr,
 
 int8_t STORAGE_GetMaxLun(void);
 
+int8_t STORAGE_Sync(uint8_t lun);
+
+int8_t STORAGE_Close(uint8_t lun);
+
 /* USB Mass storage Standard Inquiry Data */
 int8_t  STORAGE_Inquirydata[] =  /* 36 */
 {
@@ -82,6 +86,8 @@ USBD_StorageTypeDef USBD_MSC_Template_fops =
   STORAGE_IsWriteProtected,
   STORAGE_Read,
   STORAGE_Write,
+  STORAGE_Sync,
+  STORAGE_Close,
   STORAGE_GetMaxLun,
   STORAGE_Inquirydata,
 
@@ -186,6 +192,18 @@ int8_t STORAGE_Write(uint8_t lun, uint8_t *buf,
 int8_t STORAGE_GetMaxLun(void)
 {
   return (STORAGE_LUN_NBR - 1);
+}
+
+int8_t STORAGE_Sync(uint8_t lun)
+{
+  UNUSED(lun);
+  return 0;
+}
+
+int8_t STORAGE_Close(uint8_t lun)
+{
+  UNUSED(lun);
+  return 0;
 }
 
 
