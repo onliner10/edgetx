@@ -160,8 +160,7 @@ void SetupTopBarWidgetsPage::onCancel() { deleteLater(); }
 
 void SetupTopBarWidgetsPage::onDeleted()
 {
-  // restore screen setting tab on top
-  QuickMenu::openPage(QM_UI_SETUP);
+  QuickMenu::openQuickMenu();
 
   auto viewMain = ViewMain::instance();
   if (viewMain && viewMain->getTopbar()) {
