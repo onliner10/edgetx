@@ -55,6 +55,7 @@
 #endif
 
 #if defined(COLORLCD)
+  #include "fonts.h"
   #include "layout.h"
   #include "radio_calibration.h"
   #include "startup_shutdown.h"
@@ -1656,6 +1657,7 @@ void edgeTxInit()
 
 #if defined(COLORLCD)
   ThemePersistance::instance()->loadDefaultTheme();
+  preloadFonts();
   if (g_eeGeneral.backlightMode == e_backlight_mode_off) {
     // no backlight mode off on color lcd radios
     g_eeGeneral.backlightMode = e_backlight_mode_keys;
