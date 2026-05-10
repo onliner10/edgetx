@@ -278,7 +278,7 @@ void setLanguageFont(int idx)
     if (fontTable != en_fontTable) {
       // Force fonts to be decompressed.
       for (int i = FONT_STD_INDEX; i < FONTS_COUNT; i += 1) {
-        if ((fontTable[i].lz4Font != nullptr) && (i != FONT_XXL_INDEX)) {
+        if ((fontTable[i].lz4Font != nullptr) && (i != FONT_XXL_INDEX) && (i != FONT_LXL_INDEX)) {
           fontTable[i].loaded = false;
         }
       }
@@ -464,6 +464,13 @@ void decompressFont(int idx, etxLvglFont* fonts)
 
   // Set LVGL font loaded flag
   fonts[idx].loaded = true;
+}
+
+void preloadFonts()
+{
+  for (int i = FONT_STD_INDEX; i < FONTS_COUNT; i += 1) {
+    decompressFont(i, fontTable);
+  }
 }
 
 #endif  // BOOT

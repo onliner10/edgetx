@@ -41,6 +41,7 @@ enum FontIndex {
 #define FONT(xx) (unsigned(FONT_##xx##_INDEX) << 8u)
 
 const lv_font_t* getFont(LcdFlags flags);
+void preloadFonts();
 uint8_t getFontHeight(LcdFlags flags);
 uint8_t getFontHeightCondensed(LcdFlags flags);
 int getTextWidth(const char* s, int len = 0, LcdFlags flags = 0);
