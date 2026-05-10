@@ -24,6 +24,7 @@
 #include "edgetx.h"
 #include "hal/abnormal_reboot.h"
 #include "inactivity_timer.h"
+#include "lcd.h"
 #include "mainwindow.h"
 #include "os/sleep.h"
 #include "stamp.h"
@@ -193,8 +194,8 @@ void drawSleepBitmap()
   if (auto icon = new (std::nothrow) StaticIcon(shutdownWindow, 0, 0, ICON_SHUTDOWN, COLOR_THEME_PRIMARY2_INDEX))
     icon->center(LCD_W, LCD_H);
 
-  // Force screen refresh
-  lv_refr_now(nullptr);
+  // Force screen refresh and drain pending flush
+  lvglRefreshNowAndDrain();
 }
 
 void cancelShutdownAnimation()

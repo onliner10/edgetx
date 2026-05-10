@@ -47,6 +47,7 @@ static void* initialFrameBuffer = nullptr;
 
 static volatile uint8_t _frame_addr_reloaded = 0;
 
+#if defined(BOOT)
 static void waitFrameAddressReload()
 {
 #if defined(LVGL_ADAPTIVE_UI_PUMP_STATS)
@@ -66,20 +67,41 @@ static void startLcdRefresh(lv_disp_drv_t *disp_drv, uint16_t *buffer,
   (void)disp_drv;
   (void)copy_area;
 
-  // given the data cache size, this is probably
-  // faster than cleaning by address
   SCB_CleanDCache();
 
   LTDC_Layer1->CFBAR = (uint32_t)buffer;
-  // reload shadow registers on vertical blank
   _frame_addr_reloaded = 0;
   LTDC->SRCR = LTDC_SRCR_VBR;
 
   __HAL_LTDC_ENABLE_IT(&hltdc, LTDC_IT_LI);
 
-  // wait for reload
   waitFrameAddressReload();
 }
+#endif
+
+#if !defined(BOOT)
+static LcdFlushOutcome typedStartLcdRefresh(const LcdFlushChunk& chunk)
+{
+  (void)chunk.area;
+
+  if (!chunk.isFinal()) {
+    return LcdFlushOutcome::readyNow();
+  }
+
+  SCB_CleanDCache();
+
+  LTDC_Layer1->CFBAR = (uint32_t)chunk.pixels;
+  LTDC->SRCR = LTDC_SRCR_VBR;
+
+  __HAL_LTDC_CLEAR_FLAG(&hltdc, LTDC_FLAG_LI);
+
+  auto fence = LcdVBlankFence::afterNext();
+
+  __HAL_LTDC_ENABLE_IT(&hltdc, LTDC_IT_LI);
+
+  return LcdFlushOutcome::afterVBlank(fence);
+}
+#endif
 
 lcdSpiInitFucPtr lcdInitFunction;
 lcdSpiInitFucPtr lcdOffFunction;
@@ -275,7 +297,11 @@ void lcdInit(void)
   // Enable LCD display
   __HAL_LTDC_ENABLE(&hltdc);
 
+#if !defined(BOOT)
+  lcdSetTypedFlushCb(typedStartLcdRefresh);
+#else
   lcdSetFlushCb(startLcdRefresh);
+#endif
 
 #if defined(LCD_SPI_CONFLICTS_WITH_QSPI)
   stm32_qspi_nor_init();
@@ -287,5 +313,8 @@ extern "C" void LTDC_IRQHandler(void)
 {
   __HAL_LTDC_CLEAR_FLAG(&hltdc, LTDC_FLAG_LI);
   __HAL_LTDC_DISABLE_IT(&hltdc, LTDC_IT_LI);
+#if !defined(BOOT)
+  lcdVBlankTickFromIsr();
+#endif
   _frame_addr_reloaded = 1;
 }

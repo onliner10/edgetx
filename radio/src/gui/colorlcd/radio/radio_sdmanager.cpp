@@ -30,6 +30,7 @@
 #include "io/frsky_firmware_update.h"
 #include "io/multi_firmware_update.h"
 #include "io/uf2_flash.h"
+#include "lcd.h"
 #include "lib_file.h"
 #include "menu.h"
 #include "progress.h"
@@ -67,7 +68,7 @@ class FlashDialog: public FullScreenDialog
             int total) -> void {
           setMessage(message);
           progress->setValue(total > 0 ? count * 100 / total : 0);
-          lv_refr_now(nullptr);
+          lvglRefreshNowIfIdle();
         });
     deleteLater();
   }

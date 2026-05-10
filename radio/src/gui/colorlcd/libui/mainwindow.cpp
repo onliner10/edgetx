@@ -22,6 +22,7 @@
 #include "debug.h"
 #include "edgetx.h"
 #include "keyboard_base.h"
+#include "lcd.h"
 #include "layout.h"
 #include "LvglWrapper.h"
 #include "etx_lv_theme.h"
@@ -121,6 +122,11 @@ void MainWindow::collectDeletedWindows(NormalUiTick)
 template <class TickMode>
 uint32_t MainWindow::runUiTick(TickMode mode)
 {
+  lcdFlushPoll();
+  if (lcdFlushIsBusy()) {
+    return 1;
+  }
+
   uint32_t nextRun = LvglWrapper::instance()->run();
 
 #if defined(DEBUG_WINDOWS)

@@ -2,6 +2,7 @@
 
 #if defined(COLORLCD)
 #include "gui/colorlcd/libui/window.h"
+#include "gui/colorlcd/lcd.h"
 #include "lvgl/lvgl.h"
 #endif
 
@@ -319,7 +320,7 @@ bool invokeAction(const std::string& id, const std::string& action,
     lv_obj_invalidate(screen);
     lv_obj_update_layout(screen);
   }
-  lv_refr_now(nullptr);
+  lvglRefreshNowIfIdle();
   return true;
 }
 #endif

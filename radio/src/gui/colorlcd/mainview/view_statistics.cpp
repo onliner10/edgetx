@@ -120,7 +120,7 @@ class ThrottleCurveWindow : public Window
 
       graphSize = 0;
       uint16_t traceRd = s_traceWr > width() ? s_traceWr - width() : 0;
-      for (int x = 0; x < width() && x < DIM(graph) && traceRd < s_traceWr;
+      for (int x = 0; x < width() && x < int(DIM(graph)) && traceRd < s_traceWr;
            x += 1, traceRd += 1) {
         uint8_t h = s_traceBuf[traceRd % width()];
         lv_coord_t y = height() - PAD_THREE - CV_SCALE * h;

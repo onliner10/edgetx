@@ -25,6 +25,7 @@
 #include "etx_lv_theme.h"
 #include "hal/rotary_encoder.h"
 #include "keyboard_base.h"
+#include "lcd.h"
 #include "mainwindow.h"
 #include "os/time.h"
 #include "view_main.h"
@@ -459,6 +460,13 @@ uint32_t LvglWrapper::run()
   if (!updating) {
     // Normal UI loop - call lgvl timer handler
     updating = true;
+
+    lcdFlushPoll();
+    if (lcdFlushIsBusy()) {
+      updating = false;
+      return 1;
+    }
+
 #if defined(LVGL_ADAPTIVE_UI_PUMP_STATS)
     uint32_t start = time_get_ms();
 #endif
@@ -477,16 +485,27 @@ uint32_t LvglWrapper::run()
       nextRunKnown = true;
       nextRunAt = time_get_ms() + nextRun;
     }
+
+    lcdFlushPoll();
+
     updating = false;
     return nextRun;
   } else {
     // Used when running the loop manually from within
-    // the LVGL timer handler (blocking UI code)
-    lv_refr_now(nullptr);
+    // the LVGL timer handler (blocking UI code).
+    // Preserve synchronous semantics: drain pending, force refresh, drain again.
+    lcdFlushDrain(LCD_FLUSH_VBLANK_TIMEOUT_MS * 2);
 
-    lv_indev_t* indev = nullptr;
-    while((indev = lv_indev_get_next(indev)) != nullptr) {
-      lv_indev_read_timer_cb(indev->driver->read_timer);
+    if (!lcdFlushIsBusy()) {
+      lv_refr_now(nullptr);
+      lcdFlushDrain(LCD_FLUSH_VBLANK_TIMEOUT_MS * 2);
+    }
+
+    if (!lcdFlushIsBusy()) {
+      lv_indev_t* indev = nullptr;
+      while((indev = lv_indev_get_next(indev)) != nullptr) {
+        lv_indev_read_timer_cb(indev->driver->read_timer);
+      }
     }
 
     return 1;

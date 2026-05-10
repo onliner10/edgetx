@@ -69,8 +69,14 @@ static pixel_t _LCD_BUF_2[DISPLAY_BUFFER_SIZE] __SDRAM;
 
 static pixel_t _line_buffer[LCD_W];
 
+#if !defined(BOOT)
+static RotatedFrameBuffers g_rotatedFb(_LCD_BUF_1, _LCD_BUF_2);
+#endif
+
+#if defined(BOOT)
 static uint16_t* _front_buffer = _LCD_BUF_1;
 static uint16_t* _back_buffer = _LCD_BUF_2;
+#endif
 
 // Copy 2 pixels at once to speed up a little
 static void _copy_rotate_180(uint16_t* dst, uint16_t* src, const rect_t& copy_area)
@@ -83,7 +89,8 @@ static void _copy_rotate_180(uint16_t* dst, uint16_t* src, const rect_t& copy_ar
 
   for (auto line = 0; line < copy_area.h; line++) {
 
-    // invert line into _line_buffer first (SRAM)
+    DMAWait();
+
     auto px_dst = _line_buffer;
 
     auto line_end = px_dst + (copy_area.w & ~1);
@@ -108,6 +115,8 @@ static void _copy_rotate_180(uint16_t* dst, uint16_t* src, const rect_t& copy_ar
     src += copy_area.w * 2;
     dst -= LCD_W;
   }
+
+  DMAWait();
 }
 
 static void _rotate_area_180(lv_area_t& area)
@@ -120,10 +129,35 @@ static void _rotate_area_180(lv_area_t& area)
   area.x2 = LCD_W - area.x1 - 1;
   area.x1 = LCD_W - tmp_coord - 1;
 }
+
+void HorusBackBufferSync::run(void* ctx)
+{
+  auto* self = static_cast<HorusBackBufferSync*>(ctx);
+
+  if (self->areas.overflowed || self->areas.count == 0) {
+    DMACopyBitmap(self->back, LCD_W, LCD_H, 0, 0,
+                  self->front, LCD_W, LCD_H, 0, 0,
+                  LCD_W, LCD_H);
+    DMAWait();
+    return;
+  }
+
+  for (uint8_t i = 0; i < self->areas.count; i++) {
+    lv_area_t area;
+    lv_area_copy(&area, &self->areas.areas[i]);
+    _rotate_area_180(area);
+    auto w = area.x2 - area.x1 + 1;
+    auto h = area.y2 - area.y1 + 1;
+    DMACopyBitmap(self->back, LCD_W, LCD_H, area.x1, area.y1,
+                  self->front, LCD_W, LCD_H, area.x1, area.y1, w, h);
+  }
+  DMAWait();
+}
 #endif
 
 static volatile uint8_t _frame_addr_reloaded = 0;
 
+#if defined(BOOT)
 static void waitFrameAddressReload()
 {
 #if defined(LVGL_ADAPTIVE_UI_PUMP_STATS)
@@ -136,7 +170,9 @@ static void waitFrameAddressReload()
   lvglAdaptiveUiPumpRecordVblankWait(time_get_ms() - start);
 #endif
 }
+#endif
 
+#if defined(BOOT)
 static void _update_frame_buffer_addr(uint16_t* addr)
 {
   LTDC_Layer1->CFBAR = (uint32_t)addr;
@@ -148,7 +184,9 @@ static void _update_frame_buffer_addr(uint16_t* addr)
   // wait for reload
   waitFrameAddressReload();
 }
+#endif
 
+#if defined(BOOT)
 static void startLcdRefresh(lv_disp_drv_t *disp_drv, uint16_t *buffer,
                             const rect_t &copy_area)
 {
@@ -206,6 +244,50 @@ static void startLcdRefresh(lv_disp_drv_t *disp_drv, uint16_t *buffer,
   _update_frame_buffer_addr(buffer);
 #endif
 }
+#endif
+
+#if !defined(BOOT)
+static HorusBackBufferSync g_horusSync;
+
+static LcdFlushOutcome typedStartLcdRefresh(const LcdFlushChunk& chunk)
+{
+#if defined(LCD_VERTICAL_INVERT)
+#if defined(RADIO_F16)
+  if (hardwareOptions.pcbrev > 0) {
+    LTDC_Layer1->CFBAR = (uint32_t)chunk.pixels;
+    _frame_addr_reloaded = 0;
+    LTDC->SRCR = LTDC_SRCR_VBR;
+    return LcdFlushOutcome::afterVBlank(LcdVBlankFence::afterNext());
+  }
+#endif
+  {
+    _copy_rotate_180(g_rotatedFb.backBuf(), chunk.pixels, chunk.area);
+
+    if (chunk.isFinal()) {
+      g_rotatedFb.swap();
+      LTDC_Layer1->CFBAR = (uint32_t)g_rotatedFb.frontBuf();
+      _frame_addr_reloaded = 0;
+      LTDC->SRCR = LTDC_SRCR_VBR;
+
+      g_horusSync.front = g_rotatedFb.frontBuf();
+      g_horusSync.back = g_rotatedFb.backBuf();
+      g_horusSync.areas = chunk.invalidatedAreas;
+
+      return LcdFlushOutcome::afterVBlank(
+          LcdVBlankFence::afterNext(),
+          LcdPostVBlankWork(HorusBackBufferSync::run, &g_horusSync));
+    }
+
+    return LcdFlushOutcome::readyNow();
+  }
+#else
+  LTDC_Layer1->CFBAR = (uint32_t)chunk.pixels;
+  _frame_addr_reloaded = 0;
+  LTDC->SRCR = LTDC_SRCR_VBR;
+  return LcdFlushOutcome::afterVBlank(LcdVBlankFence::afterNext());
+#endif
+}
+#endif
 
 inline void LCD_NRST_LOW()
 {
@@ -451,7 +533,11 @@ void lcdInit()
   // Enable LCD display
   __HAL_LTDC_ENABLE(&hltdc);
 
+#if !defined(BOOT)
+  lcdSetTypedFlushCb(typedStartLcdRefresh);
+#else
   lcdSetFlushCb(startLcdRefresh);
+#endif
 }
 
 
@@ -459,5 +545,8 @@ extern "C" void LTDC_IRQHandler(void)
 {
   // clear interrupt flag
   __HAL_LTDC_CLEAR_FLAG(&hltdc, LTDC_FLAG_LI);
+#if !defined(BOOT)
+  lcdVBlankTickFromIsr();
+#endif
   _frame_addr_reloaded = 1;
 }

@@ -21,6 +21,7 @@
 #include "edgetx.h"
 #include "etx_lv_theme.h"
 #include "keyboard_base.h"
+#include "lcd.h"
 #include "mainwindow.h"
 #include "progress.h"
 #include "static.h"
@@ -128,7 +129,7 @@ void ProgressDialog::updateProgress(int percentage)
 {
   if (progress) {
     progress->setValue(percentage);
-    lv_refr_now(nullptr);
+    lvglRefreshNowIfIdle();
   }
 }
 

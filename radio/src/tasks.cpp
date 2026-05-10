@@ -48,6 +48,7 @@
 #include "LvglWrapper.h"
 #include "mainwindow.h"
 #endif
+#include "lcd.h"
 #include "startup_shutdown.h"
 #endif
 
@@ -85,6 +86,15 @@ static uint32_t clampLvglPumpSleep(uint32_t sleepTime, uint32_t remaining)
 static void pumpAdaptiveLvglUntilMenuDeadline(uint32_t cycleStart)
 {
   while (time_get_ms() - cycleStart < MENU_TASK_PERIOD) {
+    lcdFlushPoll();
+
+    if (lcdFlushIsBusy()) {
+      uint32_t elapsed = time_get_ms() - cycleStart;
+      if (elapsed >= MENU_TASK_PERIOD) break;
+      sleep_ms(1);
+      continue;
+    }
+
     LvglWrapper* lvgl = LvglWrapper::instance();
     uint32_t nextRun = LVGL_ADAPTIVE_PUMP_MAX_SLEEP_MS;
     bool nextRunKnown = lvgl->getNextRunDelay(nextRun);
