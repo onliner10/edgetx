@@ -44,6 +44,7 @@
   #include "disk_cache.h"
   const diskio_driver_t disk_cache_shim = {
     .initialize = _STORAGE_DRIVER.initialize,
+    .deinit = _STORAGE_DRIVER.deinit,
     .status = _STORAGE_DRIVER.status,
     .read = disk_cache_read,
     .write = disk_cache_write,

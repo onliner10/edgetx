@@ -70,6 +70,9 @@ extern "C" {
 #define SCSI_VERIFY12                               0xAFU
 #define SCSI_VERIFY16                               0x8FU
 
+#define SCSI_SYNCHRONIZE_CACHE10                    0x35U
+#define READ_CAPACITY16_DATA_LEN                    0x20U
+
 #define SCSI_READ_FORMAT_CAPACITIES                 0x23U
 #define SCSI_RECEIVE_DIAGNOSTIC_RESULTS             0x1CU
 #define SCSI_SEND_DIAGNOSTIC                        0x1DU

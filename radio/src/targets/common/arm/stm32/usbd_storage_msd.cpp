@@ -74,6 +74,226 @@ enum MassstorageLuns {
   STORAGE_LUN_NBR
 };
 
+static_assert(BLOCK_SIZE == 512, "USB MSC SD-card path assumes 512-byte sectors");
+static_assert(STORAGE_LUN_NBR <= MSC_BOT_MAX_LUN, "USB MSC LUN count exceeds BOT LUN storage");
+static_assert(STORAGE_SDCARD_LUN == 0, "USB MSC SD-card LUN mapping changed; update parser");
+
+namespace {
+
+enum class UsbMscLun : uint8_t {
+  SdCard = STORAGE_SDCARD_LUN,
+#if USE_UF2_DRIVE
+  Uf2 = STORAGE_UF2_LUN,
+#endif
+};
+
+enum class UsbSdState : uint8_t {
+  Closed,
+  Ready,
+  Failed,
+};
+
+struct UsbSdCapacity {
+  uint32_t sectors = 0;
+  uint16_t blockSize = BLOCK_SIZE;
+  bool valid = false;
+};
+
+struct UsbBlockRange {
+  uint32_t first;
+  uint16_t count;
+};
+
+static bool parseUsbMscLun(uint8_t raw, UsbMscLun* out)
+{
+  if (raw == (uint8_t)UsbMscLun::SdCard) {
+    *out = UsbMscLun::SdCard;
+    return true;
+  }
+#if USE_UF2_DRIVE
+  if (raw == (uint8_t)UsbMscLun::Uf2) {
+    *out = UsbMscLun::Uf2;
+    return true;
+  }
+#endif
+  return false;
+}
+
+static bool makeBlockRange(uint32_t blk_addr, uint16_t blk_len,
+                           uint32_t total_sectors, UsbBlockRange* out)
+{
+  if (blk_addr > total_sectors) return false;
+  if ((uint32_t)blk_len > total_sectors - blk_addr) return false;
+  out->first = blk_addr;
+  out->count = blk_len;
+  return true;
+}
+
+class UsbSdSession {
+ public:
+  int8_t init();
+  int8_t isReady() const;
+  int8_t getCapacity(uint32_t* block_num, uint16_t* block_size);
+  int8_t read(uint8_t* buf, uint32_t blk_addr, uint16_t blk_len);
+  int8_t write(uint8_t* buf, uint32_t blk_addr, uint16_t blk_len);
+  int8_t sync();
+  int8_t close();
+
+ private:
+  void reset();
+  int8_t refreshCapacity();
+
+  UsbSdState state_ = UsbSdState::Closed;
+  const diskio_driver_t* drv_ = nullptr;
+  UsbSdCapacity capacity_ = {};
+};
+
+void UsbSdSession::reset()
+{
+  state_ = UsbSdState::Closed;
+  drv_ = nullptr;
+  capacity_ = {};
+}
+
+int8_t UsbSdSession::refreshCapacity()
+{
+  if (state_ != UsbSdState::Ready) return USBD_FAIL;
+  if (drv_ == nullptr || drv_->ioctl == nullptr) return USBD_FAIL;
+
+  uint32_t sector_count = 0;
+  if (drv_->ioctl(0, GET_SECTOR_COUNT, &sector_count) != RES_OK)
+    return USBD_FAIL;
+  if (sector_count == 0) return USBD_FAIL;
+
+  uint32_t sector_size = 0;
+  if (drv_->ioctl(0, GET_SECTOR_SIZE, &sector_size) != RES_OK)
+    return USBD_FAIL;
+  if (sector_size != BLOCK_SIZE) return USBD_FAIL;
+
+  capacity_.sectors = sector_count;
+  capacity_.blockSize = BLOCK_SIZE;
+  capacity_.valid = true;
+  return USBD_OK;
+}
+
+int8_t UsbSdSession::init()
+{
+  if (state_ == UsbSdState::Ready) {
+    if (capacity_.valid) return USBD_OK;
+    return refreshCapacity();
+  }
+
+  if (state_ == UsbSdState::Failed) {
+    close();
+  }
+  // state_ is now Closed
+
+  if (!storageIsPresent()) return USBD_FAIL;
+
+  drv_ = storageGetDefaultDriver();
+  if (drv_ == nullptr) return USBD_FAIL;
+  if (drv_->initialize == nullptr) return USBD_FAIL;
+
+  if (drv_->initialize(0) != RES_OK) {
+    state_ = UsbSdState::Failed;
+    return USBD_FAIL;
+  }
+
+  state_ = UsbSdState::Ready;
+
+  if (refreshCapacity() != USBD_OK) {
+    close();
+    return USBD_FAIL;
+  }
+
+  return USBD_OK;
+}
+
+int8_t UsbSdSession::isReady() const
+{
+  if (state_ != UsbSdState::Ready) return USBD_FAIL;
+  if (!capacity_.valid) return USBD_FAIL;
+  if (!storageIsPresent()) return USBD_FAIL;
+  return USBD_OK;
+}
+
+int8_t UsbSdSession::getCapacity(uint32_t* block_num, uint16_t* block_size)
+{
+  if (isReady() != USBD_OK) return USBD_FAIL;
+  *block_num = capacity_.sectors;
+  *block_size = capacity_.blockSize;
+  return USBD_OK;
+}
+
+int8_t UsbSdSession::read(uint8_t* buf, uint32_t blk_addr, uint16_t blk_len)
+{
+  WATCHDOG_SUSPEND(100);
+
+  if (isReady() != USBD_OK) return USBD_FAIL;
+
+  if (blk_len == 0) return USBD_OK;
+
+  UsbBlockRange range;
+  if (!makeBlockRange(blk_addr, blk_len, capacity_.sectors, &range))
+    return USBD_FAIL;
+
+  if (drv_->read(0, buf, range.first, range.count) != RES_OK)
+    return USBD_FAIL;
+
+  return USBD_OK;
+}
+
+int8_t UsbSdSession::write(uint8_t* buf, uint32_t blk_addr, uint16_t blk_len)
+{
+  WATCHDOG_SUSPEND(500);
+
+  if (isReady() != USBD_OK) return USBD_FAIL;
+
+  if (blk_len == 0) return USBD_OK;
+
+  UsbBlockRange range;
+  if (!makeBlockRange(blk_addr, blk_len, capacity_.sectors, &range))
+    return USBD_FAIL;
+
+  if (drv_->write(0, buf, range.first, range.count) != RES_OK)
+    return USBD_FAIL;
+
+  return USBD_OK;
+}
+
+int8_t UsbSdSession::sync()
+{
+  if (state_ != UsbSdState::Ready) return USBD_FAIL;
+  if (drv_ == nullptr || drv_->ioctl == nullptr) return USBD_FAIL;
+
+  if (drv_->ioctl(0, CTRL_SYNC, nullptr) != RES_OK)
+    return USBD_FAIL;
+
+  return USBD_OK;
+}
+
+int8_t UsbSdSession::close()
+{
+  int8_t result = USBD_OK;
+
+  if (state_ == UsbSdState::Ready) {
+    result = sync();
+  }
+
+  if (drv_ != nullptr && drv_->deinit != nullptr) {
+    if (drv_->deinit(0) != RES_OK) {
+      result = USBD_FAIL;
+    }
+  }
+
+  reset();
+  return result;
+}
+
+static UsbSdSession usbSdSession;
+
+}  // namespace
+
 /** USB Mass storage Standard Inquiry Data. */
 const uint8_t STORAGE_Inquirydata[] = {/* 36 */
   /* LUN 0 */
@@ -114,6 +334,8 @@ static int8_t STORAGE_IsWriteProtected(uint8_t lun);
 static int8_t STORAGE_Read(uint8_t lun, uint8_t *buf, uint32_t blk_addr, uint16_t blk_len);
 static int8_t STORAGE_Write(uint8_t lun, uint8_t *buf, uint32_t blk_addr, uint16_t blk_len);
 static int8_t STORAGE_GetMaxLun(void);
+static int8_t STORAGE_Sync(uint8_t lun);
+static int8_t STORAGE_Close(uint8_t lun);
 
 /* USER CODE BEGIN PRIVATE_FUNCTIONS_DECLARATION */
 
@@ -125,21 +347,25 @@ USBD_StorageTypeDef USBD_Storage_Interface_fops =
   STORAGE_IsWriteProtected,
   STORAGE_Read,
   STORAGE_Write,
+  STORAGE_Sync,
+  STORAGE_Close,
   STORAGE_GetMaxLun,
   (int8_t *)STORAGE_Inquirydata
 };
 
 int8_t STORAGE_Init(uint8_t lun)
 {
+  UsbMscLun parsed;
+  if (!parseUsbMscLun(lun, &parsed)) return USBD_FAIL;
+
 #if USE_UF2_DRIVE
-  if (lun == STORAGE_UF2_LUN) {
+  if (parsed == UsbMscLun::Uf2) {
     uf2_fat_reset_state();
     return USBD_OK;
   }
 #endif
 
-  disk_initialize(0);
-  return USBD_OK;
+  return usbSdSession.init();
 }
 
 /**
@@ -151,41 +377,23 @@ int8_t STORAGE_Init(uint8_t lun)
   */
 int8_t STORAGE_GetCapacity(uint8_t lun, uint32_t *block_num, uint16_t *block_size)
 {
-  if (lun >= STORAGE_LUN_NBR) return USBD_FAIL;
-  
+  UsbMscLun parsed;
+  if (!parseUsbMscLun(lun, &parsed)) return USBD_FAIL;
+
 #if USE_UF2_DRIVE
-  if (lun == STORAGE_UF2_LUN) {
+  if (parsed == UsbMscLun::Uf2) {
     *block_size = BLOCK_SIZE;
     *block_num = UF2_NUM_BLOCKS;
     return USBD_OK;
   }
 #endif
 
-  if (!SD_CARD_PRESENT())
-    return USBD_FAIL;
-
-  *block_size = BLOCK_SIZE;
-
-  static DWORD sector_count = 0;
-  if (sector_count == 0) {
-    auto drv = storageGetDefaultDriver();
-    if (drv->ioctl(0, GET_SECTOR_COUNT, &sector_count) != RES_OK) {
-      sector_count = 0;
-      return USBD_FAIL;
-    }
-  }
-
-  *block_num  = sector_count;
-  return USBD_OK;
+  return usbSdSession.getCapacity(block_num, block_size);
 }
-
-uint8_t lunReady[STORAGE_LUN_NBR];
 
 void usbInitLUNs()
 {
-  for (int i = 0; i < STORAGE_LUN_NBR; i++) {
-    lunReady[i] = 1;
-  }
+  usbSdSession.close();
 }
 
 /**
@@ -195,20 +403,16 @@ void usbInitLUNs()
   */
 int8_t STORAGE_IsReady(uint8_t lun)
 {
-  switch (lun) {
-    case STORAGE_SDCARD_LUN:
-      return (lunReady[STORAGE_SDCARD_LUN] != 0 && storageIsPresent())
-                 ? USBD_OK
-                 : USBD_FAIL;
+  UsbMscLun parsed;
+  if (!parseUsbMscLun(lun, &parsed)) return USBD_FAIL;
 
 #if USE_UF2_DRIVE
-    case STORAGE_UF2_LUN:
-      return USBD_OK;
+  if (parsed == UsbMscLun::Uf2) {
+    return USBD_OK;
+  }
 #endif
 
-    default:
-      return USBD_FAIL;
-  }
+  return usbSdSession.isReady();
 }
 
 /**
@@ -237,15 +441,17 @@ int8_t STORAGE_Read (uint8_t lun,
 {
   WATCHDOG_SUSPEND(100/*1s*/);
 
+  UsbMscLun parsed;
+  if (!parseUsbMscLun(lun, &parsed)) return USBD_FAIL;
+
 #if USE_UF2_DRIVE
-  if (lun == STORAGE_UF2_LUN) {
+  if (parsed == UsbMscLun::Uf2) {
     uf2_fat_read_block(blk_addr, buf);
     return 0;
   }
 #endif
 
-  auto drv = storageGetDefaultDriver();
-  return (drv->read(0, buf, blk_addr, blk_len) == RES_OK) ? USBD_OK : USBD_FAIL;
+  return usbSdSession.read(buf, blk_addr, blk_len);
 }
 /**
   * @brief  Write data to the medium
@@ -259,20 +465,21 @@ int8_t STORAGE_Write(uint8_t lun, uint8_t *buf, uint32_t blk_addr, uint16_t blk_
 {
   WATCHDOG_SUSPEND(500/*5s*/);
 
+  UsbMscLun parsed;
+  if (!parseUsbMscLun(lun, &parsed)) return USBD_FAIL;
+
 #if USE_UF2_DRIVE
-  if (lun == STORAGE_UF2_LUN) {
+  if (parsed == UsbMscLun::Uf2) {
     int wr_ret;
     while ((blk_len--) && (wr_ret = uf2_fat_write_block(blk_addr, buf)) > 0) {
       blk_addr += 512;
       buf += 512;
     }
-    // return wr_ret > 0 ? USBD_OK : USBD_FAIL;
     return USBD_OK;
   }
 #endif
 
-  auto drv = storageGetDefaultDriver();
-  return (drv->write(0, buf, blk_addr, blk_len) == RES_OK) ? USBD_OK : USBD_FAIL;
+  return usbSdSession.write(buf, blk_addr, blk_len);
 }
 
 /**
@@ -280,6 +487,34 @@ int8_t STORAGE_Write(uint8_t lun, uint8_t *buf, uint32_t blk_addr, uint16_t blk_
   * @param  None
   * @retval number of logical unit
   */
+
+int8_t STORAGE_Sync(uint8_t lun)
+{
+  UsbMscLun parsed;
+  if (!parseUsbMscLun(lun, &parsed)) return USBD_FAIL;
+
+#if USE_UF2_DRIVE
+  if (parsed == UsbMscLun::Uf2) {
+    return USBD_OK;
+  }
+#endif
+
+  return usbSdSession.sync();
+}
+
+int8_t STORAGE_Close(uint8_t lun)
+{
+  UsbMscLun parsed;
+  if (!parseUsbMscLun(lun, &parsed)) return USBD_FAIL;
+
+#if USE_UF2_DRIVE
+  if (parsed == UsbMscLun::Uf2) {
+    return USBD_OK;
+  }
+#endif
+
+  return usbSdSession.close();
+}
 
 int8_t STORAGE_GetMaxLun(void)
 {
