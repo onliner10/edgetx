@@ -22,7 +22,6 @@
 #pragma once
 
 #include "datastructs.h"
-#include "screen_user_interface.h"
 #include "radio_theme.h"
 
 #if VERSION_MAJOR == 2
