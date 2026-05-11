@@ -224,8 +224,21 @@ uint8_t USBD_MSC_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
     return (uint8_t)USBD_EMEM;
   }
 
+  (void)USBD_memset(hmsc, 0, sizeof(*hmsc));
+
   pdev->pClassDataCmsit[pdev->classId] = (void *)hmsc;
   pdev->pClassData = pdev->pClassDataCmsit[pdev->classId];
+
+  /* Initialize max_lun from registered storage */
+  {
+    USBD_StorageTypeDef *storage = (USBD_StorageTypeDef *)pdev->pUserData[pdev->classId];
+    if (storage != NULL && storage->GetMaxLun != NULL) {
+      uint32_t max_lun = (uint32_t)storage->GetMaxLun();
+      hmsc->max_lun = (max_lun >= MSC_BOT_MAX_LUN)
+          ? (MSC_BOT_MAX_LUN - 1U)
+          : max_lun;
+    }
+  }
 
 #ifdef USE_USBD_COMPOSITE
   /* Get the Endpoints addresses allocated for this class instance */
@@ -288,6 +301,16 @@ uint8_t USBD_MSC_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
   /* Free MSC Class Resources */
   if (pdev->pClassDataCmsit[pdev->classId] != NULL)
   {
+    /* Close all storage LUNs before BOT deinit */
+    USBD_StorageTypeDef* storage = (USBD_StorageTypeDef*)pdev->pUserData[pdev->classId];
+    if (storage != NULL && storage->Close != NULL && storage->GetMaxLun != NULL) {
+      uint32_t max_lun = (uint32_t)storage->GetMaxLun();
+      if (max_lun >= MSC_BOT_MAX_LUN) max_lun = MSC_BOT_MAX_LUN - 1U;
+      for (uint32_t i = 0U; i <= max_lun; i++) {
+        storage->Close((uint8_t)i);
+      }
+    }
+
     /* De-Init the BOT layer */
     MSC_BOT_DeInit(pdev);
 
@@ -334,7 +357,7 @@ uint8_t USBD_MSC_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
               ((req->bmRequest & 0x80U) == 0x80U))
           {
             max_lun = (uint32_t)((USBD_StorageTypeDef *)pdev->pUserData[pdev->classId])->GetMaxLun();
-            hmsc->max_lun = (max_lun > MSC_BOT_MAX_LUN) ? MSC_BOT_MAX_LUN : max_lun;
+            hmsc->max_lun = (max_lun >= MSC_BOT_MAX_LUN) ? (MSC_BOT_MAX_LUN - 1U) : max_lun;
             (void)USBD_CtlSendData(pdev, (uint8_t *)&hmsc->max_lun, 1U);
           }
           else

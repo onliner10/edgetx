@@ -41,6 +41,7 @@
 #include "radio_trainer.h"
 #include "radio_version.h"
 #include "screen_setup.h"
+#include "topbar.h"
 #include "special_functions.h"
 #include "view_channels.h"
 #include "view_logical_switches.h"
@@ -92,7 +93,7 @@ const PageDef screensMenuItems[] = {
 #if VERSION_MAJOR > 2
   { ICON_RADIO_EDIT_THEME, STR_DEF(STR_QM_THEMES), STR_DEF(STR_MAIN_MENU_THEMES), PAGE_CREATE, QM_UI_THEMES, [](const PageDef& pageDef) { return new (std::nothrow) ThemeSetupPage(pageDef); }, radioThemesEnabled},
 #endif
-  { ICON_THEME_SETUP, STR_DEF(STR_QM_TOP_BAR), STR_DEF(STR_USER_INTERFACE), PAGE_CREATE, QM_UI_SETUP, [](const PageDef& pageDef) { return new (std::nothrow) ScreenUserInterfacePage(pageDef); }},
+  { ICON_THEME_SETUP, STR_DEF(STR_QM_TOP_BAR), STR_DEF(STR_USER_INTERFACE), PAGE_ACTION, QM_UI_SETUP, nullptr, nullptr, []() { new (std::nothrow) SetupTopBarWidgetsPage(); }},
   { ICON_THEME_VIEW1, STR_DEF(STR_QM_SCREEN_1), STR_DEF(STR_MAIN_VIEW_1), PAGE_CREATE, QM_UI_SCREEN1, [](const PageDef& pageDef) { return new (std::nothrow) ScreenSetupPage(0, pageDef); }},
   { ICON_THEME_VIEW2, STR_DEF(STR_QM_SCREEN_2), STR_DEF(STR_MAIN_VIEW_2), PAGE_CREATE, QM_UI_SCREEN2, [](const PageDef& pageDef) { return new (std::nothrow) ScreenSetupPage(1, pageDef); }, []() { return customScreens[1] != nullptr; }},
   { ICON_THEME_VIEW3, STR_DEF(STR_QM_SCREEN_3), STR_DEF(STR_MAIN_VIEW_3), PAGE_CREATE, QM_UI_SCREEN3, [](const PageDef& pageDef) { return new (std::nothrow) ScreenSetupPage(2, pageDef); }, []() { return customScreens[2] != nullptr; }},

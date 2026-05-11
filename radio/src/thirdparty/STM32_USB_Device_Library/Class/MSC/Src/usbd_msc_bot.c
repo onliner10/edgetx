@@ -346,7 +346,7 @@ static void  MSC_BOT_SendData(USBD_HandleTypeDef *pdev, uint8_t *pbuf, uint32_t 
 
   length = MIN(hmsc->cbw.dDataLength, len);
 
-  hmsc->csw.dDataResidue -= len;
+  hmsc->csw.dDataResidue -= length;
   hmsc->csw.bStatus = USBD_CSW_CMD_PASSED;
   hmsc->bot_state = USBD_BOT_SEND_DATA;
 
