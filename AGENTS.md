@@ -109,7 +109,7 @@ For clang-tidy, cppcheck, GCC analyzer, and CodeQL, mirror `.github/workflows/bu
 
 ### UI simulator harness
 
-Use the MCP servers from `opencode.json` when available: `edge16-serena` and `edge16-ui-harness`.
+Use the MCP servers when available: `edge16-serena` and `edge16-ui-harness`.
 
 CLI fallback:
 
