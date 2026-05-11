@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "edge16-ui-harness": {
+      "command": "nix",
+      "args": ["develop", ".", "-c", "tools/ui-harness/edgetx-mcp"]
+    },
+    "edge16-serena": {
+      "command": "nix",
+      "args": ["develop", ".", "-c", "tools/edge16-serena-mcp"]
+    }
+  }
+}
