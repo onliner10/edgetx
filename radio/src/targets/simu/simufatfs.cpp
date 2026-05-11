@@ -138,11 +138,16 @@ static std::string resolveForRead(const fs::path& path)
     auto resolved = resolveInBase(simuSettingsDirectory, p);
     std::error_code ec;
     if (fs::exists(resolved, ec) && !ec) {
+      if (p.string().find("radio.yml") != std::string::npos)
+        fprintf(stderr, "resolveForRead: using settings overlay: %s\n", resolved.string().c_str());
       return resolved.string();
     }
   }
 
-  return resolveInBase(simuSdDirectory, p).string();
+  auto result = resolveInBase(simuSdDirectory, p);
+  if (p.string().find("radio.yml") != std::string::npos)
+    fprintf(stderr, "resolveForRead: using SD card: %s\n", result.string().c_str());
+  return result.string();
 }
 
 // Resolve for write: always use settingsPath if available
@@ -533,8 +538,10 @@ FRESULT f_mkdir(const TCHAR* name)
 
 FRESULT f_unlink(const TCHAR * name)
 {
-  std::string path = resolveForWrite(name);
+  std::string path = resolveForRead(name);
   std::error_code ec;
+
+  if (!fs::exists(path, ec) || ec) return FR_INVALID_NAME;
 
   bool removed = fs::remove(path, ec);
   if (ec) return FR_INVALID_NAME;
@@ -544,12 +551,23 @@ FRESULT f_unlink(const TCHAR * name)
 
 FRESULT f_rename(const TCHAR *oldname, const TCHAR *newname)
 {
-  std::string old = resolveForWrite(oldname);
-  std::string path = resolveForWrite(newname);
+  std::string oldReadPath = resolveForRead(oldname);
+  std::string newPath = resolveForWrite(newname);
   std::error_code ec;
 
-  fs::rename(old.c_str(), path.c_str(), ec);
-  if (ec) return FR_INVALID_NAME;
+  if (!fs::exists(oldReadPath, ec) || ec) return FR_INVALID_NAME;
+
+  std::string oldWritePath = resolveForWrite(oldname);
+  if (oldWritePath == newPath) return FR_INVALID_NAME;
+
+  if (oldReadPath != oldWritePath) {
+    fs::copy_file(oldReadPath, newPath, ec);
+    if (ec) return FR_INVALID_NAME;
+    fs::remove(oldReadPath, ec);
+  } else {
+    fs::rename(oldWritePath.c_str(), newPath.c_str(), ec);
+    if (ec) return FR_INVALID_NAME;
+  }
 
   return FR_OK;
 }

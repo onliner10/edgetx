@@ -84,6 +84,7 @@
 #include "audio.h"
 #include "debug.h"
 #include "edgetx.h"
+#include "telemetry/telemetry_sensors.h"
 
 #include "arg_parser.h"
 #include "simu_ui_automation.h"
@@ -121,7 +122,15 @@ static std::string json_escape(const std::string& value)
     case '\n': escaped += "\\n"; break;
     case '\r': escaped += "\\r"; break;
     case '\t': escaped += "\\t"; break;
-    default: escaped += ch; break;
+    default:
+      if (static_cast<unsigned char>(ch) < 0x20) {
+        char buf[8];
+        snprintf(buf, sizeof(buf), "\\u%04x", static_cast<unsigned char>(ch));
+        escaped += buf;
+      } else {
+        escaped += ch;
+      }
+      break;
     }
   }
   return escaped;
@@ -199,6 +208,7 @@ static bool write_ppm_screenshot(const std::string& path)
 
 static void automation_handle_command(const std::string& line)
 {
+  TRACE("automation_handle_command: '%s'", line.c_str());
   std::istringstream in(line);
   std::string command;
   in >> command;
@@ -263,7 +273,16 @@ static void automation_handle_command(const std::string& line)
   } else if (command == "wait") {
     int duration_ms = 0;
     in >> duration_ms;
-    SDL_Delay(std::max(0, duration_ms));
+    const int kChunkMs = 10;
+    for (int remaining = std::max(0, duration_ms); remaining > 0; remaining -= kChunkMs) {
+      SDL_Delay(std::min(kChunkMs, remaining));
+      SDL_Event ev;
+      while (SDL_PollEvent(&ev)) {
+        if (ev.type == SDL_QUIT) {
+          break;
+        }
+      }
+    }
     automation_reply_ok();
   } else if (command == "ui_tree") {
     std::string json;
@@ -307,6 +326,50 @@ static void automation_handle_command(const std::string& line)
           << ",\"width\":" << simuLcdGetWidth()
           << ",\"height\":" << simuLcdGetHeight()
           << ",\"depth\":" << simuLcdGetDepth();
+    automation_reply_ok(extra.str());
+  } else if (command == "telemetry_streaming") {
+    int streaming = 0;
+    in >> streaming;
+    simuSetTelemetryStreaming(streaming ? 1 : 0);
+    automation_reply_ok();
+  } else if (command == "set_telemetry") {
+    std::string sensor_name;
+    int value = 0;
+    in >> sensor_name >> value;
+    if (sensor_name.empty()) {
+      automation_reply_error("missing sensor name");
+      return;
+    }
+    bool found = false;
+    for (int i = 0; i < MAX_TELEMETRY_SENSORS; i++) {
+      if (strcmp(g_model.telemetrySensors[i].label, sensor_name.c_str()) == 0) {
+        telemetryItems[i].value = value;
+        telemetryItems[i].valueMin = value;
+        telemetryItems[i].valueMax = value;
+        telemetryItems[i].setFresh();
+        found = true;
+        break;
+      }
+    }
+    if (!found)
+      automation_reply_error("sensor not found: " + sensor_name);
+    else
+      automation_reply_ok();
+  } else if (command == "set_switch") {
+    int switch_idx = -1, position = 0;
+    in >> switch_idx >> position;
+    if (switch_idx < 0 || switch_idx >= switchGetMaxSwitches()) {
+      automation_reply_error("invalid switch index");
+      return;
+    }
+    simuSetSwitch(switch_idx, position);
+    automation_reply_ok();
+  } else if (command == "audio_history") {
+    int maxLines = 200;
+    in >> maxLines;
+    std::string history = simuGetAudioHistory(maxLines);
+    std::ostringstream extra;
+    extra << "\"lines\":\"" << json_escape(history) << "\"";
     automation_reply_ok(extra.str());
   } else if (command == "stop") {
     SDL_Event event;

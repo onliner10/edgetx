@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+import os
+import sys
+
+local_path = os.path.join(os.path.dirname(__file__), "..")
+if local_path not in sys.path:
+    sys.path.insert(0, local_path)
+
 from edgetx_ui.mcp_server import main
 
 if __name__ == "__main__":

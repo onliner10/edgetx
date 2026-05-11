@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import atexit
 from collections import deque
 import select
 from dataclasses import dataclass
@@ -28,6 +29,46 @@ def _resolve_repo_root() -> Path:
 
 
 REPO_ROOT = _resolve_repo_root()
+
+_ORPHANED_SIMU_LOCKFILES: list[Path] = []
+
+
+def _cleanup_stale_lockfile(lockfile: Path) -> bool:
+    """Clean up a single stale lockfile. Returns True if cleaned, False otherwise."""
+    try:
+        if not lockfile.exists():
+            return False
+        pid = int(lockfile.read_text().strip())
+        try:
+            os.kill(pid, 0)
+            return False
+        except OSError:
+            lockfile.unlink()
+            return True
+    except Exception:
+        try:
+            lockfile.unlink()
+            return True
+        except Exception:
+            return False
+
+
+def _cleanup_orphaned_simulators() -> None:
+    for lockfile in _ORPHANED_SIMU_LOCKFILES:
+        _cleanup_stale_lockfile(lockfile)
+    _ORPHANED_SIMU_LOCKFILES.clear()
+
+
+def _discover_and_clean_stale_locks() -> None:
+    """Called at module load to clean any lockfiles left behind by dead processes."""
+    tmpdir = Path(tempfile.gettempdir())
+    for lockfile in tmpdir.glob("edgetx-simulator-*.lock"):
+        _cleanup_stale_lockfile(lockfile)
+
+
+_discover_and_clean_stale_locks()
+
+atexit.register(_cleanup_orphaned_simulators)
 
 
 @dataclass(frozen=True)
@@ -197,19 +238,26 @@ class SdlAutomationSession:
     ) -> None:
         self.target = target_config(target)
         self.runtime_dir: tempfile.TemporaryDirectory[str] | None = None
-        self.sdcard = Path(sdcard) if sdcard else self.runtime_fixture_path("sdcard")
-        self.settings = Path(settings) if settings else self.runtime_fixture_path("settings")
+        self._using_explicit_sdcard = bool(sdcard)
+        self.sdcard = Path(sdcard) if self._using_explicit_sdcard else self.runtime_fixture_path("sdcard")
+        if settings:
+            self.settings = Path(settings)
+        elif self._using_explicit_sdcard:
+            self.settings = self.runtime_fixture_path("settings", use_fixture=False)
+        else:
+            self.settings = self.runtime_fixture_path("settings")
         self.width = width
         self.height = height
         self.process: subprocess.Popen[str] | None = None
+        self._log_lines: deque[str] = deque(maxlen=2000)
 
-    def runtime_fixture_path(self, kind: str) -> Path:
+    def runtime_fixture_path(self, kind: str, use_fixture: bool = True) -> Path:
         if self.runtime_dir is None:
             self.runtime_dir = tempfile.TemporaryDirectory(prefix=f"edgetx-ui-{self.target.name}-")
 
         source = default_fixture_path(kind, self.target.name)
         destination = Path(self.runtime_dir.name) / f"{kind}-{self.target.name}"
-        if source.exists():
+        if use_fixture and source.exists():
             shutil.copytree(source, destination, dirs_exist_ok=True)
             if kind == "settings":
                 normalize_yaml_line_endings(destination)
@@ -220,6 +268,14 @@ class SdlAutomationSession:
     def start(self) -> dict[str, Any]:
         if self.process and self.process.poll() is None:
             return self.status()
+
+        if self.runtime_dir is None:
+            self.runtime_dir = tempfile.TemporaryDirectory(prefix=f"edgetx-ui-{self.target.name}-")
+
+        if self._using_explicit_sdcard:
+            sdcard_copy = Path(self.runtime_dir.name) / f"sdcard-{self.target.name}"
+            shutil.copytree(self.sdcard, sdcard_copy, dirs_exist_ok=True)
+            self.sdcard = sdcard_copy
 
         self.sdcard.mkdir(parents=True, exist_ok=True)
         self.settings.mkdir(parents=True, exist_ok=True)
@@ -245,17 +301,28 @@ class SdlAutomationSession:
             text=True,
             bufsize=1,
         )
+
+        lockfile = Path(tempfile.gettempdir()) / f"edgetx-simulator-{self.target.name}-{self.process.pid}.lock"
+        lockfile.write_text(str(self.process.pid))
+        _ORPHANED_SIMU_LOCKFILES.append(lockfile)
+
         deadline = time.monotonic() + 5.0
         last_error: Exception | None = None
+        poll_interval = 0.1
         while time.monotonic() < deadline:
             try:
-                return self.status()
+                st = self.status()
+                if st.get("startup_completed"):
+                    return st
+                poll_interval = min(poll_interval * 1.1, 2.0)
+                time.sleep(poll_interval)
             except HarnessError as exc:
                 last_error = exc
                 if self.process.poll() is not None:
                     break
-                time.sleep(0.05)
-        raise HarnessError(f"simulator did not become responsive: {last_error}")
+                poll_interval = min(poll_interval * 1.1, 2.0)
+                time.sleep(poll_interval)
+        raise HarnessError(f"simulator did not become ready: {last_error}")
 
     def stop(self) -> dict[str, Any]:
         if not self.process:
@@ -272,6 +339,17 @@ class SdlAutomationSession:
         if self.runtime_dir is not None:
             self.runtime_dir.cleanup()
             self.runtime_dir = None
+        if self._using_explicit_sdcard and self.sdcard.exists():
+            shutil.rmtree(self.sdcard, ignore_errors=True)
+        for lockfile in Path(tempfile.gettempdir()).glob(f"edgetx-simulator-{self.target.name}-*.lock"):
+            try:
+                pid = int(lockfile.read_text().strip())
+                if pid == self.process.pid if self.process else False:
+                    lockfile.unlink()
+                    if lockfile in _ORPHANED_SIMU_LOCKFILES:
+                        _ORPHANED_SIMU_LOCKFILES.remove(lockfile)
+            except Exception:
+                pass
         return {"running": False}
 
     def command(self, command: str, timeout: float = 5.0) -> dict[str, Any]:
@@ -308,6 +386,7 @@ class SdlAutomationSession:
                 if not line:
                     continue
                 recent_lines.append(line)
+                self._log_lines.append(line)
         tail = "\n".join(recent_lines)
         if tail:
             raise HarnessError(
@@ -328,6 +407,12 @@ class SdlAutomationSession:
             "sdcard": str(self.sdcard),
             "settings": str(self.settings),
         }
+
+    def get_logs(self, filter_text: str | None = None, tail: int = 200) -> list[str]:
+        lines = list(self._log_lines)
+        if filter_text:
+            lines = [l for l in lines if filter_text in l]
+        return lines[-tail:]
 
     def press(self, key: str, duration_ms: int = 120) -> dict[str, Any]:
         normalized = normalize_key(key)
@@ -358,6 +443,18 @@ class SdlAutomationSession:
 
     def wait(self, ms: int) -> dict[str, Any]:
         return self.command(f"wait {int(ms)}")
+
+    def set_telemetry(self, name: str, value: float) -> dict[str, Any]:
+        return self.command(f"set_telemetry {name} {int(value)}")
+
+    def set_telemetry_streaming(self, enabled: bool) -> dict[str, Any]:
+        return self.command(f"telemetry_streaming {1 if enabled else 0}")
+
+    def set_switch(self, index: int, position: int) -> dict[str, Any]:
+        return self.command(f"set_switch {int(index)} {int(position)}")
+
+    def audio_history(self, max_lines: int = 200) -> dict[str, Any]:
+        return self.command(f"audio_history {int(max_lines)}")
 
     def ui_tree(self) -> dict[str, Any]:
         response = self.command("ui_tree", timeout=5.0)
@@ -588,6 +685,18 @@ class HarnessService:
     def wait(self, ms: int) -> dict[str, Any]:
         return self.require_session().wait(ms)
 
+    def set_telemetry(self, name: str, value: float) -> dict[str, Any]:
+        return self.require_session().set_telemetry(name, value)
+
+    def set_telemetry_streaming(self, enabled: bool) -> dict[str, Any]:
+        return self.require_session().set_telemetry_streaming(enabled)
+
+    def set_switch(self, index: int, position: int) -> dict[str, Any]:
+        return self.require_session().set_switch(index, position)
+
+    def audio_history(self, max_lines: int = 200) -> dict[str, Any]:
+        return self.require_session().audio_history(max_lines)
+
     def ui_tree(self) -> dict[str, Any]:
         return self.require_session().ui_tree()
 
@@ -599,6 +708,12 @@ class HarnessService:
 
     def assert_visible(self, selector: dict[str, Any] | str) -> dict[str, Any]:
         return self.require_session().assert_visible(selector)
+
+    def set_switch(self, index: int, position: int) -> dict[str, Any]:
+        return self.require_session().set_switch(index, position)
+
+    def audio_history(self, max_lines: int = 200) -> dict[str, Any]:
+        return self.require_session().audio_history(max_lines)
 
     def skip_storage_warning_if_present(self) -> dict[str, Any]:
         return self.require_session().skip_storage_warning_if_present()

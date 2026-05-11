@@ -794,3 +794,42 @@ uint32_t simuGetCustomSwitchColor(uint8_t idx)
 #endif
   return 0;
 }
+
+#include <deque>
+#include <sstream>
+#include <cstdarg>
+#include <cstdio>
+
+static std::deque<std::string> _simuAudioEvents;
+static std::mutex _simuAudioMutex;
+
+void simuLogAudioEvent(const char* fmt, ...)
+{
+  char buf[256];
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, args);
+  va_end(args);
+  std::lock_guard<std::mutex> lock(_simuAudioMutex);
+  _simuAudioEvents.push_back(buf);
+  while (_simuAudioEvents.size() > 500)
+    _simuAudioEvents.pop_front();
+}
+
+std::string simuGetAudioHistory(int maxLines)
+{
+  std::lock_guard<std::mutex> lock(_simuAudioMutex);
+  int start = std::max(0, (int)_simuAudioEvents.size() - maxLines);
+  std::ostringstream out;
+  for (int i = start; i < (int)_simuAudioEvents.size(); i++) {
+    if (i > start) out << "\n";
+    out << _simuAudioEvents[i];
+  }
+  return out.str();
+}
+
+void simuSetTelemetryStreaming(uint8_t streaming)
+{
+  extern std::atomic<uint8_t> telemetryStreaming;
+  telemetryStreaming.store(streaming, std::memory_order_release);
+}

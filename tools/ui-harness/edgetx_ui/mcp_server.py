@@ -124,9 +124,60 @@ TOOLS: dict[str, dict[str, Any]] = {
             "required": ["name"],
         },
     },
+    "edgetx_set_telemetry": {
+        "description": "Inject a telemetry sensor value. name is the sensor label (e.g. 'VFAS', 'Capa') and value is the raw integer value (VFAS: volts*100, Capa: mAh).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Sensor label, e.g. 'VFAS' or 'Capa'"},
+                "value": {"type": "number", "description": "Raw integer value (VFAS: volts*100, Capa: mAh)"},
+            },
+            "required": ["name", "value"],
+        },
+    },
+    "edgetx_set_telemetry_streaming": {
+        "description": "Enable or disable telemetry streaming simulation. When enabled, Lua scripts will see TELEMETRY_STREAMING() as true, allowing telemetry sensors to be readable.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "enabled": {"type": "boolean", "description": "True to enable telemetry streaming, False to disable"},
+            },
+            "required": ["enabled"],
+        },
+    },
+    "edgetx_set_switch": {
+        "description": "Set a radio switch position by index. index is the 0-based switch index (SA=0, SB=1, ..., SF=5, SH=7). position is -1 (down), 0 (middle), or +1 (up).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "index": {"type": "integer", "description": "0-based switch index: SA=0, SB=1, SC=2, SD=3, SE=4, SF=5, SG=6, SH=7"},
+                "position": {"type": "integer", "description": "Switch position: -1 (down/back), 0 (middle), +1 (up/forward)"},
+            },
+            "required": ["index", "position"],
+        },
+    },
+    "edgetx_audio_history": {
+        "description": "Return captured simulator audio events (playTone, playFile calls). Optionally limit the number of tail lines returned.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "tail": {"type": "integer", "default": 200, "description": "Maximum number of tail lines to return"},
+            },
+        },
+    },
     "edgetx_run_flow": {
         "description": "Run a JSON UI flow.",
         "inputSchema": {"type": "object", "properties": {"flow_path": {"type": "string"}}, "required": ["flow_path"]},
+    },
+    "edgetx_log": {
+        "description": "Return captured simulator log lines (TRACE/debug output). Optionally filter by substring and limit tail lines.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "filter": {"type": "string", "description": "Substring to filter log lines by"},
+                "tail": {"type": "integer", "default": 200, "description": "Maximum number of tail lines to return"},
+            },
+        },
     },
 }
 
@@ -201,8 +252,19 @@ class McpServer:
             return self.service.skip_storage_warning_if_present()
         if name == "edgetx_screenshot":
             return self.service.screenshot(args["name"], args.get("out_dir"))
+        if name == "edgetx_set_telemetry":
+            return self.service.set_telemetry(args["name"], float(args["value"]))
+        if name == "edgetx_set_telemetry_streaming":
+            return self.service.set_telemetry_streaming(bool(args["enabled"]))
+        if name == "edgetx_set_switch":
+            return self.service.set_switch(int(args["index"]), int(args["position"]))
+        if name == "edgetx_audio_history":
+            return self.service.audio_history(int(args.get("tail", 200)))
         if name == "edgetx_run_flow":
             return self.service.run_flow(args["flow_path"])
+        if name == "edgetx_log":
+            lines = self.service.session.get_logs(filter_text=args.get("filter"), tail=int(args.get("tail", 200)))
+            return {"lines": lines}
         raise HarnessError(f"unknown tool: {name}")
 
     @staticmethod
