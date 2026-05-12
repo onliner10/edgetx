@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -405,6 +406,13 @@ class SdlAutomationSession:
             )
         raise HarnessError(f"timed out waiting for simulator response to `{command}`")
 
+    def text_input(self, text: str, replace: bool = True, submit: bool = True) -> dict[str, Any]:
+        encoded = _hex_encode_text(text)
+        return self.command(
+            f"text_input {1 if replace else 0} {1 if submit else 0} {encoded}",
+            timeout=5.0,
+        )
+
     def status(self) -> dict[str, Any]:
         response = self.command("status")
         result = {
@@ -621,7 +629,9 @@ class SdlAutomationSession:
         role_title = next((str(n.get("label") or n.get("text", "")) for n in nodes if n.get("role") == "title"), "")
         title = top_window_title or header_title or role_title or menu_title or actionable_title or non_numeric_title
         scrollables = [_compact_node(n) for n in _screen_scrollables(nodes)[:10]]
-        context = _screen_context(title, page, focused, actions, scrollables, nodes)
+        fields = _screen_fields(nodes)
+        active_field = _active_field(fields, focused)
+        context = _screen_context(title, page, focused, actions, scrollables, nodes, active_field)
         return {
             "title": title,
             "page": page or ({"label": title, "kind": "page", "actions": []} if title else {}),
@@ -630,14 +640,16 @@ class SdlAutomationSession:
             "focused": focused,
             "screen_hash": _screen_digest(tree),
             "actions": actions,
+            "fields": fields[:30],
             "scrollables": scrollables,
             "available_inputs": _available_inputs(nodes),
-            "next_actions": _next_actions(context, focused, scrollables),
+            "next_actions": _next_actions(context, focused, scrollables, fields),
             "visible_text": unique_visible_text,
             "counts": {
                 "total": len(nodes),
                 "actions": len(actions),
                 "total_actions": len(all_actions),
+                "fields": len(fields),
                 "visible_text": len(unique_visible_text),
             },
         }
@@ -738,15 +750,21 @@ class SdlAutomationSession:
         )
 
     def ui_click(self, selector: dict[str, Any] | str, duration_ms: int = 0, verbose: bool = False) -> dict[str, Any]:
+        before = self.ui_tree(mode="full", verbose=True)
         node = self.find_node(selector, "click")
         response = self.command(f"ui_click {node['id']} {int(duration_ms)}", timeout=5.0)
+        self.wait(50)
+        after = self.ui_tree(mode="full", verbose=True)
+        changed = _screen_digest(before) != _screen_digest(after)
+        warnings = _action_warning(node) | _unchanged_action_warning(node, before.get("nodes", []), changed)
         if verbose:
-            return response | {"matched": node, **_action_warning(node)}
+            return response | {"matched": node, "changed": changed, **warnings}
         return {
             "ok": response.get("ok", True),
             "matched": _compact_node(node),
             "runtime_id": node.get("id", ""),
-            **_action_warning(node),
+            "changed": changed,
+            **warnings,
         }
 
     def ui_long_click(self, selector: dict[str, Any] | str, duration_ms: int = 0, verbose: bool = False) -> dict[str, Any]:
@@ -765,21 +783,145 @@ class SdlAutomationSession:
     ) -> dict[str, Any]:
         if action not in ("click", "long_click"):
             raise HarnessError("activate action must be `click` or `long_click`")
+        before = self.ui_tree(mode="full", verbose=True)
         node = self.find_node(selector, action)
         command = "ui_long_click" if action == "long_click" else "ui_click"
         response = self.command(f"{command} {node['id']} {int(duration_ms)}", timeout=5.0)
+        self.wait(50)
+        after = self.ui_tree(mode="full", verbose=True)
+        changed = _screen_digest(before) != _screen_digest(after)
+        warnings = _action_warning(node) | _unchanged_action_warning(node, before.get("nodes", []), changed)
         if verbose:
-            return response | {"matched": node, "action": action, **_action_warning(node)}
+            return response | {"matched": node, "action": action, "changed": changed, **warnings}
         return {
             "ok": response.get("ok", True),
             "action": action,
             "matched": _compact_node(node),
             "runtime_id": node.get("id", ""),
-            **_action_warning(node),
+            "changed": changed,
+            **warnings,
+        }
+
+    def adjust_field(
+        self,
+        label: str,
+        target_value: str,
+        max_steps: int = 80,
+        confirm: bool = True,
+    ) -> dict[str, Any]:
+        field = self.find_field(label)
+        target_value = _validate_field_target(field, str(target_value))
+        start_value = str(field.get("value", ""))
+        if _field_value_matches(field, start_value, target_value):
+            return {"ok": True, "field": field, "start_value": start_value, "final_value": start_value, "steps": 0}
+        if not field.get("editable"):
+            raise HarnessError(f"field `{label}` is visible but not currently editable")
+
+        self.activate({"runtime_id": field["runtime_id"]})
+        self.wait(100)
+        steps_taken = 0
+        direction = _rotation_direction(start_value, str(target_value)) or 1
+        tried_reverse = False
+        seen_values = {start_value}
+        previous_numeric_value = _first_number(start_value)
+        step_delta: float | None = None
+
+        while steps_taken < max_steps:
+            current = self.find_field(label)
+            current_value = str(current.get("value", ""))
+            if _field_value_matches(current, current_value, target_value):
+                if confirm:
+                    self.press("ENTER")
+                    self.wait(100)
+                final = self.find_field(label)
+                return {
+                    "ok": True,
+                    "field": final,
+                    "start_value": start_value,
+                    "final_value": final.get("value", current_value),
+                    "steps": steps_taken,
+                    "confirmed": confirm,
+                }
+
+            batch = direction
+            current_numeric_value = _first_number(current_value)
+            target_numeric_value = _first_number(str(target_value))
+            if (
+                step_delta
+                and current_numeric_value is not None
+                and target_numeric_value is not None
+                and abs(step_delta) > 0
+            ):
+                remaining = target_numeric_value - current_numeric_value
+                estimated = int(abs(remaining / step_delta))
+                if estimated > 1:
+                    batch_direction = 1 if (remaining / step_delta) > 0 else -1
+                    batch = batch_direction * min(10, estimated, max_steps - steps_taken)
+
+            self.rotate(batch)
+            self.wait(50)
+            steps_taken += abs(batch)
+            updated = self.find_field(label)
+            updated_value = str(updated.get("value", ""))
+            updated_numeric_value = _first_number(updated_value)
+            if (
+                previous_numeric_value is not None
+                and updated_numeric_value is not None
+                and updated_numeric_value != previous_numeric_value
+                and abs(batch) > 0
+            ):
+                step_delta = (updated_numeric_value - previous_numeric_value) / abs(batch)
+            previous_numeric_value = updated_numeric_value
+            if updated_value in seen_values and not _rotation_direction(updated_value, str(target_value)) and not tried_reverse:
+                direction = -direction
+                tried_reverse = True
+            else:
+                seen_values.add(updated_value)
+                direction = _rotation_direction(updated_value, str(target_value)) or direction
+
+        final = self.find_field(label)
+        return {
+            "ok": False,
+            "field": final,
+            "start_value": start_value,
+            "final_value": final.get("value", ""),
+            "target_value": str(target_value),
+            "steps": steps_taken,
+            "warning": "target value was not reached with bounded rotary adjustment",
+        }
+
+    def type_text(self, text: str, submit: bool = True) -> dict[str, Any]:
+        before = self.screen()
+        if before.get("context", {}).get("type") != "field_edit":
+            return {
+                "ok": False,
+                "warning": "text entry requires a visible field edit context; activate the text field first",
+                "context": before.get("context", {}),
+            }
+        before_hash = before.get("screen_hash", "")
+        response = self.text_input(str(text), replace=True, submit=submit)
+        self.wait(100)
+        after = self.screen()
+        after_hash = after.get("screen_hash", "")
+        return {
+            "ok": response.get("ok", True),
+            "typed": str(text),
+            "submitted": submit,
+            "screen_hash_before": before_hash,
+            "screen_hash_after": after_hash,
+            "changed": before_hash != after_hash,
+            "context_after": after.get("context", {}),
         }
 
     def assert_visible(self, selector: dict[str, Any] | str) -> dict[str, Any]:
         return {"matched": self.find_node(selector)}
+
+    def find_field(self, label: str) -> dict[str, Any]:
+        tree = self.ui_tree(mode="full", verbose=True)
+        field = _find_field(_screen_fields(tree.get("nodes", [])), label)
+        if field:
+            return field
+        raise HarnessError(f"could not find visible field `{label}`")
 
     def skip_storage_warning_if_present(self) -> dict[str, Any]:
         results = []
@@ -959,6 +1101,10 @@ def _clean_text(value: Any) -> str:
     return " ".join(str(value or "").replace("\x00", " ").split())
 
 
+def _hex_encode_text(value: str) -> str:
+    return str(value).encode("utf-8").hex()
+
+
 def _normalized_node(node: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(node)
     label = _clean_text(node.get("text", ""))
@@ -985,6 +1131,183 @@ def _action_warning(node: dict[str, Any]) -> dict[str, str]:
             "warning": "This dialog asks for a radio key; use edgetx_skip_storage_warning_if_present or edgetx_press ENTER if a pointer click does not dismiss it."
         }
     return {}
+
+
+def _unchanged_action_warning(
+    node: dict[str, Any], nodes: list[dict[str, Any]], changed: bool
+) -> dict[str, str]:
+    if changed:
+        return {}
+    field = _field_for_value_node(_screen_fields(nodes), node)
+    if field:
+        return {
+            "warning": f"Activating field `{field['label']}` did not visibly change the screen; use edgetx_adjust_field for numeric/list fields or edgetx_type_text after a virtual keyboard is visible."
+        }
+    return {"warning": "Activation did not visibly change the screen; inspect edgetx_screen context before retrying."}
+
+
+def _screen_fields(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    labels = [n for n in nodes if n.get("role") == "text" and _field_label_text(n)]
+    values = [
+        n
+        for n in nodes
+        if (n.get("role") in ("button", "text") and _clean_text(n.get("label") or n.get("text")))
+    ]
+    fields: list[dict[str, Any]] = []
+    used_value_ids: set[str] = set()
+    for label_node in labels:
+        label = _field_label_text(label_node)
+        if not label:
+            continue
+        label_bounds = label_node.get("bounds", [])
+        if len(label_bounds) < 4:
+            continue
+        lx, ly, lw, lh = [int(v) for v in label_bounds[:4]]
+        label_center_y = ly + lh // 2
+        candidates = []
+        for value_node in values:
+            value_id = str(value_node.get("id", ""))
+            if value_id in used_value_ids or value_node.get("id") == label_node.get("id"):
+                continue
+            value = _clean_text(value_node.get("label") or value_node.get("text"))
+            if not value or value == label:
+                continue
+            bounds = value_node.get("bounds", [])
+            if len(bounds) < 4:
+                continue
+            vx, vy, vw, vh = [int(v) for v in bounds[:4]]
+            value_center_y = vy + vh // 2
+            if abs(value_center_y - label_center_y) > max(14, (lh + vh) // 2):
+                continue
+            if vx <= lx + max(8, lw // 2):
+                continue
+            candidates.append((vx, value_node))
+        if not candidates:
+            continue
+        _, value_node = sorted(candidates, key=lambda item: item[0])[0]
+        used_value_ids.add(str(value_node.get("id", "")))
+        value = _clean_text(value_node.get("label") or value_node.get("text"))
+        field = {
+            "label": label,
+            "value": value,
+            "kind": _field_kind(value),
+            "editable": "click" in value_node.get("actions", []),
+            "runtime_id": value_node.get("id", ""),
+            "value_role": value_node.get("role", ""),
+        }
+        if value_node.get("focused"):
+            field["focused"] = True
+        fields.append(field)
+    return fields
+
+
+def _field_label_text(node: dict[str, Any]) -> str:
+    label = _clean_text(node.get("label") or node.get("text"))
+    if not label:
+        return ""
+    lower = label.lower()
+    if label.isdigit() or lower in {"back", "quick menu", "delete"}:
+        return ""
+    if len(label) > 32:
+        return ""
+    return label
+
+
+def _field_kind(value: str) -> str:
+    if re.fullmatch(r"-?\d+", value):
+        return "number"
+    if re.fullmatch(r"-?\d+(\.\d+)?\s*[A-Za-z%]+", value):
+        return "number_with_unit"
+    if value in {"---", "ON", "OFF"} or value.lower() in {"yes", "no", "enabled", "disabled"}:
+        return "choice"
+    return "text"
+
+
+def _validate_field_target(field: dict[str, Any], target_value: str) -> str:
+    target = _clean_text(target_value)
+    kind = str(field.get("kind", ""))
+    label = str(field.get("label", "field"))
+    if kind == "number" and not re.fullmatch(r"-?\d+(?:\.\d+)?", target):
+        raise HarnessError(
+            f"field `{label}` is numeric; target_value must be numeric-only, got {target_value!r}"
+        )
+    return target
+
+
+def _field_value_matches(field: dict[str, Any], value: str, target_value: str) -> bool:
+    kind = str(field.get("kind", ""))
+    if kind == "number":
+        value_num = _first_number(value)
+        target_num = _first_number(target_value)
+        return value_num is not None and target_num is not None and value_num == target_num
+    return str(value) == str(target_value)
+
+
+def _find_field(fields: list[dict[str, Any]], label: str) -> dict[str, Any] | None:
+    wanted = _clean_text(label).lower()
+    for field in fields:
+        if str(field.get("label", "")).lower() == wanted:
+            return field
+    for field in fields:
+        if wanted and wanted in str(field.get("label", "")).lower():
+            return field
+    return None
+
+
+def _field_for_value_node(fields: list[dict[str, Any]], node: dict[str, Any]) -> dict[str, Any] | None:
+    node_id = str(node.get("id", ""))
+    return next((field for field in fields if field.get("runtime_id") == node_id), None)
+
+
+def _active_field(fields: list[dict[str, Any]], focused: dict[str, Any] | str) -> dict[str, Any] | None:
+    if not isinstance(focused, dict):
+        return None
+    focused_id = focused.get("runtime_id", "")
+    direct = next((field for field in fields if field.get("runtime_id") == focused_id), None)
+    if direct:
+        return direct
+    focused_label = _clean_text(focused.get("label", ""))
+    if focused_label:
+        by_value = next((field for field in fields if field.get("value") == focused_label), None)
+        if by_value:
+            return by_value
+    if focused.get("role") == "window" and not focused.get("label"):
+        non_editable = [field for field in fields if not field.get("editable")]
+        if len(non_editable) == 1:
+            return non_editable[0]
+    return None
+
+
+def _rotation_direction(current: str, target: str) -> int | None:
+    current_num = _first_number(current)
+    target_num = _first_number(target)
+    if current_num is None or target_num is None or current_num == target_num:
+        return None
+    return 1 if target_num > current_num else -1
+
+
+def _first_number(value: str) -> float | None:
+    match = re.search(r"-?\d+(?:\.\d+)?", value)
+    return float(match.group(0)) if match else None
+
+
+def _keyboard_selector_for_char(char: str) -> dict[str, str] | None:
+    if char == " ":
+        return {"text_contains": "Space", "role": "button"}
+    if len(char) != 1:
+        return None
+    if char.isalpha():
+        return {"text": char.upper(), "role": "button"}
+    return {"text": char, "role": "button"}
+
+
+def _keyboard_submit_selectors() -> list[dict[str, str]]:
+    return [
+        {"text": "OK", "role": "button"},
+        {"text": "Enter", "role": "button"},
+        {"text": "Done", "role": "button"},
+        {"text": "✓", "role": "button"},
+    ]
 
 
 def _focused_node(tree: dict[str, Any]) -> dict[str, Any] | None:
@@ -1197,6 +1520,7 @@ def _screen_context(
     actions: list[dict[str, Any]],
     scrollables: list[dict[str, Any]],
     nodes: list[dict[str, Any]],
+    active_field: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     blocking_dialog = _blocking_dialog_context(nodes)
     if blocking_dialog:
@@ -1205,6 +1529,20 @@ def _screen_context(
     focused_label = focused.get("label", "") if isinstance(focused, dict) else ""
     page_label = str((page or {}).get("label", ""))
     action_labels = [str(action.get("label", "")) for action in actions if action.get("label")]
+    if active_field and not active_field.get("editable"):
+        return {
+            "type": "field_edit",
+            "page": page_label or title,
+            "field": active_field,
+            "instruction": "Use edgetx_type_text if a virtual keyboard is visible; otherwise use EXIT to leave this edit state and retry with a user-visible field action.",
+        }
+    if active_field:
+        return {
+            "type": "field_focus",
+            "page": page_label or title,
+            "field": active_field,
+            "instruction": "Use edgetx_adjust_field to change this visible value with bounded rotary steps, or press ENTER to edit manually.",
+        }
     if (title == "Quick menu" or page_label == "Quick menu") and len(action_labels) > 1:
         return {
             "type": "menu_grid",
@@ -1238,6 +1576,7 @@ def _next_actions(
     context: dict[str, Any],
     focused: dict[str, Any] | str,
     scrollables: list[dict[str, Any]],
+    fields: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     actions = []
     if context.get("type") == "blocking_dialog":
@@ -1259,6 +1598,26 @@ def _next_actions(
                 "reason": "Pointer fallback for the visible dialog action",
             })
         return [action for action in actions if action.get("runtime_id", True)]
+
+    if context.get("type") in ("field_focus", "field_edit"):
+        field = context.get("field", {})
+        if field.get("editable"):
+            actions.append({
+                "tool": "edgetx_adjust_field",
+                "label": field.get("label", ""),
+                "reason": f"Adjust visible field {field.get('label', '')} with bounded rotary input",
+            })
+        if context.get("type") == "field_edit":
+            actions.append({
+                "tool": "edgetx_type_text",
+                "reason": "Type through the visible virtual keyboard if it is open",
+            })
+        actions.append({
+            "tool": "edgetx_press",
+            "key": "EXIT",
+            "reason": "Cancel or leave the current field edit state",
+        })
+        return [action for action in actions if action.get("label", True)]
 
     if context.get("type") == "menu_grid" and isinstance(focused, dict) and "click" in focused.get("actions", []):
         actions.append({
@@ -1283,6 +1642,14 @@ def _next_actions(
                 "tool": "edgetx_activate",
                 "runtime_id": focused.get("runtime_id", ""),
                 "reason": f"Edit focused field {focused.get('label', '')}",
+            })
+    if fields:
+        first_editable = next((field for field in fields if field.get("editable")), None)
+        if first_editable:
+            actions.append({
+                "tool": "edgetx_adjust_field",
+                "label": first_editable.get("label", ""),
+                "reason": f"Adjust visible field {first_editable.get('label', '')}",
             })
     return [action for action in actions if action.get("runtime_id", True)]
 
@@ -1467,6 +1834,18 @@ class HarnessService:
         verbose: bool = False,
     ) -> dict[str, Any]:
         return self.require_session().activate(selector, action, duration_ms, verbose)
+
+    def adjust_field(
+        self,
+        label: str,
+        target_value: str,
+        max_steps: int = 80,
+        confirm: bool = True,
+    ) -> dict[str, Any]:
+        return self.require_session().adjust_field(label, target_value, max_steps, confirm)
+
+    def type_text(self, text: str, submit: bool = True) -> dict[str, Any]:
+        return self.require_session().type_text(text, submit)
 
     def assert_visible(self, selector: dict[str, Any] | str, verbose: bool = False) -> dict[str, Any]:
         node = self.require_session().find_node(selector)

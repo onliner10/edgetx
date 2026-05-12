@@ -133,6 +133,30 @@ TOOLS: dict[str, dict[str, Any]] = {
             },
         },
     },
+    "edgetx_adjust_field": {
+        "description": "Adjust a currently visible form field to a target value using bounded user-equivalent activation, rotary steps, and optional ENTER confirmation. Numeric fields require numeric-only target values.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "label": {"type": "string"},
+                "target_value": {"type": "string"},
+                "max_steps": {"type": "integer", "default": 80},
+                "confirm": {"type": "boolean", "default": True},
+            },
+            "required": ["label", "target_value"],
+        },
+    },
+    "edgetx_type_text": {
+        "description": "Type text into the currently active visible field editor through the simulator keyboard path; fails with guidance if no field_edit context is visible.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string"},
+                "submit": {"type": "boolean", "default": True},
+            },
+            "required": ["text"],
+        },
+    },
     "edgetx_click": {
         "description": "Invoke a visible UI node click action by text, role, id, automation_id, or text_contains. Returns compact result by default (ok + matched node summary). Use verbose=true for full node.",
         "inputSchema": {
@@ -390,6 +414,15 @@ class McpServer:
                 int(args.get("duration_ms", 0)),
                 bool(args.get("verbose", False)),
             )
+        if name == "edgetx_adjust_field":
+            return self.service.adjust_field(
+                args["label"],
+                str(args["target_value"]),
+                int(args.get("max_steps", 80)),
+                bool(args.get("confirm", True)),
+            )
+        if name == "edgetx_type_text":
+            return self.service.type_text(args["text"], bool(args.get("submit", True)))
         if name == "edgetx_click":
             return self.service.ui_click(
                 selector_from_args(args),

@@ -37,9 +37,11 @@ actions are limited to visible, user-reachable controls and radio inputs.
 edgetx_start_simulator target=tx16s
 edgetx_status                                 # if startup_blocker is present, use its skip_tool
 edgetx_skip_storage_warning_if_present        # bounded ENTER/action attempts for storage warnings
-edgetx_screen                                # low-token: title, actions, visible_text
+edgetx_screen                                # low-token: title, fields, actions, visible_text
 edgetx_ui_tree mode=summary actionable_only=true  # only clickable nodes
 edgetx_activate automation_id=model.model2.yml
+edgetx_adjust_field label=Cells target_value=4
+edgetx_type_text text=PACK1                  # only when a virtual keyboard is visible
 edgetx_scroll direction=down amount=page    # real touch-drag on visible scrollable content
 edgetx_wait_for text_contains="Throttle" timeout_ms=3000
 edgetx_screenshot name=after-model-click
@@ -53,7 +55,7 @@ Use `actionable_only`, `text_contains`, `limit`, `verbose` to filter.
 
 `edgetx_screen` — Low-token accessibility-style summary: `{title, page,
 context, focused, screen_hash,
-actions:[{kind,label,automation_id,semantic_id,actions}], scrollables,
+actions:[{kind,label,automation_id,semantic_id,actions}], fields, scrollables,
 available_inputs, next_actions, visible_text, counts}`. Text is normalized for
 matching and display. Use this instead of ui_tree when you only need to know the
 current page, whether you are on a menu grid or form, what is focused, what is
@@ -61,6 +63,11 @@ visible, which meaningful containers can scroll, and what user-equivalent
 controls can be activated. Blocking startup dialogs report
 `context.type=blocking_dialog`, include `skip_tool`, and put
 `edgetx_skip_storage_warning_if_present` first in `next_actions`.
+Visible form rows are summarized as `fields`, for example
+`{label:"Cells", value:"3", kind:"number", editable:true, runtime_id:"..."}`.
+Focused fields use `context.type=field_focus`; ambiguous edit states use
+`context.type=field_edit` with guidance for rotary, `ENTER`, `EXIT`, or text
+entry.
 
 `edgetx_status` — Simulator status and LCD geometry. If startup is not complete
 because a storage warning is visible, the result includes `startup_blocker` with
@@ -74,7 +81,22 @@ action. It does not infer nearby controls, walk to hidden screens, or perform
 multi-step navigation. If a label is visible but not actionable, activation
 fails with the visible node context. Dialog actions labeled "Press any key" warn
 that `edgetx_skip_storage_warning_if_present` or `edgetx_press ENTER` may be
-more reliable than pointer clicks.
+more reliable than pointer clicks. If activation does not visibly change the
+screen, the result includes `changed=false` and a warning, with field-specific
+guidance when the target looks like a form value.
+
+`edgetx_adjust_field` — Bounded user-equivalent field adjustment. It requires a
+visible field label and target value, activates the visible value, uses rotary
+steps until the target value is visible, and optionally confirms with `ENTER`.
+It does not write model data directly and returns `ok=false` if the value does
+not converge within `max_steps`. Numeric fields require numeric-only target
+values, for example use `target_value="3000"` for a `Capacity` field whose
+`kind` is `number`; `3000mAh` is rejected before any UI input is sent.
+
+`edgetx_type_text` — Text entry through the active color-LCD keyboard/editor
+path. It only runs when `edgetx_screen.context.type=field_edit`, replaces the
+active editor text, and optionally submits the editor. If no field edit context
+is visible, it fails with guidance instead of modifying model data directly.
 
 `edgetx_scroll` — User-equivalent scroll gesture. By default it drags the main
 visible content viewport, which avoids noisy LVGL internals such as tiny labels

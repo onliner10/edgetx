@@ -190,6 +190,30 @@ void Keyboard::hide(bool wasCancelled)
   }
 }
 
+#if defined(SIMU)
+bool Keyboard::automationTextInput(const char* text, bool replace, bool submit)
+{
+  auto keyboardWindow = activeKeyboard;
+  if (!keyboardWindow || !text) return false;
+
+  bool inserted = false;
+  keyboardWindow->withKeyboardParts([&](LiveWindow&, lv_obj_t* keyboard,
+                                        lv_group_t*) {
+    auto* kb = reinterpret_cast<lv_keyboard_t*>(keyboard);
+    if (!kb || !kb->ta) return;
+    if (replace) {
+      lv_textarea_set_text(kb->ta, text);
+    } else {
+      lv_textarea_add_text(kb->ta, text);
+    }
+    inserted = true;
+  });
+
+  if (inserted && submit) hide(false);
+  return inserted;
+}
+#endif
+
 bool Keyboard::attachKeyboard()
 {
   bool attached = false;
