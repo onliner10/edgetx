@@ -183,6 +183,31 @@ bool centerPointIsReachable(lv_obj_t* obj, const lv_area_t& bounds)
   return isAncestorOf(obj, topObjectAtPoint(lv_scr_act(), x, y));
 }
 
+void appendScrollState(std::ostringstream& out, lv_obj_t* obj)
+{
+  const bool scrollable = lv_obj_has_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+  if (!scrollable) return;
+
+  const auto left = lv_obj_get_scroll_left(obj);
+  const auto right = lv_obj_get_scroll_right(obj);
+  const auto top = lv_obj_get_scroll_top(obj);
+  const auto bottom = lv_obj_get_scroll_bottom(obj);
+
+  out << ",\"scroll\":{"
+      << "\"scrollable\":true"
+      << ",\"x\":" << lv_obj_get_scroll_x(obj)
+      << ",\"y\":" << lv_obj_get_scroll_y(obj)
+      << ",\"left\":" << left
+      << ",\"right\":" << right
+      << ",\"top\":" << top
+      << ",\"bottom\":" << bottom
+      << ",\"can_scroll_left\":" << (left > 0 ? "true" : "false")
+      << ",\"can_scroll_right\":" << (right > 0 ? "true" : "false")
+      << ",\"can_scroll_up\":" << (top > 0 ? "true" : "false")
+      << ",\"can_scroll_down\":" << (bottom > 0 ? "true" : "false")
+      << "}";
+}
+
 void appendNode(std::ostringstream& out, lv_obj_t* obj, lv_obj_t* parent,
                 bool& first)
 {
@@ -229,7 +254,9 @@ void appendNode(std::ostringstream& out, lv_obj_t* obj, lv_obj_t* parent,
     if (!firstAction) out << ",";
     out << "\"long_click\"";
   }
-  out << "]}";
+  out << "]";
+  appendScrollState(out, obj);
+  out << "}";
 
   const auto childCount = lv_obj_get_child_cnt(obj);
   for (uint32_t i = 0; i < childCount; i += 1) {

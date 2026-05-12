@@ -5,7 +5,7 @@
       "type": "local",
       "command": ["nix", "develop", ".", "-c", "tools/ui-harness/edgetx-mcp"],
       "enabled": true,
-      "timeout": 30000
+      "timeout": 600000
     },
     "edge16-serena": {
       "type": "local",
