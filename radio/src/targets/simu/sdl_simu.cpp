@@ -77,6 +77,10 @@
 #include "simuaudio.h"
 #include "simulib.h"
 
+#if defined(COLORLCD)
+#include "gui/colorlcd/libui/keyboard_base.h"
+#endif
+
 #include "hal/key_driver.h"
 #include "hal/switch_driver.h"
 #include "switches.h"
@@ -165,6 +169,26 @@ static void automation_reply_ok(const std::string& extra = "")
 static void automation_reply_error(const std::string& message)
 {
   std::cout << "{\"ok\":false,\"error\":\"" << json_escape(message) << "\"}" << std::endl;
+}
+
+static bool hex_decode(const std::string& hex, std::string& output)
+{
+  if ((hex.size() % 2) != 0) return false;
+  output.clear();
+  output.reserve(hex.size() / 2);
+  for (size_t i = 0; i < hex.size(); i += 2) {
+    auto decode = [](char ch) -> int {
+      if (ch >= '0' && ch <= '9') return ch - '0';
+      if (ch >= 'a' && ch <= 'f') return ch - 'a' + 10;
+      if (ch >= 'A' && ch <= 'F') return ch - 'A' + 10;
+      return -1;
+    };
+    const int high = decode(hex[i]);
+    const int low = decode(hex[i + 1]);
+    if (high < 0 || low < 0) return false;
+    output += static_cast<char>((high << 4) | low);
+  }
+  return true;
 }
 
 static bool key_from_name(const std::string& name, uint8_t& key)
@@ -326,6 +350,35 @@ static void automation_handle_command(const std::string& line)
       return;
     }
     automation_reply_ok(extra);
+  } else if (command == "text_input") {
+#if defined(COLORLCD)
+    int replace = 1;
+    int submit = 1;
+    std::string encoded;
+    in >> replace >> submit >> encoded;
+    if (encoded.empty()) {
+      automation_reply_error("missing encoded text");
+      return;
+    }
+
+    std::string text;
+    if (!hex_decode(encoded, text)) {
+      automation_reply_error("invalid encoded text");
+      return;
+    }
+
+    if (!Keyboard::automationTextInput(text.c_str(), replace != 0, submit != 0)) {
+      automation_reply_error("no active text keyboard");
+      return;
+    }
+    std::ostringstream extra;
+    extra << "\"text\":\"" << json_escape(text) << "\""
+          << ",\"replace\":" << (replace ? "true" : "false")
+          << ",\"submitted\":" << (submit ? "true" : "false");
+    automation_reply_ok(extra.str());
+#else
+    automation_reply_error("text input requires color LCD keyboard support");
+#endif
   } else if (command == "screenshot_ppm") {
     std::string path;
     in >> path;

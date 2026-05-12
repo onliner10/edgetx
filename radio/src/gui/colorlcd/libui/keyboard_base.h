@@ -32,6 +32,10 @@ class Keyboard : public NavWindow
   static void hide(bool wasCancelled);
   static void detachField(FormField* field);
 
+#if defined(SIMU)
+  static bool automationTextInput(const char* text, bool replace, bool submit);
+#endif
+
   static Keyboard* keyboardWindow() { return activeKeyboard; }
 
  protected:
