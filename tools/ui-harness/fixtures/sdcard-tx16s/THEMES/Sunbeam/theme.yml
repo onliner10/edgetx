@@ -1,0 +1,19 @@
+---
+summary:
+  name: Sunbeam
+  author: OpenAI Codex
+  info: High-contrast outdoor theme with warm daylight surfaces and burnt-orange focus accents.
+colors:
+  PRIMARY1: 0x05070A
+  PRIMARY2: 0xFFFFFF
+  PRIMARY3: 0x5F6B76
+  SECONDARY1: 0x151515
+  SECONDARY2: 0xB8B1A6
+  SECONDARY3: 0xFAF8F2
+  FOCUS: 0xA84400
+  EDIT: 0x008932
+  ACTIVE: 0xA16A00
+  WARNING: 0xD70015
+  DISABLED: 0x7A828A
+  QM_BG: 0x151515
+  QM_FG: 0xFFFFFF
