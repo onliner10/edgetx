@@ -117,6 +117,10 @@ DSTATUS disk_initialize(BYTE pdrv)
 
   DSTATUS stat = RES_OK;
   auto drive = &_fatfs_drives[pdrv];
+  if (drive->initialized && (drive->drv->status(drive->lun) & STA_NOINIT)) {
+    drive->initialized = false;
+  }
+
   if (!drive->initialized) {
     stat = drive->drv->initialize(drive->lun);
     if (stat == RES_OK) {

@@ -49,7 +49,7 @@ extern "C" {
 #include "debug.h"
 
 #if !defined(BOOT)
-#include "os/task.h"
+#include "tasks.h"
 
 #include <atomic>
 #endif
@@ -71,6 +71,8 @@ static const USBD_DFU_MediaTypeDef* _dfu_media[USBD_DFU_MAX_ITF_NUM] = {nullptr}
 #else
 #define DEFAULT_USB_MODE USB_UNSELECTED_MODE;
 #endif
+
+extern PCD_HandleTypeDef hpcd_USB_OTG;
 
 namespace {
 
@@ -98,6 +100,7 @@ class UsbDriverCriticalSection
 };
 
 std::atomic_bool usbDriverStarted{false};
+std::atomic_bool usbMscBottomHalfEnabled{false};
 
 // Cached debounced USB VBUS state. Written by usbPlugged() (main task only),
 // read by usbIsPlugged() (any context). Single-writer, multiple-reader.
@@ -112,6 +115,78 @@ void setUsbDriverStarted(bool started)
 {
   usbDriverStarted.store(started, std::memory_order_release);
 }
+
+void setUsbMscBottomHalfEnabled(bool enabled)
+{
+  usbMscBottomHalfEnabled.store(enabled, std::memory_order_release);
+}
+
+bool usbMscBottomHalfEnabledState()
+{
+  return usbMscBottomHalfEnabled.load(std::memory_order_acquire);
+}
+
+#if defined(FREE_RTOS)
+#define USB_TASK_STACK_SIZE 1024
+#define USB_TASK_PRIO (tskIDLE_PRIORITY + 2)
+
+task_handle_t usbTaskId;
+TASK_DEFINE_STACK(usbStack, USB_TASK_STACK_SIZE);
+
+void disableUsbIrq()
+{
+#if defined(USE_USB_HS)
+  NVIC_DisableIRQ(OTG_HS_IRQn);
+#else
+  NVIC_DisableIRQ(OTG_FS_IRQn);
+#endif
+  __DSB();
+  __ISB();
+}
+
+void enableUsbIrq()
+{
+#if defined(USE_USB_HS)
+  NVIC_EnableIRQ(OTG_HS_IRQn);
+#else
+  NVIC_EnableIRQ(OTG_FS_IRQn);
+#endif
+}
+
+bool usbMscBottomHalfActive()
+{
+  return scheduler_is_running() && usbMscBottomHalfEnabledState() &&
+         getSelectedUsbMode() == USB_MASS_STORAGE_MODE &&
+         usbTaskId._rtos_handle != nullptr;
+}
+
+void notifyUsbTaskFromIrq()
+{
+  BaseType_t higherPriorityTaskWoken = pdFALSE;
+  vTaskNotifyGiveFromISR(usbTaskId._rtos_handle, &higherPriorityTaskWoken);
+  portYIELD_FROM_ISR(higherPriorityTaskWoken);
+}
+
+void usbTask()
+{
+  while (task_running()) {
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+    {
+      UsbDriverCriticalSection lock;
+      if (usbMscBottomHalfEnabledState() &&
+          getSelectedUsbMode() == USB_MASS_STORAGE_MODE) {
+        HAL_PCD_IRQHandler(&hpcd_USB_OTG);
+      }
+    }
+
+    if (usbMscBottomHalfEnabledState() &&
+        getSelectedUsbMode() == USB_MASS_STORAGE_MODE) {
+      enableUsbIrq();
+    }
+  }
+}
+#endif
 #else
 class UsbDriverCriticalSection
 {
@@ -190,19 +265,28 @@ int usbPlugged()
 }
 #endif
 
-extern PCD_HandleTypeDef hpcd_USB_OTG;
+static void usbIrqHandler()
+{
+  DEBUG_INTERRUPT(INT_OTG_FS);
+#if !defined(BOOT) && defined(FREE_RTOS)
+  if (usbMscBottomHalfActive()) {
+    disableUsbIrq();
+    notifyUsbTaskFromIrq();
+    return;
+  }
+#endif
+  HAL_PCD_IRQHandler(&hpcd_USB_OTG);
+}
 
 #if defined(USE_USB_HS)
 extern "C" void OTG_HS_IRQHandler()
 {
-  DEBUG_INTERRUPT(INT_OTG_FS);
-  HAL_PCD_IRQHandler(&hpcd_USB_OTG);
+  usbIrqHandler();
 }
 #else
 extern "C" void OTG_FS_IRQHandler()
 {
-  DEBUG_INTERRUPT(INT_OTG_FS);
-  HAL_PCD_IRQHandler(&hpcd_USB_OTG);
+  usbIrqHandler();
 }
 #endif
 
@@ -210,6 +294,10 @@ void usbInit()
 {
 #if !defined(BOOT)
   mutex_create(&usbDriverMutex);
+#if defined(FREE_RTOS)
+  task_create(&usbTaskId, usbTask, "usb", usbStack, USB_TASK_STACK_SIZE,
+              USB_TASK_PRIO);
+#endif
 #endif
 
 #if defined(STM32H7)
@@ -258,6 +346,9 @@ void usbStart()
   // until USBD_Start succeeds, so ISR guards in VCP_StartOfFrame_FS and
   // VCP_Receive_FS will bail safely.
   setUsbDriverStarted(false);
+#if !defined(BOOT) && defined(FREE_RTOS)
+  setUsbMscBottomHalfEnabled(false);
+#endif
   USBD_Init(&hUsbDevice, &FS_Desc, DEVICE_ID);
   switch (getSelectedUsbMode()) {
     case USB_MASS_STORAGE_MODE:
@@ -300,8 +391,18 @@ void usbStart()
       return;
   }
 
+#if !defined(BOOT) && defined(FREE_RTOS)
+  if (getSelectedUsbMode() == USB_MASS_STORAGE_MODE) {
+    setUsbMscBottomHalfEnabled(true);
+  }
+#endif
+
   if (USBD_Start(&hUsbDevice) == USBD_OK) {
     setUsbDriverStarted(true);
+  } else {
+#if !defined(BOOT) && defined(FREE_RTOS)
+    setUsbMscBottomHalfEnabled(false);
+#endif
   }
 }
 
@@ -324,6 +425,10 @@ void usbStop()
 #endif
   __DSB();
   __ISB();
+
+#if !defined(BOOT) && defined(FREE_RTOS)
+  setUsbMscBottomHalfEnabled(false);
+#endif
 
   USBD_DeInit(&hUsbDevice);
 

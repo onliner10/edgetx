@@ -207,9 +207,120 @@ enum class ActiveTransfer : uint8_t {
   Write
 };
 
+enum class SdioDriverState : uint8_t {
+  Uninitialized,
+  Ready,
+  Failed
+};
+
+enum class SdioFaultReason : uint8_t {
+  StartReadFailed,
+  StartWriteFailed,
+  ReadError,
+  WriteError,
+  ReadTimeout,
+  WriteTimeout,
+  ReadNotReady,
+  WriteNotReady,
+  SyncTimeout
+};
+
 static volatile DmaTransferStatus WriteStatus = DmaTransferStatus::Pending;
 static volatile DmaTransferStatus ReadStatus = DmaTransferStatus::Pending;
 static volatile ActiveTransfer activeTransfer = ActiveTransfer::None;
+static volatile SdioDriverState driverState = SdioDriverState::Uninitialized;
+
+#if defined(SD_SDIO_DMA)
+constexpr uint32_t SDIO_DMA_ABORT_TIMEOUT_MS = 5;
+#endif
+
+static void sdio_reset_transfer_state()
+{
+  ReadStatus = DmaTransferStatus::Pending;
+  WriteStatus = DmaTransferStatus::Pending;
+  activeTransfer = ActiveTransfer::None;
+}
+
+static void sdio_disable_irqs()
+{
+  NVIC_DisableIRQ(currentSD.IRQn);
+  NVIC_ClearPendingIRQ(currentSD.IRQn);
+#if defined(SD_SDIO_DMA)
+  NVIC_DisableIRQ(SD_SDIO_DMA_IRQn);
+  NVIC_ClearPendingIRQ(SD_SDIO_DMA_IRQn);
+#endif
+  __DSB();
+  __ISB();
+}
+
+static void sdio_stop_data_path()
+{
+  if (sdio.Instance == nullptr) return;
+
+  sdio.Instance->MASK = 0;
+  sdio.Instance->DCTRL = 0;
+#if defined(SDMMC1)
+  sdio.Instance->DLEN = 0;
+  sdio.Instance->IDMACTRL = SDMMC_DISABLE_IDMA;
+#endif
+  sdio.Instance->ICR = 0xFFFFFFFFU;
+}
+
+static void sdio_abort_active_transfer()
+{
+  if (sdio.Instance == nullptr) return;
+
+  if (activeTransfer != ActiveTransfer::None ||
+      sdio.State == HAL_SD_STATE_BUSY) {
+    HAL_StatusTypeDef status = HAL_SD_Abort(&sdio);
+    if (status != HAL_OK) {
+      TRACE("SDIO abort status=%d err=%lu", status, HAL_SD_GetError(&sdio));
+    }
+  }
+}
+
+static void sdio_stop_dma()
+{
+#if defined(SD_SDIO_DMA)
+  if (sdioTxDma.Instance != nullptr) {
+    if (sdioTxDma.State == HAL_DMA_STATE_BUSY) {
+      HAL_StatusTypeDef status = HAL_DMA_Abort(&sdioTxDma);
+      if (status != HAL_OK) {
+        TRACE("SDIO DMA abort status=%d err=%lu", status, sdioTxDma.ErrorCode);
+      }
+    }
+
+    __HAL_DMA_DISABLE(&sdioTxDma);
+
+    uint32_t timeout = HAL_GetTick();
+    while ((sdioTxDma.Instance->CR & DMA_SxCR_EN) != 0U) {
+      if ((HAL_GetTick() - timeout) > SDIO_DMA_ABORT_TIMEOUT_MS) {
+        TRACE("SDIO DMA disable timeout");
+        break;
+      }
+    }
+  }
+#endif
+}
+
+static void sdio_fail_stop(SdioFaultReason reason)
+{
+  TRACE("SDIO fail-stop reason=%u", (uint32_t)reason);
+  driverState = SdioDriverState::Failed;
+  sdio_disable_irqs();
+  sdio_abort_active_transfer();
+  sdio_stop_data_path();
+  sdio_stop_dma();
+
+  sdio_reset_transfer_state();
+  HAL_SD_DeInit(&sdio);
+}
+
+static DRESULT sdio_fail_result(SdioFaultReason reason)
+{
+  sdio_fail_stop(reason);
+  return RES_ERROR;
+}
 
 static void _sd_sdio_clk_enable(SD_SDIO_TypeDef* periph)
 {
@@ -290,6 +401,9 @@ HAL_SD_CardInfoTypeDef cardInfo;
 static DSTATUS sdio_deinitialize(BYTE lun);
 static DSTATUS sdio_initialize(BYTE lun)
 {
+  driverState = SdioDriverState::Uninitialized;
+  sdio_reset_transfer_state();
+
 #if defined(SD2_PRESENT_GPIO)
   /* Define active SD */
   if (gpio_read(SD2_PRESENT_GPIO) == 0) {
@@ -364,6 +478,7 @@ static DSTATUS sdio_initialize(BYTE lun)
   TRACE("block nbr size: %u", (uint32_t)(cardInfo.BlockNbr));
   TRACE("block size: %u", (uint32_t)(cardInfo.BlockSize));
 
+  driverState = SdioDriverState::Ready;
   return RES_OK;
 }
 
@@ -411,6 +526,9 @@ static SdioWaitResult sdio_check_card_state_with_timeout(uint32_t timeout)
 static DSTATUS sdio_status(BYTE lun)
 {
   DSTATUS stat = RES_OK;
+  if (driverState != SdioDriverState::Ready) {
+    stat |= STA_NOINIT;
+  }
 
 #if defined(SD2_PRESENT_GPIO)
   if (currentSD.periph == SDMMC2 && gpio_read(SD2_PRESENT_GPIO)) {
@@ -427,6 +545,8 @@ static DSTATUS sdio_status(BYTE lun)
 
 static DRESULT _read_dma(BYTE* buff, DWORD sector, UINT count)
 {
+  if (driverState != SdioDriverState::Ready) return RES_NOTRDY;
+
   activeTransfer = ActiveTransfer::Read;
   ReadStatus = DmaTransferStatus::Pending;
 
@@ -436,9 +556,7 @@ static DRESULT _read_dma(BYTE* buff, DWORD sector, UINT count)
 
   if (HAL_SD_ReadBlocks_DMA(&sdio, buff, sector, count) != HAL_OK) {
     TRACE("SD ReadBlocks failed (s:%u/c:%u)", sector, (uint32_t)count);
-    HAL_SD_Abort(&sdio);
-    activeTransfer = ActiveTransfer::None;
-    return RES_ERROR;
+    return sdio_fail_result(SdioFaultReason::StartReadFailed);
   }
 
   // Wait for the reading process to complete or a timeout to occur
@@ -455,26 +573,22 @@ static DRESULT _read_dma(BYTE* buff, DWORD sector, UINT count)
 
   if (ReadStatus == DmaTransferStatus::Error) {
     TRACE("SD read error (s:%u c:%u) err=%lu", sector, (uint32_t)count, HAL_SD_GetError(&sdio));
-    HAL_SD_Abort(&sdio);
-    ReadStatus = DmaTransferStatus::Pending;
-    activeTransfer = ActiveTransfer::None;
-    return RES_ERROR;
+    return sdio_fail_result(SdioFaultReason::ReadError);
   }
 
   // timeout
   TRACE("SD read timeout (s:%u c:%u)", sector, (uint32_t)count);
-  HAL_SD_Abort(&sdio);
-  ReadStatus = DmaTransferStatus::Pending;
-  activeTransfer = ActiveTransfer::None;
-  return RES_ERROR;
+  return sdio_fail_result(SdioFaultReason::ReadTimeout);
 }
 
 static DRESULT sdio_read(BYTE lun, BYTE * buff, DWORD sector, UINT count)
 {
   DRESULT res = RES_OK;
+  if (driverState != SdioDriverState::Ready) return RES_NOTRDY;
 
-  if (sdio_check_card_state_with_timeout(SD_TIMEOUT) != SdioWaitResult::Ready) {
-    return RES_ERROR;
+  if (sdio_check_card_state_with_timeout(SD_TIMEOUT) !=
+      SdioWaitResult::Ready) {
+    return sdio_fail_result(SdioFaultReason::ReadNotReady);
   }
 
   if (!_IS_DMA_BUFFER(buff) || !_IS_ALIGNED(buff)) {
@@ -490,9 +604,10 @@ static DRESULT sdio_read(BYTE lun, BYTE * buff, DWORD sector, UINT count)
   res = _read_dma(buff, sector, count);
   if (res != RES_OK) return res;
 
-  if (sdio_check_card_state_with_timeout(SD_TIMEOUT) != SdioWaitResult::Ready) {
+  if (sdio_check_card_state_with_timeout(SD_TIMEOUT) !=
+      SdioWaitResult::Ready) {
     TRACE("SD getstatus timeout, s:%u c:%u", sector, (uint32_t)count);
-    return RES_ERROR;
+    return sdio_fail_result(SdioFaultReason::ReadNotReady);
   }
 
   return RES_OK;
@@ -500,6 +615,8 @@ static DRESULT sdio_read(BYTE lun, BYTE * buff, DWORD sector, UINT count)
 
 static DRESULT _write_dma(const BYTE *buff, DWORD sector, UINT count)
 {
+  if (driverState != SdioDriverState::Ready) return RES_NOTRDY;
+
 #if __CORTEX_M >= 0x07
   SCB_CleanDCache_by_Addr((void *)buff, count * 512);
 #endif
@@ -508,9 +625,7 @@ static DRESULT _write_dma(const BYTE *buff, DWORD sector, UINT count)
   WriteStatus = DmaTransferStatus::Pending;
   if (HAL_SD_WriteBlocks_DMA(&sdio, (uint8_t*)buff, sector, count) != HAL_OK) {
     TRACE("SD WriteBlocks failed (s:%u/c:%u)", sector, (uint32_t)count);
-    HAL_SD_Abort(&sdio);
-    activeTransfer = ActiveTransfer::None;
-    return RES_ERROR;
+    return sdio_fail_result(SdioFaultReason::StartWriteFailed);
   }
 
   // Wait that the writing process is completed or a timeout occurs
@@ -527,26 +642,22 @@ static DRESULT _write_dma(const BYTE *buff, DWORD sector, UINT count)
 
   if (WriteStatus == DmaTransferStatus::Error) {
     TRACE("SD write error (s:%u c:%u) err=%lu", sector, (uint32_t)count, HAL_SD_GetError(&sdio));
-    HAL_SD_Abort(&sdio);
-    WriteStatus = DmaTransferStatus::Pending;
-    activeTransfer = ActiveTransfer::None;
-    return RES_ERROR;
+    return sdio_fail_result(SdioFaultReason::WriteError);
   }
 
   // timeout
   TRACE("SD write timeout (s:%u/c:%u)", sector, (uint32_t)count);
-  HAL_SD_Abort(&sdio);
-  WriteStatus = DmaTransferStatus::Pending;
-  activeTransfer = ActiveTransfer::None;
-  return RES_ERROR;
+  return sdio_fail_result(SdioFaultReason::WriteTimeout);
 }
 
 static DRESULT sdio_write(BYTE lun, const BYTE *buff, DWORD sector, UINT count)
 {
   DRESULT res = RES_OK;
+  if (driverState != SdioDriverState::Ready) return RES_NOTRDY;
 
-  if (sdio_check_card_state_with_timeout(SD_TIMEOUT) != SdioWaitResult::Ready) {
-    return RES_ERROR;
+  if (sdio_check_card_state_with_timeout(SD_TIMEOUT) !=
+      SdioWaitResult::Ready) {
+    return sdio_fail_result(SdioFaultReason::WriteNotReady);
   }
 
   if (!_IS_DMA_BUFFER(buff) || !_IS_ALIGNED(buff)) {
@@ -556,8 +667,9 @@ static DRESULT sdio_write(BYTE lun, const BYTE *buff, DWORD sector, UINT count)
       if (res != RES_OK) break;
       buff += BLOCK_SIZE;
 
-      if (sdio_check_card_state_with_timeout(SD_TIMEOUT) != SdioWaitResult::Ready) {
-        return RES_ERROR;
+      if (sdio_check_card_state_with_timeout(SD_TIMEOUT) !=
+          SdioWaitResult::Ready) {
+        return sdio_fail_result(SdioFaultReason::WriteNotReady);
       }
     }
     return res;
@@ -566,9 +678,10 @@ static DRESULT sdio_write(BYTE lun, const BYTE *buff, DWORD sector, UINT count)
   res = _write_dma(buff, sector, count);
   if (res != RES_OK) return res;
 
-  if (sdio_check_card_state_with_timeout(SD_TIMEOUT) != SdioWaitResult::Ready) {
+  if (sdio_check_card_state_with_timeout(SD_TIMEOUT) !=
+      SdioWaitResult::Ready) {
     TRACE("SD getstatus timeout, s:%u c: %u", sector, (uint32_t)count);
-    return RES_ERROR;
+    return sdio_fail_result(SdioFaultReason::WriteNotReady);
   }
 
   return RES_OK;
@@ -576,6 +689,8 @@ static DRESULT sdio_write(BYTE lun, const BYTE *buff, DWORD sector, UINT count)
 
 static DRESULT sdio_get_sector_count(DWORD* sectors)
 {
+  if (driverState != SdioDriverState::Ready) return RES_NOTRDY;
+
   HAL_SD_CardInfoTypeDef cardInfo;
   if(HAL_SD_GetCardInfo(&sdio, &cardInfo) != HAL_OK) {
     return RES_ERROR;
@@ -587,6 +702,8 @@ static DRESULT sdio_get_sector_count(DWORD* sectors)
 
 static DRESULT sdio_get_sector_size(DWORD* sector_size)
 {
+  if (driverState != SdioDriverState::Ready) return RES_NOTRDY;
+
   HAL_SD_CardInfoTypeDef cardInfo;
   if(HAL_SD_GetCardInfo(&sdio, &cardInfo) != HAL_OK) {
     return RES_ERROR;
@@ -608,6 +725,8 @@ static DRESULT sdio_get_block_size(DWORD* block_size)
 
 DRESULT sdio_ioctl(BYTE lun, BYTE ctrl, void *buff)
 {
+  if (driverState != SdioDriverState::Ready) return RES_NOTRDY;
+
   DRESULT res = RES_OK;
   switch (ctrl) {
     case GET_SECTOR_COUNT : /* Get number of sectors on the disk (DWORD) */
@@ -629,8 +748,7 @@ DRESULT sdio_ioctl(BYTE lun, BYTE ctrl, void *buff)
         case SdioWaitResult::Error:
         case SdioWaitResult::Timeout:
           TRACE("SD CTRL_SYNC error or timeout");
-          HAL_SD_Abort(&sdio);
-          return RES_ERROR;
+          return sdio_fail_result(SdioFaultReason::SyncTimeout);
       }
       break;
 
@@ -644,27 +762,10 @@ static DSTATUS sdio_deinitialize(BYTE lun)
 {
   UNUSED(lun);
 
-  // Disable IRQs before touching hardware
-  NVIC_DisableIRQ(currentSD.IRQn);
-  NVIC_ClearPendingIRQ(currentSD.IRQn);
-#if defined(SD_SDIO_DMA)
-  NVIC_DisableIRQ(SD_SDIO_DMA_IRQn);
-  NVIC_ClearPendingIRQ(SD_SDIO_DMA_IRQn);
-#endif
-  __DSB();
-  __ISB();
-
-  // Abort any active transfer
-  HAL_SD_Abort(&sdio);
-  activeTransfer = ActiveTransfer::None;
-
-#if defined(SD_SDIO_DMA)
-  if (sdioTxDma.Instance != nullptr) {
-    HAL_DMA_Abort(&sdioTxDma);
-  }
-#endif
-
-  HAL_StatusTypeDef halStatus = HAL_SD_DeInit(&sdio);
+  sdio_disable_irqs();
+  sdio_abort_active_transfer();
+  sdio_stop_data_path();
+  sdio_stop_dma();
 
 #if defined(SD_SDIO_DMA)
   if (sdioTxDma.Instance != nullptr) {
@@ -672,8 +773,10 @@ static DSTATUS sdio_deinitialize(BYTE lun)
   }
 #endif
 
-  ReadStatus = DmaTransferStatus::Pending;
-  WriteStatus = DmaTransferStatus::Pending;
+  HAL_StatusTypeDef halStatus = HAL_SD_DeInit(&sdio);
+
+  sdio_reset_transfer_state();
+  driverState = SdioDriverState::Uninitialized;
 
   // IRQs will be re-enabled by sdio_initialize -> sdio_low_level_init
 
