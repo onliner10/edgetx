@@ -570,6 +570,8 @@
 #define TR_THROTTLE_START               "스로틀 시작"
 #define TR_THROTTLEREVERSE              TR("스로틀 반전", "역방향")
 #define TR_MINUTEBEEP                   TR("분 경고음", "1분마다 알림")
+#define TR_MINUTEBEEP_START            TR("Start at", "Start callouts at")
+#define TR_MINUTEBEEP_EVERY            "Every minute"
 #define TR_BEEPCOUNTDOWN                "카운트다운 알림"
 #define TR_PERSISTENT                   TR("유지", "값 유지")
 

@@ -559,6 +559,8 @@
 #define TR_THROTTLE_START              "油門開始"
 #define TR_THROTTLEREVERSE             TR("油門反向", "油門反向")
 #define TR_MINUTEBEEP                  TR("分", "分鐘播報")
+#define TR_MINUTEBEEP_START            TR("Start at", "Start callouts at")
+#define TR_MINUTEBEEP_EVERY            "Every minute"
 #define TR_BEEPCOUNTDOWN               "倒數"
 #define TR_PERSISTENT                  TR("關機保持", "關機保持")
 #define TR_BACKLIGHT_LABEL             "背光"

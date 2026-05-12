@@ -35,4 +35,5 @@ class TimerWindow : public SubPage
 
  protected:
   Window* timerDirLine = nullptr;
+  Window* minuteBeepStartLine = nullptr;
 };

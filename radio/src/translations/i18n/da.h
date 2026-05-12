@@ -566,6 +566,8 @@
 #define TR_THROTTLE_START              "Gas Start"
 #define TR_THROTTLEREVERSE             TR("T-omvendt", "Omvendt")
 #define TR_MINUTEBEEP                  TR("Minut", "Minut kald")
+#define TR_MINUTEBEEP_START            TR("Start at", "Start callouts at")
+#define TR_MINUTEBEEP_EVERY            "Every minute"
 #define TR_BEEPCOUNTDOWN               "Nedtælling"
 #define TR_PERSISTENT                  TR("Varig", "Varig")
 #define TR_BACKLIGHT_LABEL             "Baggrunds lys"

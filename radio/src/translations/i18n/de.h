@@ -562,6 +562,8 @@
 #define TR_THROTTLE_START              "Gas Start"
 #define TR_THROTTLEREVERSE             TR("Gas invers", "Vollgas hinten?") //Änderung wg TH9x, Taranis
 #define TR_MINUTEBEEP                  TR("Min-Alarm", "Minuten-Alarm")
+#define TR_MINUTEBEEP_START            TR("Start at", "Start callouts at")
+#define TR_MINUTEBEEP_EVERY            "Every minute"
 #define TR_BEEPCOUNTDOWN               "Countdown"
 #define TR_PERSISTENT                  TR("Permanent", "Permanent")
 #define TR_BACKLIGHT_LABEL             "Bildschirm"

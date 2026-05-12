@@ -78,6 +78,50 @@ TEST(Timers, timerSet)
   EXPECT_TRUE(evalTimersForNSecondsAndTest(0, THR_100, 1, TMR_OFF, 300));
 }
 
+TEST(Timers, minuteBeepStartKeepsLegacyEveryMinute)
+{
+  initModelTimer(0, TMRMODE_ON, 0);
+  g_model.timers[0].minuteBeep = 1;
+
+  EXPECT_FALSE(isTimerMinuteBeepDue(g_model.timers[0], 30));
+  EXPECT_TRUE(isTimerMinuteBeepDue(g_model.timers[0], 60));
+  EXPECT_TRUE(isTimerMinuteBeepDue(g_model.timers[0], 120));
+}
+
+TEST(Timers, minuteBeepStartDelaysCountUpCallouts)
+{
+  initModelTimer(0, TMRMODE_ON, 0);
+  g_model.timers[0].minuteBeep = 1;
+  g_model.timers[0].minuteBeepStart = 5;
+
+  EXPECT_FALSE(isTimerMinuteBeepDue(g_model.timers[0], 240));
+  EXPECT_TRUE(isTimerMinuteBeepDue(g_model.timers[0], 300));
+  EXPECT_TRUE(isTimerMinuteBeepDue(g_model.timers[0], 360));
+}
+
+TEST(Timers, minuteBeepStartFollowsDisplayedCountdownDirection)
+{
+  initModelTimer(0, TMRMODE_ON, 600);
+  g_model.timers[0].minuteBeep = 1;
+  g_model.timers[0].minuteBeepStart = 5;
+
+  EXPECT_FALSE(isTimerMinuteBeepDue(g_model.timers[0], 540));
+  EXPECT_TRUE(isTimerMinuteBeepDue(g_model.timers[0], 300));
+  EXPECT_TRUE(isTimerMinuteBeepDue(g_model.timers[0], 240));
+}
+
+TEST(Timers, minuteBeepStartUsesElapsedDirectionWhenShown)
+{
+  initModelTimer(0, TMRMODE_ON, 600);
+  g_model.timers[0].showElapsed = 1;
+  g_model.timers[0].minuteBeep = 1;
+  g_model.timers[0].minuteBeepStart = 5;
+
+  EXPECT_FALSE(isTimerMinuteBeepDue(g_model.timers[0], 240));
+  EXPECT_TRUE(isTimerMinuteBeepDue(g_model.timers[0], 300));
+  EXPECT_TRUE(isTimerMinuteBeepDue(g_model.timers[0], 360));
+}
+
 TEST(Timers, timerGreaterThan9hours)
 {
   initModelTimer(0, TMRMODE_ON, 0);

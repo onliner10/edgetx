@@ -685,6 +685,8 @@
 #define STR_MINUTE_PLURAL2 currentLangStrings->STR_MINUTE_PLURAL2
 #define STR_MINUTE_SINGULAR currentLangStrings->STR_MINUTE_SINGULAR
 #define STR_MINUTEBEEP currentLangStrings->STR_MINUTEBEEP
+#define STR_MINUTEBEEP_START currentLangStrings->STR_MINUTEBEEP_START
+#define STR_MINUTEBEEP_EVERY currentLangStrings->STR_MINUTEBEEP_EVERY
 #define STR_MIRROR currentLangStrings->STR_MIRROR
 #define STR_MIX_DELAY_PREC currentLangStrings->STR_MIX_DELAY_PREC
 #define STR_MIX_SLOW_PREC currentLangStrings->STR_MIX_SLOW_PREC

@@ -565,6 +565,8 @@
 #define TR_THROTTLE_START              "Gaz Start"
 #define TR_THROTTLEREVERSE             TR("Inv. gaz", "Inversion gaz")
 #define TR_MINUTEBEEP                  TR("Bip min.", "Annonces minutes")
+#define TR_MINUTEBEEP_START            TR("Start at", "Start callouts at")
+#define TR_MINUTEBEEP_EVERY            "Every minute"
 #define TR_BEEPCOUNTDOWN               TR("Bip fin", "Compte à rebours")
 #define TR_PERSISTENT                  TR("Persist.", "Persistant")
 #define TR_BACKLIGHT_LABEL             "Rétroéclairage"

@@ -35,6 +35,8 @@ typedef int16_t tmrmode_t;
 
 #define TIMER_MIN     (tmrval_t(-TIMER_MAX-1))
 
+struct TimerData;
+
 struct TimerState {
   uint16_t cnt;
   uint16_t sum;
@@ -60,6 +62,8 @@ inline void setTimerStateValue(uint8_t idx, tmrval_t value)
 void timerReset(uint8_t idx);
 
 void timerSet(int idx, int val);
+
+bool isTimerMinuteBeepDue(const TimerData &timer, tmrval_t announceVal);
 
 void saveTimers();
 void restoreTimers();

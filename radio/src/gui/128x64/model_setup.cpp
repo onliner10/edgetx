@@ -58,18 +58,21 @@ enum MenuModelSetupItems {
   ITEM_MODEL_SETUP_TIMER1_START,
   ITEM_MODEL_SETUP_TIMER1_PERSISTENT,
   ITEM_MODEL_SETUP_TIMER1_MINUTE_BEEP,
+  ITEM_MODEL_SETUP_TIMER1_MINUTE_BEEP_START,
   ITEM_MODEL_SETUP_TIMER1_COUNTDOWN_BEEP,
   ITEM_MODEL_SETUP_TIMER2,
   ITEM_MODEL_SETUP_TIMER2_NAME,
   ITEM_MODEL_SETUP_TIMER2_START,
   ITEM_MODEL_SETUP_TIMER2_PERSISTENT,
   ITEM_MODEL_SETUP_TIMER2_MINUTE_BEEP,
+  ITEM_MODEL_SETUP_TIMER2_MINUTE_BEEP_START,
   ITEM_MODEL_SETUP_TIMER2_COUNTDOWN_BEEP,
   ITEM_MODEL_SETUP_TIMER3,
   ITEM_MODEL_SETUP_TIMER3_NAME,
   ITEM_MODEL_SETUP_TIMER3_START,
   ITEM_MODEL_SETUP_TIMER3_PERSISTENT,
   ITEM_MODEL_SETUP_TIMER3_MINUTE_BEEP,
+  ITEM_MODEL_SETUP_TIMER3_MINUTE_BEEP_START,
   ITEM_MODEL_SETUP_TIMER3_COUNTDOWN_BEEP,
 #if defined(FUNCTION_SWITCHES)
   ITEM_MODEL_SETUP_LABEL,
@@ -375,6 +378,7 @@ inline uint8_t TIMER_ROW(uint8_t timer, uint8_t value)
   1, TIMER_ROW(x,0),                                                   \
       TIMER_ROW(x,(uint8_t)((g_model.timers[x].start) ? 2 : 1)),       \
       TIMER_ROW(x,0), TIMER_ROW(x,0),                                  \
+      TIMER_ROW(x,g_model.timers[x].minuteBeep ? (uint8_t)0 : HIDDEN_ROW), \
       TIMER_ROW(x,g_model.timers[x].countdownBeep != COUNTDOWN_SILENT ? (uint8_t)1 : (uint8_t)0)
 
 #define EXTRA_MODULE_ROWS
@@ -1018,6 +1022,25 @@ void menuModelSetup(event_t event)
       {
         TimerData * timer = &g_model.timers[k>=ITEM_MODEL_SETUP_TIMER3 ? 2 : (k>=ITEM_MODEL_SETUP_TIMER2 ? 1 : 0)];
         timer->minuteBeep = editCheckBox(timer->minuteBeep, MODEL_SETUP_2ND_COLUMN, y, STR_MINUTEBEEP, attr, event, INDENT_WIDTH);
+        break;
+      }
+
+      case ITEM_MODEL_SETUP_TIMER1_MINUTE_BEEP_START:
+      case ITEM_MODEL_SETUP_TIMER2_MINUTE_BEEP_START:
+      case ITEM_MODEL_SETUP_TIMER3_MINUTE_BEEP_START:
+      {
+        TimerData * timer = &g_model.timers[k>=ITEM_MODEL_SETUP_TIMER3 ? 2 : (k>=ITEM_MODEL_SETUP_TIMER2 ? 1 : 0)];
+        lcdDrawTextIndented(y, STR_MINUTEBEEP_START);
+        if (timer->minuteBeepStart == 0) {
+          lcdDrawText(MODEL_SETUP_2ND_COLUMN, y, STR_MINUTEBEEP_EVERY, attr);
+        }
+        else {
+          lcdDrawNumber(MODEL_SETUP_2ND_COLUMN, y, timer->minuteBeepStart, attr);
+          lcdDrawText(MODEL_SETUP_2ND_COLUMN + 3 * FW, y, STR_MIN);
+        }
+        if (attr && s_editMode > 0) {
+          timer->minuteBeepStart = checkIncDecModel(event, timer->minuteBeepStart, 0, 63);
+        }
         break;
       }
 

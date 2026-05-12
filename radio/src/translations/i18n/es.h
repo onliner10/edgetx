@@ -560,6 +560,8 @@
 #define TR_THROTTLE_START      "Potencia Start"
 #define TR_THROTTLEREVERSE     TR("Invert acel", "Invertir acel.")
 #define TR_MINUTEBEEP          TR("Minuto", "Cada minuto")
+#define TR_MINUTEBEEP_START            TR("Start at", "Start callouts at")
+#define TR_MINUTEBEEP_EVERY            "Every minute"
 #define TR_BEEPCOUNTDOWN       TR("Cta. atrás", "Cuenta atrás")
 #define TR_PERSISTENT          TR("Persisten.", "Persistente")
 #define TR_BACKLIGHT_LABEL     "Luz fondo"

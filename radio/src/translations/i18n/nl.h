@@ -563,6 +563,8 @@
 #define TR_THROTTLE_START      "Gas Start"
 #define TR_THROTTLEREVERSE     TR("Reverse", "Omgekeerd")
 #define TR_MINUTEBEEP          TR("Min-Alarm", "Minuten-Alarm")
+#define TR_MINUTEBEEP_START            TR("Start at", "Start callouts at")
+#define TR_MINUTEBEEP_EVERY            "Every minute"
 #define TR_BEEPCOUNTDOWN       "Countdown"
 #define TR_PERSISTENT          TR("Vasth.", "Vasthouden")
 #define TR_BACKLIGHT_LABEL     "LCD-Verlichting"

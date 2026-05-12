@@ -564,6 +564,8 @@
 #define TR_THROTTLE_START              "Газ cтарт"
 #define TR_THROTTLEREVERSE             TR("Г-Реверс", "Реверс")
 #define TR_MINUTEBEEP                  TR("Минут", "Минут")
+#define TR_MINUTEBEEP_START            TR("Start at", "Start callouts at")
+#define TR_MINUTEBEEP_EVERY            "Every minute"
 #define TR_BEEPCOUNTDOWN               "Обр отс"
 #define TR_PERSISTENT                  TR("Пост", "Пост")
 #define TR_BACKLIGHT_LABEL             "Подсветка"

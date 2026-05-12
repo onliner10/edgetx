@@ -57,6 +57,7 @@ enum MenuModelSetupItems {
   ITEM_MODEL_SETUP_TIMER1_START,
   ITEM_MODEL_SETUP_TIMER1_PERSISTENT,
   ITEM_MODEL_SETUP_TIMER1_MINUTE_BEEP,
+  ITEM_MODEL_SETUP_TIMER1_MINUTE_BEEP_START,
   ITEM_MODEL_SETUP_TIMER1_COUNTDOWN_BEEP,
 #if TIMERS > 1
   ITEM_MODEL_SETUP_TIMER2,
@@ -64,6 +65,7 @@ enum MenuModelSetupItems {
   ITEM_MODEL_SETUP_TIMER2_START,
   ITEM_MODEL_SETUP_TIMER2_PERSISTENT,
   ITEM_MODEL_SETUP_TIMER2_MINUTE_BEEP,
+  ITEM_MODEL_SETUP_TIMER2_MINUTE_BEEP_START,
   ITEM_MODEL_SETUP_TIMER2_COUNTDOWN_BEEP,
 #endif
 #if TIMERS > 2
@@ -72,6 +74,7 @@ enum MenuModelSetupItems {
   ITEM_MODEL_SETUP_TIMER3_START,
   ITEM_MODEL_SETUP_TIMER3_PERSISTENT,
   ITEM_MODEL_SETUP_TIMER3_MINUTE_BEEP,
+  ITEM_MODEL_SETUP_TIMER3_MINUTE_BEEP_START,
   ITEM_MODEL_SETUP_TIMER3_COUNTDOWN_BEEP,
 #endif
 #if defined(PCBX9E)
@@ -382,6 +385,7 @@ inline uint8_t TIMER_ROW(uint8_t timer, uint8_t value)
   1 | NAVIGATION_LINE_BY_LINE, TIMER_ROW(x,0),                         \
       TIMER_ROW(x,(uint8_t)((g_model.timers[x].start) ? 2 : 1) | NAVIGATION_LINE_BY_LINE),       \
       TIMER_ROW(x,0), TIMER_ROW(x,0),                                  \
+      TIMER_ROW(x,g_model.timers[x].minuteBeep ? (uint8_t)0 : HIDDEN_ROW), \
       TIMER_ROW(x,g_model.timers[x].countdownBeep != COUNTDOWN_SILENT ? (uint8_t)1 : (uint8_t)0)
 
 inline uint8_t EXTERNAL_MODULE_TYPE_ROW()
@@ -677,6 +681,21 @@ void menuModelSetup(event_t event)
                 STR_MINUTEBEEP, attr, event, INDENT_WIDTH);
             break;
 
+          case ITEM_MODEL_SETUP_TIMER1_MINUTE_BEEP_START:
+            lcdDrawTextIndented(y, STR_MINUTEBEEP_START);
+            if (g_model.timers[0].minuteBeepStart == 0) {
+              lcdDrawText(MODEL_SETUP_2ND_COLUMN, y, STR_MINUTEBEEP_EVERY, attr);
+            }
+            else {
+              lcdDrawNumber(MODEL_SETUP_2ND_COLUMN, y, g_model.timers[0].minuteBeepStart, attr);
+              lcdDrawText(MODEL_SETUP_2ND_COLUMN + 3 * FW, y, STR_MIN);
+            }
+            if (attr && s_editMode > 0) {
+              g_model.timers[0].minuteBeepStart =
+                  checkIncDecModel(event, g_model.timers[0].minuteBeepStart, 0, 63);
+            }
+            break;
+
           case ITEM_MODEL_SETUP_TIMER1_COUNTDOWN_BEEP:
             editTimerCountdown(0, y, attr, event);
             break;
@@ -707,6 +726,21 @@ void menuModelSetup(event_t event)
         g_model.timers[1].minuteBeep = editCheckBox(g_model.timers[1].minuteBeep, MODEL_SETUP_2ND_COLUMN, y, STR_MINUTEBEEP, attr, event, INDENT_WIDTH);
         break;
 
+      case ITEM_MODEL_SETUP_TIMER2_MINUTE_BEEP_START:
+        lcdDrawTextIndented(y, STR_MINUTEBEEP_START);
+        if (g_model.timers[1].minuteBeepStart == 0) {
+          lcdDrawText(MODEL_SETUP_2ND_COLUMN, y, STR_MINUTEBEEP_EVERY, attr);
+        }
+        else {
+          lcdDrawNumber(MODEL_SETUP_2ND_COLUMN, y, g_model.timers[1].minuteBeepStart, attr);
+          lcdDrawText(MODEL_SETUP_2ND_COLUMN + 3 * FW, y, STR_MIN);
+        }
+        if (attr && s_editMode > 0) {
+          g_model.timers[1].minuteBeepStart =
+              checkIncDecModel(event, g_model.timers[1].minuteBeepStart, 0, 63);
+        }
+        break;
+
       case ITEM_MODEL_SETUP_TIMER2_COUNTDOWN_BEEP:
         editTimerCountdown(1, y, attr, event);
         break;
@@ -735,6 +769,21 @@ void menuModelSetup(event_t event)
         g_model.timers[2].minuteBeep =
             editCheckBox(g_model.timers[2].minuteBeep, MODEL_SETUP_2ND_COLUMN,
                          y, STR_MINUTEBEEP, attr, event, INDENT_WIDTH);
+        break;
+
+      case ITEM_MODEL_SETUP_TIMER3_MINUTE_BEEP_START:
+        lcdDrawTextIndented(y, STR_MINUTEBEEP_START);
+        if (g_model.timers[2].minuteBeepStart == 0) {
+          lcdDrawText(MODEL_SETUP_2ND_COLUMN, y, STR_MINUTEBEEP_EVERY, attr);
+        }
+        else {
+          lcdDrawNumber(MODEL_SETUP_2ND_COLUMN, y, g_model.timers[2].minuteBeepStart, attr);
+          lcdDrawText(MODEL_SETUP_2ND_COLUMN + 3 * FW, y, STR_MIN);
+        }
+        if (attr && s_editMode > 0) {
+          g_model.timers[2].minuteBeepStart =
+              checkIncDecModel(event, g_model.timers[2].minuteBeepStart, 0, 63);
+        }
         break;
 
       case ITEM_MODEL_SETUP_TIMER3_COUNTDOWN_BEEP:

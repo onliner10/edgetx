@@ -286,7 +286,7 @@ PACK(struct TimerData {
   int32_t  countdownStart:2;
   uint8_t  showElapsed:1; 
   uint8_t  extraHaptic:1;
-  uint8_t  spare:6 SKIP;
+  uint8_t  minuteBeepStart:6;
   NOBACKUP(char name[LEN_TIMER_NAME]);
 });
 

@@ -58,6 +58,19 @@ void timerSet(int idx, int val)
   timerState.val_10ms = 0 ;
 }
 
+bool isTimerMinuteBeepDue(const TimerData &timer, tmrval_t announceVal)
+{
+  if (!timer.minuteBeep || (announceVal % 60) != 0) return false;
+
+  if (timer.minuteBeepStart == 0) return true;
+
+  const tmrval_t threshold = timer.minuteBeepStart * 60;
+  if (timer.start && !timer.showElapsed) {
+    return announceVal <= threshold;
+  }
+  return announceVal >= threshold;
+}
+
 void restoreTimers()
 {
   for (uint8_t i=0; i<TIMERS; i++) {
@@ -186,7 +199,7 @@ void evalTimers(int16_t throttle, uint8_t tick10ms)
             }
             tmrval_t announceVal = newTimerVal;
             if (showElapsed) announceVal = timerStart - newTimerVal;
-            if (g_model.timers[i].minuteBeep && (announceVal % 60) == 0) {
+            if (isTimerMinuteBeepDue(g_model.timers[i], announceVal)) {
               AUDIO_TIMER_MINUTE(announceVal);
               // TRACE("Timer[%d] %d minute announcement", i, newTimerVal/60);
             }

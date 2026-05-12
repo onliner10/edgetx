@@ -561,6 +561,8 @@
 #define TR_THROTTLE_START              "Throttle アップ"
 #define TR_THROTTLEREVERSE             TR("T-Reverse", "リバース")
 #define TR_MINUTEBEEP                  TR("Minute", "分単位コール")
+#define TR_MINUTEBEEP_START            TR("Start at", "Start callouts at")
+#define TR_MINUTEBEEP_EVERY            "Every minute"
 #define TR_BEEPCOUNTDOWN               "カウントダウン"
 #define TR_PERSISTENT                  TR("Persist.", "持続設定")
 #define TR_BACKLIGHT_LABEL             "バックライト"

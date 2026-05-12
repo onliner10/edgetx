@@ -24,6 +24,7 @@
 #include "choice.h"
 #include "edgetx.h"
 #include "getset_helpers.h"
+#include "numberedit.h"
 #include "switchchoice.h"
 #include "textedit.h"
 #include "timeedit.h"
@@ -102,8 +103,25 @@ TimerWindow::TimerWindow(uint8_t timer) :
   setupLine(STR_MINUTEBEEP,
     [=](Window* parent, coord_t x, coord_t y) {
       new ToggleSwitch(parent, {x, y, 0, 0}, GET_DEFAULT(p_timer->minuteBeep),
-                       SET_TIMER_DEFAULT(p_timer->minuteBeep));
+                       [=](int newValue) {
+                         {
+                           MixerTaskLockGuard lock;
+                           p_timer->minuteBeep = newValue;
+                         }
+                         minuteBeepStartLine->show(newValue);
+                         SET_DIRTY();
+                       });
     });
+
+  minuteBeepStartLine = setupLine(STR_MINUTEBEEP_START,
+    [=](Window* parent, coord_t x, coord_t y) {
+      auto edit = new NumberEdit(parent, {x, y, 132, 0}, 0, 63,
+                                 GET_DEFAULT(p_timer->minuteBeepStart),
+                                 SET_TIMER_DEFAULT(p_timer->minuteBeepStart));
+      edit->setSuffix(" min");
+      edit->setZeroText(STR_MINUTEBEEP_EVERY);
+    });
+  minuteBeepStartLine->show(p_timer->minuteBeep);
 
   // Timer countdown
   setupLine(STR_BEEPCOUNTDOWN,

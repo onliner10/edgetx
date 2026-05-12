@@ -561,6 +561,8 @@
 #define TR_THROTTLE_START      "Gaz Start"
 #define TR_THROTTLEREVERSE     TR("OdwrGaz", "OdwrGaz")
 #define TR_MINUTEBEEP          TR("Minuta", "PikCoMinutę")
+#define TR_MINUTEBEEP_START            TR("Start at", "Start callouts at")
+#define TR_MINUTEBEEP_EVERY            "Every minute"
 #define TR_BEEPCOUNTDOWN       "Odliczanie"
 #define TR_PERSISTENT          TR("Dokł.", "Dokładny")
 #define TR_BACKLIGHT_LABEL     "Podświetl"

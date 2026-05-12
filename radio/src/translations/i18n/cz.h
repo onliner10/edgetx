@@ -564,6 +564,8 @@
 #define TR_THROTTLE_START              "Plyn Start"
 #define TR_THROTTLEREVERSE             TR("ReverzPlyn", "Reverz plynu")
 #define TR_MINUTEBEEP                  TR("Minuta", "Oznamovat minuty")
+#define TR_MINUTEBEEP_START            TR("Start at", "Start callouts at")
+#define TR_MINUTEBEEP_EVERY            "Every minute"
 #define TR_BEEPCOUNTDOWN               "Odpočet"
 #define TR_PERSISTENT                  "Trvalé"
 #define TR_BACKLIGHT_LABEL             "Podsvětlení"

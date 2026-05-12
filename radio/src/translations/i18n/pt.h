@@ -562,6 +562,8 @@
 #define TR_THROTTLE_START              "Iniciar Motor"
 #define TR_THROTTLEREVERSE             TR("T-Reverso", "Reverso")
 #define TR_MINUTEBEEP                  TR("Minuto", "Cada Minuto")
+#define TR_MINUTEBEEP_START            TR("Start at", "Start callouts at")
+#define TR_MINUTEBEEP_EVERY            "Every minute"
 #define TR_BEEPCOUNTDOWN               "ContaRegr"
 #define TR_PERSISTENT                  TR("Persist.", "Persistente")
 #define TR_BACKLIGHT_LABEL             "Backlight"

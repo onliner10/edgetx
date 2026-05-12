@@ -296,6 +296,7 @@ Get model timer parameters
  * `value` (number) current value [seconds]
  * `countdownBeep` (number) countdown beep (0­ = silent, 1 =­ beeps, 2­ = voice)
  * `minuteBeep` (boolean) minute beep
+ * `minuteBeepStart` (number) first minute callout; 0 means every minute
  * `persistent` (number) persistent timer
  * `name` (string) timer name
  * `showElapsed` (boolean) show elapsed
@@ -313,6 +314,7 @@ static int luaModelGetTimer(lua_State *L)
     lua_pushtableinteger(L, "value", getTimerStateValue(idx));
     lua_pushtableinteger(L, "countdownBeep", timer.countdownBeep);
     lua_pushtableboolean(L, "minuteBeep", timer.minuteBeep);
+    lua_pushtableinteger(L, "minuteBeepStart", timer.minuteBeepStart);
     lua_pushtableinteger(L, "persistent", timer.persistent);
     lua_pushtablenstring(L, "name", timer.name);
     lua_pushtableboolean(L, "showElapsed", timer.showElapsed);
@@ -364,6 +366,9 @@ static int luaModelSetTimer(lua_State *L)
       }
       else if (!strcmp(key, "minuteBeep")) {
         timer.minuteBeep = lua_toboolean(L, -1);
+      }
+      else if (!strcmp(key, "minuteBeepStart")) {
+        timer.minuteBeepStart = limit<int>(0, luaL_checkinteger(L, -1), 63);
       }
       else if (!strcmp(key, "persistent")) {
         timer.persistent = luaL_checkinteger(L, -1);
