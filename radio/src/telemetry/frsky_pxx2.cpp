@@ -312,6 +312,10 @@ static void processBindFrame(uint8_t module, const uint8_t * frame)
   }
 
   BindInformation * destination = moduleState[module].bindInformation;
+  if (!destination) {
+    moduleState[module].mode = MODULE_MODE_NORMAL;
+    return;
+  }
 
   switch(frame[3]) {
     case 0x00:

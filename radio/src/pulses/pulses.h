@@ -175,6 +175,11 @@ typedef void (*module_deinit_cb_t)(uint8_t, const etx_proto_driver_t*);
 void pulsesSetModuleInitCb(module_init_cb_t cb);
 void pulsesSetModuleDeInitCb(module_deinit_cb_t cb);
 
+#if defined(SIMU)
+uint8_t pulsesGetModuleInitRetryDelayForTest(uint8_t module);
+void pulsesForceModuleInitFailureForTest(uint8_t module, uint8_t protocol);
+#endif
+
 void restartModule(uint8_t module);
 bool restartModuleAsync(uint8_t module, uint8_t cnt_delay);
 

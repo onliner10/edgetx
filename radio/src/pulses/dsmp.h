@@ -25,7 +25,7 @@
 
 struct DSMPModuleStatus {
   uint8_t   version[2] = {1, 0};  // Default Version 1.0
-  tmr10ms_t lastUpdate;
+  tmr10ms_t lastUpdate = (tmr10ms_t)-500;
   uint8_t	ch_order   = 0xFF;
   uint8_t	flags      = 0;
 

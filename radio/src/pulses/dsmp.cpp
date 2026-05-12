@@ -61,8 +61,6 @@
 // MAP AETR->TAER:     
 static uint8_t AETR_TAER_MAP[] = {2, 0, 1};  
 
-static DSMPModuleStatus dsmpStatus = DSMPModuleStatus();
-
 // Power cycle of the DSMP module
 // The DSMP module code has the channel data initialized to 0 and initial number of bits as 10b (ch resolution 1024)
 // The Setup message pass the last BIND configuration to the Module via the setup package (for example, 2048 it was bound to DSMX).
@@ -91,29 +89,78 @@ static DSMPModuleStatus dsmpStatus = DSMPModuleStatus();
 #define SCHEDULER_PERIOD_V1       22060
 #define SCHEDULER_PERIOD_V2       11000
 
-static uint8_t pass;
-static uint8_t pass0_counter;
-static uint8_t pass0_period;
-
-static uint16_t fastSetup_count;  
-
+struct DSMPRuntimeState {
+    DSMPModuleStatus status;
+    uint8_t pending_version[2] = {0, 0};
+    uint8_t pending_version_confirmations = 0;
+    uint8_t pass = 1;
+    uint8_t pass0_counter = 2;
+    uint8_t pass0_period = 100;
+    uint16_t fastSetup_count = FAST_INITIAL_SETUP_COUNT;
 #if DSMP_SEND_X_PLUS
-static uint8_t x_plus_ch = 0;
+    uint8_t x_plus_ch = 0;
 #endif
+
+    void reset()
+    {
+        *this = DSMPRuntimeState();
+    }
+};
+
+static DSMPRuntimeState dsmpRuntime[MAX_MODULES];
+
+static DSMPRuntimeState* getDSMPRuntime(uint8_t module)
+{
+    if (module >= MAX_MODULES) return nullptr;
+    return &dsmpRuntime[module];
+}
+
+static bool isSaneDSMPVersion(uint8_t major, uint8_t minor)
+{
+    (void)minor;
+    return major >= 1 && major <= 9;
+}
+
+static bool confirmDSMPManufacturerVersion(DSMPRuntimeState& state,
+                                           uint8_t major, uint8_t minor)
+{
+    if (state.pending_version[0] != major ||
+        state.pending_version[1] != minor ||
+        state.pending_version_confirmations == 0) {
+        state.pending_version[0] = major;
+        state.pending_version[1] = minor;
+        state.pending_version_confirmations = 1;
+        return false;
+    }
+
+    if (state.pending_version_confirmations < 2) {
+        state.pending_version_confirmations++;
+    }
+    return state.pending_version_confirmations >= 2;
+}
 
 DSMPModuleStatus& getDSMPStatus(uint8_t module)
 { 
-    return dsmpStatus; 
+    auto state = getDSMPRuntime(module);
+    return state ? state->status : dsmpRuntime[EXTERNAL_MODULE].status;
 }
 
 static void* dsmpInit(uint8_t module)
 {
     TRACE("[DSMP] dsmpInit()");
-    pass0_counter = 2;  // Send Setup every 2 ch data packages
-    pass = 1;           // Start Sending channels
-    pass0_period = 100; // Send pass0 every 100 messages
-    fastSetup_count = FAST_INITIAL_SETUP_COUNT;
-    return (void*)dsmInit(module, DSMP_BITRATE, SCHEDULER_PERIOD_V1, true);
+    auto state = getDSMPRuntime(module);
+    if (state) state->reset();
+
+    bool telemetryRxReady = false;
+    auto mod_st = dsmInit(module, DSMP_BITRATE, SCHEDULER_PERIOD_V1, true,
+                          false, &telemetryRxReady);
+    if (!mod_st) return nullptr;
+
+    if (!telemetryRxReady) {
+        TRACE("[DSMP] telemetry RX unavailable; using V1-safe timing");
+    }
+    mod_st->user_data = state;
+    return (void*)mod_st;
 }
 
 
@@ -149,12 +196,13 @@ static void sendFPLemonDSMP(uint8_t*& p_buf)
 }
 #endif
 
-static void updateModuleStatus(uint8_t flags)
+static void updateModuleStatus(DSMPRuntimeState& state, uint8_t flags)
 {
     // Update Status
-    dsmpStatus.lastUpdate = get_tmr10ms();
-    dsmpStatus.flags = flags;
-    dsmpStatus.ch_order = (flags & DSMP_FLAGS_FUTABA) ? DSMP_CH_AETR : DSMP_CH_TAER;
+    state.status.lastUpdate = get_tmr10ms();
+    state.status.flags = flags;
+    state.status.ch_order =
+        (flags & DSMP_FLAGS_FUTABA) ? DSMP_CH_AETR : DSMP_CH_TAER;
 }
 
 static uint16_t getDSMPChannelValue(uint8_t module, uint8_t flags,
@@ -188,7 +236,8 @@ static uint16_t getDSMPChannelValue(uint8_t module, uint8_t flags,
     return pulse;
 }
 
-static void setupPulsesLemonDSMP(uint8_t module, uint8_t*& p_buf,
+static void setupPulsesLemonDSMP(uint8_t module, DSMPRuntimeState& state,
+                                 uint8_t*& p_buf,
                                  const int16_t* channels, uint8_t nChannels)
 {
     const auto modelId = g_model.header.modelId[module];
@@ -198,15 +247,15 @@ static void setupPulsesLemonDSMP(uint8_t module, uint8_t*& p_buf,
     auto channelCount = sentModuleChannels(module);
     auto flags = md.dsmp.flags;
     auto module_mode = getModuleMode(module);
-    auto version     = dsmpStatus.version[0];
+    auto version     = state.status.version[0];
 
     if (md.dsmp.enableAETR) { // Move GUI settings to flags
         flags |= DSMP_FLAGS_FUTABA;  
     }
 
-    if (pass0_counter == pass0_period/2) {
+    if (state.pass0_counter == state.pass0_period / 2) {
         // update status String.. about each second
-        updateModuleStatus(flags);
+        updateModuleStatus(state, flags);
     }
 
 #if defined(LUA)
@@ -219,17 +268,21 @@ static void setupPulsesLemonDSMP(uint8_t module, uint8_t*& p_buf,
 
     // Send channel data
     sendByte(p_buf, 0xAA);
-    sendByte(p_buf, pass);
+    sendByte(p_buf, state.pass);
 
     // Setup packet
-    if (pass == 0) {
+    if (state.pass == 0) {
         flags &= DSMP_FLAGS_TXMODE; // Only the TXMODE part
 
         if (module_mode == MODULE_MODE_BIND) {
             flags = DSMP_FLAGS_BIND | DSMP_FLAGS_AUTO;
             channelCount = min<uint8_t>(channelCount, MAX_REG_CHANNELS);
-            md.dsmp.flags = DSMP_FLAGS_DSMX | DSMP_FLAGS_11mS | DSMP_FLAGS_2048;
-            storageDirty(EE_MODEL);
+            constexpr uint8_t bindFlags =
+                DSMP_FLAGS_DSMX | DSMP_FLAGS_11mS | DSMP_FLAGS_2048;
+            if (md.dsmp.flags != bindFlags) {
+                md.dsmp.flags = bindFlags;
+                storageDirty(EE_MODEL);
+            }
         }
         sendByte(p_buf, flags);
 
@@ -241,7 +294,7 @@ static void setupPulsesLemonDSMP(uint8_t module, uint8_t*& p_buf,
         sendByte(p_buf, channelCount);
         sendByte(p_buf, modelId); // V1.0 ignores it, V2.0 use it
 
-        pass = 1; // move to send Ch data
+        state.pass = 1; // move to send Ch data
         return; 
     } else {
 #if DSMP_SEND_X_PLUS
@@ -249,7 +302,7 @@ static void setupPulsesLemonDSMP(uint8_t module, uint8_t*& p_buf,
 #endif
         //  Channel DATA messages
         uint8_t current_channel = 0;
-        if (pass == 2) {
+        if (state.pass == 2) {
             current_channel += 7;
         }
 
@@ -265,8 +318,8 @@ static void setupPulsesLemonDSMP(uint8_t module, uint8_t*& p_buf,
 #if DSMP_SEND_X_PLUS
             else if (xPlusEnabled && (current_channel >= MAX_REG_CHANNELS)) {
               // X-plus channel multiplexing (Ch13-20)
-              ch_to_send = MAX_REG_CHANNELS + x_plus_ch;
-              x_plus_ch = (x_plus_ch + 1) % 8;  // 8 X-plus channels
+              ch_to_send = MAX_REG_CHANNELS + state.x_plus_ch;
+              state.x_plus_ch = (state.x_plus_ch + 1) % 8;  // 8 X-plus channels
             }
 #endif
 
@@ -281,19 +334,19 @@ static void setupPulsesLemonDSMP(uint8_t module, uint8_t*& p_buf,
         }  // For
     }
 
-    if (++pass > 2) pass = 1;
-    if (channelCount < 8) pass = 1;
+    if (++state.pass > 2) state.pass = 1;
+    if (channelCount < 8) state.pass = 1;
 
     if (module_mode == MODULE_MODE_BIND) { // Force setup packet in Bind mode.
-        pass = 0;
-    } else if (--pass0_counter == 0) {
-        pass = 0;
-        updateModuleStatus(flags);
-        if ((version == 1) && (fastSetup_count > 0)) {
-            fastSetup_count--;
-            pass0_counter = 2;  // Keep sendint setup every 2 ch messages
+        state.pass = 0;
+    } else if (--state.pass0_counter == 0) {
+        state.pass = 0;
+        updateModuleStatus(state, flags);
+        if ((version == 1) && (state.fastSetup_count > 0)) {
+            state.fastSetup_count--;
+            state.pass0_counter = 2;  // Keep sendint setup every 2 ch messages
         } else {
-          pass0_counter = pass0_period;  // restar counter
+          state.pass0_counter = state.pass0_period;  // restar counter
         }
   }
 }
@@ -308,9 +361,12 @@ static void dsmpSendPulses(void* ctx, uint8_t* buffer, int16_t* channels, uint8_
     if (!drv) return;
 
     auto drvCtx = modulePortGetCtx(mod_st->tx);
+    auto state = static_cast<DSMPRuntimeState*>(mod_st->user_data);
+    if (!state) state = getDSMPRuntime(module);
+    if (!state) return;
 
     auto p_data = buffer;
-    setupPulsesLemonDSMP(module, p_data, channels, nChannels);
+    setupPulsesLemonDSMP(module, *state, p_data, channels, nChannels);
     drv->sendBuffer(drvCtx, buffer, p_data - buffer);
 }
 
@@ -333,7 +389,8 @@ Byte
             0xb2 - DSMX 11ms
  */
 
-static void processDSMPBindPacket(uint8_t module, uint8_t* packet) 
+static void processDSMPBindPacket(uint8_t module, DSMPRuntimeState& state,
+                                  uint8_t* packet)
 {
     uint8_t flags    = packet[0];
     uint8_t rxType   = packet[1];
@@ -358,7 +415,7 @@ static void processDSMPBindPacket(uint8_t module, uint8_t* packet)
       channels = MAX_REG_CHANNELS;
     }
     g_model.moduleData[module].channelsCount = channels - 8;
-    if (dsmpStatus.version[0] == 1) { // V1.0 always use modelId=0
+    if (state.status.version[0] == 1) { // V1.0 always use modelId=0
         g_model.header.modelId[module] = 0;  
     }
 
@@ -380,36 +437,50 @@ static void processDSMPBindPacket(uint8_t module, uint8_t* packet)
 }
 
 
-static void processDSMPManufacturerData(uint8_t module, uint8_t* packet) 
+static void processDSMPManufacturerData(uint8_t module, DSMPRuntimeState& state,
+                                        uint8_t* packet)
 {
     // Format M,M,M,M, V, V    where M is 4 byte manufacturer data, and V is 2 byte
-    dsmpStatus.version[0] = packet[4];  // Major
-    dsmpStatus.version[1] = packet[5];  // Minor
+    uint8_t major = packet[4];
+    uint8_t minor = packet[5];
 
-    TRACE("LemonDSMP: Ver [%d.%d]", dsmpStatus.version[0], dsmpStatus.version[1]);
+    if (!isSaneDSMPVersion(major, minor)) {
+      TRACE("LemonDSMP: invalid manufacturer version [%d.%d]", major, minor);
+      return;
+    }
 
-    if (dsmpStatus.version[0] > 1 && mixerSchedulerGetPeriod(module) != SCHEDULER_PERIOD_V2) {
+    if (!confirmDSMPManufacturerVersion(state, major, minor)) {
+      TRACE("LemonDSMP: candidate version [%d.%d]", major, minor);
+      return;
+    }
+
+    state.status.version[0] = major;  // Major
+    state.status.version[1] = minor;  // Minor
+
+    TRACE("LemonDSMP: Ver [%d.%d]", state.status.version[0], state.status.version[1]);
+
+    if (state.status.version[0] > 1 && mixerSchedulerGetPeriod(module) != SCHEDULER_PERIOD_V2) {
       // V2 suppors 11ms 
       mixerSchedulerSetPeriod(module, SCHEDULER_PERIOD_V2);
-      pass0_period = 200; // extend period
+      state.pass0_period = 200; // extend period
     }
 }
 
-static void dsmpTelemetryData(uint8_t module, uint8_t data,
+static void dsmpTelemetryData(uint8_t module, DSMPRuntimeState& state, uint8_t data,
                               uint8_t* rxBuffer, uint8_t& rxBufferCount)
 {
-    dsmpStatus.lastUpdate = get_tmr10ms();
+    state.status.lastUpdate = get_tmr10ms();
 
     if (rxBufferCount < 2) return;
 
     if (rxBuffer[1] == 0x80 && rxBufferCount >= DSM_BIND_PACKET_LENGTH) {
-        processDSMPBindPacket(module, rxBuffer + 2);  // Skip 0xAA 0x80
+        processDSMPBindPacket(module, state, rxBuffer + 2);  // Skip 0xAA 0x80
         rxBufferCount = 0;
         return;
     }
 
     if (rxBuffer[1] == 0xFF && rxBufferCount >= SPEKTRUM_TELEMETRY_LENGTH) {
-        processDSMPManufacturerData(module, rxBuffer + 2); // Skip 0xAA 0xFF
+        processDSMPManufacturerData(module, state, rxBuffer + 2); // Skip 0xAA 0xFF
         rxBufferCount = 0;
         return;
     }
@@ -470,7 +541,12 @@ static void dsmpProcessData(void* ctx, uint8_t data, uint8_t* buffer,
                             uint8_t* len)
 {
     auto mod_st = (etx_module_state_t*)ctx;
+    if (!mod_st || !buffer || !len) return;
+
     auto module = modulePortGetModule(mod_st);
+    auto state = static_cast<DSMPRuntimeState*>(mod_st->user_data);
+    if (!state) state = getDSMPRuntime(module);
+    if (!state) return;
 
     uint8_t& rxBufferCount = *len;
 
@@ -486,10 +562,11 @@ static void dsmpProcessData(void* ctx, uint8_t data, uint8_t* buffer,
     } else {
         TRACE("[DSMP] array size %d error", rxBufferCount);
         rxBufferCount = 0;
+        return;
     }
 
     if (buffer[0] == 0xAA) {  // Telemetry data or Bind
-        dsmpTelemetryData(module, data, buffer, *len);
+        dsmpTelemetryData(module, *state, data, buffer, *len);
     } else if (buffer[0] == 0xAB) {  // Status
         dsmpDebugData(module, data, buffer, *len);
     }
@@ -510,9 +587,9 @@ void DSMPModuleStatus::getStatusString(char* statusText) const
     // Version
     *tmp = 0;
     tmp = strAppend(tmp, "v", 1);
-    tmp = strAppendUnsigned(tmp, dsmpStatus.version[0]);
+    tmp = strAppendUnsigned(tmp, version[0]);
     tmp = strAppend(tmp, ".", 1);
-    tmp = strAppendUnsigned(tmp, dsmpStatus.version[1]);
+    tmp = strAppendUnsigned(tmp, version[1]);
 
     char b[] = "?   ";
     if (ch_order != 0xFF) { // Same encoding as MultiModule

@@ -194,6 +194,14 @@
       ]
     },
     {
+      "name": "fuzz-protocols-smoke",
+      "displayName": "Protocol Fuzzer Smoke",
+      "configurePreset": "fuzzers",
+      "targets": [
+        "fuzz-protocols-smoke"
+      ]
+    },
+    {
       "name": "fuzz-smoke",
       "displayName": "All Fuzzer Smoke Targets",
       "configurePreset": "fuzzers",

@@ -23,6 +23,8 @@
 
 #include "hal/module_port.h"
 #include "pulses/pulses.h"
+#include "storage/storage.h"
+#include "telemetry/telemetry.h"
 
 #if defined(PXX2) || defined(AFHDS3) || defined(DSMP)
 #include <sys/mman.h>
@@ -274,6 +276,33 @@ void feedShortAfhds3Response(void* ctx, afhds3::COMMAND command,
 }
 #endif
 
+#if defined(DSMP)
+void feedDsmpPacket(void* ctx, const uint8_t* packet, size_t size)
+{
+  uint8_t rxBuffer[TELEMETRY_RX_PACKET_SIZE] = {};
+  uint8_t len = 0;
+  for (size_t i = 0; i < size; i += 1) {
+    DSMPDriver.processData(ctx, packet[i], rxBuffer, &len);
+  }
+}
+
+void feedDsmpManufacturerVersion(void* ctx, uint8_t major, uint8_t minor)
+{
+  uint8_t packet[SPEKTRUM_TELEMETRY_LENGTH] = {};
+  packet[0] = 0xAA;
+  packet[1] = 0xFF;
+  packet[6] = major;
+  packet[7] = minor;
+  feedDsmpPacket(ctx, packet, sizeof(packet));
+}
+
+void feedConfirmedDsmpManufacturerVersion(void* ctx, uint8_t major, uint8_t minor)
+{
+  feedDsmpManufacturerVersion(ctx, major, minor);
+  feedDsmpManufacturerVersion(ctx, major, minor);
+}
+#endif
+
 }  // namespace
 
 class PulsesTest : public EdgeTxTest
@@ -497,6 +526,39 @@ TEST_F(PulsesTest, dsm2SendPulsesHonorsChannelCount)
 #endif
 
 #if defined(DSMP) && defined(HARDWARE_EXTERNAL_MODULE)
+TEST_F(PulsesTest, failedProtocolInitDoesNotMarkModuleActive)
+{
+  pulsesInit();
+  modulePortInit();
+
+  constexpr uint8_t module = EXTERNAL_MODULE;
+  g_model.moduleData[module].type = MODULE_TYPE_LEMON_DSMP;
+  moduleState[module].protocol = PROTOCOL_CHANNELS_NONE;
+  pulsesForceModuleInitFailureForTest(module, PROTOCOL_CHANNELS_DSMP);
+
+  pulsesSendNextFrame(module);
+  uint8_t firstRetryDelay = pulsesGetModuleInitRetryDelayForTest(module);
+
+  EXPECT_EQ(moduleState[module].protocol, PROTOCOL_CHANNELS_NONE);
+  EXPECT_EQ(pulsesGetModuleDriver(module)->drv, nullptr);
+  EXPECT_GT(firstRetryDelay, 0);
+
+  pulsesSendNextFrame(module);
+
+  EXPECT_EQ(moduleState[module].protocol, PROTOCOL_CHANNELS_NONE);
+  EXPECT_EQ(pulsesGetModuleDriver(module)->drv, nullptr);
+  EXPECT_EQ(pulsesGetModuleInitRetryDelayForTest(module), firstRetryDelay - 1);
+
+  pulsesModuleSettingsUpdate(module);
+  pulsesSendNextFrame(module);
+  EXPECT_EQ(pulsesGetModuleInitRetryDelayForTest(module), firstRetryDelay);
+
+  pulsesSendNextFrame(module);
+  EXPECT_EQ(pulsesGetModuleInitRetryDelayForTest(module), firstRetryDelay - 1);
+
+  pulsesForceModuleInitFailureForTest(module, PROTOCOL_CHANNELS_UNINITIALIZED);
+}
+
 TEST_F(PulsesTest, dsmpSendPulsesHonorsChannelCount)
 {
   modulePortInit();
@@ -513,6 +575,126 @@ TEST_F(PulsesTest, dsmpSendPulsesHonorsChannelCount)
 
   uint16_t firstPulse = ((buffer[2] << 8) | buffer[3]) & 0x03FF;
   EXPECT_EQ(firstPulse, 512);
+
+  DSMPDriver.deinit(ctx);
+}
+
+TEST_F(PulsesTest, dsmpInitResetsRuntimeStatus)
+{
+  modulePortInit();
+  g_model.moduleData[EXTERNAL_MODULE].type = MODULE_TYPE_LEMON_DSMP;
+
+  auto ctx = DSMPDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  feedConfirmedDsmpManufacturerVersion(ctx, 2, 3);
+  EXPECT_EQ(getDSMPStatus(EXTERNAL_MODULE).version[0], 2);
+  EXPECT_EQ(getDSMPStatus(EXTERNAL_MODULE).version[1], 3);
+  EXPECT_TRUE(getDSMPStatus(EXTERNAL_MODULE).isValid());
+
+  DSMPDriver.deinit(ctx);
+
+  ctx = DSMPDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+  EXPECT_EQ(getDSMPStatus(EXTERNAL_MODULE).version[0], 1);
+  EXPECT_EQ(getDSMPStatus(EXTERNAL_MODULE).version[1], 0);
+  EXPECT_FALSE(getDSMPStatus(EXTERNAL_MODULE).isValid());
+
+  DSMPDriver.deinit(ctx);
+}
+
+TEST_F(PulsesTest, dsmpManufacturerPacketUpdatesRuntimeVersion)
+{
+  modulePortInit();
+  g_model.moduleData[EXTERNAL_MODULE].type = MODULE_TYPE_LEMON_DSMP;
+
+  auto ctx = DSMPDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  feedConfirmedDsmpManufacturerVersion(ctx, 2, 0);
+
+  EXPECT_EQ(getDSMPStatus(EXTERNAL_MODULE).version[0], 2);
+  EXPECT_EQ(getDSMPStatus(EXTERNAL_MODULE).version[1], 0);
+  EXPECT_TRUE(getDSMPStatus(EXTERNAL_MODULE).isValid());
+
+  DSMPDriver.deinit(ctx);
+}
+
+TEST_F(PulsesTest, dsmpSingleManufacturerPacketDoesNotUpdateVersion)
+{
+  modulePortInit();
+  g_model.moduleData[EXTERNAL_MODULE].type = MODULE_TYPE_LEMON_DSMP;
+
+  auto ctx = DSMPDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  feedDsmpManufacturerVersion(ctx, 2, 0);
+
+  EXPECT_EQ(getDSMPStatus(EXTERNAL_MODULE).version[0], 1);
+  EXPECT_EQ(getDSMPStatus(EXTERNAL_MODULE).version[1], 0);
+
+  DSMPDriver.deinit(ctx);
+}
+
+TEST_F(PulsesTest, dsmpRejectsInvalidManufacturerVersion)
+{
+  modulePortInit();
+  g_model.moduleData[EXTERNAL_MODULE].type = MODULE_TYPE_LEMON_DSMP;
+
+  auto ctx = DSMPDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  feedDsmpManufacturerVersion(ctx, 10, 0);
+  feedDsmpManufacturerVersion(ctx, 10, 0);
+
+  EXPECT_EQ(getDSMPStatus(EXTERNAL_MODULE).version[0], 1);
+  EXPECT_EQ(getDSMPStatus(EXTERNAL_MODULE).version[1], 0);
+
+  DSMPDriver.deinit(ctx);
+}
+
+TEST_F(PulsesTest, dsmpBindSetupDoesNotDirtyWhenFlagsUnchanged)
+{
+  modulePortInit();
+  g_model.moduleData[EXTERNAL_MODULE].type = MODULE_TYPE_LEMON_DSMP;
+  g_model.moduleData[EXTERNAL_MODULE].dsmp.flags = 0x07;
+  moduleState[EXTERNAL_MODULE].mode = MODULE_MODE_BIND;
+  storageDirtyMsk = 0;
+
+  auto ctx = DSMPDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  uint8_t buffer[MODULE_BUFFER_SIZE] = {};
+  DSMPDriver.sendPulses(ctx, buffer, nullptr, 0);
+  memset(buffer, 0, sizeof(buffer));
+  DSMPDriver.sendPulses(ctx, buffer, nullptr, 0);
+
+  EXPECT_EQ(buffer[0], 0xAA);
+  EXPECT_EQ(buffer[1], 0);
+  EXPECT_EQ(storageDirtyMsk & EE_MODEL, 0);
+
+  storageDirtyMsk = 0;
+  moduleState[EXTERNAL_MODULE].mode = MODULE_MODE_NORMAL;
+  DSMPDriver.deinit(ctx);
+}
+
+TEST_F(PulsesTest, dsmpBindClampsHighChannelCount)
+{
+  modulePortInit();
+  g_model.moduleData[EXTERNAL_MODULE].type = MODULE_TYPE_LEMON_DSMP;
+  g_model.moduleData[EXTERNAL_MODULE].channelsCount = 0;
+  moduleState[EXTERNAL_MODULE].mode = MODULE_MODE_BIND;
+
+  auto ctx = DSMPDriver.init(EXTERNAL_MODULE);
+  ASSERT_NE(ctx, nullptr);
+
+  const uint8_t bindPacket[DSM_BIND_PACKET_LENGTH] = {
+      0xAA, 0x80, 0x07, 0x00, 20, 0xB2,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+  feedDsmpPacket(ctx, bindPacket, sizeof(bindPacket));
+
+  EXPECT_EQ(g_model.moduleData[EXTERNAL_MODULE].channelsCount, 4);
+  EXPECT_EQ(moduleState[EXTERNAL_MODULE].mode, MODULE_MODE_NORMAL);
 
   DSMPDriver.deinit(ctx);
 }
@@ -715,6 +897,46 @@ TEST_F(PulsesTest, pxx1R9MRejectsInvalidSubtype)
 
   EXPECT_EQ(buffer[2], MODULE_SUBTYPE_R9M_FCC << 6);
 }
+
+TEST_F(PulsesTest, pxx1SportTelemetryRejectsInvalidSizes)
+{
+  uint8_t payloadSize = 0xA5;
+
+  outputTelemetryBuffer.size = 0;
+  outputTelemetryBuffer.setDestination(TELEMETRY_ENDPOINT_SPORT);
+  EXPECT_FALSE(pxx1PrepareSportTelemetryPayloadForTest(payloadSize));
+  EXPECT_EQ(outputTelemetryBuffer.destination, TELEMETRY_ENDPOINT_NONE);
+
+  outputTelemetryBuffer.size = 1;
+  outputTelemetryBuffer.data[0] = 0x7E;
+  outputTelemetryBuffer.setDestination(TELEMETRY_ENDPOINT_SPORT);
+  EXPECT_FALSE(pxx1PrepareSportTelemetryPayloadForTest(payloadSize));
+  EXPECT_EQ(outputTelemetryBuffer.destination, TELEMETRY_ENDPOINT_NONE);
+
+  outputTelemetryBuffer.size = TELEMETRY_OUTPUT_BUFFER_SIZE + 1;
+  outputTelemetryBuffer.setDestination(TELEMETRY_ENDPOINT_SPORT);
+  EXPECT_FALSE(pxx1PrepareSportTelemetryPayloadForTest(payloadSize));
+  EXPECT_EQ(outputTelemetryBuffer.destination, TELEMETRY_ENDPOINT_NONE);
+}
+
+TEST_F(PulsesTest, pxx1SportTelemetryPayloadDropsPhysicalId)
+{
+  outputTelemetryBuffer.size = 4;
+  outputTelemetryBuffer.data[0] = 0x1B;
+  outputTelemetryBuffer.data[1] = 0x10;
+  outputTelemetryBuffer.data[2] = 0x20;
+  outputTelemetryBuffer.data[3] = 0x30;
+  outputTelemetryBuffer.setDestination(TELEMETRY_ENDPOINT_SPORT);
+
+  uint8_t payloadSize = 0;
+  EXPECT_TRUE(pxx1PrepareSportTelemetryPayloadForTest(payloadSize));
+  EXPECT_EQ(payloadSize, 3);
+  EXPECT_EQ(outputTelemetryBuffer.data[0], 0x10);
+  EXPECT_EQ(outputTelemetryBuffer.data[1], 0x20);
+  EXPECT_EQ(outputTelemetryBuffer.data[2], 0x30);
+
+  outputTelemetryBuffer.reset();
+}
 #endif
 
 #if defined(PXX2) && defined(HARDWARE_INTERNAL_MODULE)
@@ -760,6 +982,24 @@ TEST_F(PulsesTest, pxx2IsrmRejectsInvalidSubtype)
   ASSERT_TRUE(frame.setupFrame(INTERNAL_MODULE, nullptr, 0));
 
   EXPECT_EQ(buffer[5], MODULE_SUBTYPE_ISRM_PXX2_ACCESS << 4);
+}
+
+TEST_F(PulsesTest, pxx2AccessBindMissingStateFallsBackToChannels)
+{
+  g_model.moduleData[INTERNAL_MODULE].type = MODULE_TYPE_ISRM_PXX2;
+  g_model.moduleData[INTERNAL_MODULE].subType = MODULE_SUBTYPE_ISRM_PXX2_ACCESS;
+  g_model.moduleData[INTERNAL_MODULE].channelsCount = 0;
+  g_model.moduleData[INTERNAL_MODULE].failsafeMode = FAILSAFE_NOT_SET;
+  moduleState[INTERNAL_MODULE].mode = MODULE_MODE_BIND;
+  moduleState[INTERNAL_MODULE].bindInformation = nullptr;
+
+  uint8_t buffer[MODULE_BUFFER_SIZE] = {};
+  Pxx2Pulses frame(buffer);
+  ASSERT_TRUE(frame.setupFrame(INTERNAL_MODULE, nullptr, 0));
+
+  EXPECT_EQ(moduleState[INTERNAL_MODULE].mode, MODULE_MODE_NORMAL);
+  EXPECT_EQ(buffer[2], PXX2_TYPE_C_MODULE);
+  EXPECT_EQ(buffer[3], PXX2_TYPE_ID_CHANNELS);
 }
 #endif
 
@@ -856,6 +1096,24 @@ TEST_F(PulsesTest, pxx2RejectsShortBindFrame)
 
   EXPECT_EQ(reusableBuffer.moduleSetup.bindInformation.candidateReceiversCount,
             0);
+}
+
+TEST_F(PulsesTest, pxx2BindTelemetryMissingStateReturnsToNormal)
+{
+  moduleState[INTERNAL_MODULE].bindInformation = nullptr;
+  moduleState[INTERNAL_MODULE].mode = MODULE_MODE_BIND;
+
+  GuardedPxx2Frame guardedFrame(4 + PXX2_LEN_RX_NAME - 1);
+  ASSERT_TRUE(guardedFrame.isValid());
+
+  uint8_t * frame = guardedFrame.data();
+  frame[1] = PXX2_TYPE_C_MODULE;
+  frame[2] = PXX2_TYPE_ID_BIND;
+  frame[3] = 0;
+
+  processPXX2Frame(INTERNAL_MODULE, frame, nullptr, nullptr);
+
+  EXPECT_EQ(moduleState[INTERNAL_MODULE].mode, MODULE_MODE_NORMAL);
 }
 
 TEST_F(PulsesTest, pxx2RejectsShortHardwareInfoFrame)

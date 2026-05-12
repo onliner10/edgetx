@@ -1,0 +1,72 @@
+---
+name: TX16S MK2/MK3 Protocol Fuzz
+
+on:
+  push:
+    branches:
+      - 'main'
+      - '[0-9]+.[0-9]+'
+    paths:
+      - '.github/workflows/protocol_fuzz.yml'
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+      - 'cmake/**'
+      - 'radio/src/pulses/**'
+      - 'radio/src/telemetry/frsky*'
+      - 'radio/src/telemetry/spektrum*'
+      - 'radio/src/tests/CMakeLists.txt'
+      - 'radio/src/tests/fuzz/protocols*'
+      - 'requirements.txt'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.gitmodules'
+  pull_request:
+    paths:
+      - '.github/workflows/protocol_fuzz.yml'
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+      - 'cmake/**'
+      - 'radio/src/pulses/**'
+      - 'radio/src/telemetry/frsky*'
+      - 'radio/src/telemetry/spektrum*'
+      - 'radio/src/tests/CMakeLists.txt'
+      - 'radio/src/tests/fuzz/protocols*'
+      - 'requirements.txt'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.gitmodules'
+  workflow_dispatch:
+
+jobs:
+  protocol-fuzz:
+    name: Protocol fuzz smoke
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/edgetx/edgetx-dev:latest
+      volumes:
+        - ${{ github.workspace }}:/src
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install Clang
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends clang
+          rm -rf /var/lib/apt/lists/*
+
+      - name: Run protocol fuzzer smoke
+        env:
+          CC: clang
+          CXX: clang++
+          EDGE16_UV_ACTIVE: 1
+          ASAN_OPTIONS: "abort_on_error=1:detect_leaks=0"
+          UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
+        run: |
+          uv run --with-requirements requirements.txt bash -lc \
+            'cmake --preset fuzzers && cmake --build --preset fuzz-protocols-smoke'

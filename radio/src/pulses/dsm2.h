@@ -28,6 +28,8 @@
 // DSM2/DSMX
 
 extern etx_module_state_t* dsmInit(uint8_t module, uint32_t baudrate,
-                                   uint16_t period, bool telemetry);
+                                   uint16_t period, bool telemetry,
+                                   bool telemetryRequired = false,
+                                   bool* telemetryStarted = nullptr);
 extern void dsmDeInit(void* ctx);
 extern const etx_proto_driver_t DSM2Driver;
