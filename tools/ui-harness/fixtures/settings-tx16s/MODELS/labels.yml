@@ -4,13 +4,13 @@ Labels:
 Sort: 1
 Models:
   model1.yml:
-    hash: "97300000a95c2592"
-    name: "'Sim Bigfoot"
-    labels: "sim"
-    bitmap: "bigfoot.png"
+    hash: "241a0000ac5ca2ae"
+    name: "MODEL01"
+    labels: ""
+    bitmap: ""
     lastopen: 1778350103
   model4.yml:
-    hash: "192d0000a75cd17c"
+    hash: "6b2a0000ac5cbda2"
     name: "'Habu50EDF sim"
     labels: "sim"
     bitmap: "habu.png"

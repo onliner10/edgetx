@@ -969,6 +969,46 @@ void invalidateFlightBatteryPackSlot(uint8_t slot)
 
 static void confirmFlightBatteryPackImpl(uint8_t monitor, uint8_t selectedPackSlot);
 
+static void classifyPresentFlightBattery(uint8_t monitorIndex,
+                                         const BatteryMonitorData& config,
+                                         uint16_t packVoltageCv)
+{
+  FlightBatteryRuntimeState& runtime = flightBatteryRuntimeState[monitorIndex];
+
+  uint16_t matchingMask = 0;
+  const uint8_t matchCount =
+      buildVoltageCompatiblePackMask(config, packVoltageCv, matchingMask);
+
+  if (matchCount == 1) {
+    confirmFlightBatteryPackImpl(monitorIndex, firstPackSlotFromMask(matchingMask));
+  } else if (matchCount > 1) {
+    if (runtime.state != FlightBatterySessionState::NeedsConfirmation ||
+        runtime.promptPackMask != matchingMask) {
+      runtime.promptShown = false;
+    }
+    runtime.state = FlightBatterySessionState::NeedsConfirmation;
+    runtime.promptPackMask = matchingMask;
+  } else if (config.compatiblePackMask == 0 && isValidManualLipoConfig(config)) {
+    if (flightBatteryPackMatchesLipo(packVoltageCv, config.cellCount)) {
+      if (runtime.state != FlightBatterySessionState::NeedsConfirmation ||
+          runtime.promptPackMask != 0) {
+        runtime.promptShown = false;
+      }
+      runtime.state = FlightBatterySessionState::NeedsConfirmation;
+      runtime.promptPackMask = 0;
+    } else {
+      runtime.promptPackMask = 0;
+      runtime.state = FlightBatterySessionState::VoltageMismatch;
+    }
+  } else if (config.compatiblePackMask == 0) {
+    runtime.promptPackMask = 0;
+    runtime.state = FlightBatterySessionState::NeedsConfiguration;
+  } else {
+    runtime.promptPackMask = 0;
+    runtime.state = FlightBatterySessionState::VoltageMismatch;
+  }
+}
+
 void updateFlightBatterySessions()
 {
   for (uint8_t monitorIndex = 0; monitorIndex < MAX_BATTERY_MONITORS; monitorIndex++) {
@@ -1002,32 +1042,7 @@ void updateFlightBatterySessions()
         runtime.absentSeconds = 0;
         runtime.presentSeconds++;
         if (runtime.presentSeconds >= FLIGHT_BATTERY_PRESENT_DEBOUNCE_SECONDS) {
-          uint16_t matchingMask = 0;
-          const uint8_t matchCount = buildVoltageCompatiblePackMask(
-              config, packVoltageCv, matchingMask);
-
-          if (matchCount == 1) {
-            confirmFlightBatteryPackImpl(monitorIndex,
-                                         firstPackSlotFromMask(matchingMask));
-          } else if (matchCount > 1) {
-            runtime.state = FlightBatterySessionState::NeedsConfirmation;
-            runtime.promptPackMask = matchingMask;
-            runtime.promptShown = false;
-          } else {
-            if (config.compatiblePackMask == 0 && isValidManualLipoConfig(config)) {
-              if (flightBatteryPackMatchesLipo(packVoltageCv, config.cellCount)) {
-                runtime.state = FlightBatterySessionState::NeedsConfirmation;
-                runtime.promptPackMask = 0;
-                runtime.promptShown = false;
-              } else {
-                runtime.state = FlightBatterySessionState::VoltageMismatch;
-              }
-            } else if (config.compatiblePackMask == 0) {
-              runtime.state = FlightBatterySessionState::NeedsConfiguration;
-            } else {
-              runtime.state = FlightBatterySessionState::VoltageMismatch;
-            }
-          }
+          classifyPresentFlightBattery(monitorIndex, config, packVoltageCv);
         }
       }
     } else if (currentState == FlightBatterySessionState::Confirmed ||
@@ -1079,24 +1094,7 @@ void updateFlightBatterySessions()
       } else {
         runtime.presentSeconds = 0;
         runtime.absentSeconds = 0;
-
-        if (currentState == FlightBatterySessionState::NeedsConfirmation) {
-          uint16_t matchingMask = 0;
-          const uint8_t matchCount = buildVoltageCompatiblePackMask(
-              config, packVoltageCv, matchingMask);
-
-          if (matchCount == 1) {
-            confirmFlightBatteryPackImpl(monitorIndex,
-                                         firstPackSlotFromMask(matchingMask));
-          } else if (matchCount > 1) {
-            runtime.promptPackMask = matchingMask;
-          } else if (!flightBatteryPromptAllowsManual(monitorIndex) ||
-                     !flightBatteryPackMatchesLipo(packVoltageCv,
-                                                   config.cellCount)) {
-            runtime.promptPackMask = 0;
-            runtime.state = FlightBatterySessionState::VoltageMismatch;
-          }
-        }
+        classifyPresentFlightBattery(monitorIndex, config, packVoltageCv);
       }
     }
 
@@ -1378,7 +1376,8 @@ static void checkFlightBatteryMissingTelemetryAfterArming()
 
   for (uint8_t i = 0; i < MAX_BATTERY_MONITORS; i++) {
     if (hasMissingArmedFlightBatteryTelemetry(g_model.batteryMonitors[i])) {
-      AUDIO_WARNING1();
+      audioQueue.playTone(BEEP_DEFAULT_FREQ + 1500, 800, 20,
+                          PLAY_REPEAT(1) | PLAY_NOW);
       warningPlayed = true;
       return;
     }

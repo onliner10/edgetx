@@ -97,10 +97,27 @@ static SDL_Renderer* renderer;
 static SDL_Texture* screen_frame_buffer;
 static bool automation_stdio = false;
 static bool automation_telemetry_streaming = false;
+static bool automation_wait_pending = false;
+static uint32_t automation_wait_deadline = 0;
 
 static std::mutex inputStateMutex;
 static GimbalState stick_left = {{0.5f, 0.5f}, false};
 static GimbalState stick_right = {{0.5f, 0.5f}, false};
+static int switch_positions[MAX_SWITCHES] = {0};
+
+static int switchPositionToSliderValue(uint8_t switch_idx, int position)
+{
+  if (IS_CONFIG_3POS(switch_idx)) {
+    return position < 0 ? 0 : position > 0 ? 2 : 1;
+  }
+  return position < 0 ? 0 : 1;
+}
+
+static void setSwitchPosition(uint8_t switch_idx, int position)
+{
+  switch_positions[switch_idx] = switchPositionToSliderValue(switch_idx, position);
+  simuSetSwitch(switch_idx, position);
+}
 
 #if !defined(__EMSCRIPTEN__)
 static const unsigned char _icon_png[] = {
@@ -275,17 +292,14 @@ static void automation_handle_command(const std::string& line)
   } else if (command == "wait") {
     int duration_ms = 0;
     in >> duration_ms;
-    const int kChunkMs = 10;
-    for (int remaining = std::max(0, duration_ms); remaining > 0; remaining -= kChunkMs) {
-      SDL_Delay(std::min(kChunkMs, remaining));
-      SDL_Event ev;
-      while (SDL_PollEvent(&ev)) {
-        if (ev.type == SDL_QUIT) {
-          break;
-        }
-      }
+    const uint32_t wait_ms = static_cast<uint32_t>(std::max(0, duration_ms));
+    if (wait_ms == 0) {
+      automation_reply_ok();
+      return;
     }
-    automation_reply_ok();
+
+    automation_wait_pending = true;
+    automation_wait_deadline = SDL_GetTicks() + wait_ms;
   } else if (command == "ui_tree") {
     std::string json;
     std::string error;
@@ -376,7 +390,7 @@ static void automation_handle_command(const std::string& line)
       automation_reply_error("invalid switch index");
       return;
     }
-    simuSetSwitch(switch_idx, position);
+    setSwitchPosition(switch_idx, position);
     std::ostringstream extra;
     extra << "\"armed\":" << (isModelArmedState() ? 1 : 0);
     automation_reply_ok(extra.str());
@@ -396,7 +410,7 @@ static void automation_handle_command(const std::string& line)
         automation_reply_error("invalid switch sequence step");
         return;
       }
-      simuSetSwitch(switch_idx, position);
+      setSwitchPosition(switch_idx, position);
       if (automation_telemetry_streaming) {
         simuSetTelemetryStreaming(100);
       }
@@ -432,6 +446,14 @@ static void automation_handle_command(const std::string& line)
 static void automation_poll_stdin()
 {
   if (!automation_stdio) return;
+
+  if (automation_wait_pending) {
+    if (SDL_TICKS_PASSED(SDL_GetTicks(), automation_wait_deadline)) {
+      automation_wait_pending = false;
+      automation_reply_ok();
+    }
+    return;
+  }
 
 #if defined(_WIN32)
   return;
@@ -593,6 +615,28 @@ static bool handleKeyEvents(SDL_Event& event)
   return false;
 }
 
+static void handleTimerEvents()
+{
+  static uint32_t next_tick = 0;
+  const uint32_t now = SDL_GetTicks();
+
+  if (next_tick == 0) {
+    next_tick = now + TIMER_INTERVAL;
+    return;
+  }
+
+  uint8_t ticks = 0;
+  while (SDL_TICKS_PASSED(now, next_tick) && ticks < 10) {
+    per10ms();
+    next_tick += TIMER_INTERVAL;
+    ticks++;
+  }
+
+  if (ticks == 10 && SDL_TICKS_PASSED(now, next_tick)) {
+    next_tick = now + TIMER_INTERVAL;
+  }
+}
+
 static void redraw();
 
 static bool handleEvents()
@@ -617,6 +661,7 @@ static bool handleEvents()
   if (automation_telemetry_streaming) {
     simuSetTelemetryStreaming(100);
   }
+  handleTimerEvents();
   redraw();
   automation_poll_stdin();
   return true;
@@ -668,8 +713,6 @@ static void draw_switches()
 
   ImGui::PushID("switches");
   {
-    static int switches[MAX_SWITCHES] = {0};
-
     ImGui::BeginGroup();
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(spacing, spacing));
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
@@ -682,12 +725,12 @@ static void draw_switches()
       if (!switchIsCustomSwitch(i)) {
         if (++sw_idx >= MAX_SWITCHES / 2) sw_idx = 0;
         if (!SWITCH_EXISTS(i)) {
-          switches[i] = 0;
+          switch_positions[i] = 0;
           ImGui::Dummy(sw_size);
         } else {
           ImGui::PushID(i);
           ImGui::VSliderInt("##sw", sw_size,
-                            &switches[i], IS_CONFIG_3POS(i) ? 2 : 1,
+                            &switch_positions[i], IS_CONFIG_3POS(i) ? 2 : 1,
                             0, "", ImGuiSliderFlags_NoInput);
           if (ImGui::IsItemActive() || ImGui::IsItemHovered()) {
             ImGui::SetTooltip("%s", switchGetDefaultName(i));
@@ -696,9 +739,9 @@ static void draw_switches()
         }
         
         if (IS_CONFIG_3POS(i)) {
-          simuSetSwitch(i, switches[i] == 0 ? -1 : switches[i] == 1 ? 0 : 1);
+          simuSetSwitch(i, switch_positions[i] == 0 ? -1 : switch_positions[i] == 1 ? 0 : 1);
         } else {
-          simuSetSwitch(i, switches[i] == 0 ? -1 : 1);
+          simuSetSwitch(i, switch_positions[i] == 0 ? -1 : 1);
         }
       }
     }

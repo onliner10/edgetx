@@ -1,4 +1,4 @@
-checksum: 63545
+checksum: 10451
 manuallyEdited: 0
 timezoneMinutes: 0
 ppmunit: 0
@@ -110,18 +110,7 @@ speakerVolume: 12
 vBatMin: 67
 vBatMax: 83
 backlightBright: 0
-globalTimer: 520
-batteryPacks:
-   0:
-      name: ""
-      capacity: 2200
-      cellCount: 3
-      active: 1
-   1:
-      name: ""
-      capacity: 100
-      cellCount: 3
-      active: 1
+globalTimer: 7
 bluetoothBaudrate: 0
 bluetoothMode: OFF
 countryCode: 0

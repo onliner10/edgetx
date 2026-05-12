@@ -1,10 +1,10 @@
-checksum: 44530
+checksum: 45604
 manuallyEdited: 0
 timezoneMinutes: 0
 ppmunit: 0
 semver: 3.0.0
 board: tx16s
-calib: 
+calib:
    LH:
       mid: 1023
       spanNeg: 1008
@@ -65,8 +65,8 @@ disableRtcWarning: 0
 keysBacklight: 0
 dontPlayHello: 0
 internalModule: TYPE_MULTIMODULE
-trainer: 
-   mix: 
+trainer:
+   mix:
       0:
          srcChn: 0
          mode: REPL
@@ -110,18 +110,18 @@ speakerVolume: 12
 vBatMin: 67
 vBatMax: 83
 backlightBright: 0
-globalTimer: 10671
+globalTimer: 5213
 batteryPacks:
- -
-   name: ""
-   capacity: 2200
-   cellCount: 3
-   active: 1
- -
-   name: ""
-   capacity: 100
-   cellCount: 3
-   active: 1
+   0:
+      name: ""
+      capacity: 2200
+      cellCount: 3
+      active: 1
+   1:
+      name: ""
+      capacity: 100
+      cellCount: 3
+      active: 1
 bluetoothBaudrate: 0
 bluetoothMode: OFF
 countryCode: 0
@@ -141,7 +141,7 @@ backgroundVolume: 3
 varioPitch: 0
 varioRange: 0
 varioRepeat: 0
-potsConfig: 
+potsConfig:
    P1:
       type: with_detent
       inv: 0
@@ -150,19 +150,7 @@ potsConfig:
       type: multipos_switch
       inv: 0
       name: ""
-   P3:
-      type: with_detent
-      inv: 0
-      name: ""
-   SL1:
-      type: slider
-      inv: 0
-      name: ""
-   SL2:
-      type: slider
-      inv: 0
-      name: ""
-switchConfig: 
+switchConfig:
    SA:
       name: ""
       type: 3POS
@@ -230,7 +218,7 @@ modelSelectLayout: 0
 radioThemesDisabled: 0
 oneLogPerDay: 0
 pwrOffIfInactive: 0
-keyShortcuts: 
+keyShortcuts:
    0:
       shortcut: MODEL_SETUP
    1:

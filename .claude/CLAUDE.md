@@ -1,0 +1,1 @@
+/home/mateusz/git/Edge16.worktrees/testing-setup/AGENTS.md

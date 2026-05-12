@@ -15,7 +15,7 @@ extendedLimits: 0
 extendedTrims: 0
 throttleReversed: 0
 enableCustomThrottleWarning: 0
-disableTelemetryWarning: 1
+disableTelemetryWarning: 0
 showInstanceIds: 0
 checklistInteractive: 0
 customThrottleWarningPosition: 0
@@ -147,8 +147,6 @@ expoData:
    flightModes: 000000000
    name: ""
 thrTraceSrc: Thr
-armingEnabled: 1
-armingThrottleChannel: 0
 switchWarning:
    SA:
       pos: up
@@ -168,18 +166,6 @@ rssiSource: none
 rfAlarms:
    warning: 45
    critical: 42
-batteryMonitors:
-   0:
-      enabled: 1
-      batteryType: TYPE_LIPO
-      capAlertEnabled: 1
-      voltAlertEnabled: 1
-      cellCount: 3
-      capacity: 2200
-      sourceIndex: 4
-      currentIndex: 6
-      selectedPackSlot: 1
-      compatiblePackMask: 3
 thrTrimSw: 0
 potsWarnMode: WARN_OFF
 jitterFilter: GLOBAL
@@ -193,44 +179,6 @@ inputNames:
    3:
       val: "Ail"
 potsWarnEnabled: 0
-telemetrySensors:
-   3:
-      id1:
-         id: 528
-      id2:
-         instance: 2
-      label: "VFAS"
-      subId: 0
-      type: TYPE_CUSTOM
-      unit: 1
-      prec: 2
-      autoOffset: 0
-      filter: 0
-      logs: 1
-      persistent: 0
-      onlyPositive: 0
-      cfg:
-         custom:
-            ratio: 0
-            offset: 0
-   5:
-      id1:
-         id: 0
-      id2:
-         formula: FORMULA_CONSUMPTION
-      label: "Capa"
-      subId: 0
-      type: TYPE_CALCULATED
-      unit: 14
-      prec: 0
-      autoOffset: 0
-      filter: 0
-      logs: 1
-      persistent: 0
-      onlyPositive: 1
-      cfg:
-         consumption:
-            source: 5
 screenData:
    0:
       LayoutId: Layout2P1

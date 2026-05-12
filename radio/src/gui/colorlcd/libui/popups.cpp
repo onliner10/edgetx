@@ -163,9 +163,14 @@ void POPUP_BUBBLE(const char* message, uint32_t timeout, coord_t width)
 
 void show_ui_popup_battery_confirm(uint8_t monitor)
 {
+  static bool batteryConfirmOpen = false;
+  if (batteryConfirmOpen) return;
+
   auto mask = flightBatteryPromptPackMask(monitor);
   auto dialog = new (std::nothrow) BatteryConfirmDialog(monitor, mask);
   if (dialog) {
+    batteryConfirmOpen = true;
     MainWindow::instance()->blockUntilClosed(*dialog, true);
+    batteryConfirmOpen = false;
   }
 }
