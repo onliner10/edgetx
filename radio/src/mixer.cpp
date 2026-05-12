@@ -1172,7 +1172,12 @@ static int8_t s_sf_idx = -1;
 static int8_t s_sh_idx = -1;
 static bool s_last_sh_down = false;
 static bool s_sf_was_down = false;
+static bool s_sh_press_pending = false;
+static uint8_t s_sh_press_ticks = 0;
 static bool s_wasArmed = false;
+
+static constexpr uint8_t ARMING_SH_PRESS_MIN_TICKS = 1;
+static constexpr uint8_t ARMING_SH_PRESS_MAX_TICKS = 100;
 
 void resetArmingState()
 {
@@ -1180,6 +1185,8 @@ void resetArmingState()
   s_armed_output = false;
   s_last_sh_down = false;
   s_sf_was_down = false;
+  s_sh_press_pending = false;
+  s_sh_press_ticks = 0;
   s_wasArmed = false;
   s_sf_idx = -1;
   s_sh_idx = -1;
@@ -1191,6 +1198,8 @@ static void updateArmingState()
     s_armed_state = false;
     s_sf_was_down = false;
     s_last_sh_down = false;
+    s_sh_press_pending = false;
+    s_sh_press_ticks = 0;
     return;
   }
 
@@ -1207,12 +1216,33 @@ static void updateArmingState()
   if (!sf_down) {
     s_armed_state = false;
     s_sf_was_down = false;
+    s_sh_press_pending = false;
+    s_sh_press_ticks = 0;
     s_last_sh_down = sh_down;
     return;
   }
 
-  if (sh_down && !s_last_sh_down && s_sf_was_down) {
-    s_armed_state = true;
+  if (!s_armed_state) {
+    if (sh_down) {
+      if (!s_last_sh_down && s_sf_was_down) {
+        s_sh_press_pending = true;
+        s_sh_press_ticks = 1;
+      } else if (s_sh_press_pending &&
+                 s_sh_press_ticks <= ARMING_SH_PRESS_MAX_TICKS) {
+        s_sh_press_ticks += 1;
+      }
+    } else {
+      if (s_sh_press_pending &&
+          s_sh_press_ticks >= ARMING_SH_PRESS_MIN_TICKS &&
+          s_sh_press_ticks <= ARMING_SH_PRESS_MAX_TICKS) {
+        s_armed_state = true;
+      }
+      s_sh_press_pending = false;
+      s_sh_press_ticks = 0;
+    }
+  } else {
+    s_sh_press_pending = false;
+    s_sh_press_ticks = 0;
   }
 
   s_sf_was_down = sf_down;
@@ -1365,11 +1395,7 @@ void evalMixes(uint8_t tick10ms)
     // The arming gate below modifies `value` before setChannelOutput (final RF output).
     if (g_model.armingEnabled && i == armingThrottleChannel) {
       LimitData* lim = limitAddress(i);
-      int16_t idle_threshold = lim->revert ? (LIMIT_MAX_RESX(lim) * 3 / 4)
-                                            : (LIMIT_MIN_RESX(lim) * 3 / 4);
-      bool throttle_idle = lim->revert ? (value >= idle_threshold)
-                                       : (value <= idle_threshold);
-      if (armingChannelValid && s_armed_state && throttle_idle) {
+      if (armingChannelValid && s_armed_state) {
         s_armed_output = true;
       } else {
         value = lim->revert ? LIMIT_MAX_RESX(lim) : LIMIT_MIN_RESX(lim);
