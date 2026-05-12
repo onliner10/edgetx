@@ -30,6 +30,7 @@
 #include "hal/trainer_driver.h"
 #include "hal/switch_driver.h"
 #include "hal/audio_driver.h"
+#include "telemetry/battery_monitor.h"
 
 #if defined(LUMINOSITY_SENSOR)
 #include "luminosity_sensor.h"
@@ -1235,7 +1236,13 @@ static void updateArmingState()
       if (s_sh_press_pending &&
           s_sh_press_ticks >= ARMING_SH_PRESS_MIN_TICKS &&
           s_sh_press_ticks <= ARMING_SH_PRESS_MAX_TICKS) {
-        s_armed_state = true;
+        if (!flightBatteryArmingAllowed()) {
+          requestFlightBatteryBlockedPrompt();
+          setArmingBlockReason(flightBatteryArmingBlockReason());
+          s_armed_state = false;
+        } else {
+          s_armed_state = true;
+        }
       }
       s_sh_press_pending = false;
       s_sh_press_ticks = 0;

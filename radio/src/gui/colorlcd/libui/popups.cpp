@@ -22,6 +22,7 @@
 #include "popups.h"
 
 #include "dialog.h"
+#include "dialogs/battery_confirm_dialog.h"
 #include "edgetx.h"
 #include "etx_lv_theme.h"
 #include "hal/watchdog_driver.h"
@@ -29,6 +30,7 @@
 #include "mainwindow.h"
 #include "os/sleep.h"
 #include "pwr.h"
+#include "telemetry/battery_monitor.h"
 
 #include <new>
 
@@ -157,4 +159,13 @@ class BubbleDialog : public Window
 void POPUP_BUBBLE(const char* message, uint32_t timeout, coord_t width)
 {
   new (std::nothrow) BubbleDialog(message, timeout, width);
+}
+
+void show_ui_popup_battery_confirm(uint8_t monitor)
+{
+  auto mask = flightBatteryPromptPackMask(monitor);
+  auto dialog = new (std::nothrow) BatteryConfirmDialog(monitor, mask);
+  if (dialog) {
+    MainWindow::instance()->blockUntilClosed(*dialog, true);
+  }
 }

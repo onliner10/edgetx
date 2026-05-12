@@ -425,6 +425,7 @@
 #define STR_BATT_CALIB currentLangStrings->STR_BATT_CALIB
 #define STR_BATTERY_RANGE currentLangStrings->STR_BATTERY_RANGE
 #define STR_BATTERY currentLangStrings->STR_BATTERY
+#define STR_BATTERY_PACKS currentLangStrings->STR_BATTERY_PACKS
 #define STR_BATTERYCHARGING currentLangStrings->STR_BATTERYCHARGING
 #define STR_BATTERYFULL currentLangStrings->STR_BATTERYFULL
 #define STR_BATTERYNONE currentLangStrings->STR_BATTERYNONE

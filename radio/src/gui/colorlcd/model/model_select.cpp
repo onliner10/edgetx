@@ -176,7 +176,7 @@ class ModelButton : public Button
 
   void onLiveClicked(LiveWindow& live) override
   {
-    setFocused();
+    if (!hasState(LV_STATE_FOCUSED)) focus();
     ButtonBase::onLiveClicked(live);
     if (!acceptsEvents()) return;
     if (m_setSelected) m_setSelected();

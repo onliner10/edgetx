@@ -10,6 +10,7 @@ include_directories(
   ${RADIO_SRC_DIR}/gui/colorlcd
   ${RADIO_SRC_DIR}/gui/colorlcd/layouts
   ${RADIO_SRC_DIR}/gui/colorlcd/libui
+  ${RADIO_SRC_DIR}/gui/colorlcd/dialogs
   ${RADIO_SRC_DIR}/gui/colorlcd/model
   ${RADIO_SRC_DIR}/gui/colorlcd/radio
   ${RADIO_SRC_DIR}/gui/colorlcd/module
@@ -57,6 +58,8 @@ set(GUI_SRC
   LvglWrapper.cpp
   startup_shutdown.cpp
 
+  dialogs/battery_confirm_dialog.cpp
+
   model/curveedit.cpp
   model/input_edit.cpp
   model/mixer_edit_adv.cpp
@@ -77,6 +80,7 @@ set(GUI_SRC
   model/special_functions.cpp
   model/timer_setup.cpp
   model/trainer_setup.cpp
+  model/battery_monitor_setup.cpp
 
   module/bind_menu_d16.cpp
   module/custom_failsafe.cpp
@@ -94,6 +98,7 @@ set(GUI_SRC
   radio/radio_hardware.cpp
   radio/radio_sdmanager.cpp
   radio/radio_setup.cpp
+  radio/battery_packs.cpp
   radio/radio_theme.cpp
   radio/radio_tools.cpp
   radio/radio_trainer.cpp

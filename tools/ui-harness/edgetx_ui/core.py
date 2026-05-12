@@ -442,7 +442,8 @@ class SdlAutomationSession:
         )
 
     def wait(self, ms: int) -> dict[str, Any]:
-        return self.command(f"wait {int(ms)}")
+        wait_ms = int(ms)
+        return self.command(f"wait {wait_ms}", timeout=max(5.0, wait_ms / 1000.0 + 2.0))
 
     def set_telemetry(self, name: str, value: float) -> dict[str, Any]:
         return self.command(f"set_telemetry {name} {int(value)}")
@@ -452,6 +453,20 @@ class SdlAutomationSession:
 
     def set_switch(self, index: int, position: int) -> dict[str, Any]:
         return self.command(f"set_switch {int(index)} {int(position)}")
+
+    def switch_sequence(self, steps: list[dict[str, int]]) -> dict[str, Any]:
+        encoded_steps = []
+        for step in steps:
+            encoded_steps.extend(
+                [
+                    str(int(step["index"])),
+                    str(int(step["position"])),
+                    str(int(step.get("duration_ms", 0))),
+                ]
+            )
+        return self.command(
+            f"switch_sequence {len(steps)} {' '.join(encoded_steps)}"
+        )
 
     def audio_history(self, max_lines: int = 200) -> dict[str, Any]:
         return self.command(f"audio_history {int(max_lines)}")
@@ -694,6 +709,9 @@ class HarnessService:
     def set_switch(self, index: int, position: int) -> dict[str, Any]:
         return self.require_session().set_switch(index, position)
 
+    def switch_sequence(self, steps: list[dict[str, int]]) -> dict[str, Any]:
+        return self.require_session().switch_sequence(steps)
+
     def audio_history(self, max_lines: int = 200) -> dict[str, Any]:
         return self.require_session().audio_history(max_lines)
 
@@ -711,6 +729,9 @@ class HarnessService:
 
     def set_switch(self, index: int, position: int) -> dict[str, Any]:
         return self.require_session().set_switch(index, position)
+
+    def switch_sequence(self, steps: list[dict[str, int]]) -> dict[str, Any]:
+        return self.require_session().switch_sequence(steps)
 
     def audio_history(self, max_lines: int = 200) -> dict[str, Any]:
         return self.require_session().audio_history(max_lines)
@@ -798,6 +819,8 @@ class HarnessService:
                 int(value.get("duration_ms", 300)),
                 int(value.get("steps", 12)),
             )
+        elif "switch_sequence" in step:
+            self.switch_sequence(step["switch_sequence"])
         elif "screenshot" in step:
             screenshots.append(self.screenshot(str(step["screenshot"]), str(output_dir)))
         else:

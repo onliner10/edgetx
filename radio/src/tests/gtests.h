@@ -28,6 +28,7 @@
 #include "simulib.h"
 #include "model_init.h"
 #include "switches.h"
+#include "telemetry/battery_monitor.h"
 #include "hal/switch_driver.h"
 
 #define CHANNEL_MAX (1024*256)
@@ -86,6 +87,7 @@ inline void MODEL_RESET()
   extern uint8_t s_mixer_first_run_done;
   s_mixer_first_run_done = false;
   resetArmingState();
+  resetFlightBatteryRuntimeState();
   evalMixes(1);  // this is needed to reset fp_act
   lastFlightMode = 255;
 }

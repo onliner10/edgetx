@@ -230,6 +230,14 @@ const struct YamlIdStr enum_SwitchSources[] = {
   {  SWSRC_OFF, "OFF"  },
   {  0, NULL  }
 };
+const struct YamlIdStr enum_BatteryType[] = {
+  {  BATTERY_TYPE_LIPO, "TYPE_LIPO"  },
+  {  BATTERY_TYPE_LIION, "TYPE_LIION"  },
+  {  BATTERY_TYPE_LIFE, "TYPE_LIFE"  },
+  {  BATTERY_TYPE_NIMH, "TYPE_NIMH"  },
+  {  BATTERY_TYPE_PB, "TYPE_PB"  },
+  {  0, NULL  }
+};
 const struct YamlIdStr enum_PotsWarnMode[] = {
   {  POTS_WARN_OFF, "WARN_OFF"  },
   {  POTS_WARN_MANUAL, "WARN_MANUAL"  },
@@ -371,12 +379,7 @@ static const struct YamlNode struct_QMFavorite[] = {
   YAML_PADDING( 8 ),
   YAML_END
 };
-static const struct YamlNode struct_RadioTopbarUnsigned8[] = {
-  YAML_IDX,
-  YAML_UNSIGNED( "val", 8 ),
-  YAML_END
-};
-static const struct YamlNode union_RadioTopbarWidgetOptionValue_elmts[] = {
+static const struct YamlNode union_WidgetOptionValue_elmts[] = {
   YAML_CUSTOM("unsignedValue",r_wov_unsigned,w_wov_unsigned),
   YAML_CUSTOM("signedValue",r_wov_signed,w_wov_signed),
   YAML_CUSTOM("boolValue",r_wov_unsigned,w_wov_unsigned),
@@ -385,24 +388,39 @@ static const struct YamlNode union_RadioTopbarWidgetOptionValue_elmts[] = {
   YAML_CUSTOM("color",r_wov_color,w_wov_color),
   YAML_END
 };
-static const struct YamlNode struct_RadioTopbarWidgetOptionValueTyped[] = {
+static const struct YamlNode struct_WidgetOptionValueTyped[] = {
   YAML_IDX,
   YAML_CUSTOM("type",r_wov_type,w_wov_type),
-  YAML_UNION("value", 0, union_RadioTopbarWidgetOptionValue_elmts, select_wov),
+  YAML_UNION("value", 0, union_WidgetOptionValue_elmts, select_wov),
   YAML_END
 };
-static const struct YamlNode struct_RadioTopbarWidgetPersistentData[] = {
-  YAML_ARRAY("options", 0, 50, struct_RadioTopbarWidgetOptionValueTyped, widget_option_is_active),
+static const struct YamlNode struct_WidgetPersistentData[] = {
+  YAML_ARRAY("options", 0, 50, struct_WidgetOptionValueTyped, widget_option_is_active),
   YAML_END
 };
-static const struct YamlNode struct_RadioTopbarZonePersistentData[] = {
+static const struct YamlNode struct_ZonePersistentData[] = {
   YAML_IDX,
   YAML_CUSTOM("widgetName",r_widget_name,w_widget_name),
-  YAML_STRUCT("widgetData", 0, struct_RadioTopbarWidgetPersistentData, isAlwaysActive),
+  YAML_STRUCT("widgetData", 0, struct_WidgetPersistentData, isAlwaysActive),
   YAML_END
 };
-static const struct YamlNode struct_RadioTopBarPersistentData[] = {
-  YAML_ARRAY("zones", 0, 7, struct_RadioTopbarZonePersistentData, widget_is_active),
+static const struct YamlNode struct_TopBarPersistentData[] = {
+  YAML_ARRAY("zones", 0, 7, struct_ZonePersistentData, widget_is_active),
+  YAML_END
+};
+static const struct YamlNode struct_unsigned_8[] = {
+  YAML_IDX,
+  YAML_UNSIGNED( "val", 8 ),
+  YAML_END
+};
+static const struct YamlNode struct_BatteryPackData[] = {
+  YAML_IDX,
+  YAML_STRING("name", LEN_BATTERY_PACK_NAME),
+  YAML_SIGNED( "capacity", 16 ),
+  YAML_UNSIGNED( "cellCount", 4 ),
+  YAML_UNSIGNED( "active", 1 ),
+  YAML_PADDING( 3 ),
+  YAML_PADDING( 8 ),
   YAML_END
 };
 static const struct YamlNode struct_RadioData[] = {
@@ -453,6 +471,7 @@ static const struct YamlNode struct_RadioData[] = {
   YAML_SIGNED_CUST( "vBatMax", 8, r_vbat_max, w_vbat_max ),
   YAML_UNSIGNED( "backlightBright", 8 ),
   YAML_UNSIGNED( "globalTimer", 32 ),
+  YAML_ARRAY("batteryPacks", 128, 16, struct_BatteryPackData, battery_pack_is_active),
   YAML_UNSIGNED( "bluetoothBaudrate", 4 ),
   YAML_ENUM("bluetoothMode", 4, enum_BluetoothModes, NULL),
   YAML_UNSIGNED( "countryCode", 2 ),
@@ -519,13 +538,8 @@ static const struct YamlNode struct_RadioData[] = {
   YAML_UNSIGNED( "pwrOffIfInactive", 8 ),
   YAML_ARRAY("keyShortcuts", 8, 6, struct_KeyShortcut, NULL),
   YAML_ARRAY("qmFavorites", 8, 12, struct_QMFavorite, NULL),
-  YAML_STRUCT("topbarData", 0, struct_RadioTopBarPersistentData, isAlwaysActive),
-  YAML_ARRAY("topbarWidgetWidth", 8, 7, struct_RadioTopbarUnsigned8, NULL),
-  YAML_END
-};
-static const struct YamlNode struct_unsigned_8[] = {
-  YAML_IDX,
-  YAML_UNSIGNED( "val", 8 ),
+  YAML_STRUCT("topbarData", 0, struct_TopBarPersistentData, isAlwaysActive),
+  YAML_ARRAY("topbarWidgetWidth", 8, 7, struct_unsigned_8, NULL),
   YAML_END
 };
 static const struct YamlNode struct_ModelHeader[] = {
@@ -690,6 +704,22 @@ static const struct YamlNode struct_RssiAlarmData[] = {
 static const struct YamlNode struct_RFAlarmData[] = {
   YAML_SIGNED( "warning", 8 ),
   YAML_SIGNED( "critical", 8 ),
+  YAML_END
+};
+static const struct YamlNode struct_BatteryMonitorData[] = {
+  YAML_IDX,
+  YAML_UNSIGNED( "enabled", 1 ),
+  YAML_ENUM("batteryType", 3, enum_BatteryType, NULL),
+  YAML_UNSIGNED( "capAlertEnabled", 1 ),
+  YAML_UNSIGNED( "voltAlertEnabled", 1 ),
+  YAML_PADDING( 2 ),
+  YAML_UNSIGNED( "cellCount", 4 ),
+  YAML_PADDING( 4 ),
+  YAML_SIGNED( "capacity", 16 ),
+  YAML_SIGNED( "sourceIndex", 8 ),
+  YAML_SIGNED( "currentIndex", 8 ),
+  YAML_UNSIGNED( "selectedPackSlot", 8 ),
+  YAML_UNSIGNED( "compatiblePackMask", 16 ),
   YAML_END
 };
 static const struct YamlNode struct_PpmModule[] = {
@@ -900,31 +930,6 @@ static const struct YamlNode struct_TelemetrySensor[] = {
   YAML_UNION("cfg", 32, union_anonymous_17_elmts, select_sensor_cfg),
   YAML_END
 };
-static const struct YamlNode union_WidgetOptionValue_elmts[] = {
-  YAML_CUSTOM("unsignedValue",r_wov_unsigned,w_wov_unsigned),
-  YAML_CUSTOM("signedValue",r_wov_signed,w_wov_signed),
-  YAML_CUSTOM("boolValue",r_wov_unsigned,w_wov_unsigned),
-  YAML_CUSTOM("stringValue",r_wov_string,w_wov_string),
-  YAML_CUSTOM("source",r_wov_source,w_wov_source),
-  YAML_CUSTOM("color",r_wov_color,w_wov_color),
-  YAML_END
-};
-static const struct YamlNode struct_WidgetOptionValueTyped[] = {
-  YAML_IDX,
-  YAML_CUSTOM("type",r_wov_type,w_wov_type),
-  YAML_UNION("value", 0, union_WidgetOptionValue_elmts, select_wov),
-  YAML_END
-};
-static const struct YamlNode struct_WidgetPersistentData[] = {
-  YAML_ARRAY("options", 0, 50, struct_WidgetOptionValueTyped, widget_option_is_active),
-  YAML_END
-};
-static const struct YamlNode struct_ZonePersistentData[] = {
-  YAML_IDX,
-  YAML_CUSTOM("widgetName",r_widget_name,w_widget_name),
-  YAML_STRUCT("widgetData", 0, struct_WidgetPersistentData, isAlwaysActive),
-  YAML_END
-};
 static const struct YamlNode union_LayoutOptionValue_elmts[] = {
   YAML_CUSTOM("unsignedValue",r_lov_unsigned,w_lov_unsigned),
   YAML_CUSTOM("boolValue",r_lov_unsigned,w_lov_unsigned),
@@ -946,10 +951,6 @@ static const struct YamlNode struct_CustomScreenData[] = {
   YAML_IDX,
   YAML_CUSTOM("LayoutId",r_screen_id,w_screen_id),
   YAML_STRUCT("layoutData", 0, struct_LayoutPersistentData, isAlwaysActive),
-  YAML_END
-};
-static const struct YamlNode struct_TopBarPersistentData[] = {
-  YAML_ARRAY("zones", 0, 7, struct_ZonePersistentData, widget_is_active),
   YAML_END
 };
 static const struct YamlNode struct_customSwitch[] = {
@@ -1016,6 +1017,7 @@ static const struct YamlNode struct_ModelData[] = {
   YAML_UNSIGNED_CUST( "rssiSource", 8, r_tele_sensor, w_tele_sensor ),
   YAML_STRUCT("rssiAlarms", 0, struct_RssiAlarmData, NULL),
   YAML_STRUCT("rfAlarms", 16, struct_RFAlarmData, NULL),
+  YAML_ARRAY("batteryMonitors", 72, 4, struct_BatteryMonitorData, NULL),
   YAML_UNSIGNED( "thrTrimSw", 3 ),
   YAML_ENUM("potsWarnMode", 2, enum_PotsWarnMode, NULL),
   YAML_ENUM("jitterFilter", 2, enum_ModelOverridableEnable, NULL),

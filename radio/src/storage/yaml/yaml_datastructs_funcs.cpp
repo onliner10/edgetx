@@ -1527,6 +1527,12 @@ bool cfn_is_active(void* user, uint8_t* data, uint32_t bitoffs)
   return ((CustomFunctionData*)data)->swtch;
 }
 
+bool battery_pack_is_active(void* user, uint8_t* data, uint32_t bitoffs)
+{
+  data += bitoffs >> 3UL;
+  return ((BatteryPackData*)data)->active;
+}
+
 static bool gvar_is_active(void* user, uint8_t* data, uint32_t bitoffs)
 {
   // TODO: no need to output 0 values for FM0

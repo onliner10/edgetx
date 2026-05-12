@@ -92,6 +92,9 @@
 #endif
 
 #define MAX_TIMERS                     3
+#define MAX_BATTERY_MONITORS           4
+#define MAX_BATTERY_PACKS              16
+#define LEN_BATTERY_PACK_NAME           12
 #define NUM_CAL_PPM                    4
 
 enum CurveType {

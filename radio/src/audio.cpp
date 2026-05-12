@@ -31,6 +31,10 @@
 #include "model_audio.h"
 #include "hal/audio_driver.h"
 
+#if defined(SIMU)
+#include "simulib.h"
+#endif
+
 extern mutex_handle_t audioMutex;
 
 // Only first quadrant values - other quadrants calulated taking advantage of symmetry in sine wave.
@@ -729,6 +733,11 @@ bool AudioQueue::isPlaying(uint8_t id)
 
 void AudioQueue::playTone(uint16_t freq, uint16_t len, uint16_t pause, uint8_t flags, int8_t freqIncr, int8_t fragmentVolume)
 {
+#if defined(SIMU)
+  simuLogAudioEvent("playTone freq=%u len=%u pause=%u flags=%u", freq, len,
+                    pause, flags);
+#endif
+
   AudioLockGuard lock;
 
   freq = limit<uint16_t>(BEEP_MIN_FREQ, freq, BEEP_MAX_FREQ);
@@ -756,6 +765,11 @@ void AudioQueue::playTone(uint16_t freq, uint16_t len, uint16_t pause, uint8_t f
 
 void AudioQueue::playFile(const char * filename, uint8_t flags, uint8_t id, int8_t fragmentVolume)
 {
+#if defined(SIMU)
+  simuLogAudioEvent("playFile filename=%s flags=%u id=%u", filename, flags,
+                    id);
+#endif
+
   if (!sdMounted())
     return;
 

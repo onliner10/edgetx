@@ -42,6 +42,8 @@
 #include "textedit.h"
 #include "toggleswitch.h"
 
+#include "battery_packs.h"
+
 #define SET_DIRTY() storageDirty(EE_GENERAL)
 
 static const lv_coord_t col_two_dsc[] = {LV_GRID_FR(19), LV_GRID_FR(21),
@@ -1064,6 +1066,7 @@ const static PageButtonDef radioSetupButtons[] = {
   {STR_DEF(STR_GPS), []() { new SubPage(ICON_RADIO_SETUP, STR_MAIN_MENU_RADIO_SETTINGS, STR_GPS, gpsPageSetupLines); }},
   {STR_DEF(STR_ENABLED_FEATURES), []() { new SubPage(ICON_RADIO_SETUP, STR_MAIN_MENU_RADIO_SETTINGS, STR_ENABLED_FEATURES, viewOptionsPageSetupLines); }},
   {STR_DEF(STR_MAIN_MENU_MANAGE_MODELS), []() { new SubPage(ICON_RADIO_SETUP, STR_MAIN_MENU_RADIO_SETTINGS, STR_MAIN_MENU_MANAGE_MODELS, manageModelsSetupLines); }},
+  {STR_DEF(STR_BATTERY_PACKS), []() { new BatteryPacksPage(); }, nullptr},
 #if VERSION_MAJOR > 2
   {STR_DEF(STR_KEY_SHORTCUTS), []() { new QMKeyShortcutsPage(); }, nullptr, []() { return hasShortcutKeys(); }},
   {STR_DEF(STR_QUICK_MENU_FAVORITES), []() { new QMFavoritesPage(); }, nullptr},

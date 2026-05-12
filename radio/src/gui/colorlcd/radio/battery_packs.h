@@ -21,27 +21,25 @@
 
 #pragma once
 
-#include <functional>
-#include "edgetx_types.h"
-#include "hal.h"
+#include "page.h"
 
-enum WarningType
+class BatteryPacksPage : public SubPage
 {
-  WARNING_TYPE_WAIT,
-  WARNING_TYPE_INFO,
-  WARNING_TYPE_ASTERISK,
-  WARNING_TYPE_CONFIRM,
-  WARNING_TYPE_INPUT,
-  WARNING_TYPE_ALERT
+ public:
+  BatteryPacksPage();
+
+  void rebuild();
+  void editPack(uint8_t slot);
+
+ protected:
+  void build();
 };
 
-typedef std::function<void(const char *, const char *, int, int)>
-    ProgressHandler;
+class BatteryPackEditWindow : public Page
+{
+ public:
+  BatteryPackEditWindow(uint8_t slot);
 
-void POPUP_INFORMATION(const char *message);
-void POPUP_WARNING(const char *message, const char *info = nullptr);
-bool POPUP_WARNING_ON_UI_TASK(const char *message, const char *info = nullptr);
-void POPUP_BUBBLE(const char *message, uint32_t timeout, coord_t width = LCD_W - 100);
-
-void show_ui_popup();
-void show_ui_popup_battery_confirm(uint8_t monitor);
+ protected:
+  uint8_t slot;
+};

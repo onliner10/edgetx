@@ -31,6 +31,7 @@
 #include "os/sleep.h"
 #include "os/time.h"
 #include "sdcard.h"
+#include "telemetry/battery_monitor.h"
 
 #if defined(SIMU)
 #include "targets/simu/simu_ui_automation.h"
@@ -146,6 +147,16 @@ uint32_t MainWindow::runUiTick(TickMode mode)
     ++it;
     if (child && child->isBubblePopup()) {
       child->checkEvents();
+    }
+  }
+
+  static bool batteryPromptPending = false;
+  if (!batteryPromptPending && !isModelArmedState()) {
+    uint8_t monitor = 0;
+    if (flightBatteryNeedsPrompt(&monitor)) {
+      batteryPromptPending = true;
+      show_ui_popup_battery_confirm(monitor);
+      batteryPromptPending = false;
     }
   }
 

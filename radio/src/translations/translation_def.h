@@ -56,6 +56,7 @@
 #endif
 
 #define TR_EMPTY                        "---"
+#define TR_BATTERY_PACKS                "Battery Packs"
 
 // '~' is remapped to 0x7B in B&W font
 #define CHAR_TILDE                      TR_BW_COL("{", "~")

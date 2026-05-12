@@ -156,6 +156,29 @@ TOOLS: dict[str, dict[str, Any]] = {
             "required": ["index", "position"],
         },
     },
+    "edgetx_switch_sequence": {
+        "description": "Run a deterministic switch sequence. Each step sets a switch position, then holds it for duration_ms before the next step.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "steps": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "index": {"type": "integer", "description": "0-based switch index: SA=0, SB=1, SC=2, SD=3, SE=4, SF=5, SG=6, SH=7"},
+                            "position": {"type": "integer", "description": "Switch position: -1 (down/back), 0 (middle), +1 (up/forward)"},
+                            "duration_ms": {"type": "integer", "default": 0, "description": "Time to hold this position before the next step"},
+                        },
+                        "required": ["index", "position"],
+                    },
+                    "minItems": 1,
+                    "maxItems": 16,
+                },
+            },
+            "required": ["steps"],
+        },
+    },
     "edgetx_audio_history": {
         "description": "Return captured simulator audio events (playTone, playFile calls). Optionally limit the number of tail lines returned.",
         "inputSchema": {
@@ -258,6 +281,8 @@ class McpServer:
             return self.service.set_telemetry_streaming(bool(args["enabled"]))
         if name == "edgetx_set_switch":
             return self.service.set_switch(int(args["index"]), int(args["position"]))
+        if name == "edgetx_switch_sequence":
+            return self.service.switch_sequence(args["steps"])
         if name == "edgetx_audio_history":
             return self.service.audio_history(int(args.get("tail", 200)))
         if name == "edgetx_run_flow":

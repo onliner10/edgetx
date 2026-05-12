@@ -84,6 +84,7 @@
 #include "audio.h"
 #include "debug.h"
 #include "edgetx.h"
+#include "telemetry/battery_monitor.h"
 #include "telemetry/telemetry_sensors.h"
 
 #include "arg_parser.h"
@@ -95,6 +96,7 @@ static SDL_Window* window;
 static SDL_Renderer* renderer;
 static SDL_Texture* screen_frame_buffer;
 static bool automation_stdio = false;
+static bool automation_telemetry_streaming = false;
 
 static std::mutex inputStateMutex;
 static GimbalState stick_left = {{0.5f, 0.5f}, false};
@@ -330,7 +332,8 @@ static void automation_handle_command(const std::string& line)
   } else if (command == "telemetry_streaming") {
     int streaming = 0;
     in >> streaming;
-    simuSetTelemetryStreaming(streaming ? 1 : 0);
+    automation_telemetry_streaming = streaming != 0;
+    simuSetTelemetryStreaming(automation_telemetry_streaming ? 100 : 0);
     automation_reply_ok();
   } else if (command == "set_telemetry") {
     std::string sensor_name;
@@ -341,6 +344,7 @@ static void automation_handle_command(const std::string& line)
       return;
     }
     bool found = false;
+    int found_index = -1;
     for (int i = 0; i < MAX_TELEMETRY_SENSORS; i++) {
       if (strcmp(g_model.telemetrySensors[i].label, sensor_name.c_str()) == 0) {
         telemetryItems[i].value = value;
@@ -348,13 +352,23 @@ static void automation_handle_command(const std::string& line)
         telemetryItems[i].valueMax = value;
         telemetryItems[i].setFresh();
         found = true;
+        found_index = i;
         break;
       }
     }
     if (!found)
       automation_reply_error("sensor not found: " + sensor_name);
-    else
-      automation_reply_ok();
+    else {
+      for (uint8_t i = 0; i < FLIGHT_BATTERY_PRESENT_DEBOUNCE_SECONDS; i++) {
+        updateFlightBatterySessions();
+      }
+      std::ostringstream extra;
+      extra << "\"index\":" << found_index
+            << ",\"value\":" << telemetryItems[found_index].value
+            << ",\"battery_state\":"
+            << int(flightBatterySessionState(0));
+      automation_reply_ok(extra.str());
+    }
   } else if (command == "set_switch") {
     int switch_idx = -1, position = 0;
     in >> switch_idx >> position;
@@ -363,7 +377,41 @@ static void automation_handle_command(const std::string& line)
       return;
     }
     simuSetSwitch(switch_idx, position);
-    automation_reply_ok();
+    std::ostringstream extra;
+    extra << "\"armed\":" << (isModelArmedState() ? 1 : 0);
+    automation_reply_ok(extra.str());
+  } else if (command == "switch_sequence") {
+    int step_count = 0;
+    in >> step_count;
+    if (step_count <= 0 || step_count > 16) {
+      automation_reply_error("invalid switch sequence length");
+      return;
+    }
+
+    for (int i = 0; i < step_count; i++) {
+      int switch_idx = -1, position = 0, duration_ms = 0;
+      in >> switch_idx >> position >> duration_ms;
+      if (!in || switch_idx < 0 || switch_idx >= switchGetMaxSwitches() ||
+          duration_ms < 0 || duration_ms > 5000) {
+        automation_reply_error("invalid switch sequence step");
+        return;
+      }
+      simuSetSwitch(switch_idx, position);
+      if (automation_telemetry_streaming) {
+        simuSetTelemetryStreaming(100);
+      }
+      const int update_count = duration_ms >= 10 ? duration_ms / 10 : 1;
+      for (int update = 0; update < update_count; update++) {
+        testUpdateArmingState();
+      }
+    }
+
+    std::ostringstream extra;
+    extra << "\"armed\":" << (isModelArmedState() ? 1 : 0)
+          << ",\"battery_allowed\":"
+          << (flightBatteryArmingAllowed() ? 1 : 0)
+          << ",\"battery_state\":" << int(flightBatterySessionState(0));
+    automation_reply_ok(extra.str());
   } else if (command == "audio_history") {
     int maxLines = 200;
     in >> maxLines;
@@ -566,6 +614,9 @@ static bool handleEvents()
       return false;
   }
 
+  if (automation_telemetry_streaming) {
+    simuSetTelemetryStreaming(100);
+  }
   redraw();
   automation_poll_stdin();
   return true;

@@ -22,6 +22,7 @@
 #include "gtests.h"
 #include "hal/adc_driver.h"
 #include "mixes.h"
+#include "telemetry/battery_monitor.h"
 
 class TrimsTest : public EdgeTxTest {};
 class MixerTest : public EdgeTxTest {};
@@ -1636,6 +1637,139 @@ TEST_F(ArmingTest, LongRejectedShPressRequiresFreshMomentaryPress)
   simuSetSwitch(sh_idx, -1);  // Fresh release arms
   testUpdateArmingState();
   EXPECT_TRUE(isModelArmedState());
+}
+
+static void setupValidManualBatteryMonitor()
+{
+  g_model.batteryMonitors[0].enabled = 1;
+  g_model.batteryMonitors[0].batteryType = BATTERY_TYPE_LIPO;
+  g_model.batteryMonitors[0].cellCount = 3;
+  g_model.batteryMonitors[0].capacity = 2200;
+  invalidateFlightBatteryMonitor(0);
+}
+
+TEST_F(ArmingTest, BatteryNeedsConfiguration_DoesNotArm)
+{
+  g_model.armingEnabled = true;
+  g_model.batteryMonitors[0].enabled = 1;
+  invalidateFlightBatteryMonitor(0);
+  s_mixer_first_run_done = true;
+
+  int sf_idx = switchLookupIdx("SF", 2);
+  if (sf_idx < 0) return;
+  int sh_idx = switchLookupIdx("SH", 2);
+  if (sh_idx < 0) return;
+
+  simuSetSwitch(sf_idx, 1);
+  testUpdateArmingState();
+  EXPECT_FALSE(isModelArmedState());
+  simuSetSwitch(sh_idx, 1);
+  testUpdateArmingState();
+  EXPECT_FALSE(isModelArmedState());
+  simuSetSwitch(sh_idx, -1);
+  testUpdateArmingState();
+  EXPECT_FALSE(isModelArmedState());
+  EXPECT_EQ(consumeArmingBlockReason(), ArmingBlockReason::BatteryNeedsConfiguration);
+}
+
+TEST_F(ArmingTest, BatteryMissingVoltage_ArmsWithValidManualConfig)
+{
+  g_model.armingEnabled = true;
+  setupValidManualBatteryMonitor();
+  s_mixer_first_run_done = true;
+
+  int sf_idx = switchLookupIdx("SF", 2);
+  if (sf_idx < 0) return;
+  int sh_idx = switchLookupIdx("SH", 2);
+  if (sh_idx < 0) return;
+
+  simuSetSwitch(sf_idx, 1);
+  testUpdateArmingState();
+  EXPECT_FALSE(isModelArmedState());
+  simuSetSwitch(sh_idx, 1);
+  testUpdateArmingState();
+  EXPECT_FALSE(isModelArmedState());
+  simuSetSwitch(sh_idx, -1);
+  testUpdateArmingState();
+  EXPECT_TRUE(isModelArmedState());
+}
+
+TEST_F(ArmingTest, BatteryTelemetryLossWhileArmed_DoesNotDisarm)
+{
+  g_model.armingEnabled = true;
+  setupValidManualBatteryMonitor();
+  s_mixer_first_run_done = true;
+
+  int sf_idx = switchLookupIdx("SF", 2);
+  if (sf_idx < 0) return;
+  int sh_idx = switchLookupIdx("SH", 2);
+  if (sh_idx < 0) return;
+
+  simuSetSwitch(sf_idx, 1);
+  testUpdateArmingState();
+  simuSetSwitch(sh_idx, 1);
+  testUpdateArmingState();
+  EXPECT_FALSE(isModelArmedState());
+  simuSetSwitch(sh_idx, -1);
+  testUpdateArmingState();
+  EXPECT_TRUE(isModelArmedState());
+
+  simuSetSwitch(sh_idx, -1);
+  for (int i = 0; i < 5; i++) {
+    testUpdateArmingState();
+    EXPECT_TRUE(isModelArmedState());
+  }
+}
+
+TEST_F(ArmingTest, NoEnabledMonitor_ArmsWithoutBatteryGate)
+{
+  g_model.armingEnabled = true;
+  g_model.batteryMonitors[0].enabled = 0;
+  s_mixer_first_run_done = true;
+
+  int sf_idx = switchLookupIdx("SF", 2);
+  if (sf_idx < 0) return;
+  int sh_idx = switchLookupIdx("SH", 2);
+  if (sh_idx < 0) return;
+
+  simuSetSwitch(sf_idx, 1);
+  testUpdateArmingState();
+  EXPECT_FALSE(isModelArmedState());
+  simuSetSwitch(sh_idx, 1);
+  testUpdateArmingState();
+  EXPECT_FALSE(isModelArmedState());
+  simuSetSwitch(sh_idx, -1);
+  testUpdateArmingState();
+  EXPECT_TRUE(isModelArmedState());
+}
+
+TEST_F(ArmingTest, BatteryVoltageMismatch_BlocksArming)
+{
+  g_model.armingEnabled = true;
+  setupValidManualBatteryMonitor();
+  g_model.telemetrySensors[0].init("VFAS", UNIT_VOLTS, 2);
+  telemetryItems[0].value = 1600;
+  telemetryItems[0].setFresh();
+  g_model.batteryMonitors[0].sourceIndex = 1;
+  updateFlightBatterySessions();
+  updateFlightBatterySessions();
+  s_mixer_first_run_done = true;
+
+  int sf_idx = switchLookupIdx("SF", 2);
+  if (sf_idx < 0) return;
+  int sh_idx = switchLookupIdx("SH", 2);
+  if (sh_idx < 0) return;
+
+  simuSetSwitch(sf_idx, 1);
+  testUpdateArmingState();
+  EXPECT_FALSE(isModelArmedState());
+  simuSetSwitch(sh_idx, 1);
+  testUpdateArmingState();
+  EXPECT_FALSE(isModelArmedState());
+  simuSetSwitch(sh_idx, -1);
+  testUpdateArmingState();
+  EXPECT_FALSE(isModelArmedState());
+  EXPECT_EQ(consumeArmingBlockReason(), ArmingBlockReason::BatteryVoltageMismatch);
 }
 
 TEST_F(ArmingTest, InvalidThrottleChannel_FailsClosedOnDefaultThrottleOutput)

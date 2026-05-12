@@ -335,6 +335,38 @@ PACK(struct RFAlarmData {
   int8_t critical;
 });
 
+enum BatteryType {
+  BATTERY_TYPE_LIPO = 0,
+  BATTERY_TYPE_LIION = 1,
+  BATTERY_TYPE_LIFE = 2,
+  BATTERY_TYPE_NIMH = 3,
+  BATTERY_TYPE_PB = 4,
+  BATTERY_TYPE_LAST SKIP = BATTERY_TYPE_PB
+};
+
+PACK(struct BatteryPackData {
+  char name[LEN_BATTERY_PACK_NAME];
+  int16_t capacity;
+  uint8_t cellCount:4;
+  uint8_t active:1;
+  uint8_t spare1:3 SKIP;
+  uint8_t spare2:8 SKIP;
+});
+
+PACK(struct BatteryMonitorData {
+  uint8_t enabled:1;
+  uint8_t batteryType:3 ENUM(BatteryType);
+  uint8_t capAlertEnabled:1;
+  uint8_t voltAlertEnabled:1;
+  uint8_t spare1:2 SKIP;
+  uint8_t cellCount:4;
+  int16_t capacity;
+  int8_t sourceIndex;
+  int8_t currentIndex;
+  uint8_t selectedPackSlot;
+  uint16_t compatiblePackMask;
+});
+
 typedef int16_t ls_telemetry_value_t;
 
 #if !defined(COLORLCD)
@@ -807,6 +839,8 @@ PACK(struct ModelData {
 #endif
   NOBACKUP(RFAlarmData rfAlarms);
 
+  BatteryMonitorData batteryMonitors[MAX_BATTERY_MONITORS];
+
   uint8_t thrTrimSw:3;
   uint8_t potsWarnMode:2 ENUM(PotsWarnMode);
   NOBACKUP(uint8_t jitterFilter:2 ENUM(ModelOverridableEnable));
@@ -1070,6 +1104,7 @@ PACK(struct RadioData {
 
   NOBACKUP(uint8_t  backlightBright);
   NOBACKUP(uint32_t globalTimer);
+  BatteryPackData batteryPacks[MAX_BATTERY_PACKS];
   NOBACKUP(uint8_t  bluetoothBaudrate:4);
   NOBACKUP(uint8_t  bluetoothMode:4 ENUM(BluetoothModes));
 
