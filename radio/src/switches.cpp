@@ -753,6 +753,9 @@ bool getSwitch(swsrc_t swtch, uint8_t flags)
   else if (cs_idx == SWSRC_TRAINER_CONNECTED) {
     result = isTrainerConnected();
   }
+  else if (cs_idx == SWSRC_MODEL_ARMED) {
+    result = isModelArmedState();
+  }
   else if (cs_idx >= SWSRC_FIRST_SENSOR && cs_idx <= SWSRC_LAST_SENSOR) {
     result = !telemetryItems[cs_idx-SWSRC_FIRST_SENSOR].isOld();
   }

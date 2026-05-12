@@ -557,6 +557,8 @@
 #define TR_MODEL_SHUTDOWN              "Desligar?"
 #define TR_PRESS_ENTER_TO_CONFIRM      "Press enter p/ confirmar"
 #define TR_THROTTLE_LABEL              "Motor"
+#define TR_ARMING_ENABLED             "Arming enabled"
+#define TR_ARMING_DISABLED            "Arming disabled"
 #define TR_THROTTLE_START              "Iniciar Motor"
 #define TR_THROTTLEREVERSE             TR("T-Reverso", "Reverso")
 #define TR_MINUTEBEEP                  TR("Minuto", "Cada Minuto")

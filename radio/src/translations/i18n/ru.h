@@ -559,6 +559,8 @@
 #define TR_MODEL_SHUTDOWN              "Отключение?"
 #define TR_PRESS_ENTER_TO_CONFIRM      "Нажмите [Enter] для подтв"
 #define TR_THROTTLE_LABEL              "Газ"
+#define TR_ARMING_ENABLED             "Arming enabled"
+#define TR_ARMING_DISABLED            "Arming disabled"
 #define TR_THROTTLE_START              "Газ cтарт"
 #define TR_THROTTLEREVERSE             TR("Г-Реверс", "Реверс")
 #define TR_MINUTEBEEP                  TR("Минут", "Минут")

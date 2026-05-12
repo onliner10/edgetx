@@ -556,6 +556,8 @@
 #define TR_MODEL_SHUTDOWN              "シャットダウンしますか？"
 #define TR_PRESS_ENTER_TO_CONFIRM      "Enterを押して確認してください"
 #define TR_THROTTLE_LABEL              "Throttle"
+#define TR_ARMING_ENABLED             "Arming enabled"
+#define TR_ARMING_DISABLED            "Arming disabled"
 #define TR_THROTTLE_START              "Throttle アップ"
 #define TR_THROTTLEREVERSE             TR("T-Reverse", "リバース")
 #define TR_MINUTEBEEP                  TR("Minute", "分単位コール")

@@ -1,0 +1,76 @@
+{
+  "target": "tx16s",
+  "output": "build/ui-harness/screenshots/arming-test",
+  "steps": [
+    { "wait": { "ms": 2500 } },
+
+    // Go to home screen
+    { "press": { "key": "EXIT", "duration_ms": 120 } },
+    { "wait": { "ms": 500 } },
+    { "screenshot": "00-home" },
+
+    // Open model menu
+    { "press": { "key": "MODEL", "duration_ms": 120 } },
+    { "wait": { "ms": 800 } },
+    { "screenshot": "01-model-menu" },
+
+    // Enter model setup
+    { "press": { "key": "ENTER", "duration_ms": 120 } },
+    { "wait": { "ms": 800 } },
+    { "screenshot": "02-model-setup" },
+
+    // Navigate to throttle page (page containing arming settings)
+    { "press": { "key": "PAGEDN", "duration_ms": 120 } },
+    { "wait": { "ms": 800 } },
+    { "screenshot": "03-throttle-page" },
+
+    // Scroll down to find arming toggle (appears below throttle source)
+    { "press": { "key": "ENTER", "duration_ms": 120 } },
+    { "wait": { "ms": 500 } },
+    { "screenshot": "04-throttle-scroll" },
+
+    { "press": { "key": "DOWN", "duration_ms": 120 } },
+    { "wait": { "ms": 300 } },
+    { "press": { "key": "DOWN", "duration_ms": 120 } },
+    { "wait": { "ms": 300 } },
+    { "press": { "key": "DOWN", "duration_ms": 120 } },
+    { "wait": { "ms": 300 } },
+    { "press": { "key": "DOWN", "duration_ms": 120 } },
+    { "wait": { "ms": 300 } },
+    { "screenshot": "05-scrolled-to-arming" },
+
+    // Toggle arming ON (navigate to the arming toggle and activate it)
+    { "press": { "key": "ENTER", "duration_ms": 120 } },
+    { "wait": { "ms": 500 } },
+    { "screenshot": "06-arming-enabled" },
+
+    // Exit back to main view
+    { "press": { "key": "EXIT", "duration_ms": 120 } },
+    { "wait": { "ms": 500 } },
+
+    // --- Actual arming test ---
+    // Correct sequence: SF down first (safety engaged), then SH press (trigger)
+    { "set_switch": { "index": 5, "position": -1 } },
+    { "wait": { "ms": 300 } },
+    { "screenshot": "07-sf-down" },
+
+    // Press SH (set to DOWN) to trigger arming, then release to UP
+    { "set_switch": { "index": 7, "position": -1 } },
+    { "wait": { "ms": 100 } },
+    { "set_switch": { "index": 7, "position": 1 } },
+    { "wait": { "ms": 500 } },
+    { "screenshot": "08-armed" },
+
+    // Verify audio was played (armed sound)
+    // Note: audio history check requires scripting; screenshot confirms armed state
+
+    // Disarm: flip SF back to UP
+    { "set_switch": { "index": 5, "position": 1 } },
+    { "wait": { "ms": 500 } },
+    { "screenshot": "09-disarmed" },
+
+    // Verify audio was played (disarm sound)
+    { "wait": { "ms": 500 } },
+    { "screenshot": "10-final" }
+  ]
+}

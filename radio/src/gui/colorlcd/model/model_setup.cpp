@@ -320,9 +320,29 @@ const static SetupLineDef throttleParamsSetupLines[] = {
           });
     }
   },
+  {
+    STR_DEF(STR_ARMING_ENABLED),
+    [](Window* parent, coord_t x, coord_t y) {
+      new ToggleSwitch(parent, {x, y, 0, 0}, GET_SET_DEFAULT(g_model.armingEnabled));
+    }
+  },
+  {
+    STR_DEF(STR_THROTTLE_LABEL),
+    [](Window* parent, coord_t x, coord_t y) {
+      auto sc = new SourceChoice(
+          parent, {x, y, 0, 0}, MIXSRC_FIRST_CH, MIXSRC_LAST_CH,
+          []() { return MIXSRC_FIRST_CH + g_model.armingThrottleChannel; },
+          [](int16_t src) {
+            if (src >= MIXSRC_FIRST_CH && src <= MIXSRC_LAST_CH) {
+              g_model.armingThrottleChannel = src - MIXSRC_FIRST_CH;
+              SET_DIRTY();
+            }
+          });
+      sc->setAvailableHandler(isThrottleSourceAvailable);
+    }
+  },
   {nullptr, nullptr},
 };
-
 #if defined(USE_HATS_AS_KEYS)
 static LAYOUT_VAL_SCALED(HATSMODE_W, 120)
 #endif

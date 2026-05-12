@@ -556,6 +556,8 @@
 #define TR_MODEL_SHUTDOWN              "关机 ?"
 #define TR_PRESS_ENTER_TO_CONFIRM      "确认"
 #define TR_THROTTLE_LABEL              "油门"
+#define TR_ARMING_ENABLED             "Arming enabled"
+#define TR_ARMING_DISABLED            "Arming disabled"
 #define TR_THROTTLE_START              "油门开始"
 #define TR_THROTTLEREVERSE             TR("油门反向", "油门反向")
 #define TR_MINUTEBEEP                  TR("分", "分钟播报")

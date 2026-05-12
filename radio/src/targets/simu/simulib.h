@@ -36,6 +36,7 @@ void simuSetKey(uint8_t key, bool state);
 void simuSetTrim(uint8_t trim, bool state);
 
 void simuFatfsSetPaths(const char* sdPath, const char* settingsPath);
+std::string simuFatfsGetRealPath(const std::string& p);
 
 void simuRotaryEncoderEvent(int32_t steps);
 

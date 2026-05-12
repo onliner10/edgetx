@@ -1,0 +1,75 @@
+Labels:
+  "Favorites":
+  "sim":
+  "plane":
+  "test":
+Sort: 1
+Models:
+  model1.yml:
+    hash: "97300000a95c2592"
+    name: "'Sim Bigfoot"
+    labels: "sim"
+    bitmap: "bigfoot.png"
+    lastopen: 1778350103
+  model2.yml:
+    hash: "a84f0000aa5c307f"
+    name: "Bigfoot Real"
+    mod0type: 6
+    mod0rf: 63
+    labels: "plane"
+    bitmap: "bigfoot.png"
+    lastopen: 1778495206
+  model3.yml:
+    hash: "d40d00009f2765b8"
+    name: "dron lr"
+    mod1type: 5
+    labels: ""
+    bitmap: ""
+    lastopen: 946685184
+  model4.yml:
+    hash: "192d0000a75cd17c"
+    name: "'Habu50EDF sim"
+    labels: "sim"
+    bitmap: "habu.png"
+    lastopen: 1778168306
+  model5.yml:
+    hash: "553b0000a25c29a1"
+    name: "Blizzard"
+    mod0type: 6
+    mod0rf: 2
+    labels: ""
+    bitmap: ""
+    lastopen: 1777750015
+  model6.yml:
+    hash: "f1210000a85c8762"
+    name: "test"
+    labels: "test"
+    bitmap: ""
+    lastopen: 1778242258
+  model7.yml:
+    hash: "8a1f0000a75cf27b"
+    name: "HIL PPM8c"
+    mod1type: 1
+    labels: "test"
+    bitmap: ""
+    lastopen: 1778157583
+  model8.yml:
+    hash: "c50f0000a75cf47b"
+    name: "HIL SBUS16"
+    mod1type: 13
+    labels: "test"
+    bitmap: ""
+    lastopen: 1778157367
+  model9.yml:
+    hash: "46100000a75cef7b"
+    name: "HIL AUTO"
+    mod1type: 1
+    labels: "test"
+    bitmap: ""
+    lastopen: 1778156766
+  model10.yml:
+    hash: "c2320000ab5c2453"
+    name: "'Sim T-28 BNF"
+    labels: "sim"
+    bitmap: "t28.png"
+    lastopen: 1778405828

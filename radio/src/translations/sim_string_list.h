@@ -38,6 +38,8 @@
 #define STR_ANADIAGS_MOVE currentLangStrings->STR_ANADIAGS_MOVE
 #define STR_ANADIAGS_UNFILTRAW currentLangStrings->STR_ANADIAGS_UNFILTRAW
 #define STR_ANALOG_SERVO currentLangStrings->STR_ANALOG_SERVO
+#define STR_ARMING_DISABLED currentLangStrings->STR_ARMING_DISABLED
+#define STR_ARMING_ENABLED  currentLangStrings->STR_ARMING_ENABLED
 #define STR_ASK_OVERWRITE currentLangStrings->STR_ASK_OVERWRITE
 #define STR_ASSIGN_SPLASH currentLangStrings->STR_ASSIGN_SPLASH
 #define STR_AUTHOR currentLangStrings->STR_AUTHOR

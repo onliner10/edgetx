@@ -558,6 +558,8 @@
 #define TR_MODEL_SHUTDOWN      "Shutdown ?"
 #define TR_PRESS_ENTER_TO_CONFIRM "Press enter to confirm"
 #define TR_THROTTLE_LABEL      "Gas"
+#define TR_ARMING_ENABLED             "Arming enabled"
+#define TR_ARMING_DISABLED            "Arming disabled"
 #define TR_THROTTLE_START      "Gas Start"
 #define TR_THROTTLEREVERSE     TR("Reverse", "Omgekeerd")
 #define TR_MINUTEBEEP          TR("Min-Alarm", "Minuten-Alarm")

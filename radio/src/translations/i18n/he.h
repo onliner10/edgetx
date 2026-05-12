@@ -560,6 +560,8 @@
 #define TR_MODEL_SHUTDOWN              "?לכבות"
 #define TR_PRESS_ENTER_TO_CONFIRM      "לחץ אנטר לאישור"
 #define TR_THROTTLE_LABEL              "מצערת"
+#define TR_ARMING_ENABLED             "Arming enabled"
+#define TR_ARMING_DISABLED            "Arming disabled"
 #define TR_THROTTLE_START              "מצערת מתחילה"
 #define TR_THROTTLEREVERSE             TR("T-Reverse", "היפוך")
 #define TR_MINUTEBEEP                  TR("דקה", "הקראת דקות")

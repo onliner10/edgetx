@@ -160,6 +160,7 @@ const struct YamlIdStr enum_SwitchSources[] = {
   {  SWSRC_ONE, "ONE"  },
   {  SWSRC_TELEMETRY_STREAMING, "TELEMETRY_STREAMING"  },
   {  SWSRC_RADIO_ACTIVITY, "RADIO_ACTIVITY"  },
+  {  SWSRC_MODEL_ARMED, "MODEL_ARMED"  },
   {  SWSRC_TRAINER_CONNECTED, "TRAINER_CONNECTED"  },
   {  SWSRC_OFF, "OFF"  },
   {  0, NULL  }
@@ -843,6 +844,8 @@ static const struct YamlNode struct_ModelData[] = {
   YAML_STRUCT("swashR", 64, struct_SwashRingData, swash_is_active),
   YAML_ARRAY("flightModeData", 320, 9, struct_FlightModeData, fmd_is_active),
   YAML_UNSIGNED_CUST( "thrTraceSrc", 8, r_thrSrc, w_thrSrc ),
+  YAML_UNSIGNED( "armingEnabled", 8 ),
+  YAML_UNSIGNED( "armingThrottleChannel", 8 ),
   YAML_CUSTOM("switchWarningState",r_swtchWarn,nullptr),
   YAML_ARRAY("switchWarning", 2, 32, struct_swtchWarn, nullptr),
   YAML_ARRAY("gvars", 56, 9, struct_GVarData, NULL),

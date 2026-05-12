@@ -560,6 +560,8 @@
 #define TR_MODEL_SHUTDOWN              "Éteindre ?"
 #define TR_PRESS_ENTER_TO_CONFIRM      "Appui [Enter] pour confirmer"
 #define TR_THROTTLE_LABEL              "Gaz"
+#define TR_ARMING_ENABLED             "Arming enabled"
+#define TR_ARMING_DISABLED            "Arming disabled"
 #define TR_THROTTLE_START              "Gaz Start"
 #define TR_THROTTLEREVERSE             TR("Inv. gaz", "Inversion gaz")
 #define TR_MINUTEBEEP                  TR("Bip min.", "Annonces minutes")
