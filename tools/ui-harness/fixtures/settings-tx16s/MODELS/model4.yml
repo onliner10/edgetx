@@ -1,13 +1,13 @@
 semver: 3.0.0
 header:
-   name: "'Sim Bigfoot"
-   bitmap: "bigfoot.png"
+   name: "'Habu50EDF sim"
+   bitmap: "habu.png"
    labels: "sim"
 timers:
    0:
       start: 0
       swtch: "NONE"
-      value: 240
+      value: 225
       mode: THR
       countdownBeep: 2
       minuteBeep: 0
@@ -15,7 +15,7 @@ timers:
       countdownStart: -2
       showElapsed: 0
       extraHaptic: 0
-      name: "Flight"
+      name: "EDF"
 telemetryProtocol: 0
 thrTrim: 0
 noGlobalFunctions: 0
@@ -128,14 +128,14 @@ mixData:
    delayPrec: 0
    speedPrec: 0
    flightModes: 000000000
-   weight: 0
+   weight: -100
    offset: 0
    swtch: "SB0"
    delayUp: 0
    delayDown: 0
    speedUp: 0
    speedDown: 0
-   name: "GYRO_S"
+   name: "AS3X"
  -
    destCh: 4
    srcRaw: "MAX"
@@ -152,7 +152,7 @@ mixData:
    delayDown: 0
    speedUp: 0
    speedDown: 0
-   name: "GYRO_O"
+   name: "AS3X"
  -
    destCh: 4
    srcRaw: "MAX"
@@ -169,7 +169,7 @@ mixData:
    delayDown: 0
    speedUp: 0
    speedDown: 0
-   name: "GYRO_O"
+   name: "SAFE"
  -
    destCh: 5
    srcRaw: "SG"
@@ -186,31 +186,31 @@ mixData:
    delayDown: 0
    speedUp: 20
    speedDown: 20
-   name: "FLAP"
+   name: "SIM_AU"
  -
    destCh: 6
-   srcRaw: "SE"
+   srcRaw: "MAX"
    carryTrim: 0
    mixWarn: 0
-   mltpx: ADD
+   mltpx: REPL
    delayPrec: 0
    speedPrec: 0
    flightModes: 000000000
-   weight: 100
+   weight: -100
    offset: 0
    swtch: "NONE"
    delayUp: 0
    delayDown: 0
    speedUp: 0
    speedDown: 0
-   name: "LED"
+   name: "REV_OF"
 expoData:
  -
    mode: 3
    scale: 0
    trimSource: 0
    srcRaw: "Ail"
-   weight: 40
+   weight: 70
    offset: 0
    swtch: "SC0"
    curve:
@@ -218,21 +218,21 @@ expoData:
       value: 0
    chn: 0
    flightModes: 000000000
-   name: "landin"
+   name: "LOW"
  -
    mode: 3
    scale: 0
    trimSource: 0
    srcRaw: "Ail"
-   weight: 55
+   weight: 85
    offset: 0
    swtch: "SC1"
    curve:
       type: 1
-      value: 30
+      value: 8
    chn: 0
    flightModes: 000000000
-   name: "normal"
+   name: "MID"
  -
    mode: 3
    scale: 0
@@ -243,16 +243,16 @@ expoData:
    swtch: "SC2"
    curve:
       type: 1
-      value: 55
+      value: 10
    chn: 0
    flightModes: 000000000
-   name: "acro"
+   name: "HIGH"
  -
    mode: 3
    scale: 0
    trimSource: 0
    srcRaw: "Ele"
-   weight: 40
+   weight: 70
    offset: 0
    swtch: "SC0"
    curve:
@@ -260,35 +260,35 @@ expoData:
       value: 0
    chn: 1
    flightModes: 000000000
-   name: "landin"
+   name: "LOW"
  -
    mode: 3
    scale: 0
    trimSource: 0
    srcRaw: "Ele"
-   weight: 60
+   weight: 85
    offset: 0
    swtch: "SC1"
+   curve:
+      type: 1
+      value: 8
+   chn: 1
+   flightModes: 000000000
+   name: "MID"
+ -
+   mode: 3
+   scale: 0
+   trimSource: 0
+   srcRaw: "Ele"
+   weight: 100
+   offset: 0
+   swtch: "SC2"
    curve:
       type: 1
       value: 10
    chn: 1
    flightModes: 000000000
-   name: "normal"
- -
-   mode: 3
-   scale: 0
-   trimSource: 0
-   srcRaw: "Ele"
-   weight: 100
-   offset: 0
-   swtch: "SC2"
-   curve:
-      type: 1
-      value: 40
-   chn: 1
-   flightModes: 000000000
-   name: "acro"
+   name: "HIGH"
  -
    mode: 3
    scale: 0
@@ -302,13 +302,13 @@ expoData:
       value: 0
    chn: 2
    flightModes: 000000000
-   name: "''''''"
+   name: ""
  -
    mode: 3
    scale: 0
    trimSource: 0
    srcRaw: "Rud"
-   weight: 50
+   weight: 70
    offset: 0
    swtch: "SC0"
    curve:
@@ -316,21 +316,21 @@ expoData:
       value: 0
    chn: 3
    flightModes: 000000000
-   name: "landin"
+   name: "LOW"
  -
    mode: 3
    scale: 0
    trimSource: 0
    srcRaw: "Rud"
-   weight: 65
+   weight: 85
    offset: 0
    swtch: "SC1"
    curve:
       type: 1
-      value: 30
+      value: 8
    chn: 3
    flightModes: 000000000
-   name: "normal"
+   name: "MID"
  -
    mode: 3
    scale: 0
@@ -341,10 +341,10 @@ expoData:
    swtch: "SC2"
    curve:
       type: 1
-      value: 40
+      value: 10
    chn: 3
    flightModes: 000000000
-   name: "acro"
+   name: "HIGH"
 logicalSw:
    0:
       func: FUNC_AND
@@ -430,7 +430,7 @@ customFn:
    12:
       swtch: "SB1"
       func: PLAY_TRACK
-      def: "normal,1,1x"
+      def: "manual,1,1x"
    13:
       swtch: "SB1"
       func: PLAY_SOUND
@@ -468,44 +468,16 @@ customFn:
       func: PLAY_SOUND
       def: "Tada,1,1x"
    22:
-      swtch: "SE0"
-      func: PLAY_TRACK
-      def: "off,1,1x"
-   23:
-      swtch: "SE0"
-      func: PLAY_SOUND
-      def: "Bp1,1,1x"
-   24:
-      swtch: "SE1"
-      func: PLAY_TRACK
-      def: "medium,1,1x"
-   25:
-      swtch: "SE1"
-      func: PLAY_SOUND
-      def: "Bp1,1,1x"
-   26:
-      swtch: "SE2"
-      func: PLAY_TRACK
-      def: "on,1,1x"
-   27:
-      swtch: "SE2"
-      func: PLAY_SOUND
-      def: "Bp1,1,1x"
-   28:
       swtch: "L3"
       func: PLAY_TRACK
       def: "batlow,1,15"
-   29:
+   23:
       swtch: "L4"
       func: PLAY_TRACK
       def: "landin,1,5"
 flightModeData:
    0:
-      trim:
-         1:
-            value: 14
-            mode: 0
-      name: "CLEAN"
+      name: "AS3X"
       swtch: "NONE"
       fadeIn: 0
       fadeOut: 0
@@ -529,29 +501,10 @@ flightModeData:
          8:
             val: 0
    1:
-      trim:
-         1:
-            value: 0
-            mode: 1
-         2:
-            value: 0
-            mode: 1
-      name: "MIDFLAP"
-      swtch: "SG1"
-      fadeIn: 20
-      fadeOut: 20
-   2:
-      trim:
-         1:
-            value: 0
-            mode: 1
-         2:
-            value: 0
-            mode: 1
-      name: "LANDING"
-      swtch: "SG2"
-      fadeIn: 20
-      fadeOut: 20
+      name: "SAFE"
+      swtch: "SB2"
+      fadeIn: 0
+      fadeOut: 0
 thrTraceSrc: Thr
 switchWarning:
    SA:
