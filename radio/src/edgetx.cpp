@@ -1210,6 +1210,7 @@ void flightReset(uint8_t check)
   telemetryReset();
 
   s_mixer_first_run_done = false;
+  resetArmingState();
 
   START_SILENCE_PERIOD();
 

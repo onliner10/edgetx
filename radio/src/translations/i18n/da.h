@@ -561,6 +561,8 @@
 #define TR_MODEL_SHUTDOWN              "Luk ned?"
 #define TR_PRESS_ENTER_TO_CONFIRM      "Tryk enter for bekræft"
 #define TR_THROTTLE_LABEL              "Gas"
+#define TR_ARMING_ENABLED             "Arming enabled"
+#define TR_ARMING_DISABLED            "Arming disabled"
 #define TR_THROTTLE_START              "Gas Start"
 #define TR_THROTTLEREVERSE             TR("T-omvendt", "Omvendt")
 #define TR_MINUTEBEEP                  TR("Minut", "Minut kald")

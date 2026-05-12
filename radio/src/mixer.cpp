@@ -1166,8 +1166,77 @@ uint8_t lastFlightMode = 255; // TODO reinit everything here when the model chan
 tmr10ms_t flightModeTransitionTime;
 uint8_t   flightModeTransitionLast = 255;
 
+static bool s_armed_state = false;
+static bool s_armed_output = false;
+static int8_t s_sf_idx = -1;
+static int8_t s_sh_idx = -1;
+static bool s_last_sh_down = false;
+static bool s_sf_was_down = false;
+static bool s_wasArmed = false;
+
+void resetArmingState()
+{
+  s_armed_state = false;
+  s_armed_output = false;
+  s_last_sh_down = false;
+  s_sf_was_down = false;
+  s_wasArmed = false;
+  s_sf_idx = -1;
+  s_sh_idx = -1;
+}
+
+static void updateArmingState()
+{
+  if (!s_mixer_first_run_done || !g_model.armingEnabled) {
+    s_armed_state = false;
+    s_sf_was_down = false;
+    s_last_sh_down = false;
+    return;
+  }
+
+  if (s_sf_idx < 0) {
+    s_sf_idx = switchLookupIdx("SF", 2);
+    s_sh_idx = switchLookupIdx("SH", 2);
+  }
+  if (s_sf_idx < 0 || s_sh_idx < 0)
+    return;
+
+  bool sf_down = (switchGetPosition(s_sf_idx) == SWITCH_HW_DOWN);
+  bool sh_down = (switchGetPosition(s_sh_idx) == SWITCH_HW_DOWN);
+
+  if (!sf_down) {
+    s_armed_state = false;
+    s_sf_was_down = false;
+    s_last_sh_down = sh_down;
+    return;
+  }
+
+  if (sh_down && !s_last_sh_down && s_sf_was_down) {
+    s_armed_state = true;
+  }
+
+  s_sf_was_down = sf_down;
+  s_last_sh_down = sh_down;
+}
+
+bool isModelArmedState()
+{
+  return s_armed_state;
+}
+
+bool isModelArmedOutput()
+{
+  return s_armed_output;
+}
+
+#if defined(SIMU)
+void testUpdateArmingState() { updateArmingState(); }
+#endif
+
 void evalMixes(uint8_t tick10ms)
 {
+  updateArmingState();
+
   int32_t sum_chans512[MAX_OUTPUT_CHANNELS];
 
   static uint16_t fp_act[MAX_FLIGHT_MODES] = {0};
@@ -1277,6 +1346,9 @@ void evalMixes(uint8_t tick10ms)
   }
 
   //========== LIMITS ===============
+  s_armed_output = false;
+  const bool armingChannelValid = g_model.armingThrottleChannel < MAX_OUTPUT_CHANNELS;
+  const uint8_t armingThrottleChannel = armingChannelValid ? g_model.armingThrottleChannel : 0;
   for (uint8_t i=0; i<MAX_OUTPUT_CHANNELS; i++) {
     // chans[i] holds data from mixer.   chans[i] = v*weight => 1024*256
     // later we multiply by the limit (up to 100) and then we need to normalize
@@ -1288,6 +1360,22 @@ void evalMixes(uint8_t tick10ms)
     setRawChannelOutput(i, q / 256);
 
     int16_t value = applyLimits(i, q);  // applyLimits will remove the 256 100% basis
+
+    // NOTE: setRawChannelOutput stores ungated throttle for UI channel monitor.
+    // The arming gate below modifies `value` before setChannelOutput (final RF output).
+    if (g_model.armingEnabled && i == armingThrottleChannel) {
+      LimitData* lim = limitAddress(i);
+      int16_t idle_threshold = lim->revert ? (LIMIT_MAX_RESX(lim) * 3 / 4)
+                                            : (LIMIT_MIN_RESX(lim) * 3 / 4);
+      bool throttle_idle = lim->revert ? (value >= idle_threshold)
+                                       : (value <= idle_threshold);
+      if (armingChannelValid && s_armed_state && throttle_idle) {
+        s_armed_output = true;
+      } else {
+        value = lim->revert ? LIMIT_MAX_RESX(lim) : LIMIT_MIN_RESX(lim);
+        s_armed_output = false;
+      }
+    }
 
     setChannelOutput(i, value);  // copy consistent word to int-level
   }
@@ -1471,6 +1559,17 @@ void doMixerPeriodicUpdates()
   }
 
   DEBUG_TIMER_STOP(debugTimerMixes10ms);
+
+  // Arming state change audio notification
+  bool isArmed = isModelArmedState();
+  if (isArmed != s_wasArmed) {
+    s_wasArmed = isArmed;
+    if (isArmed) {
+      AUDIO_MODEL_ARMED();
+    } else {
+      AUDIO_MODEL_DISARMED();
+    }
+  }
 
   s_mixer_first_run_done = true;
 }

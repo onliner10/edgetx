@@ -85,6 +85,7 @@ inline void MODEL_RESET()
   anaResetFiltered();
   extern uint8_t s_mixer_first_run_done;
   s_mixer_first_run_done = false;
+  resetArmingState();
   evalMixes(1);  // this is needed to reset fp_act
   lastFlightMode = 255;
 }

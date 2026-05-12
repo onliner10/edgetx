@@ -165,7 +165,9 @@ const char * const audioFilenames[] = {
   "mixwarn3",
   "timovr1",
   "timovr2",
-  "timovr3"
+  "timovr3",
+  "armed",
+  "disarm"
 };
 
 constexpr unsigned int MAX_SWITCH_POSITIONS =

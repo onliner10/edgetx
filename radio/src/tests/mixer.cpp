@@ -1408,3 +1408,366 @@ TEST_F(TrimsTest, invertedThrottlePlusThrottleTrimWithCrossTrims)
   EXPECT_EQ(channelOutputs[THR_CHAN], +1024);
   EXPECT_EQ(channelOutputs[ELE_CHAN], 0);
 }
+
+class ArmingTest : public MixerTest {
+  protected:
+    void SetUp() override {
+      MixerTest::SetUp();
+      resetArmingState();
+    }
+};
+
+// simuSetSwitch mapping: -1 = SWITCH_HW_UP, 0 = SWITCH_HW_MID, +1 = SWITCH_HW_DOWN
+// SF +1 = DOWN (armed position), -1 = UP (disarmed position)
+// SH +1 = DOWN (pressed = trigger), -1 = UP (released = at rest)
+
+// === State machine tests (switch logic only, no throttle dependency) ===
+
+TEST_F(ArmingTest, FeatureDisabled_StateStaysFalse)
+{
+  g_model.armingEnabled = false;
+  s_mixer_first_run_done = true;
+  EXPECT_FALSE(isModelArmedState());
+  EXPECT_FALSE(isModelArmedOutput());
+}
+
+TEST_F(ArmingTest, NotInitialized_StateStaysFalse)
+{
+  g_model.armingEnabled = true;
+  s_mixer_first_run_done = false;
+  EXPECT_FALSE(isModelArmedState());
+  EXPECT_FALSE(isModelArmedOutput());
+}
+
+TEST_F(ArmingTest, SfUp_CannotArm)
+{
+  g_model.armingEnabled = true;
+  s_mixer_first_run_done = true;
+
+  int sf_idx = switchLookupIdx("SF", 2);
+  if (sf_idx < 0) return;
+  simuSetSwitch(sf_idx, -1);  // SF UP
+  testUpdateArmingState();
+
+  EXPECT_FALSE(isModelArmedState());
+}
+
+TEST_F(ArmingTest, SfDownAndShPressed_ArmsRegardlessOfThrottle)
+{
+  g_model.armingEnabled = true;
+  g_model.armingThrottleChannel = 0;
+  s_mixer_first_run_done = true;
+
+  int sf_idx = switchLookupIdx("SF", 2);
+  if (sf_idx < 0) return;
+  int sh_idx = switchLookupIdx("SH", 2);
+  if (sh_idx < 0) return;
+
+  simuSetSwitch(sf_idx, 1);   // SF DOWN first
+  testUpdateArmingState();
+  EXPECT_FALSE(isModelArmedState());
+
+  simuSetSwitch(sh_idx, 1);   // SH DOWN (rising edge while SF already down)
+  testUpdateArmingState();
+  EXPECT_TRUE(isModelArmedState());
+}
+
+TEST_F(ArmingTest, SfBackUp_DisarmsModel)
+{
+  g_model.armingEnabled = true;
+  g_model.armingThrottleChannel = 0;
+  s_mixer_first_run_done = true;
+
+  int sf_idx = switchLookupIdx("SF", 2);
+  if (sf_idx < 0) return;
+  int sh_idx = switchLookupIdx("SH", 2);
+  if (sh_idx < 0) return;
+
+  // Arm: SF down + SH press (sequential)
+  simuSetSwitch(sf_idx, 1);   // SF DOWN first
+  testUpdateArmingState();
+  EXPECT_FALSE(isModelArmedState());
+  simuSetSwitch(sh_idx, 1);   // SH DOWN
+  testUpdateArmingState();
+  EXPECT_TRUE(isModelArmedState());
+
+  // SF back to UP = disarm
+  simuSetSwitch(sf_idx, -1);  // SF UP
+  testUpdateArmingState();
+  EXPECT_FALSE(isModelArmedState());
+}
+
+TEST_F(ArmingTest, Armed_StaysArmedAfterShReleased)
+{
+  g_model.armingEnabled = true;
+  g_model.armingThrottleChannel = 0;
+  s_mixer_first_run_done = true;
+
+  int sf_idx = switchLookupIdx("SF", 2);
+  if (sf_idx < 0) return;
+  int sh_idx = switchLookupIdx("SH", 2);
+  if (sh_idx < 0) return;
+
+  // Arm: SF down + SH press (sequential)
+  simuSetSwitch(sf_idx, 1);   // SF DOWN first
+  testUpdateArmingState();
+  EXPECT_FALSE(isModelArmedState());
+  simuSetSwitch(sh_idx, 1);   // SH DOWN
+  testUpdateArmingState();
+  EXPECT_TRUE(isModelArmedState());
+
+  // SH springs back to UP (released)
+  simuSetSwitch(sh_idx, -1);  // SH UP (released)
+
+  // Model stays armed while SF still down
+  for (int i = 0; i < 5; i++) {
+    testUpdateArmingState();
+    EXPECT_TRUE(isModelArmedState());
+  }
+}
+
+TEST_F(ArmingTest, SfDownButShNotPressed_NoArm)
+{
+  g_model.armingEnabled = true;
+  g_model.armingThrottleChannel = 0;
+  s_mixer_first_run_done = true;
+
+  int sf_idx = switchLookupIdx("SF", 2);
+  if (sf_idx < 0) return;
+  int sh_idx = switchLookupIdx("SH", 2);
+  if (sh_idx < 0) return;
+
+  // SF down, SH at UP (not pressed)
+  simuSetSwitch(sf_idx, 1);   // SF DOWN
+  simuSetSwitch(sh_idx, -1);  // SH UP (not pressed)
+  testUpdateArmingState();
+  EXPECT_FALSE(isModelArmedState());
+
+  // Cycle SF up then down again while SH still up
+  simuSetSwitch(sf_idx, -1);  // SF UP
+  testUpdateArmingState();
+  EXPECT_FALSE(isModelArmedState());
+  simuSetSwitch(sf_idx, 1);   // SF DOWN again
+  simuSetSwitch(sh_idx, -1);  // SH still UP (not pressed)
+  testUpdateArmingState();
+  EXPECT_FALSE(isModelArmedState());
+}
+
+TEST_F(ArmingTest, ShHeldBeforeSfDown_NoArm)
+{
+  g_model.armingEnabled = true;
+  g_model.armingThrottleChannel = 0;
+  s_mixer_first_run_done = true;
+
+  int sf_idx = switchLookupIdx("SF", 2);
+  if (sf_idx < 0) return;
+  int sh_idx = switchLookupIdx("SH", 2);
+  if (sh_idx < 0) return;
+
+  // SH already pressed before SF goes down — no rising edge while SF down
+  simuSetSwitch(sf_idx, -1);  // SF UP
+  simuSetSwitch(sh_idx, 1);   // SH DOWN (already pressed)
+  testUpdateArmingState();
+  EXPECT_FALSE(isModelArmedState());
+
+  // Now SF goes down — but SH was already down, so no rising edge
+  simuSetSwitch(sf_idx, 1);   // SF DOWN
+  testUpdateArmingState();
+  EXPECT_FALSE(isModelArmedState());
+}
+
+TEST_F(ArmingTest, InvalidThrottleChannel_FailsClosedOnDefaultThrottleOutput)
+{
+  g_model.armingEnabled = true;
+  g_model.armingThrottleChannel = MAX_OUTPUT_CHANNELS;
+  s_mixer_first_run_done = true;
+
+  memclear(g_model.mixData, sizeof(g_model.mixData));
+  g_model.mixData[0].destCh = 0;
+  g_model.mixData[0].mltpx = MLTPX_REPL;
+  g_model.mixData[0].srcRaw = MIXSRC_THR;
+  g_model.mixData[0].weight = makeSourceNumVal(100);
+
+  anaSetFiltered(inputMappingConvertMode(THR_STICK), 512);
+  evalMixes(1);
+
+  EXPECT_FALSE(isModelArmedOutput());
+  EXPECT_EQ(channelOutputs[0], -RESX);
+}
+
+// === Output gating tests (throttle interaction via evalMixes) ===
+
+TEST_F(ArmingTest, OutputCutoff_Disarmed_CutsToMin)
+{
+  g_model.armingEnabled = true;
+  g_model.armingThrottleChannel = 0;
+  s_mixer_first_run_done = true;
+
+  memclear(g_model.mixData, sizeof(g_model.mixData));
+  g_model.mixData[0].destCh = 0;
+  g_model.mixData[0].mltpx = MLTPX_REPL;
+  g_model.mixData[0].srcRaw = MIXSRC_THR;
+  g_model.mixData[0].weight = makeSourceNumVal(100);
+
+  anaSetFiltered(inputMappingConvertMode(THR_STICK), 512);
+  evalMixes(1);
+
+  EXPECT_FALSE(isModelArmedOutput());
+  EXPECT_EQ(channelOutputs[0], -RESX);
+}
+
+TEST_F(ArmingTest, OutputCutoff_ArmingDisabled_NoCut)
+{
+  g_model.armingEnabled = false;
+  g_model.armingThrottleChannel = 0;
+  s_mixer_first_run_done = true;
+
+  memclear(g_model.mixData, sizeof(g_model.mixData));
+  g_model.mixData[0].destCh = 0;
+  g_model.mixData[0].mltpx = MLTPX_REPL;
+  g_model.mixData[0].srcRaw = MIXSRC_THR;
+  g_model.mixData[0].weight = makeSourceNumVal(100);
+
+  anaSetFiltered(inputMappingConvertMode(THR_STICK), -1024);
+  evalMixes(1);
+
+  EXPECT_FALSE(isModelArmedOutput());
+  EXPECT_LT(channelOutputs[0], 0);
+}
+
+TEST_F(ArmingTest, OutputCutoff_ArmedIdleThrottle_Passthrough)
+{
+  g_model.armingEnabled = true;
+  g_model.armingThrottleChannel = 0;
+  s_mixer_first_run_done = true;
+
+  int sf_idx = switchLookupIdx("SF", 2);
+  if (sf_idx < 0) return;
+  int sh_idx = switchLookupIdx("SH", 2);
+  if (sh_idx < 0) return;
+
+  memclear(g_model.mixData, sizeof(g_model.mixData));
+  g_model.mixData[0].destCh = 0;
+  g_model.mixData[0].mltpx = MLTPX_REPL;
+  g_model.mixData[0].srcRaw = MIXSRC_THR;
+  g_model.mixData[0].weight = makeSourceNumVal(100);
+
+  anaSetFiltered(inputMappingConvertMode(THR_STICK), -1024);
+  evalMixes(1);
+
+  // Arm the model: SF down first
+  simuSetSwitch(sf_idx, 1);   // SF DOWN
+  evalMixes(1);
+  // Then SH down
+  simuSetSwitch(sh_idx, 1);   // SH DOWN
+  evalMixes(1);
+
+  EXPECT_TRUE(isModelArmedState());
+  EXPECT_TRUE(isModelArmedOutput());
+  EXPECT_LT(channelOutputs[0], 0);
+}
+
+TEST_F(ArmingTest, OutputCutoff_ReversedChannel_ForcesPositiveMin)
+{
+  g_model.armingEnabled = true;
+  g_model.armingThrottleChannel = 0;
+  s_mixer_first_run_done = true;
+
+  LimitData* lim = limitAddress(0);
+  lim->revert = true;
+
+  memclear(g_model.mixData, sizeof(g_model.mixData));
+  g_model.mixData[0].destCh = 0;
+  g_model.mixData[0].mltpx = MLTPX_REPL;
+  g_model.mixData[0].srcRaw = MIXSRC_THR;
+  g_model.mixData[0].weight = makeSourceNumVal(100);
+
+  anaSetFiltered(inputMappingConvertMode(THR_STICK), 512);
+  evalMixes(1);
+
+  EXPECT_FALSE(isModelArmedOutput());
+  EXPECT_EQ(channelOutputs[0], RESX);
+}
+
+TEST_F(ArmingTest, OutputGate_ArmedButThrottleNotIdle_CutsOutput)
+{
+  g_model.armingEnabled = true;
+  g_model.armingThrottleChannel = 0;
+  s_mixer_first_run_done = true;
+
+  int sf_idx = switchLookupIdx("SF", 2);
+  if (sf_idx < 0) return;
+  int sh_idx = switchLookupIdx("SH", 2);
+  if (sh_idx < 0) return;
+
+  memclear(g_model.mixData, sizeof(g_model.mixData));
+  g_model.mixData[0].destCh = 0;
+  g_model.mixData[0].mltpx = MLTPX_REPL;
+  g_model.mixData[0].srcRaw = MIXSRC_THR;
+  g_model.mixData[0].weight = makeSourceNumVal(100);
+
+  // Set throttle idle and arm (sequential: SF first, then SH)
+  anaSetFiltered(inputMappingConvertMode(THR_STICK), -1024);
+  evalMixes(1);
+
+  simuSetSwitch(sf_idx, 1);   // SF DOWN first
+  evalMixes(1);
+  simuSetSwitch(sh_idx, 1);   // SH DOWN
+  evalMixes(1);
+
+  EXPECT_TRUE(isModelArmedState());
+  EXPECT_TRUE(isModelArmedOutput());
+
+  // Now move throttle above idle
+  anaSetFiltered(inputMappingConvertMode(THR_STICK), 512);
+  evalMixes(1);
+
+  EXPECT_TRUE(isModelArmedState());
+  EXPECT_FALSE(isModelArmedOutput());
+  EXPECT_EQ(channelOutputs[0], -RESX);
+}
+
+TEST_F(ArmingTest, DisableThenReenableWhileShHeld_NoSpuriousArm)
+{
+  g_model.armingEnabled = true;
+  g_model.armingThrottleChannel = 0;
+  s_mixer_first_run_done = true;
+
+  int sf_idx = switchLookupIdx("SF", 2);
+  if (sf_idx < 0) return;
+  int sh_idx = switchLookupIdx("SH", 2);
+  if (sh_idx < 0) return;
+
+  // Arm normally: SF down first, then SH press
+  simuSetSwitch(sf_idx, 1);   // SF DOWN
+  testUpdateArmingState();
+  EXPECT_FALSE(isModelArmedState());
+
+  simuSetSwitch(sh_idx, 1);   // SH DOWN (rising edge while SF down)
+  testUpdateArmingState();
+  EXPECT_TRUE(isModelArmedState());
+
+  // Release SH, SF stays down
+  simuSetSwitch(sh_idx, -1);  // SH UP (released)
+  testUpdateArmingState();
+  EXPECT_TRUE(isModelArmedState());
+
+  // Disable arming — flags should reset internally
+  g_model.armingEnabled = false;
+  testUpdateArmingState();
+  EXPECT_FALSE(isModelArmedState());
+
+  // Hold SH while re-enabling (SF still down)
+  simuSetSwitch(sh_idx, 1);   // SH DOWN (held)
+  g_model.armingEnabled = true;
+  testUpdateArmingState();
+  // Must NOT arm spontaneously — requires fresh rising edge after re-enable
+  EXPECT_FALSE(isModelArmedState());
+
+  // Now perform correct arming sequence: release SH, press SH again
+  simuSetSwitch(sh_idx, -1);  // SH UP
+  testUpdateArmingState();
+  simuSetSwitch(sh_idx, 1);   // SH DOWN — rising edge while SF is down
+  testUpdateArmingState();
+  EXPECT_TRUE(isModelArmedState());
+}

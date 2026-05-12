@@ -84,6 +84,14 @@ uint8_t getSwitchCountInFSGroup(uint8_t index);
 
 SwitchConfig switchGetMaxType(uint8_t idx);
 
+bool isModelArmedState();
+bool isModelArmedOutput();
+void resetArmingState();
+
+#if defined(SIMU)
+void testUpdateArmingState();
+#endif
+
 // Restore switch state
 void logicalSwitchesInit(bool force);
 

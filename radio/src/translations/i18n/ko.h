@@ -565,6 +565,8 @@
 #define TR_PRESS_ENTER_TO_CONFIRM         "ENTER를 눌러 확인"
 
 #define TR_THROTTLE_LABEL               "스로틀"
+#define TR_ARMING_ENABLED             "Arming enabled"
+#define TR_ARMING_DISABLED            "Arming disabled"
 #define TR_THROTTLE_START               "스로틀 시작"
 #define TR_THROTTLEREVERSE              TR("스로틀 반전", "역방향")
 #define TR_MINUTEBEEP                   TR("분 경고음", "1분마다 알림")

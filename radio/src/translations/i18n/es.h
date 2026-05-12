@@ -555,6 +555,8 @@
 #define TR_MODEL_SHUTDOWN              "Apagar ?"
 #define TR_PRESS_ENTER_TO_CONFIRM      "Enter para confirmar"
 #define TR_THROTTLE_LABEL      "Potencia"
+#define TR_ARMING_ENABLED             "Arming enabled"
+#define TR_ARMING_DISABLED            "Arming disabled"
 #define TR_THROTTLE_START      "Potencia Start"
 #define TR_THROTTLEREVERSE     TR("Invert acel", "Invertir acel.")
 #define TR_MINUTEBEEP          TR("Minuto", "Cada minuto")

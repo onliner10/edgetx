@@ -18,20 +18,34 @@ namespace SimuUiAutomation
 namespace
 {
 
+[[maybe_unused]]
 std::mutex snapshotMutex;
+[[maybe_unused]]
 std::condition_variable snapshotCv;
+[[maybe_unused]]
 uint64_t requestedRevision = 0;
+[[maybe_unused]]
 uint64_t completedRevision = 0;
+[[maybe_unused]]
 bool snapshotRequested = false;
-std::string latestTreeJson = "\"ui\":{\"nodes\":[]}";
+[[maybe_unused]]
+  std::string latestTreeJson = "\"ui\":{\"nodes\":[]}";
 
+[[maybe_unused]]
 uint64_t requestedActionRevision = 0;
+[[maybe_unused]]
 uint64_t completedActionRevision = 0;
+[[maybe_unused]]
 bool actionRequested = false;
+[[maybe_unused]]
 bool latestActionOk = false;
+[[maybe_unused]]
 std::string requestedActionId;
+[[maybe_unused]]
 std::string requestedAction;
+[[maybe_unused]]
 std::string latestActionExtra;
+[[maybe_unused]]
 std::string latestActionError;
 
 std::string jsonEscape(const std::string& value)
