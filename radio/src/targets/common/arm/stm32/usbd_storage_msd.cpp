@@ -141,6 +141,7 @@ class UsbSdSession {
 
  private:
   void reset();
+  void fail();
   int8_t refreshCapacity();
 
   UsbSdState state_ = UsbSdState::Closed;
@@ -152,6 +153,12 @@ void UsbSdSession::reset()
 {
   state_ = UsbSdState::Closed;
   drv_ = nullptr;
+  capacity_ = {};
+}
+
+void UsbSdSession::fail()
+{
+  state_ = UsbSdState::Failed;
   capacity_ = {};
 }
 
@@ -237,8 +244,10 @@ int8_t UsbSdSession::read(uint8_t* buf, uint32_t blk_addr, uint16_t blk_len)
   if (!makeBlockRange(blk_addr, blk_len, capacity_.sectors, &range))
     return USBD_FAIL;
 
-  if (drv_->read(0, buf, range.first, range.count) != RES_OK)
+  if (drv_->read(0, buf, range.first, range.count) != RES_OK) {
+    fail();
     return USBD_FAIL;
+  }
 
   return USBD_OK;
 }
@@ -255,8 +264,10 @@ int8_t UsbSdSession::write(uint8_t* buf, uint32_t blk_addr, uint16_t blk_len)
   if (!makeBlockRange(blk_addr, blk_len, capacity_.sectors, &range))
     return USBD_FAIL;
 
-  if (drv_->write(0, buf, range.first, range.count) != RES_OK)
+  if (drv_->write(0, buf, range.first, range.count) != RES_OK) {
+    fail();
     return USBD_FAIL;
+  }
 
   return USBD_OK;
 }
@@ -266,8 +277,10 @@ int8_t UsbSdSession::sync()
   if (state_ != UsbSdState::Ready) return USBD_FAIL;
   if (drv_ == nullptr || drv_->ioctl == nullptr) return USBD_FAIL;
 
-  if (drv_->ioctl(0, CTRL_SYNC, nullptr) != RES_OK)
+  if (drv_->ioctl(0, CTRL_SYNC, nullptr) != RES_OK) {
+    fail();
     return USBD_FAIL;
+  }
 
   return USBD_OK;
 }
