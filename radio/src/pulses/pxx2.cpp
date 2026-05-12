@@ -419,7 +419,8 @@ void Pxx2Pulses::setupRegisterFrame(uint8_t module)
 #endif
 }
 
-void Pxx2Pulses::setupBindFrame(uint8_t module)
+void Pxx2Pulses::setupBindFrame(uint8_t module, int16_t* channels,
+                                uint8_t nChannels)
 {
   if ((g_model.moduleData[module].type == MODULE_TYPE_ISRM_PXX2 &&
        g_model.moduleData[module].subType !=
@@ -427,6 +428,11 @@ void Pxx2Pulses::setupBindFrame(uint8_t module)
       (g_model.moduleData[module].type == MODULE_TYPE_XJT_LITE_PXX2)) {
     setupAccstBindFrame(module);
   } else {
+    if (!moduleState[module].bindInformation) {
+      moduleState[module].mode = MODULE_MODE_NORMAL;
+      setupChannelsFrame(module, channels, nChannels);
+      return;
+    }
     setupAccessBindFrame(module);
   }  
 }
@@ -664,7 +670,7 @@ bool Pxx2Pulses::setupFrame(uint8_t module, int16_t* channels, uint8_t nChannels
       setupRegisterFrame(module);
       break;
     case MODULE_MODE_BIND:
-      setupBindFrame(module);
+      setupBindFrame(module, channels, nChannels);
       break;
     case MODULE_MODE_RESET:
       setupResetFrame(module);

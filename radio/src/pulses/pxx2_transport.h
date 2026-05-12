@@ -87,7 +87,7 @@ class Pxx2Pulses: public Pxx2Transport {
 
     void setupRegisterFrame(uint8_t module);
 
-    void setupBindFrame(uint8_t module);
+    void setupBindFrame(uint8_t module, int16_t* channels, uint8_t nChannels);
 
     void setupAccstBindFrame(uint8_t module);
 

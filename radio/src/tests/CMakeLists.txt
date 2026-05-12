@@ -120,6 +120,20 @@ if(EDGE16_BUILD_FUZZERS)
     ${EDGE16_FUZZ_SANITIZER_FLAGS}
   )
 
+  add_executable(edge16-fuzz-protocols EXCLUDE_FROM_ALL
+    fuzz/protocols_fuzzer.cpp
+    ${SIMU_SRC}
+  )
+  target_compile_options(edge16-fuzz-protocols PRIVATE
+    ${SIMU_SRC_OPTIONS}
+    ${EDGE16_FUZZ_SANITIZER_FLAGS}
+    -O1
+    -g
+  )
+  target_link_options(edge16-fuzz-protocols PRIVATE
+    ${EDGE16_FUZZ_SANITIZER_FLAGS}
+  )
+
   add_custom_target(fuzz-yaml-smoke
     COMMAND ${CMAKE_COMMAND} -E env
       ASAN_OPTIONS=abort_on_error=1:detect_leaks=0
@@ -136,6 +150,18 @@ if(EDGE16_BUILD_FUZZERS)
     DEPENDS edge16-fuzz-mixer
   )
 
-  add_custom_target(fuzz-smoke DEPENDS fuzz-yaml-smoke fuzz-mixer-smoke)
-  add_custom_target(fuzzers DEPENDS edge16-fuzz-yaml edge16-fuzz-mixer)
+  add_custom_target(fuzz-protocols-smoke
+    COMMAND ${CMAKE_COMMAND} -E env
+      ASAN_OPTIONS=abort_on_error=1:detect_leaks=0
+      UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1
+      $<TARGET_FILE:edge16-fuzz-protocols>
+        -runs=10000
+        -max_len=768
+        -timeout=5
+        -dict=${CMAKE_CURRENT_SOURCE_DIR}/fuzz/protocols.dict
+    DEPENDS edge16-fuzz-protocols ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/protocols.dict
+  )
+
+  add_custom_target(fuzz-smoke DEPENDS fuzz-yaml-smoke fuzz-mixer-smoke fuzz-protocols-smoke)
+  add_custom_target(fuzzers DEPENDS edge16-fuzz-yaml edge16-fuzz-mixer edge16-fuzz-protocols)
 endif()

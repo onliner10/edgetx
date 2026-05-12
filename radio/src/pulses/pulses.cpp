@@ -76,10 +76,60 @@
 
 static module_pulse_driver _module_drivers[MAX_MODULES];
 static module_pulse_buffer _module_buffers[MAX_MODULES] __DMA_NO_CACHE;
+static std::atomic<uint8_t> _module_init_failed_protocol[MAX_MODULES];
+static std::atomic<uint8_t> _module_init_retry_delay[MAX_MODULES];
+#if defined(SIMU)
+static std::atomic<uint8_t> _module_init_forced_failure_protocol[MAX_MODULES];
+#endif
+
+constexpr uint8_t MODULE_INIT_RETRY_DELAY_FRAMES = 50;
+
+static void clearModuleInitFailure(uint8_t module)
+{
+  _module_init_failed_protocol[module].store(PROTOCOL_CHANNELS_UNINITIALIZED,
+                                             std::memory_order_relaxed);
+  _module_init_retry_delay[module].store(0, std::memory_order_relaxed);
+}
+
+static void markModuleInitFailure(uint8_t module, uint8_t protocol)
+{
+  _module_init_failed_protocol[module].store(protocol, std::memory_order_relaxed);
+  _module_init_retry_delay[module].store(MODULE_INIT_RETRY_DELAY_FRAMES,
+                                         std::memory_order_relaxed);
+  mixerSchedulerSetPeriod(module, 0);
+}
+
+static bool moduleInitRetryDeferred(uint8_t module, uint8_t protocol,
+                                    bool settingsUpdated)
+{
+  if (protocol == PROTOCOL_CHANNELS_NONE ||
+      _module_init_failed_protocol[module].load(std::memory_order_relaxed) !=
+          protocol ||
+      settingsUpdated) {
+    clearModuleInitFailure(module);
+    return false;
+  }
+
+  uint8_t delay =
+      _module_init_retry_delay[module].load(std::memory_order_relaxed);
+  if (delay == 0) {
+    return false;
+  }
+
+  _module_init_retry_delay[module].store(delay - 1, std::memory_order_relaxed);
+  return true;
+}
 
 void pulsesInit()
 {
   memset(_module_drivers, 0, sizeof(_module_drivers));
+  for (uint8_t i = 0; i < MAX_MODULES; i++) {
+    clearModuleInitFailure(i);
+#if defined(SIMU)
+    _module_init_forced_failure_protocol[i].store(PROTOCOL_CHANNELS_UNINITIALIZED,
+                                                  std::memory_order_relaxed);
+#endif
+  }
 }
 
 module_pulse_driver* pulsesGetModuleDriver(uint8_t module)
@@ -167,6 +217,7 @@ bool restartModuleAsync(uint8_t module, uint8_t cnt_delay)
 
 void pulsesModuleSettingsUpdate(uint8_t module)
 {
+  if (module < MAX_MODULES) clearModuleInitFailure(module);
   moduleState[module].settings_updated = 1;
 }
 
@@ -374,15 +425,22 @@ void pulsesSetModuleDeInitCb(module_deinit_cb_t cb)
   _on_module_deinit = cb;
 }
 
-static void _init_module(uint8_t module, const etx_proto_driver_t* drv)
+static bool _init_module(uint8_t module, const etx_proto_driver_t* drv)
 {
   auto mod = &(_module_drivers[module]);
+#if defined(SIMU)
+  if (_module_init_forced_failure_protocol[module].load(
+          std::memory_order_relaxed) == drv->protocol) {
+    TRACE("Module #%d forced init failure", module);
+    return false;
+  }
+#endif
   void* ctx = drv->init(module);
 
   // TODO: module init failed somehow, we should handle this better...
   if (!ctx) {
     TRACE("Module #%d init failed", module);
-    return;
+    return false;
   }
 
   mod->drv = drv;
@@ -395,6 +453,7 @@ static void _init_module(uint8_t module, const etx_proto_driver_t* drv)
   // power ON
   modulePortSetPower(module, true);
   TRACE("Module #%d init succeeded", module);
+  return true;
 }
 
 static void _deinit_module(uint8_t module)
@@ -422,80 +481,71 @@ static void _deinit_module(uint8_t module)
   TRACE("Module #%d de-init succeeded", module);
 }
 
-static void pulsesEnableModule(uint8_t module, uint8_t protocol)
+static bool pulsesEnableModule(uint8_t module, uint8_t protocol)
 {
   _deinit_module(module);
 
   switch (protocol) {
 #if defined(PXX1)
     case PROTOCOL_CHANNELS_PXX1:
-      _init_module(module, &Pxx1Driver);
-      break;
+      return _init_module(module, &Pxx1Driver);
 #endif
 
 #if defined(DSM2)
     case PROTOCOL_CHANNELS_DSM2:
-      _init_module(module, &DSM2Driver);
-      break;
+      return _init_module(module, &DSM2Driver);
 #endif
 
 #if defined(SBUS)
     case PROTOCOL_CHANNELS_SBUS:
-      _init_module(module, &SBusDriver);
-      break;
+      return _init_module(module, &SBusDriver);
 #endif
 
 #if defined(PXX2)
     case PROTOCOL_CHANNELS_PXX2:
-      _init_module(module, &Pxx2Driver);
-      break;
+      return _init_module(module, &Pxx2Driver);
 #endif
 
 #if defined(MULTIMODULE)
     case PROTOCOL_CHANNELS_MULTIMODULE:
-      _init_module(module, &MultiDriver);
-      break;
+      return _init_module(module, &MultiDriver);
 #endif
 
 #if defined(CROSSFIRE)
     case PROTOCOL_CHANNELS_CROSSFIRE:
-      _init_module(module, &CrossfireDriver);
-      break;
+      return _init_module(module, &CrossfireDriver);
 #endif
 
 #if defined(GHOST)
     case PROTOCOL_CHANNELS_GHOST:
-      _init_module(module, &GhostDriver);
-      break;
+      return _init_module(module, &GhostDriver);
 #endif
 
 #if defined(PPM)
   case PROTOCOL_CHANNELS_PPM:
-      _init_module(module, &PpmDriver);
-      break;
+      return _init_module(module, &PpmDriver);
 #endif
 
 #if defined(INTERNAL_MODULE_AFHDS2A) && defined(AFHDS2)
     case PROTOCOL_CHANNELS_AFHDS2A:
-      _init_module(module, &Afhds2InternalDriver);
-      break;
+      return _init_module(module, &Afhds2InternalDriver);
 #endif
 
 #if defined(INTERNAL_MODULE_AFHDS3) || defined(AFHDS3)
     case PROTOCOL_CHANNELS_AFHDS3:
-      _init_module(module, &afhds3::ProtoDriver);
-      break;
+      return _init_module(module, &afhds3::ProtoDriver);
 #endif
 
 #if defined(DSM2)
     case PROTOCOL_CHANNELS_DSMP:
-      _init_module(module, &DSMPDriver);
-      break;
+      return _init_module(module, &DSMPDriver);
 #endif
 
     default:
       break;
   }
+
+  return protocol == PROTOCOL_CHANNELS_NONE;
 }
 
 void pulsesStopModule(uint8_t module)
@@ -514,6 +564,7 @@ void pulsesStopModule(uint8_t module)
 
   auto& proto = moduleState[module].protocol;
   proto = PROTOCOL_CHANNELS_NONE;
+  clearModuleInitFailure(module);
   mixerTaskUnlock();
 }
 
@@ -562,9 +613,19 @@ void pulsesSendNextFrame(uint8_t module)
 
     if (_handle_async_restart(module))
       return;
+
+    bool settingsUpdated =
+        state.settings_updated.exchange(0, std::memory_order_relaxed) != 0;
+    if (moduleInitRetryDeferred(module, protocol, settingsUpdated))
+      return;
     
-    pulsesEnableModule(module, protocol);
-    moduleState[module].protocol = protocol;
+    if (pulsesEnableModule(module, protocol)) {
+      clearModuleInitFailure(module);
+      moduleState[module].protocol = protocol;
+    } else {
+      markModuleInitFailure(module, protocol);
+      moduleState[module].protocol = PROTOCOL_CHANNELS_NONE;
+    }
     return;
   }
 
@@ -595,6 +656,21 @@ void pulsesSendChannels()
     pulsesSendNextFrame(i);
   }
 }
+
+#if defined(SIMU)
+uint8_t pulsesGetModuleInitRetryDelayForTest(uint8_t module)
+{
+  if (module >= MAX_MODULES) return 0;
+  return _module_init_retry_delay[module].load(std::memory_order_relaxed);
+}
+
+void pulsesForceModuleInitFailureForTest(uint8_t module, uint8_t protocol)
+{
+  if (module >= MAX_MODULES) return;
+  _module_init_forced_failure_protocol[module].store(protocol,
+                                                    std::memory_order_relaxed);
+}
+#endif
 
 // set the failsafe channel values to the current output values
 void setCustomFailsafe(uint8_t moduleIndex)

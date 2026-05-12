@@ -303,15 +303,42 @@ static const etx_serial_init pxx1SerialCfg = {
   .polarity = ETX_Pol_Normal,
 };
 
+static bool pxx1PrepareSportTelemetryPayload(uint8_t& payloadSize)
+{
+  const uint8_t size = outputTelemetryBuffer.size;
+  if (size < 2 || size > TELEMETRY_OUTPUT_BUFFER_SIZE) {
+    outputTelemetryBuffer.reset();
+    return false;
+  }
+
+  payloadSize = size - 1;
+  // fix alignement for DMA
+  memmove(outputTelemetryBuffer.data, outputTelemetryBuffer.data + 1,
+          payloadSize);
+  return true;
+}
+
+#if defined(SIMU)
+bool pxx1PrepareSportTelemetryPayloadForTest(uint8_t& payloadSize)
+{
+  return pxx1PrepareSportTelemetryPayload(payloadSize);
+}
+#endif
+
 static void pxx1SportSensorPolling(void* param)
 {
   if (outputTelemetryBuffer.destination != TELEMETRY_ENDPOINT_SPORT)
     return;
 
   auto mod_rx = (etx_module_driver_t*)param;
+  if (!mod_rx) return;
+
   auto drv = modulePortGetSerialDrv(*mod_rx);
   auto ctx = modulePortGetCtx(*mod_rx);
-  if (!drv) return;
+  if (!drv || !ctx || !drv->getBufferedBytes || !drv->getLastByte ||
+      !drv->sendBuffer) {
+    return;
+  }
 
   // Match sensor polling from the module
   // -> detect <0x7E [Physical ID]> as the last sequence
@@ -322,13 +349,12 @@ static void pxx1SportSensorPolling(void* param)
       b != outputTelemetryBuffer.sport.physicalId)
     return;
 
-  // fix alignement for DMA
-  memmove(outputTelemetryBuffer.data, outputTelemetryBuffer.data + 1,
-          outputTelemetryBuffer.size - 1);
+  uint8_t payloadSize = 0;
+  if (!pxx1PrepareSportTelemetryPayload(payloadSize)) {
+    return;
+  }
 
-  drv->sendBuffer(ctx, outputTelemetryBuffer.data,
-                  outputTelemetryBuffer.size - 1);
-
+  drv->sendBuffer(ctx, outputTelemetryBuffer.data, payloadSize);
   outputTelemetryBuffer.reset();
 }
 

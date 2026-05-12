@@ -48,8 +48,11 @@ const etx_serial_init dsmUartParams = {
 };
 
 etx_module_state_t* dsmInit(uint8_t module, uint32_t baudrate,
-                            uint16_t period, bool telemetry)
+                            uint16_t period, bool telemetry,
+                            bool telemetryRequired, bool* telemetryStarted)
 {
+  if (telemetryStarted) *telemetryStarted = false;
+
   // only external module supported
   if (module == INTERNAL_MODULE) return nullptr;
 
@@ -60,7 +63,14 @@ etx_module_state_t* dsmInit(uint8_t module, uint32_t baudrate,
 
   if (telemetry) {
     params.direction = ETX_Dir_RX;
-    modulePortInitSerial(module, ETX_MOD_PORT_SPORT, &params, true);
+    bool telemetryOk =
+        modulePortInitSerial(module, ETX_MOD_PORT_SPORT, &params, true);
+    if (telemetryStarted) *telemetryStarted = telemetryOk;
+    if (!telemetryOk && telemetryRequired) {
+      modulePortDeInit(mod_st);
+      mixerSchedulerSetPeriod(module, 0);
+      return nullptr;
+    }
   }
 
   mixerSchedulerSetPeriod(module, period);

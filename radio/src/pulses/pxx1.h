@@ -26,4 +26,8 @@
 // Set the board specific PXX1 baudrate (X-lite only?)
 void pxx1SetInternalBaudrate(uint32_t baudrate);
 
+#if defined(SIMU)
+bool pxx1PrepareSportTelemetryPayloadForTest(uint8_t& payloadSize);
+#endif
+
 extern const etx_proto_driver_t Pxx1Driver;
