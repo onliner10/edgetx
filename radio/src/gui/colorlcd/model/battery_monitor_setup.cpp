@@ -15,18 +15,14 @@
 
 #include "battery_monitor_setup.h"
 
-#include "button_matrix.h"
-#include "choice.h"
 #include "edgetx.h"
 #include "getset_helpers.h"
-#include "numberedit.h"
 #include "sourcechoice.h"
+#include "list_line_button.h"
 #include "toggleswitch.h"
 #include "telemetry/battery_monitor.h"
 
 #define SET_DIRTY() storageDirty(EE_MODEL)
-
-static const char* const batteryTypeNames[] = {"LiPo", "Li-ion", "LiFe", "NiMH", "Pb"};
 
 static bool isBatteryMonitorVoltageSensor(uint8_t index)
 {
@@ -114,72 +110,77 @@ static void getFlightPackStatusString(FlightBatterySessionState state,
   }
 }
 
-class CompatiblePacksMatrix : public ButtonMatrix
+class CompatiblePackLine : public ListLineButton
 {
  public:
-  CompatiblePacksMatrix(Window* parent, const rect_t& rect, uint8_t monitor)
-      : ButtonMatrix(parent, rect), monitor(monitor)
+  CompatiblePackLine(Window* parent, uint8_t monitor, uint8_t slot)
+      : ListLineButton(parent, slot), monitor(monitor), slot(slot)
   {
-    uint8_t count = 0;
-    for (uint8_t i = 0; i < MAX_BATTERY_PACKS; i++) {
-      if (g_eeGeneral.batteryPacks[i].active) {
-        count++;
-      }
+    setHeight(PACK_LINE_H);
+    padAll(PAD_ZERO);
+    setWidth(ListLineButton::GRP_W);
+
+    nameText = new StaticText(this, {PAD_MEDIUM, PACK_TEXT_Y,
+                                    ListLineButton::GRP_W - 2 * PAD_MEDIUM,
+                                    EdgeTxStyles::STD_FONT_HEIGHT},
+                             "", COLOR_THEME_PRIMARY1_INDEX);
+
+    setPressHandler([this]() -> uint8_t {
+      togglePack();
+      return 0;
+    });
+    check(isActive());
+    delayLoad();
+  }
+
+  bool isActive() const override
+  {
+    const uint16_t mask = g_model.batteryMonitors[monitor].compatiblePackMask;
+    return (mask & (uint16_t(1u) << slot)) != 0;
+  }
+
+  void onRefresh() override
+  {
+    if (!nameText) {
+      return;
     }
-    initBtnMap(4, count);
-    update();
-  }
 
-  void onPress(uint8_t btn_id) override
-  {
-    uint8_t slot = getSlotFromBtnId(btn_id);
-    if (slot >= MAX_BATTERY_PACKS) return;
-    uint16_t mask = g_model.batteryMonitors[monitor].compatiblePackMask;
-    mask ^= (1 << slot);
-    g_model.batteryMonitors[monitor].compatiblePackMask = mask;
-    invalidateFlightBatteryMonitor(monitor);
-    SET_DIRTY();
-    setChecked(btn_id);
-  }
+    const BatteryPackData& pack = g_eeGeneral.batteryPacks[slot];
+    char name[LEN_BATTERY_PACK_NAME + 1] = {};
+    char lineText[80] = {};
 
-  bool isActive(uint8_t btn_id) override
-  {
-    uint8_t slot = getSlotFromBtnId(btn_id);
-    if (slot >= MAX_BATTERY_PACKS) return false;
-    uint16_t mask = g_model.batteryMonitors[monitor].compatiblePackMask;
-    return (mask & (1 << slot)) != 0;
-  }
-
-  void update()
-  {
-    uint8_t btn_id = 0;
-    for (uint8_t i = 0; i < MAX_BATTERY_PACKS; i++) {
-      if (g_eeGeneral.batteryPacks[i].active) {
-        const BatteryPackData& pack = g_eeGeneral.batteryPacks[i];
-        char label[32];
-        snprintf(label, sizeof(label), "%d: %dS %dmAh", i + 1,
-                 pack.cellCount, pack.capacity);
-        setText(btn_id, label);
-        setChecked(btn_id);
-        btn_id++;
-      }
+    if (pack.name[0] == '\0') {
+      snprintf(name, sizeof(name), "Pack %d", slot + 1);
+    } else {
+      strncpy(name, pack.name, LEN_BATTERY_PACK_NAME);
     }
-    ButtonMatrix::update();
+
+    snprintf(lineText, sizeof(lineText), "%d: %s (%dS %dmAh)", slot + 1, name,
+             pack.cellCount, pack.capacity);
+    nameText->setText(lineText);
+    check(isActive());
   }
+
+  void delayedInit() override { refresh(); }
 
  protected:
   uint8_t monitor;
+  uint8_t slot;
+  StaticText* nameText = nullptr;
 
-  uint8_t getSlotFromBtnId(uint8_t btn_id)
+  static constexpr coord_t PACK_LINE_H = EdgeTxStyles::UI_ELEMENT_HEIGHT +
+                                         PAD_TINY * 2;
+  static constexpr coord_t PACK_TEXT_Y =
+      (PACK_LINE_H - EdgeTxStyles::STD_FONT_HEIGHT) / 2;
+
+  void togglePack()
   {
-    uint8_t btn_count = 0;
-    for (uint8_t i = 0; i < MAX_BATTERY_PACKS; i++) {
-      if (g_eeGeneral.batteryPacks[i].active) {
-        if (btn_count == btn_id) return i;
-        btn_count++;
-      }
-    }
-    return MAX_BATTERY_PACKS;
+    uint16_t mask = g_model.batteryMonitors[monitor].compatiblePackMask;
+    mask ^= (uint16_t(1u) << slot);
+    g_model.batteryMonitors[monitor].compatiblePackMask = mask;
+    invalidateFlightBatteryMonitor(monitor);
+    SET_DIRTY();
+    check(isActive());
   }
 };
 
@@ -191,10 +192,8 @@ BatteryMonitorPage::BatteryMonitorPage(uint8_t monitor)
 
   BatteryMonitorData* config = &g_model.batteryMonitors[monitor];
 
-  setupLine(nullptr, [=](Window* parent, coord_t x, coord_t y) {
-    new StaticText(parent, {x, y, 0, 0}, "Enabled",
-                  COLOR_THEME_PRIMARY1_INDEX);
-    new ToggleSwitch(parent, {x + 80, y, 0, 0}, GET_DEFAULT(config->enabled),
+  setupLine("Enabled", [=](Window* parent, coord_t x, coord_t y) {
+    new ToggleSwitch(parent, {x, y, 0, 0}, GET_DEFAULT(config->enabled),
                       [=](int32_t newValue) {
                         config->enabled = newValue;
                         invalidateFlightBatteryMonitor(monitor);
@@ -202,47 +201,8 @@ BatteryMonitorPage::BatteryMonitorPage(uint8_t monitor)
                       });
   });
 
-  setupLine(STR_TYPE, [=](Window* parent, coord_t x, coord_t y) {
-    new Choice(parent, {x, y, 0, 0}, batteryTypeNames, 0, BATTERY_TYPE_LAST - 1,
-                GET_DEFAULT(config->batteryType), [=](int32_t newValue) {
-                  config->batteryType = newValue;
-                  invalidateFlightBatteryMonitor(monitor);
-                  SET_DIRTY();
-                });
-  });
-
-  setupLine(nullptr, [=](Window* parent, coord_t x, coord_t y) {
-    new StaticText(parent, {x, y, 0, 0}, "Cells",
-                   COLOR_THEME_PRIMARY1_INDEX);
-    auto cellsEdit = new NumberEdit(
-        parent, {x + 80, y, 0, 0}, 0, 12, GET_DEFAULT(config->cellCount),
-        [=](int32_t newValue) {
-          config->cellCount = newValue;
-          invalidateFlightBatteryMonitor(monitor);
-          SET_DIRTY();
-        });
-    cellsEdit->setAccelFactor(0);
-  });
-
-  setupLine(nullptr, [=](Window* parent, coord_t x, coord_t y) {
-    new StaticText(parent, {x, y, 0, 0}, "Capacity",
-                   COLOR_THEME_PRIMARY1_INDEX);
-    auto capacityEdit = new NumberEdit(
-        parent, {x + 80, y, 0, 0}, 100, 30000, GET_DEFAULT(config->capacity),
-        [=](int32_t newValue) {
-          config->capacity = newValue;
-          invalidateFlightBatteryMonitor(monitor);
-          SET_DIRTY();
-        });
-    capacityEdit->setStep(100);
-    capacityEdit->setAccelFactor(0);
-    new StaticText(parent, {x + 160, y, 0, 0}, "mAh");
-  });
-
-  setupLine(nullptr, [=](Window* parent, coord_t x, coord_t y) {
-    new StaticText(parent, {x, y, 0, 0}, "Voltage Alert",
-                  COLOR_THEME_PRIMARY1_INDEX);
-    new ToggleSwitch(parent, {x + 100, y, 0, 0},
+  setupLine("Voltage Alert", [=](Window* parent, coord_t x, coord_t y) {
+    new ToggleSwitch(parent, {x, y, 0, 0},
                      GET_DEFAULT(config->voltAlertEnabled),
                       [=](int32_t newValue) {
                         config->voltAlertEnabled = newValue;
@@ -251,10 +211,8 @@ BatteryMonitorPage::BatteryMonitorPage(uint8_t monitor)
                       });
   });
 
-  setupLine(nullptr, [=](Window* parent, coord_t x, coord_t y) {
-    new StaticText(parent, {x, y, 0, 0}, "Capacity Alert",
-                  COLOR_THEME_PRIMARY1_INDEX);
-    new ToggleSwitch(parent, {x + 110, y, 0, 0},
+  setupLine("Capacity Alert", [=](Window* parent, coord_t x, coord_t y) {
+    new ToggleSwitch(parent, {x, y, 0, 0},
                      GET_DEFAULT(config->capAlertEnabled),
                       [=](int32_t newValue) {
                         config->capAlertEnabled = newValue;
@@ -263,12 +221,7 @@ BatteryMonitorPage::BatteryMonitorPage(uint8_t monitor)
                       });
   });
 
-  setupLine(nullptr, [=](Window* parent, coord_t x, coord_t y) {
-    new StaticText(parent, {x, y, 0, 0}, "Flight Pack Status",
-                   COLOR_THEME_PRIMARY1_INDEX);
-  });
-
-  setupLine(nullptr, [=](Window* parent, coord_t x, coord_t y) {
+  setupLine("Flight Pack Status", [=](Window* parent, coord_t x, coord_t y) {
     new DynamicText(parent, {x, y, 0, 0}, [=]() {
       char buf[64];
       auto state = flightBatterySessionState(monitor);
@@ -286,26 +239,20 @@ BatteryMonitorPage::BatteryMonitorPage(uint8_t monitor)
   }
 
   if (hasActivePacks) {
-    setupLine(nullptr, [=](Window* parent, coord_t x, coord_t y) {
-      new StaticText(parent, {x, y, 0, 0}, "Compatible Packs",
-                     COLOR_THEME_PRIMARY1_INDEX);
-    });
+    setupLine("Compatible Packs", nullptr);
 
-    setupLine(nullptr, [=](Window* parent, coord_t x, coord_t y) {
-      new CompatiblePacksMatrix(parent, {x, y, LCD_W - x * 2, 40}, monitor);
-    });
+    for (uint8_t i = 0; i < MAX_BATTERY_PACKS; i++) {
+      if (g_eeGeneral.batteryPacks[i].active) {
+        setupLine(nullptr, [=](Window* parent, coord_t, coord_t) {
+          new CompatiblePackLine(parent, monitor, i);
+        });
+      }
+    }
   } else {
-    setupLine(nullptr, [=](Window* parent, coord_t x, coord_t y) {
-      new StaticText(parent, {x, y, 0, 0},
-                     "No battery packs configured in Radio Setup",
-                     COLOR_THEME_SECONDARY1_INDEX);
-    });
+    setupLine("No battery packs configured in Radio Setup", nullptr);
   }
 
-  setupLine(nullptr, [=](Window* parent, coord_t x, coord_t y) {
-    new StaticText(parent, {x, y, 0, 0}, "Advanced Telemetry",
-                   COLOR_THEME_PRIMARY1_INDEX);
-  });
+  setupLine("Advanced Telemetry", nullptr);
 
   setupLine(STR_VOLTAGE, [=](Window* parent, coord_t x, coord_t y) {
     bool hasVoltageSensor = false;
@@ -316,9 +263,9 @@ BatteryMonitorPage::BatteryMonitorPage(uint8_t monitor)
       }
     }
     if (!hasVoltageSensor) {
-      new StaticText(parent, {x, y, 0, 0},
-                     "No voltage telemetry sensor",
-                     COLOR_THEME_WARNING_INDEX);
+      new StaticText(parent, {x, y + PAD_LARGE, 0, 0},
+                      "No voltage telemetry sensor",
+                      COLOR_THEME_WARNING_INDEX);
     } else {
       auto sc = new SourceChoice(
           parent, {x, y, 0, 0}, MIXSRC_NONE, MIXSRC_LAST_TELEM,
@@ -349,7 +296,7 @@ BatteryMonitorPage::BatteryMonitorPage(uint8_t monitor)
       }
     }
     if (!hasCurrentSensor) {
-      new StaticText(parent, {x, y, 0, 0},
+      new StaticText(parent, {x, y + PAD_LARGE, 0, 0},
                       "No capacity telemetry sensor",
                      COLOR_THEME_WARNING_INDEX);
     } else {
