@@ -729,6 +729,7 @@ struct PageButtonDef {
   std::function<void()> createPage;
   std::function<bool()> isActive;
   std::function<bool()> enabled;
+  const char* automationId = nullptr;
 };
 
 //-----------------------------------------------------------------------------

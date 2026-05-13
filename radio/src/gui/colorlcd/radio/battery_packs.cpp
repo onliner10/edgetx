@@ -22,18 +22,31 @@
 #include "battery_packs.h"
 
 #include "button.h"
+#include "choice.h"
 #include "edgetx.h"
 #include "getset_helpers.h"
 #include "numberedit.h"
 #include "page.h"
 #include "telemetry/battery_monitor.h"
-#include "textedit.h"
 
 #define SET_DIRTY() storageDirty(EE_GENERAL)
 
 static constexpr coord_t ROW_H = EdgeTxStyles::UI_ELEMENT_HEIGHT + PAD_TINY;
 static constexpr uint16_t DEFAULT_BATTERY_PACK_CAPACITY_MAH = 2200;
 static constexpr uint16_t MIN_BATTERY_PACK_CAPACITY_MAH = 100;
+
+static bool batterySpecExists(uint8_t excludeSlot, uint8_t type,
+                               uint8_t cells, int16_t cap)
+{
+  for (uint8_t i = 0; i < MAX_BATTERY_PACKS; i++) {
+    if (i == excludeSlot) continue;
+    const auto& p = g_eeGeneral.batteryPacks[i];
+    if (!p.active) continue;
+    if ((uint8_t)p.batteryType == type && p.cellCount == cells && p.capacity == cap)
+      return true;
+  }
+  return false;
+}
 
 class BatteryPackButton : public Button
 {
@@ -55,23 +68,13 @@ class BatteryPackButton : public Button
 
     coord_t y = height() / 2 - EdgeTxStyles::STD_FONT_HEIGHT / 2;
 
-    new StaticText(this, {PAD_MEDIUM, y, 30, EdgeTxStyles::STD_FONT_HEIGHT},
-                   std::to_string(slot + 1).c_str(), COLOR_THEME_SECONDARY1_INDEX);
-
-    char name[LEN_BATTERY_PACK_NAME + 1] = {};
-    strncpy(name, pack->name, LEN_BATTERY_PACK_NAME);
-    new StaticText(this, {PAD_MEDIUM + 35, y, 80, EdgeTxStyles::STD_FONT_HEIGHT},
-                   name, COLOR_THEME_PRIMARY1_INDEX);
-
-    char cells[8];
-    snprintf(cells, sizeof(cells), "%dS", pack->cellCount);
-    new StaticText(this, {PAD_MEDIUM + 120, y, 30, EdgeTxStyles::STD_FONT_HEIGHT},
-                   cells, COLOR_THEME_PRIMARY1_INDEX);
-
-    char cap[16];
-    snprintf(cap, sizeof(cap), "%dmAh", pack->capacity);
-    new StaticText(this, {PAD_MEDIUM + 155, y, 70, EdgeTxStyles::STD_FONT_HEIGHT},
-                   cap, COLOR_THEME_PRIMARY1_INDEX);
+    char spec[48];
+    snprintf(spec, sizeof(spec), "%s %dS %dmAh",
+             batteryTypeToString((BatteryType)pack->batteryType),
+             pack->cellCount, pack->capacity);
+    new StaticText(this, {PAD_MEDIUM, y, LCD_W - PAD_MEDIUM * 2,
+                          EdgeTxStyles::STD_FONT_HEIGHT},
+                   spec, COLOR_THEME_PRIMARY1_INDEX);
   }
 
  protected:
@@ -107,10 +110,11 @@ void BatteryPacksPage::build()
   if (firstInactive < MAX_BATTERY_PACKS) {
     new TextButton(body, {0, 0, LCD_W, ROW_H}, "+", [=]() -> uint8_t {
       BatteryPackData* pack = &g_eeGeneral.batteryPacks[firstInactive];
+
       pack->active = 1;
-      pack->name[0] = '\0';
-      pack->capacity = DEFAULT_BATTERY_PACK_CAPACITY_MAH;
+      pack->batteryType = BATTERY_TYPE_LIPO;
       pack->cellCount = 3;
+      pack->capacity = DEFAULT_BATTERY_PACK_CAPACITY_MAH;
       SET_DIRTY();
       editPack(firstInactive);
       return 0;
@@ -136,6 +140,10 @@ static const lv_coord_t col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(2),
 static const lv_coord_t row_dsc[] = {LV_GRID_CONTENT, LV_GRID_TEMPLATE_LAST};
 #endif
 
+static const char* batteryTypeLabels[] = {
+  "LiPo", "Li-Ion", "LiFe", "NiMH", "Pb"
+};
+
 class BatteryPackEditBody : public Window
 {
  public:
@@ -160,15 +168,29 @@ BatteryPackEditBody::BatteryPackEditBody(BatteryPackEditWindow* page,
 
   BatteryPackData* pack = &g_eeGeneral.batteryPacks[slot];
 
-  auto nameLine = newLine(grid);
-  new StaticText(nameLine, rect_t{}, STR_NAME);
-  new RadioTextEdit(nameLine, rect_t{}, pack->name, LEN_BATTERY_PACK_NAME);
+  auto typeLine = newLine(grid);
+  new StaticText(typeLine, rect_t{}, "Chemistry");
+  auto typeEdit = new Choice(typeLine, rect_t{}, batteryTypeLabels,
+                             0, BATTERY_TYPE_PB,
+                             GET_DEFAULT(pack->batteryType),
+                             [=](int32_t newValue) {
+                               if (batterySpecExists(slot, newValue,
+                                   pack->cellCount, pack->capacity))
+                                 return;
+                               pack->batteryType = (BatteryType)newValue;
+                               invalidateFlightBatteryPackSlot(slot);
+                               SET_DIRTY();
+                             });
 
   auto cellsLine = newLine(grid);
   new StaticText(cellsLine, rect_t{}, "Cells");
   auto cellsEdit = new NumberEdit(cellsLine, rect_t{}, 1, 12,
                                   GET_DEFAULT(pack->cellCount),
                                   [=](int32_t newValue) {
+                                    if (batterySpecExists(slot,
+                                        pack->batteryType, newValue,
+                                        pack->capacity))
+                                      return;
                                     pack->cellCount = newValue;
                                     invalidateFlightBatteryPackSlot(slot);
                                     SET_DIRTY();
@@ -181,6 +203,10 @@ BatteryPackEditBody::BatteryPackEditBody(BatteryPackEditWindow* page,
                                  MIN_BATTERY_PACK_CAPACITY_MAH, 30000,
                                  GET_DEFAULT(pack->capacity),
                                  [=](int32_t newValue) {
+                                   if (batterySpecExists(slot,
+                                       pack->batteryType, pack->cellCount,
+                                       newValue))
+                                     return;
                                    pack->capacity = newValue;
                                    invalidateFlightBatteryPackSlot(slot);
                                    SET_DIRTY();

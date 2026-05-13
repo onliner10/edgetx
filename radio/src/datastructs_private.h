@@ -345,12 +345,11 @@ enum BatteryType {
 };
 
 PACK(struct BatteryPackData {
-  char name[LEN_BATTERY_PACK_NAME];
   int16_t capacity;
+  uint8_t batteryType:3 ENUM(BatteryType);
   uint8_t cellCount:4;
   uint8_t active:1;
-  uint8_t spare1:3 SKIP;
-  uint8_t spare2:8 SKIP;
+  uint8_t spare:8 SKIP;
 });
 
 PACK(struct BatteryMonitorData {

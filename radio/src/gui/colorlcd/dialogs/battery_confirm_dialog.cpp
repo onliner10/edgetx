@@ -46,23 +46,32 @@ void BatteryConfirmDialog::buildBody()
 
   body->setFlexLayout(LV_FLEX_FLOW_COLUMN_WRAP, PAD_TINY);
 
+  bool specSeen[MAX_BATTERY_PACKS] = {};
   for (uint8_t slot = 0; slot < MAX_BATTERY_PACKS; slot++) {
-    if (packMask & (1 << slot)) {
-      BatteryPackData* pack = &g_eeGeneral.batteryPacks[slot];
-      if (!pack->active) continue;
+    if (specSeen[slot] || !(packMask & (1 << slot))) continue;
 
-      char label[32];
-      snprintf(label, sizeof(label), "%dS %dmAh", pack->cellCount, pack->capacity);
+    BatteryPackData* pack = &g_eeGeneral.batteryPacks[slot];
+    if (!pack->active) continue;
 
-      auto btn = Window::makeLive<TextButton>(
-          body, rect_t{}, label, [=]() -> uint8_t {
-            onConfirmPack(slot + 1);
-            return 0;
-          });
-      if (btn) {
-        btn->setFont(FONT_BOLD_INDEX);
-        btn->setWrap();
-      }
+    for (uint8_t j = slot + 1; j < MAX_BATTERY_PACKS; j++) {
+      if ((packMask & (1 << j)) && g_eeGeneral.batteryPacks[j].active &&
+          batterySpecEquals(*pack, g_eeGeneral.batteryPacks[j]))
+        specSeen[j] = true;
+    }
+
+    char label[32];
+    snprintf(label, sizeof(label), "%s %dS %dmAh",
+             batteryTypeToString((BatteryType)pack->batteryType),
+             pack->cellCount, pack->capacity);
+
+    auto btn = Window::makeLive<TextButton>(
+        body, rect_t{}, label, [=]() -> uint8_t {
+          onConfirmPack(slot + 1);
+          return 0;
+        });
+    if (btn) {
+      btn->setFont(FONT_BOLD_INDEX);
+      btn->setWrap();
     }
   }
 

@@ -79,7 +79,7 @@ TOOLS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "direction": {"type": "string", "enum": ["up", "down", "left", "right"]},
-                "amount": {"type": "string", "enum": ["small", "page"], "default": "page"},
+                "amount": {"type": "string", "enum": ["line", "small", "half_page", "page"], "default": "page"},
                 "target": {"type": "object"},
                 "id": {"type": "string"},
                 "runtime_id": {"type": "string"},
@@ -91,6 +91,25 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "duration_ms": {"type": "integer", "default": 300},
             },
             "required": ["direction"],
+        },
+    },
+    "edgetx_scroll_to": {
+        "description": "Scroll a node into actionable view using user-equivalent drag gestures. Finds the node by text, automation_id, or id; then repeatedly scrolls in small increments until the node declares the requested action (click/long_click). Does not click automatically.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string"},
+                "text_contains": {"type": "string"},
+                "automation_id": {"type": "string"},
+                "semantic_id": {"type": "string"},
+                "id": {"type": "string"},
+                "runtime_id": {"type": "string"},
+                "role": {"type": "string"},
+                "action": {"type": "string", "enum": ["click", "long_click"], "default": "click"},
+                "max_attempts": {"type": "integer", "default": 10},
+                "amount": {"type": "string", "enum": ["line", "small", "half_page", "page"], "default": "line"},
+                "margin": {"type": "integer", "default": 12},
+            },
         },
     },
     "edgetx_wait": {
@@ -115,7 +134,7 @@ TOOLS: dict[str, dict[str, Any]] = {
         "inputSchema": {"type": "object"},
     },
     "edgetx_activate": {
-        "description": "Activate a currently visible user-actionable UI node by semantic_id/automation_id, id/runtime_id, role, text, or text_contains. This does not navigate or infer targets; it only invokes declared click/long_click actions.",
+        "description": "Activate a currently visible user-actionable UI node by semantic_id/automation_id, id/runtime_id, role, text, or text_contains. This does not navigate or infer targets; it only invokes declared click/long_click actions. When ensure_visible=true, first scrolls the node into view.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -130,6 +149,7 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "action": {"type": "string", "enum": ["click", "long_click"], "default": "click"},
                 "duration_ms": {"type": "integer", "default": 0},
                 "verbose": {"type": "boolean", "default": False},
+                "ensure_visible": {"type": "boolean", "default": False},
             },
         },
     },
@@ -158,7 +178,7 @@ TOOLS: dict[str, dict[str, Any]] = {
         },
     },
     "edgetx_click": {
-        "description": "Invoke a visible UI node click action by text, role, id, automation_id, or text_contains. Returns compact result by default (ok + matched node summary). Use verbose=true for full node.",
+        "description": "Invoke a visible UI node click action by text, role, id, automation_id, or text_contains. Returns compact result by default (ok + matched node summary). Use verbose=true for full node. When ensure_visible=true, first scrolls the node into view.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -170,6 +190,7 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "automation_id": {"type": "string"},
                 "duration_ms": {"type": "integer", "default": 0},
                 "verbose": {"type": "boolean", "default": False},
+                "ensure_visible": {"type": "boolean", "default": False},
             },
         },
     },
@@ -387,6 +408,14 @@ class McpServer:
                 int(args.get("duration_ms", 300)),
                 int(args.get("steps", 12)),
             )
+        if name == "edgetx_scroll_to":
+            return self.service.scroll_to(
+                selector_from_args(args),
+                action=args.get("action", "click"),
+                max_attempts=args.get("max_attempts", 10),
+                amount=args.get("amount", "line"),
+                margin=args.get("margin", 12),
+            )
         if name == "edgetx_scroll":
             selector = selector_from_args(args)
             return self.service.scroll(
@@ -413,6 +442,7 @@ class McpServer:
                 args.get("action", "click"),
                 int(args.get("duration_ms", 0)),
                 bool(args.get("verbose", False)),
+                bool(args.get("ensure_visible", False)),
             )
         if name == "edgetx_adjust_field":
             return self.service.adjust_field(
@@ -428,6 +458,7 @@ class McpServer:
                 selector_from_args(args),
                 int(args.get("duration_ms", 0)),
                 bool(args.get("verbose", False)),
+                bool(args.get("ensure_visible", False)),
             )
         if name == "edgetx_long_click":
             return self.service.ui_long_click(
