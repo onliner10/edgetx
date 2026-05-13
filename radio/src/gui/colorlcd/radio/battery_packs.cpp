@@ -170,7 +170,7 @@ BatteryPackEditBody::BatteryPackEditBody(BatteryPackEditWindow* page,
 
   auto typeLine = newLine(grid);
   new StaticText(typeLine, rect_t{}, "Chemistry");
-  auto typeEdit = new Choice(typeLine, rect_t{}, batteryTypeLabels,
+  new Choice(typeLine, rect_t{}, batteryTypeLabels,
                              0, BATTERY_TYPE_PB,
                              GET_DEFAULT(pack->batteryType),
                              [=](int32_t newValue) {
