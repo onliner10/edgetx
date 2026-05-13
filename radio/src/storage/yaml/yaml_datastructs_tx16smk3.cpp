@@ -415,11 +415,10 @@ static const struct YamlNode struct_unsigned_8[] = {
 };
 static const struct YamlNode struct_BatteryPackData[] = {
   YAML_IDX,
-  YAML_STRING("name", LEN_BATTERY_PACK_NAME),
   YAML_SIGNED( "capacity", 16 ),
+  YAML_ENUM("batteryType", 3, enum_BatteryType, NULL),
   YAML_UNSIGNED( "cellCount", 4 ),
   YAML_UNSIGNED( "active", 1 ),
-  YAML_PADDING( 3 ),
   YAML_PADDING( 8 ),
   YAML_END
 };
@@ -471,7 +470,7 @@ static const struct YamlNode struct_RadioData[] = {
   YAML_SIGNED_CUST( "vBatMax", 8, r_vbat_max, w_vbat_max ),
   YAML_UNSIGNED( "backlightBright", 8 ),
   YAML_UNSIGNED( "globalTimer", 32 ),
-  YAML_ARRAY("batteryPacks", 128, 16, struct_BatteryPackData, battery_pack_is_active),
+  YAML_ARRAY("batteryPacks", 32, 16, struct_BatteryPackData, battery_pack_is_active),
   YAML_UNSIGNED( "bluetoothBaudrate", 4 ),
   YAML_ENUM("bluetoothMode", 4, enum_BluetoothModes, NULL),
   YAML_UNSIGNED( "countryCode", 2 ),

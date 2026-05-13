@@ -1,0 +1,53 @@
+{
+  "target": "tx16s",
+  "output": "build/ui-harness/screenshots/battery-full",
+  "steps": [
+    { "wait": { "ms": 2000 } },
+    { "skip_storage_warning_if_present": true },
+    { "wait": { "ms": 500 } },
+
+    { "press": { "key": "SYS" } },
+    { "wait": { "ms": 300 } },
+    { "click": { "text": "Radio Setup" } },
+    { "wait": { "ms": 300 } },
+    { "click": { "text": "Radio Settings" } },
+    { "wait": { "ms": 300 } },
+    { "scroll_to": { "text_contains": "Battery Library", "action": "click" } },
+    { "wait": { "ms": 200 } },
+    { "click": { "automation_id": "radio.settings.battery_library" } },
+    { "wait": { "ms": 300 } },
+    { "screenshot": "00-battery-library-empty" },
+
+    { "click": { "text": "+" } },
+    { "wait": { "ms": 300 } },
+    { "screenshot": "01-edit-pack1" },
+    { "click": { "automation_id": "nav.back" } },
+    { "wait": { "ms": 300 } },
+    { "screenshot": "02-pack1-created" },
+
+    { "click": { "text": "+" } },
+    { "wait": { "ms": 300 } },
+    { "adjust_field": { "label": "Cells", "target_value": "4" } },
+    { "wait": { "ms": 100 } },
+    { "adjust_field": { "label": "Capacity", "target_value": "3000" } },
+    { "wait": { "ms": 100 } },
+    { "screenshot": "03-edit-pack2" },
+    { "click": { "automation_id": "nav.back" } },
+    { "wait": { "ms": 300 } },
+    { "screenshot": "04-both-packs" },
+
+    { "press": { "key": "SYS" } },
+    { "wait": { "ms": 300 } },
+    { "click": { "text": "Model Setup" } },
+    { "wait": { "ms": 300 } },
+    { "click": { "text": "Model Settings" } },
+    { "wait": { "ms": 500 } },
+    { "screenshot": "05-model-settings" },
+
+    { "scroll_to": { "automation_id": "model.setup.battery", "amount": "half_page" } },
+    { "wait": { "ms": 200 } },
+    { "click": { "automation_id": "model.setup.battery", "ensure_visible": true } },
+    { "wait": { "ms": 500 } },
+    { "screenshot": "06-model-battery" }
+  ]
+}

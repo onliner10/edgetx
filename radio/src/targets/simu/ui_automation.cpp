@@ -183,6 +183,69 @@ bool centerPointIsReachable(lv_obj_t* obj, const lv_area_t& bounds)
   return isAncestorOf(obj, topObjectAtPoint(lv_scr_act(), x, y));
 }
 
+int computeVisibleRatioPct(lv_obj_t* obj, const lv_area_t& bounds)
+{
+  auto* scr = lv_scr_act();
+  if (!scr) return 100;
+  lv_area_t scrArea;
+  lv_obj_get_coords(scr, &scrArea);
+
+  lv_area_t clipped = bounds;
+  if (clipped.x1 < scrArea.x1) clipped.x1 = scrArea.x1;
+  if (clipped.y1 < scrArea.y1) clipped.y1 = scrArea.y1;
+  if (clipped.x2 > scrArea.x2) clipped.x2 = scrArea.x2;
+  if (clipped.y2 > scrArea.y2) clipped.y2 = scrArea.y2;
+
+  const int totalW = bounds.x2 - bounds.x1 + 1;
+  const int totalH = bounds.y2 - bounds.y1 + 1;
+  const int totalArea = totalW * totalH;
+  if (totalArea <= 0) return 0;
+
+  int visibleW = clipped.x2 - clipped.x1 + 1;
+  if (visibleW < 0) visibleW = 0;
+  int visibleH = clipped.y2 - clipped.y1 + 1;
+  if (visibleH < 0) visibleH = 0;
+  int visibleArea = visibleW * visibleH;
+
+  return (visibleArea * 100) / totalArea;
+}
+
+bool centerInScreen(const lv_area_t& bounds)
+{
+  auto* scr = lv_scr_act();
+  if (!scr) return true;
+  lv_area_t scrArea;
+  lv_obj_get_coords(scr, &scrArea);
+  const int cx = (bounds.x1 + bounds.x2) / 2;
+  const int cy = (bounds.y1 + bounds.y2) / 2;
+  return cx >= scrArea.x1 && cx <= scrArea.x2 &&
+         cy >= scrArea.y1 && cy <= scrArea.y2;
+}
+
+void appendActionabilityState(std::ostringstream& out, lv_obj_t* obj,
+                               const lv_area_t& bounds,
+                               bool rawClickable,
+                               bool centeredReachable)
+{
+  const int cx = (bounds.x1 + bounds.x2) / 2;
+  const int cy = (bounds.y1 + bounds.y2) / 2;
+  out << ",\"center\":[" << cx << "," << cy << "]"
+      << ",\"raw_clickable\":" << (rawClickable ? "true" : "false")
+      << ",\"center_reachable\":" << (centeredReachable ? "true" : "false");
+
+  const int pct = computeVisibleRatioPct(obj, bounds);
+  out << ",\"visible_ratio_pct\":" << pct;
+
+  if (rawClickable && !centeredReachable) {
+    const bool clipped = !centerInScreen(bounds);
+    out << ",\"action_blocked_reason\":\""
+        << (clipped ? "center_not_reachable_clipped" : "center_not_reachable_covered")
+        << "\"";
+  } else if (nodeClickable(obj) && !rawClickable) {
+    out << ",\"action_blocked_reason\":\"lvgl_not_clickable\"";
+  }
+}
+
 void appendScrollState(std::ostringstream& out, lv_obj_t* obj)
 {
   const bool scrollable = lv_obj_has_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
@@ -219,9 +282,11 @@ void appendNode(std::ostringstream& out, lv_obj_t* obj, lv_obj_t* parent,
   const auto role = nodeRole(obj);
   const auto text = nodeText(obj);
   const auto* w = automationWindow(obj);
+  const bool rawClickable = nodeClickable(obj);
+  const bool rawLongClickable = nodeLongClickable(obj);
   const bool reachable = centerPointIsReachable(obj, bounds);
-  const bool clickable = reachable && nodeClickable(obj);
-  const bool longClickable = reachable && nodeLongClickable(obj);
+  const bool clickable = reachable && rawClickable;
+  const bool longClickable = reachable && rawLongClickable;
 
   if (!first) out << ",";
   first = false;
@@ -255,6 +320,7 @@ void appendNode(std::ostringstream& out, lv_obj_t* obj, lv_obj_t* parent,
     out << "\"long_click\"";
   }
   out << "]";
+  appendActionabilityState(out, obj, bounds, rawClickable, reachable);
   appendScrollState(out, obj);
   out << "}";
 

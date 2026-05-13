@@ -1,0 +1,30 @@
+{
+  "target": "tx16s",
+  "output": "build/ui-harness/screenshots/battery-library",
+  "steps": [
+    { "wait": { "ms": 1500 } },
+    { "skip_storage_warning_if_present": true },
+    { "wait": { "ms": 500 } },
+    { "screenshot": "00-home" },
+    { "press": { "key": "SYS" } },
+    { "wait": { "ms": 300 } },
+    { "screenshot": "01-sys-menu" },
+    { "click": { "text": "Radio Setup" } },
+    { "wait": { "ms": 300 } },
+    { "screenshot": "02-radio-setup" },
+    { "click": { "text": "Radio Settings" } },
+    { "wait": { "ms": 300 } },
+    { "screenshot": "03-radio-settings" },
+    { "click": { "text_contains": "Battery Library" } },
+    { "wait": { "ms": 300 } },
+    { "screenshot": "04-battery-library" },
+    { "click": { "text": "+" } },
+    { "wait": { "ms": 200 } },
+    { "screenshot": "05-edit-pack1" },
+    { "click": { "automation_id": "nav.back" } },
+    { "wait": { "ms": 200 } },
+    { "screenshot": "06-after-pack1" },
+    { "click": { "text": "+" } },
+    { "wait": { "ms": 200 } }
+  ]
+}

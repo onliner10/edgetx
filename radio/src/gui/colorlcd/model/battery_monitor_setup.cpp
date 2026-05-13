@@ -63,7 +63,7 @@ static void getFlightPackStatusString(FlightBatterySessionState state,
     return;
   }
 
-  if (config.batteryType != BATTERY_TYPE_LIPO) {
+  if (config.batteryType > BATTERY_TYPE_PB) {
     strncpy(buf, "Needs setup", bufsize);
     return;
   }
@@ -84,15 +84,18 @@ static void getFlightPackStatusString(FlightBatterySessionState state,
     case FlightBatterySessionState::Confirmed: {
       uint8_t cellCount = config.cellCount;
       int16_t capacity = config.capacity;
+      BatteryType chem = (BatteryType)config.batteryType;
       if (config.selectedPackSlot > 0) {
         uint8_t slot = config.selectedPackSlot - 1;
         if (slot < MAX_BATTERY_PACKS &&
             g_eeGeneral.batteryPacks[slot].active) {
           cellCount = g_eeGeneral.batteryPacks[slot].cellCount;
           capacity = g_eeGeneral.batteryPacks[slot].capacity;
+          chem = (BatteryType)g_eeGeneral.batteryPacks[slot].batteryType;
         }
       }
-      snprintf(buf, bufsize, "%dS %d confirmed", cellCount, capacity);
+      snprintf(buf, bufsize, "%s %dS %d confirmed",
+               batteryTypeToString(chem), cellCount, capacity);
       break;
     }
     case FlightBatterySessionState::ConfirmedWaitingForVoltage:
@@ -136,7 +139,7 @@ class CompatiblePackLine : public ListLineButton
   bool isActive() const override
   {
     const uint16_t mask = g_model.batteryMonitors[monitor].compatiblePackMask;
-    return (mask & (uint16_t(1u) << slot)) != 0;
+    return (mask & specMask()) != 0;
   }
 
   void onRefresh() override
@@ -146,16 +149,9 @@ class CompatiblePackLine : public ListLineButton
     }
 
     const BatteryPackData& pack = g_eeGeneral.batteryPacks[slot];
-    char name[LEN_BATTERY_PACK_NAME + 1] = {};
-    char lineText[80] = {};
-
-    if (pack.name[0] == '\0') {
-      snprintf(name, sizeof(name), "Pack %d", slot + 1);
-    } else {
-      strncpy(name, pack.name, LEN_BATTERY_PACK_NAME);
-    }
-
-    snprintf(lineText, sizeof(lineText), "%d: %s (%dS %dmAh)", slot + 1, name,
+    char lineText[64] = {};
+    snprintf(lineText, sizeof(lineText), "%s %dS %dmAh",
+             batteryTypeToString((BatteryType)pack.batteryType),
              pack.cellCount, pack.capacity);
     nameText->setText(lineText);
     check(isActive());
@@ -173,10 +169,27 @@ class CompatiblePackLine : public ListLineButton
   static constexpr coord_t PACK_TEXT_Y =
       (PACK_LINE_H - EdgeTxStyles::STD_FONT_HEIGHT) / 2;
 
+  uint16_t specMask() const
+  {
+    uint16_t mask = 0;
+    const auto& ref = g_eeGeneral.batteryPacks[slot];
+    for (uint8_t i = 0; i < MAX_BATTERY_PACKS; i++) {
+      const auto& p = g_eeGeneral.batteryPacks[i];
+      if (!p.active) continue;
+      if (batterySpecEquals(p, ref))
+        mask |= (uint16_t(1u) << i);
+    }
+    return mask;
+  }
+
   void togglePack()
   {
     uint16_t mask = g_model.batteryMonitors[monitor].compatiblePackMask;
-    mask ^= (uint16_t(1u) << slot);
+    uint16_t match = specMask();
+    if ((mask & match) == match)
+      mask &= ~match;
+    else
+      mask |= match;
     g_model.batteryMonitors[monitor].compatiblePackMask = mask;
     invalidateFlightBatteryMonitor(monitor);
     SET_DIRTY();
@@ -239,17 +252,27 @@ BatteryMonitorPage::BatteryMonitorPage(uint8_t monitor)
   }
 
   if (hasActivePacks) {
-    setupLine("Compatible Packs", nullptr);
+    setupLine("Compatible Batteries", nullptr);
 
+    bool seen[MAX_BATTERY_PACKS] = {};
     for (uint8_t i = 0; i < MAX_BATTERY_PACKS; i++) {
-      if (g_eeGeneral.batteryPacks[i].active) {
-        setupLine(nullptr, [=](Window* parent, coord_t, coord_t) {
-          new CompatiblePackLine(parent, monitor, i);
-        });
+      if (!g_eeGeneral.batteryPacks[i].active) continue;
+      if (seen[i]) continue;
+
+      for (uint8_t j = i + 1; j < MAX_BATTERY_PACKS; j++) {
+        if (g_eeGeneral.batteryPacks[j].active &&
+            batterySpecEquals(g_eeGeneral.batteryPacks[i],
+                              g_eeGeneral.batteryPacks[j]))
+          seen[j] = true;
       }
+
+      uint8_t slotIdx = i;
+      setupLine(nullptr, [=](Window* parent, coord_t, coord_t) {
+        new CompatiblePackLine(parent, monitor, slotIdx);
+      });
     }
   } else {
-    setupLine("No battery packs configured in Radio Setup", nullptr);
+    setupLine("No batteries configured in Radio Setup", nullptr);
   }
 
   setupLine("Advanced Telemetry", nullptr);

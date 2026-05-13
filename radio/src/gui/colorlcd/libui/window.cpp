@@ -1422,6 +1422,8 @@ class SetupTextButton : public TextButton
       if (entry.enabled) show(entry.enabled());
     });
     setWrap();
+    if (entry.automationId)
+      setAutomationId(entry.automationId);
   }
 
  protected:

@@ -803,7 +803,7 @@ static bool isFlightBatteryVoltageUnit(uint8_t unit)
 
 static bool isValidManualLipoConfig(const BatteryMonitorData& config)
 {
-  return config.batteryType == BATTERY_TYPE_LIPO && config.cellCount > 0 &&
+  return config.batteryType <= BATTERY_TYPE_PB && config.cellCount > 0 &&
          config.capacity > 0;
 }
 
@@ -899,10 +899,21 @@ static uint8_t buildVoltageCompatiblePackMask(const BatteryMonitorData& config,
     const BatteryPackData& pack = g_eeGeneral.batteryPacks[slot];
     if (!pack.active) continue;
 
-    if (flightBatteryPackMatchesLipo(packVoltageCv, pack.cellCount)) {
-      matchingMask |= slotBit;
-      matchCount++;
+    if (!flightBatteryPackMatchesLipo(packVoltageCv, pack.cellCount,
+                                      (BatteryType)pack.batteryType))
+      continue;
+
+    matchingMask |= slotBit;
+
+    bool duplicate = false;
+    for (uint8_t prev = 0; prev < slot; prev++) {
+      if ((matchingMask & (uint16_t(1u << prev))) == 0) continue;
+      if (batterySpecEquals(pack, g_eeGeneral.batteryPacks[prev])) {
+        duplicate = true;
+        break;
+      }
     }
+    if (!duplicate) matchCount++;
   }
 
   return matchCount;
@@ -925,11 +936,13 @@ static bool confirmedPackMatchesVoltage(const BatteryMonitorData& config,
     if (slot >= MAX_BATTERY_PACKS) return false;
     const BatteryPackData& pack = g_eeGeneral.batteryPacks[slot];
     return pack.active &&
-           flightBatteryPackMatchesLipo(packVoltageCv, pack.cellCount);
+           flightBatteryPackMatchesLipo(packVoltageCv, pack.cellCount,
+                                        (BatteryType)pack.batteryType);
   }
 
   return isValidManualLipoConfig(config) &&
-         flightBatteryPackMatchesLipo(packVoltageCv, config.cellCount);
+         flightBatteryPackMatchesLipo(packVoltageCv, config.cellCount,
+                                      (BatteryType)config.batteryType);
 }
 
 void resetFlightBatteryRuntimeState()
@@ -989,7 +1002,8 @@ static void classifyPresentFlightBattery(uint8_t monitorIndex,
     runtime.state = FlightBatterySessionState::NeedsConfirmation;
     runtime.promptPackMask = matchingMask;
   } else if (config.compatiblePackMask == 0 && isValidManualLipoConfig(config)) {
-    if (flightBatteryPackMatchesLipo(packVoltageCv, config.cellCount)) {
+    if (flightBatteryPackMatchesLipo(packVoltageCv, config.cellCount,
+                                     (BatteryType)config.batteryType)) {
       if (runtime.state != FlightBatterySessionState::NeedsConfirmation ||
           runtime.promptPackMask != 0) {
         runtime.promptShown = false;
@@ -1113,7 +1127,7 @@ static void confirmFlightBatteryPackImpl(uint8_t monitor, uint8_t selectedPackSl
       return;
 
     auto& pack = g_eeGeneral.batteryPacks[slot];
-    config.batteryType = BATTERY_TYPE_LIPO;
+    config.batteryType = pack.batteryType;
     config.cellCount = pack.cellCount;
     config.capacity = pack.capacity;
     config.selectedPackSlot = selectedPackSlot;
@@ -1234,11 +1248,13 @@ bool confirmFlightBatteryPack(uint8_t monitor, uint8_t selectedPackSlot)
 
     const BatteryPackData& pack = g_eeGeneral.batteryPacks[slot];
     if (!pack.active ||
-        !flightBatteryPackMatchesLipo(packVoltageCv, pack.cellCount)) {
+        !flightBatteryPackMatchesLipo(packVoltageCv, pack.cellCount,
+                                      (BatteryType)pack.batteryType)) {
       return false;
     }
   } else if (!isValidManualLipoConfig(config) ||
-             !flightBatteryPackMatchesLipo(packVoltageCv, config.cellCount)) {
+             !flightBatteryPackMatchesLipo(packVoltageCv, config.cellCount,
+                                           (BatteryType)config.batteryType)) {
     return false;
   }
 
@@ -1311,7 +1327,7 @@ static bool checkFlightBatteryVoltageAlert(uint8_t monitorIndex,
   const bool capacityUsable = capSensorIdx >= 0 && isUsableTelemetrySensor(capSensorIdx);
   const uint16_t thresholdPerCell = capacityUsable
                                         ? FLIGHT_BATTERY_LIPO_BACKUP_MIN_PER_CELL_CV
-                                        : flightBatteryVoltageThresholdPerCellCentivolts(BATTERY_TYPE_LIPO);
+                                        : flightBatteryVoltageThresholdPerCellCentivolts((BatteryType)config.batteryType);
 
   if (packVoltageCv <= uint16_t(thresholdPerCell * cellCount)) {
     if (runtime.voltageLowSeconds < FLIGHT_BATTERY_VOLTAGE_DEBOUNCE_SECONDS)

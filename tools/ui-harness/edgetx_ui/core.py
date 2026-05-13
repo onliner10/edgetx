@@ -478,8 +478,8 @@ class SdlAutomationSession:
         normalized_direction = direction.lower()
         if normalized_direction not in ("up", "down", "left", "right"):
             raise HarnessError("scroll direction must be up, down, left, or right")
-        if amount not in ("small", "page"):
-            raise HarnessError("scroll amount must be small or page")
+        if amount not in ("line", "small", "half_page", "page"):
+            raise HarnessError("scroll amount must be line, small, half_page, or page")
 
         before = self.ui_tree(mode="full", verbose=True)
         mode = "target_drag" if target else "viewport_drag"
@@ -512,6 +512,107 @@ class SdlAutomationSession:
             "screen_hash_after": after_hash,
             "changed": changed,
             **({"warning": warning} if warning else {}),
+        }
+
+    def scroll_to(
+        self,
+        selector: dict[str, Any] | str,
+        action: str = "click",
+        max_attempts: int = 10,
+        amount: str = "line",
+        margin: int = 12,
+    ) -> dict[str, Any]:
+        tree = self.ui_tree()
+        normalized = normalize_selector(selector)
+        nodes = [n for n in tree.get("nodes", []) if node_matches(n, normalized)]
+
+        if not nodes:
+            for attempt in range(1, max_attempts + 1):
+                result = self.scroll(direction="down", amount=amount)
+                tree = self.ui_tree()
+                nodes = [n for n in tree.get("nodes", []) if node_matches(n, normalized)]
+                if nodes:
+                    target = nodes[0]
+                    if action in target.get("actions", []):
+                        return {
+                            "ok": True,
+                            "action": action,
+                            "node": _compact_node(target),
+                            "attempts": attempt,
+                            "already_visible": False,
+                        }
+                    break
+                if not result.get("changed", True):
+                    break
+            if not nodes:
+                raise HarnessError(f"could not find node matching {json.dumps(normalized)}")
+
+        target = nodes[0]
+        has_action = action in target.get("actions", [])
+        if has_action:
+            return {
+                "ok": True,
+                "action": action,
+                "node": _compact_node(target),
+                "attempts": 0,
+                "already_visible": True,
+            }
+
+        screen_bounds = [0, 0, 480, 272]
+        screen_node = next((n for n in tree.get("nodes", []) if n.get("id") == tree.get("screen")), None)
+        if screen_node:
+            sb = screen_node.get("bounds", [])
+            if len(sb) >= 4:
+                screen_bounds = [int(v) for v in sb[:4]]
+
+        bounds = target.get("bounds", [])
+        if len(bounds) < 4:
+            raise HarnessError("node has no bounds, cannot scroll to it")
+
+        header_height = 45
+        viewport_top = screen_bounds[1] + header_height
+        viewport_bottom = screen_bounds[1] + screen_bounds[3] - 8
+        node_top = int(bounds[1])
+        node_bottom = int(bounds[1]) + int(bounds[3])
+
+        for attempt in range(1, max_attempts + 1):
+            if node_bottom > viewport_bottom - margin:
+                self.scroll(direction="up" if attempt > 1 and attempt % 3 == 0 else "down", amount=amount)
+            elif node_top < viewport_top + margin:
+                self.scroll(direction="down" if attempt > 1 and attempt % 3 == 0 else "up", amount=amount)
+            else:
+                break
+
+            self.wait(100)
+            tree = self.ui_tree()
+            updated = [n for n in tree.get("nodes", []) if node_matches(n, normalized)]
+            if updated:
+                target = updated[0]
+                new_bounds = target.get("bounds", [])
+                if len(new_bounds) >= 4:
+                    node_top = int(new_bounds[1])
+                    node_bottom = int(new_bounds[1]) + int(new_bounds[3])
+                if action in target.get("actions", []):
+                    return {
+                        "ok": True,
+                        "action": action,
+                        "node": _compact_node(target),
+                        "attempts": attempt,
+                        "already_visible": False,
+                    }
+                bounds = target.get("bounds", [])
+                if len(bounds) >= 4:
+                    node_top = int(bounds[1])
+                    node_bottom = int(bounds[1]) + int(bounds[3])
+
+        return {
+            "ok": False,
+            "action": action,
+            "node": _compact_node(target),
+            "attempts": max_attempts,
+            "already_visible": False,
+            "warning": f"Could not scroll node into actionable position after {max_attempts} attempts. "
+                       f"Try edgetx_scroll direction=down amount=line manually and retry.",
         }
 
     def wait(self, ms: int) -> dict[str, Any]:
@@ -632,6 +733,15 @@ class SdlAutomationSession:
         fields = _screen_fields(nodes)
         active_field = _active_field(fields, focused)
         context = _screen_context(title, page, focused, actions, scrollables, nodes, active_field)
+
+        blocked_actions = [
+            _compact_node(n)
+            for n in nodes
+            if n.get("raw_clickable")
+            and not n.get("actions")
+            and (n.get("label") or n.get("automation_id"))
+        ][:10]
+
         return {
             "title": title,
             "page": page or ({"label": title, "kind": "page", "actions": []} if title else {}),
@@ -642,13 +752,15 @@ class SdlAutomationSession:
             "actions": actions,
             "fields": fields[:30],
             "scrollables": scrollables,
+            "blocked_actions": blocked_actions,
             "available_inputs": _available_inputs(nodes),
-            "next_actions": _next_actions(context, focused, scrollables, fields),
+            "next_actions": _next_actions(context, focused, scrollables, fields, blocked_actions),
             "visible_text": unique_visible_text,
             "counts": {
                 "total": len(nodes),
                 "actions": len(actions),
                 "total_actions": len(all_actions),
+                "blocked_actions": len(blocked_actions),
                 "fields": len(fields),
                 "visible_text": len(unique_visible_text),
             },
@@ -708,8 +820,12 @@ class SdlAutomationSession:
         tree = self.ui_tree()
         nodes = [node for node in tree.get("nodes", []) if node_matches(node, normalized)]
         required_action = action or normalized.get("action")
+        blocked_hint = ""
         if required_action:
+            all_match = list(nodes)
             nodes = [node for node in nodes if required_action in node.get("actions", [])]
+            if not nodes and all_match:
+                blocked_hint = _actionability_hint(all_match, required_action)
 
         if "index" in normalized:
             index = int(normalized["index"])
@@ -741,15 +857,21 @@ class SdlAutomationSession:
         candidates.sort(key=lambda x: -x[0])
         near_miss_lines = "\n".join(f"  [{s}] {line}" for s, line in candidates[:near_miss_count])
 
-        raise HarnessError(
-            f"could not find UI node matching {json.dumps(normalized, sort_keys=True)}"
-            + (f" with action `{required_action}`" if required_action else "")
-            + (f"\n\nNearest visible candidates:\n{near_miss_lines}" if near_miss_lines else "")
-            + "\n\nAll visible nodes:\n"
-            + summarize_ui_nodes(tree.get("nodes", []))
-        )
+        msg = f"could not find UI node matching {json.dumps(normalized, sort_keys=True)}"
+        if required_action:
+            msg += f" with action `{required_action}`"
+        if blocked_hint:
+            msg += f"\n\n{blocked_hint}"
+        if near_miss_lines:
+            msg += f"\n\nNearest visible candidates:\n{near_miss_lines}"
+        msg += "\n\nAll visible nodes:\n" + summarize_ui_nodes(tree.get("nodes", []))
+        raise HarnessError(msg)
 
-    def ui_click(self, selector: dict[str, Any] | str, duration_ms: int = 0, verbose: bool = False) -> dict[str, Any]:
+    def ui_click(self, selector: dict[str, Any] | str, duration_ms: int = 0, verbose: bool = False, ensure_visible: bool = False) -> dict[str, Any]:
+        if ensure_visible:
+            scrolled = self.scroll_to(selector, action="click", max_attempts=8, amount="line")
+            if not scrolled.get("ok"):
+                return {"ok": False, "warning": scrolled.get("warning", "could not scroll node into view"), "scroll_result": scrolled}
         before = self.ui_tree(mode="full", verbose=True)
         node = self.find_node(selector, "click")
         response = self.command(f"ui_click {node['id']} {int(duration_ms)}", timeout=5.0)
@@ -780,9 +902,14 @@ class SdlAutomationSession:
         action: str = "click",
         duration_ms: int = 0,
         verbose: bool = False,
+        ensure_visible: bool = False,
     ) -> dict[str, Any]:
         if action not in ("click", "long_click"):
             raise HarnessError("activate action must be `click` or `long_click`")
+        if ensure_visible:
+            scrolled = self.scroll_to(selector, action=action, max_attempts=8, amount="line")
+            if not scrolled.get("ok"):
+                return {"ok": False, "warning": scrolled.get("warning", "could not scroll node into view"), "scroll_result": scrolled}
         before = self.ui_tree(mode="full", verbose=True)
         node = self.find_node(selector, action)
         command = "ui_long_click" if action == "long_click" else "ui_click"
@@ -1061,6 +1188,7 @@ def node_matches(node: dict[str, Any], selector: dict[str, Any]) -> bool:
 
 
 def _compact_node(node: dict[str, Any]) -> dict[str, Any]:
+    has_label = bool(node.get("label") or node.get("text") or node.get("automation_id"))
     compact = {
         "kind": node.get("kind", node.get("role", "")),
         "role": node.get("role", ""),
@@ -1078,6 +1206,11 @@ def _compact_node(node: dict[str, Any]) -> dict[str, Any]:
         compact["checked"] = True
     if node.get("enabled") is False:
         compact["enabled"] = False
+    if has_label and not node.get("actions") and node.get("action_blocked_reason"):
+        compact["action_blocked_reason"] = node.get("action_blocked_reason", "")
+        compact["visible_ratio_pct"] = node.get("visible_ratio_pct", 0)
+        compact["bounds"] = node.get("bounds", [])
+        compact["center"] = node.get("center", [])
     if _node_can_scroll(node):
         scroll = node.get("scroll", {})
         compact["scroll"] = {
@@ -1113,6 +1246,15 @@ def _normalized_node(node: dict[str, Any]) -> dict[str, Any]:
     normalized["kind"] = str(node.get("role", ""))
     if node.get("automation_id"):
         normalized["semantic_id"] = str(node.get("automation_id", ""))
+    for actionability_key in (
+        "center",
+        "raw_clickable",
+        "center_reachable",
+        "visible_ratio_pct",
+        "action_blocked_reason",
+    ):
+        if actionability_key in node:
+            normalized[actionability_key] = node[actionability_key]
     return normalized
 
 
@@ -1122,6 +1264,49 @@ def _node_search_text(node: dict[str, Any]) -> str:
         for key in ("label", "text", "automation_id", "semantic_id", "role", "kind", "id")
         if node.get(key)
     )
+
+
+def _actionability_hint(
+    nodes: list[dict[str, Any]], required_action: str,
+) -> str:
+    blocked = [
+        n for n in nodes
+        if n.get("action_blocked_reason")
+        and "raw_clickable" in n
+        and required_action in ("click", "long_click")
+    ]
+    if not blocked:
+        return ""
+
+    lines: list[str] = []
+    for n in blocked[:3]:
+        label = n.get("label") or n.get("text") or n.get("automation_id", "")
+        reason = str(n.get("action_blocked_reason", ""))
+        pct = n.get("visible_ratio_pct", "")
+        bounds = n.get("bounds", [])
+        center = n.get("center", [])
+        hint = (
+            f"  Node \"{label}\" is visible but NOT actionable: "
+            f"blocked_reason={reason}"
+        )
+        if pct:
+            hint += f" visible={pct}%"
+        if bounds:
+            hint += f" bounds={bounds}"
+        if center:
+            hint += f" center={center}"
+        if "clipped" in reason:
+            hint += (
+                "\n    Use edgetx_scroll_to to reveal the node first, "
+                "or edgetx_scroll direction=down amount=line and retry."
+            )
+        elif "covered" in reason:
+            hint += (
+                "\n    Close the covering dialog/window first."
+            )
+        lines.append(hint)
+
+    return "Nodes matched the selector but were blocked:\n" + "\n".join(lines)
 
 
 def _action_warning(node: dict[str, Any]) -> dict[str, str]:
@@ -1452,7 +1637,16 @@ def _scroll_drag_points(node: dict[str, Any], direction: str, amount: str) -> tu
     inset_y = min(24, max(4, height // 5))
     usable_width = max(1, width - 2 * inset_x)
     usable_height = max(1, height - 2 * inset_y)
-    distance_scale = 0.75 if amount == "page" else 0.35
+    _LINE_SCALE = 0.18
+    _SMALL_SCALE = 0.35
+    _HALF_PAGE_SCALE = 0.50
+    _PAGE_SCALE = 0.75
+    distance_scale = {
+        "line": _LINE_SCALE,
+        "small": _SMALL_SCALE,
+        "half_page": _HALF_PAGE_SCALE,
+        "page": _PAGE_SCALE,
+    }.get(amount, _SMALL_SCALE)
     dx = max(8, int(usable_width * distance_scale))
     dy = max(8, int(usable_height * distance_scale))
     cx = x + width // 2
@@ -1477,7 +1671,16 @@ def _viewport_scroll_drag_points(tree: dict[str, Any], direction: str, amount: s
     bottom = y + height - footer_height
     left = x
     right = x + width
-    distance_scale = 0.80 if amount == "page" else 0.35
+    _LINE_SCALE = 0.18
+    _SMALL_SCALE = 0.35
+    _HALF_PAGE_SCALE = 0.50
+    _PAGE_SCALE = 0.80
+    distance_scale = {
+        "line": _LINE_SCALE,
+        "small": _SMALL_SCALE,
+        "half_page": _HALF_PAGE_SCALE,
+        "page": _PAGE_SCALE,
+    }.get(amount, _SMALL_SCALE)
     cx = left + width // 2
     cy = top + max(1, bottom - top) // 2
     dx = max(12, int((right - left) * distance_scale))
@@ -1577,6 +1780,7 @@ def _next_actions(
     focused: dict[str, Any] | str,
     scrollables: list[dict[str, Any]],
     fields: list[dict[str, Any]] | None = None,
+    blocked_actions: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     actions = []
     if context.get("type") == "blocking_dialog":
@@ -1651,6 +1855,18 @@ def _next_actions(
                 "label": first_editable.get("label", ""),
                 "reason": f"Adjust visible field {first_editable.get('label', '')}",
             })
+    if blocked_actions:
+        for ba in blocked_actions[:3]:
+            label = ba.get("label") or ba.get("automation_id") or ""
+            reason = ba.get("action_blocked_reason", "")
+            if label:
+                tool_args = {"text": ba.get("label", "")} if ba.get("label") else {"automation_id": ba.get("automation_id", "")}
+                actions.append({
+                    "tool": "edgetx_scroll_to",
+                    **tool_args,
+                    "action": "click",
+                    "reason": f"Reveal blocked action \"{label}\" (blocked_reason={reason})",
+                })
     return [action for action in actions if action.get("runtime_id", True)]
 
 
@@ -1779,6 +1995,16 @@ class HarnessService:
     ) -> dict[str, Any]:
         return self.require_session().scroll(direction, target, amount, duration_ms)
 
+    def scroll_to(
+        self,
+        selector: dict[str, Any] | str,
+        action: str = "click",
+        max_attempts: int = 10,
+        amount: str = "line",
+        margin: int = 12,
+    ) -> dict[str, Any]:
+        return self.require_session().scroll_to(selector, action, max_attempts, amount, margin)
+
     def wait(self, ms: int) -> dict[str, Any]:
         return self.require_session().wait(ms)
 
@@ -1820,8 +2046,8 @@ class HarnessService:
     ) -> dict[str, Any]:
         return self.require_session().wait_for(text_contains, automation_id, role, timeout_ms, poll_ms)
 
-    def ui_click(self, selector: dict[str, Any] | str, duration_ms: int = 0, verbose: bool = False) -> dict[str, Any]:
-        return self.require_session().ui_click(selector, duration_ms, verbose)
+    def ui_click(self, selector: dict[str, Any] | str, duration_ms: int = 0, verbose: bool = False, ensure_visible: bool = False) -> dict[str, Any]:
+        return self.require_session().ui_click(selector, duration_ms, verbose, ensure_visible)
 
     def ui_long_click(self, selector: dict[str, Any] | str, duration_ms: int = 0, verbose: bool = False) -> dict[str, Any]:
         return self.require_session().ui_long_click(selector, duration_ms, verbose)
@@ -1832,8 +2058,9 @@ class HarnessService:
         action: str = "click",
         duration_ms: int = 0,
         verbose: bool = False,
+        ensure_visible: bool = False,
     ) -> dict[str, Any]:
-        return self.require_session().activate(selector, action, duration_ms, verbose)
+        return self.require_session().activate(selector, action, duration_ms, verbose, ensure_visible)
 
     def adjust_field(
         self,
@@ -1895,7 +2122,8 @@ class HarnessService:
                 self.ui_click(value)
             else:
                 selector = value.get("selector", value)
-                self.ui_click(selector, int(value.get("duration_ms", 0)))
+                self.ui_click(selector, int(value.get("duration_ms", 0)),
+                              ensure_visible=bool(value.get("ensure_visible", False)))
         elif "long_click" in step:
             value = step["long_click"]
             if isinstance(value, str):
@@ -1935,6 +2163,24 @@ class HarnessService:
                 int(value["y2"]),
                 int(value.get("duration_ms", 300)),
                 int(value.get("steps", 12)),
+            )
+        elif "scroll_to" in step:
+            value = step["scroll_to"]
+            selector = value if isinstance(value, dict) else str(value)
+            self.scroll_to(
+                selector,
+                action=value.get("action", "click") if isinstance(value, dict) else "click",
+                max_attempts=int(value.get("max_attempts", 10)) if isinstance(value, dict) else 10,
+                amount=value.get("amount", "line") if isinstance(value, dict) else "line",
+                margin=int(value.get("margin", 12)) if isinstance(value, dict) else 12,
+            )
+        elif "adjust_field" in step:
+            value = step["adjust_field"]
+            self.adjust_field(
+                str(value["label"]),
+                str(value["target_value"]),
+                int(value.get("max_steps", 80)),
+                bool(value.get("confirm", True)),
             )
         elif "switch_sequence" in step:
             self.switch_sequence(step["switch_sequence"])

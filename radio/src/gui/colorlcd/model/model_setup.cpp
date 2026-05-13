@@ -498,7 +498,7 @@ const static PageButtonDef modelSetupButtons[] = {
 #if defined(HELI)
   {STR_DEF(STR_MENUHELISETUP), []() { return new ModelHeliPage(); }, nullptr, modelHeliEnabled},
 #endif
-  {STR_DEF(STR_BATTERY), []() { new BatteryMonitorPage(0); }, nullptr},
+  {STR_DEF(STR_BATTERY), []() { new BatteryMonitorPage(0); }, nullptr, nullptr, "model.setup.battery"},
   {nullptr},
 };
 

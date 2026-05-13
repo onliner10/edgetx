@@ -346,7 +346,7 @@ TEST_F(BatteryRuntimeTest, ConfirmationCopiesGlobalPackIntoMonitor)
 {
   resetFlightBatteryRuntimeState();
   g_eeGeneral.batteryPacks[0].active = 1;
-  strncpy(g_eeGeneral.batteryPacks[0].name, "3S 2200", 8);
+  g_eeGeneral.batteryPacks[0].batteryType = BATTERY_TYPE_LIPO;
   g_eeGeneral.batteryPacks[0].cellCount = 3;
   g_eeGeneral.batteryPacks[0].capacity = 2200;
 
@@ -363,13 +363,11 @@ TEST_F(BatteryRuntimeTest, ConfirmationCopiesGlobalPackIntoMonitor)
   EXPECT_EQ(FlightBatterySessionState::Confirmed, flightBatterySessionState(0));
 }
 
-TEST_F(BatteryRuntimeTest, ConfirmationRejectsInvalidManual)
+TEST_F(BatteryRuntimeTest, ConfirmationRejectsUnconfiguredManual)
 {
   resetFlightBatteryRuntimeState();
   g_model.batteryMonitors[0].enabled = true;
-  g_model.batteryMonitors[0].batteryType = BATTERY_TYPE_LIION;
-  g_model.batteryMonitors[0].cellCount = 3;
-  g_model.batteryMonitors[0].capacity = 2200;
+  g_model.batteryMonitors[0].cellCount = 0;
 
   confirmFlightBatteryPack(0, 0);
 
