@@ -38,6 +38,8 @@
 #include <string>
 #include <vector>
 
+extern void simuSetBatteryVoltage(uint8_t decivolts);
+
 #if !defined(_WIN32)
 #include <sys/select.h>
 #include <unistd.h>
@@ -436,6 +438,22 @@ static void automation_handle_command(const std::string& line)
             << int(flightBatterySessionState(0));
       automation_reply_ok(extra.str());
     }
+  } else if (command == "set_batt_voltage") {
+    int dv = 0;
+    in >> dv;
+    if (dv < 30 || dv > 255) {
+      automation_reply_error("invalid decivolts value (30-255)");
+      return;
+    }
+    int vbatChan = adcGetInputOffset(ADC_INPUT_VBAT);
+    if (vbatChan <= 0) {
+      automation_reply_error("no VBAT ADC channel");
+      return;
+    }
+    simuSetBatteryVoltage((uint8_t)dv);
+    std::ostringstream extra;
+    extra << "\"decivolts\":" << dv;
+    automation_reply_ok(extra.str());
   } else if (command == "set_switch") {
     int switch_idx = -1, position = 0;
     in >> switch_idx >> position;

@@ -51,6 +51,13 @@ uint16_t getRTCBatteryVoltage()
 
 extern uint16_t simuGetAnalog(uint8_t idx);
 
+static uint16_t simuVbatOverride = 0;
+
+void simuSetBatteryVoltage(uint8_t decivolts)
+{
+  simuVbatOverride = (decivolts * 10 - 5) * 2;
+}
+
 static bool simu_start_conversion()
 {
   int max_input = adcGetMaxInputs(ADC_INPUT_ALL);
@@ -64,8 +71,9 @@ static bool simu_start_conversion()
     // +0.5V and prec2
     uint16_t vBatWarn = BATTERY_WARN;
     if (g_eeGeneral.vBatWarn > 0) vBatWarn = g_eeGeneral.vBatWarn;
-    uint16_t volts = (vBatWarn + 5) * 10;
-    setAnalogValue(i, volts * 2);
+    uint16_t volts = simuVbatOverride ? simuVbatOverride
+                                      : (vBatWarn + 5) * 10 * 2;
+    setAnalogValue(i, volts);
   }
 
   return true;

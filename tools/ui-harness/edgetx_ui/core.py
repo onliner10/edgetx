@@ -625,6 +625,9 @@ class SdlAutomationSession:
     def set_telemetry_streaming(self, enabled: bool) -> dict[str, Any]:
         return self.command(f"telemetry_streaming {1 if enabled else 0}")
 
+    def set_batt_voltage(self, dv: int) -> dict[str, Any]:
+        return self.command(f"set_batt_voltage {int(dv)}")
+
     def set_switch(self, index: int, position: int) -> dict[str, Any]:
         return self.command(f"set_switch {int(index)} {int(position)}")
 
@@ -2013,6 +2016,9 @@ class HarnessService:
 
     def set_telemetry_streaming(self, enabled: bool) -> dict[str, Any]:
         return self.require_session().set_telemetry_streaming(enabled)
+
+    def set_batt_voltage(self, dv: int) -> dict[str, Any]:
+        return self.require_session().set_batt_voltage(dv)
 
     def set_switch(self, index: int, position: int) -> dict[str, Any]:
         return self.require_session().set_switch(index, position)

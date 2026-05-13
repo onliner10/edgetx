@@ -352,6 +352,7 @@ class TxBatteryStatusWidget : public Widget
       cap = makeStatusPart(live.lvobj());
       title = etx_label_create(live.lvobj(), FONT_XXS_INDEX);
       value = etx_label_create(live.lvobj(), FONT_BOLD_INDEX);
+      pctLabel = etx_label_create(live.lvobj(), FONT_BOLD_INDEX);
     });
 
     if (shell) {
@@ -360,6 +361,10 @@ class TxBatteryStatusWidget : public Widget
     }
     if (fill) lv_obj_set_style_radius(fill, 2, LV_PART_MAIN);
     if (cap) lv_obj_set_style_radius(cap, 1, LV_PART_MAIN);
+    if (pctLabel) {
+      lv_label_set_text(pctLabel, "");
+      lv_obj_set_style_text_align(pctLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    }
 
     update();
     foreground();
@@ -370,8 +375,8 @@ class TxBatteryStatusWidget : public Widget
     const bool topbar = isCompactTopBarWidget();
     const coord_t pad = topbar ? TOPBAR_CONTENT_PAD : PAD_SMALL;
 
-    setLvVisible(title, !topbar && height() >= 54);
-    setLvVisible(value, !topbar);
+    setLvVisible(title, false);
+    setLvVisible(value, false);
 
     coord_t capW = PAD_THREE;
     coord_t battW = 0;
@@ -419,35 +424,24 @@ class TxBatteryStatusWidget : public Widget
       lv_obj_set_size(fill, fillMaxW, fillH);
     }
 
-    if (!topbar) {
-      coord_t textX = battX + battW + PAD_SMALL + 3;
-      coord_t textRight = width() > pad ? width() - pad : width();
-      if (textX + 24 < textRight) {
-        coord_t titleH = height() >= 54 ? EdgeTxStyles::STD_FONT_HEIGHT / 2 : 0;
-        FontIndex valueFont = responsiveTextFont(height() - 2 * pad - titleH);
-        coord_t valueH = getFontHeight(LcdFlags(valueFont) << 8u);
-        coord_t textBlockH = titleH + valueH;
-        coord_t textY = (height() - textBlockH) / 2;
-        coord_t textW = textRight - textX;
+    this->battX = battX;
+    this->battY = battY;
+    this->battW = battW;
+    this->battH = battH;
 
-        setStatusLabel(title, "TX BAT", COLOR_THEME_PRIMARY1_INDEX,
-                       FONT_XXS_INDEX, textX, textY, textW, titleH);
-        setStatusLabel(value, "", statusPrimaryColor(false), valueFont,
-                       textX, textY + titleH, textW, valueH);
-      } else {
-        setLvVisible(title, false);
-        setLvVisible(value, false);
-      }
+    if (pctLabel) {
+      lv_obj_set_size(pctLabel, battW, battH);
+      setLvVisible(pctLabel, true);
     }
 
     lastBattBars = 255;
-    lastVoltage = 255;
+    lastBattPct = 255;
   }
 
   void onForeground() override
   {
     bool topbar = isCompactTopBarWidget();
-    bool warning = IS_TXBATT_WARNING();
+    bool warning = IS_TXBATT_WARNING() || txBatteryPercent(g_vbat100mV) < 30;
     uint8_t bars = GET_TXBATT_BARS(fillMaxW);
     LcdColorIndex color = warning ? COLOR_THEME_WARNING_INDEX
                                   : statusPrimaryColor(topbar);
@@ -463,20 +457,20 @@ class TxBatteryStatusWidget : public Widget
     }
     setStatusPartColor(fill, color);
 
-    if (value && !topbar && g_vbat100mV != lastVoltage) {
-      lastVoltage = g_vbat100mV;
-
-      char text[10];
-      snprintf(text, sizeof(text), "%u.%uV", g_vbat100mV / 10,
-               g_vbat100mV % 10);
-
-      setStatusLabel(value, text,
-                     warning ? COLOR_THEME_WARNING_INDEX
-                             : statusPrimaryColor(false),
-                     responsiveTextFont(height() - 2 * PAD_SMALL -
-                                        EdgeTxStyles::STD_FONT_HEIGHT / 2),
-                     lv_obj_get_x(value), lv_obj_get_y(value),
-                     lv_obj_get_width(value), lv_obj_get_height(value));
+    if (pctLabel) {
+      uint8_t pct = txBatteryPercent(g_vbat100mV);
+      if (pct != lastBattPct) {
+        lastBattPct = pct;
+        char text[4];
+        snprintf(text, sizeof(text), "%u", pct);
+        lv_label_set_text(pctLabel, text);
+        FontIndex font = chipTextFontForBox(text, battW - 4, battH - 4);
+        etx_font(pctLabel, font);
+        coord_t fh = getFontHeight(LcdFlags(font) << 8u);
+        lv_obj_set_pos(pctLabel, battX, battY + (battH - fh) / 2);
+        lv_obj_set_size(pctLabel, battW, fh);
+      }
+      etx_txt_color(pctLabel, COLOR_BLACK_INDEX);
     }
   }
 
@@ -486,10 +480,15 @@ class TxBatteryStatusWidget : public Widget
   lv_obj_t* cap = nullptr;
   lv_obj_t* title = nullptr;
   lv_obj_t* value = nullptr;
+  lv_obj_t* pctLabel = nullptr;
   coord_t fillMaxW = 1;
   coord_t fillH = 1;
+  coord_t battX = 0;
+  coord_t battY = 0;
+  coord_t battW = 1;
+  coord_t battH = 1;
   uint8_t lastBattBars = 255;
-  uint8_t lastVoltage = 255;
+  uint8_t lastBattPct = 255;
 };
 
 BaseWidgetFactory<TxBatteryStatusWidget> txBatteryStatusWidget("TX Battery",
@@ -852,15 +851,16 @@ class RadioInfoWidget : public Widget
     if (bars != lastBatt) {
       lastBatt = bars;
       lv_obj_set_size(batteryFill, bars, batteryFillHeight());
-      if (bars >= batteryGreenThreshold()) {
-        lv_obj_clear_state(batteryFill, LV_STATE_USER_1 | LV_STATE_USER_2);
-      } else if (bars >= batteryOrangeThreshold()) {
-        lv_obj_add_state(batteryFill, LV_STATE_USER_1);
-        lv_obj_clear_state(batteryFill, LV_STATE_USER_2);
-      } else {
-        lv_obj_clear_state(batteryFill, LV_STATE_USER_1);
-        lv_obj_add_state(batteryFill, LV_STATE_USER_2);
-      }
+    }
+    uint8_t pct = txBatteryPercent(g_vbat100mV);
+    if (pct >= 60) {
+      lv_obj_clear_state(batteryFill, LV_STATE_USER_1 | LV_STATE_USER_2);
+    } else if (pct >= 30) {
+      lv_obj_add_state(batteryFill, LV_STATE_USER_1);
+      lv_obj_clear_state(batteryFill, LV_STATE_USER_2);
+    } else {
+      lv_obj_clear_state(batteryFill, LV_STATE_USER_1);
+      lv_obj_add_state(batteryFill, LV_STATE_USER_2);
     }
 
     // RSSI

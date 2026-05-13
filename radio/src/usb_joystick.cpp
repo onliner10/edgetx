@@ -491,14 +491,7 @@ extern "C" struct usbReport_t usbReportDesc()
 
 static void setBatteryBits(int hid_pos)
 {
-  // vBatMin / vBatMax are encoded with offsets 90 / 120
-  uint8_t percent = limit<uint8_t>(
-      0,
-      divRoundClosest((g_vbat100mV - g_eeGeneral.vBatMin - 90) * 100,
-                      g_eeGeneral.vBatMax - g_eeGeneral.vBatMin + 30),
-      100);
-
-  _hidReport[hid_pos] = percent;
+  _hidReport[hid_pos] = txBatteryPercent(g_vbat100mV);
 }
 
 static void setDpadBits(int hid_pos, int channelIx)

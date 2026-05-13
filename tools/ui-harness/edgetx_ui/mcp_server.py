@@ -271,6 +271,16 @@ TOOLS: dict[str, dict[str, Any]] = {
             "required": ["enabled"],
         },
     },
+    "edgetx_set_batt_voltage": {
+        "description": "Set the simulated TX battery voltage. dv is the voltage in decivolts (100mV units). For TX16S mk2 with 2S Li-Ion, typical values: 84=8.4V=100%, 76=7.6V~45%, 74=7.4V~25%, 66=6.6V=0%.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "dv": {"type": "integer", "description": "Battery voltage in decivolts (100mV units, e.g. 84 for 8.4V)"},
+            },
+            "required": ["dv"],
+        },
+    },
     "edgetx_set_switch": {
         "description": "Set a radio switch position by index. index is the 0-based switch index (SA=0, SB=1, ..., SF=5, SH=7). position is -1 (down), 0 (middle), or +1 (up).",
         "inputSchema": {
@@ -484,6 +494,8 @@ class McpServer:
             return self.service.set_telemetry(args["name"], float(args["value"]))
         if name == "edgetx_set_telemetry_streaming":
             return self.service.set_telemetry_streaming(bool(args["enabled"]))
+        if name == "edgetx_set_batt_voltage":
+            return self.service.set_batt_voltage(int(args["dv"]))
         if name == "edgetx_set_switch":
             return self.service.set_switch(int(args["index"]), int(args["position"]))
         if name == "edgetx_switch_sequence":

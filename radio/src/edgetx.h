@@ -37,6 +37,7 @@
 #include "touch.h"
 #include "switches.h"
 #include "board.h"
+#include "battery_math.h"
 
 #if !defined(SIMU)
 #include "usbd_msc_conf.h"
@@ -867,7 +868,8 @@ extern uint8_t g_vbat100mV;
 
 inline uint8_t GET_TXBATT_BARS(uint8_t barsMax)
 {
-  return limit<int8_t>(0, divRoundClosest(barsMax * (g_vbat100mV - g_eeGeneral.vBatMin - 90), 30 + g_eeGeneral.vBatMax - g_eeGeneral.vBatMin), barsMax);
+  uint16_t pct = txBatteryPercent(g_vbat100mV);
+  return limit<uint8_t>(0, uint8_t((pct * barsMax + 50) / 100), barsMax);
 }
 
 inline bool IS_TXBATT_WARNING()
