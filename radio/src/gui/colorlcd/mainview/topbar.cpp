@@ -272,6 +272,7 @@ coord_t TopBar::intrinsicZoneWidth(unsigned int index) const
   if (!strcmp(name, "Today")) return TOPBAR_TODAY_WIDTH;
   if (!strcmp(name, "Link")) return TOPBAR_LINK_WIDTH;
   if (!strcmp(name, "TX Battery")) return TOPBAR_BATTERY_WIDTH;
+  if (!strcmp(name, "Battery Monitor")) return TOPBAR_STATUS_WIDTH;
   if (!strcmp(name, "Volume")) return TOPBAR_VOLUME_WIDTH;
   if (!strcmp(name, "Internal GPS")) return TOPBAR_GPS_WIDTH;
   if (!strcmp(name, "Radio Info")) return TOPBAR_LEGACY_STATUS_WIDTH;
