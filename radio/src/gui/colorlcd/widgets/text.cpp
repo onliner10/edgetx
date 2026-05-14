@@ -24,19 +24,27 @@
 
 #define TEXT_WIDGET_DEFAULT_LABEL "My Label"
 
-class TextWidget : public Widget
+class TextWidget : public NativeWidget
 {
  public:
   TextWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
              WidgetLocation location) :
-      Widget(factory, parent, rect, location)
+      NativeWidget(factory, parent, rect, location)
   {
-    delayWidgetLoad();
   }
 
-  void delayedInit() override
+  void createContent(lv_obj_t* parent) override
   {
+    (void)parent;
+
     lv_style_init(&style);
+
+    initRequiredLvObj(
+        contentBox,
+        [](lv_obj_t* parent) {
+          return createFlexBox(parent, LV_FLEX_FLOW_COLUMN);
+        },
+        [](lv_obj_t*) {});
 
     initRequiredLvObj(
         shadow, [](lv_obj_t* parent) { return etx_label_create(parent); },
@@ -48,13 +56,15 @@ class TextWidget : public Widget
         });
 
     initRequiredLvObj(
-        label, [](lv_obj_t* parent) { return etx_label_create(parent); },
+        label,
+        [&](lv_obj_t* parent) {
+          contentBox.with([&](lv_obj_t* obj) { parent = obj; });
+          return etx_label_create(parent);
+        },
         [&](lv_obj_t* obj) {
           lv_obj_add_style(obj, &style, LV_PART_MAIN);
           lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
         });
-
-    update();
   }
 
   static const WidgetOption options[];
@@ -63,8 +73,9 @@ class TextWidget : public Widget
   lv_style_t style;
   RequiredLvObj shadow;
   RequiredLvObj label;
+  RequiredLvObj contentBox;
 
-  void onUpdate() override
+  void layoutContent(const rect_t& content) override
   {
     auto widgetData = getPersistentData();
 
@@ -78,21 +89,42 @@ class TextWidget : public Widget
 
     auto color = widgetData->options[1].value.unsignedValue;
     label.with([&](lv_obj_t* obj) {
-      if (isCompactTopBarWidget() &&
-          color == COLOR2FLAGS(COLOR_THEME_SECONDARY1_INDEX)) {
+      if (usesCardChrome()) {
+        lv_obj_set_style_text_color(obj, primaryTextColor(), LV_PART_MAIN);
+      } else if (isCompactTopBarWidget() &&
+                 color == COLOR2FLAGS(COLOR_THEME_SECONDARY1_INDEX)) {
         etx_txt_color(obj, COLOR_THEME_PRIMARY2_INDEX);
       } else {
         etx_txt_color_from_flags(obj, color);
       }
     });
 
-    FontIndex font = responsiveTextFont(height());
-    shadow.with([&](lv_obj_t* obj) {
-      layoutTextLabel(obj, {0, 0, width(), height()}, font, 1, 1);
-    });
-    label.with([&](lv_obj_t* obj) {
-      layoutTextLabel(obj, {0, 0, width(), height()}, font);
-    });
+    FontIndex font = responsiveTextFont(content.h);
+    if (usesCardChrome()) font = cardValueFont(content);
+    if (usesCardChrome()) {
+      LcdFlags align = widgetData->options[4].value.unsignedValue;
+      lv_text_align_t textAlign = LV_TEXT_ALIGN_LEFT;
+      if (align == ALIGN_RIGHT)
+        textAlign = LV_TEXT_ALIGN_RIGHT;
+      else if (align == ALIGN_CENTER)
+        textAlign = LV_TEXT_ALIGN_CENTER;
+
+      contentBox.with([&](lv_obj_t* obj) {
+        layoutFlexBox(obj, content, LV_FLEX_FLOW_COLUMN, PAD_ZERO,
+                      LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
+      });
+      label.with([&](lv_obj_t* obj) {
+        etx_font(obj, font);
+        lv_obj_set_style_text_align(obj, textAlign, LV_PART_MAIN);
+        setFlexChild(obj, content.w, getFontHeight(LcdFlags(font) << 8u));
+      });
+      shadow.with([&](lv_obj_t* obj) { setObjVisible(obj, false); });
+      return;
+    }
+
+    shadow.with(
+        [&](lv_obj_t* obj) { layoutTextLabel(obj, content, font, 1, 1); });
+    label.with([&](lv_obj_t* obj) { layoutTextLabel(obj, content, font); });
 
     // Show or hide shadow
     shadow.with([&](lv_obj_t* obj) {

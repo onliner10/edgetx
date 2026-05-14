@@ -19,79 +19,108 @@
  * GNU General Public License for more details.
  */
 
-#include "widget.h"
+#include <new>
 
 #include "edgetx.h"
 #include "messaging.h"
-
-#include <new>
+#include "widget.h"
 
 constexpr int16_t OUTPUT_INVALID_VALUE = INT16_MIN;
+constexpr coord_t OUTPUT_PILL_RADIUS = 0;
 
 #define ETX_STATE_BG_FILL LV_STATE_USER_1
 
 class ChannelValue : public Window
 {
  public:
-  ChannelValue(Widget* parent, uint8_t col, uint8_t row, coord_t colWidth,
-               uint8_t channel, LcdFlags txtColor, LcdFlags barColor) :
-      Window(parent,
-             {col * colWidth, row * ROW_HEIGHT, colWidth - 1 + (colWidth & 1), (ROW_HEIGHT + 1)}),
+  ChannelValue(Widget* parent, const rect_t& rect, uint8_t channel,
+               LcdFlags txtColor, LcdFlags barColor, coord_t rowHeight) :
+      Window(parent, rect),
       channel(channel),
       txtColor(txtColor),
       barColor(barColor),
+      rowHeight(rowHeight),
       compactTopBar(parent->isCompactTopBarWidget())
   {
     setWindowFlag(NO_FOCUS | NO_CLICK);
 
-    refreshMsg.subscribe(Messaging::REFRESH_OUTPUTS_WIDGET, [=](uint32_t param) { refresh(); });
-  
+    refreshMsg.subscribe(Messaging::REFRESH_OUTPUTS_WIDGET,
+                         [=](uint32_t param) { refresh(); });
+
     delayLoad();
   }
 
   void delayedInit() override
   {
-    addStyle(styles->border_thin, LV_PART_MAIN);
-    addStyle(styles->border_color[compactTopBar ? COLOR_THEME_SECONDARY2_INDEX
-                                                : COLOR_BLACK_INDEX],
-             LV_PART_MAIN);
-
     padAll(PAD_ZERO);
 
-    lv_style_init(&style);
-    lv_style_set_width(&style, lv_pct(100));
-    lv_style_set_height(&style, lv_pct(100));
-
-    divPoints[0] = {(lv_coord_t)(width() / 2 - 1), 0};
-    divPoints[1] = {(lv_coord_t)(width() / 2 - 1), ROW_HEIGHT - 1};
-
     if (!withLive([&](LiveWindow& live) {
+          lv_obj_set_layout(live.lvobj(), LV_LAYOUT_FLEX);
+          lv_obj_set_flex_flow(live.lvobj(), LV_FLEX_FLOW_COLUMN);
+          lv_obj_set_flex_align(live.lvobj(), LV_FLEX_ALIGN_START,
+                                LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
+          lv_obj_set_style_pad_all(live.lvobj(), 0, LV_PART_MAIN);
+          lv_obj_set_style_pad_row(live.lvobj(), 1, LV_PART_MAIN);
+          lv_obj_set_style_pad_column(live.lvobj(), 0, LV_PART_MAIN);
+
           auto obj = lv_obj_create(live.lvobj());
-          if (!requireLvObj(bar, obj)) return false;
+          if (!requireLvObj(rowBox, obj)) return false;
+          lv_obj_t* row = obj;
+          lv_obj_remove_style_all(obj);
+          lv_obj_clear_flag(obj,
+                            LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+          lv_obj_set_layout(obj, LV_LAYOUT_FLEX);
+          lv_obj_set_flex_flow(obj, LV_FLEX_FLOW_ROW);
+          lv_obj_set_flex_align(obj, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
+                                LV_FLEX_ALIGN_START);
+          lv_obj_set_style_bg_opa(obj, LV_OPA_TRANSP, LV_PART_MAIN);
+          lv_obj_set_style_pad_all(obj, 0, LV_PART_MAIN);
+          lv_obj_set_style_pad_column(obj, PAD_TINY, LV_PART_MAIN);
+          lv_obj_set_size(obj, width(), labelHeight());
+
+          obj = lv_obj_create(live.lvobj());
+          if (!requireLvObj(track, obj)) return false;
+          lv_obj_t* trackObj = obj;
+          lv_obj_remove_style_all(obj);
+          lv_obj_clear_flag(obj,
+                            LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
           lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_PART_MAIN);
-          lv_obj_clear_flag(obj, LV_OBJ_FLAG_CLICKABLE);
-          lv_obj_set_size(obj, 0, ROW_HEIGHT - 1);
+          lv_obj_set_style_bg_color(obj, lv_color_make(215, 228, 238),
+                                    LV_PART_MAIN);
+          lv_obj_set_style_radius(obj, OUTPUT_PILL_RADIUS, LV_PART_MAIN);
+          lv_obj_set_size(obj, width(), barHeight());
+
+          obj = lv_obj_create(trackObj);
+          if (!requireLvObj(bar, obj)) return false;
+          lv_obj_remove_style_all(obj);
+          lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_PART_MAIN);
+          lv_obj_clear_flag(obj,
+                            LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+          lv_obj_set_style_radius(obj, OUTPUT_PILL_RADIUS, LV_PART_MAIN);
+          lv_obj_set_size(obj, 0, barHeight());
           etx_bg_color_from_flags(obj, barColor);
 
-          obj = etx_label_create(live.lvobj(), FONT_XS_INDEX);
-          if (!requireLvObj(valueLabel, obj)) return false;
-          etx_obj_add_style(obj, styles->text_align_right, LV_PART_MAIN);
-          etx_txt_color_from_flags(obj, txtColor);
-          lv_obj_add_style(obj, &style, LV_PART_MAIN);
-          lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
-          lv_label_set_text(obj, "");
-
-          obj = etx_label_create(live.lvobj(), FONT_XS_INDEX);
+          obj = etx_label_create(row, labelFont());
           if (!requireLvObj(chanLabel, obj)) return false;
           etx_obj_add_style(obj, styles->text_align_left, LV_PART_MAIN);
           etx_txt_color_from_flags(obj, txtColor);
+          lv_obj_set_size(obj, labelWidth(), labelHeight());
+          lv_obj_set_flex_grow(obj, 1);
           lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
           lv_label_set_text(obj, "");
 
-          auto divLine = lv_line_create(live.lvobj());
-          if (!requireLvObj(divLine)) return false;
-          lv_line_set_points(divLine, divPoints, 2);
-          etx_obj_add_style(divLine, styles->div_line, LV_PART_MAIN);
+          obj = etx_label_create(row, labelFont());
+          if (!requireLvObj(valueLabel, obj)) return false;
+          etx_obj_add_style(obj, styles->text_align_right, LV_PART_MAIN);
+          etx_txt_color_from_flags(obj, txtColor);
+          lv_obj_set_size(obj, valueWidth(), labelHeight());
+          if (showValue())
+            lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
+          else
+            lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+          lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
+          lv_label_set_text(obj, "");
+
           return true;
         }))
       return;
@@ -100,6 +129,34 @@ class ChannelValue : public Window
     setChannel();
 
     refresh();
+  }
+
+  FontIndex labelFont() const
+  {
+    return labelFont(rowHeight);
+  }
+
+  bool showValue() const { return rowHeight > 16 && width() >= 92; }
+
+  coord_t labelHeight() const
+  {
+    coord_t fontH = getFontHeight(LcdFlags(labelFont()) << 8u);
+    coord_t h = rowHeight - barHeight() - 1;
+    return h > fontH ? h : fontH;
+  }
+
+  coord_t valueWidth() const
+  {
+    if (!showValue()) return 1;
+    coord_t w = width() / 3;
+    return w > 28 ? w : 28;
+  }
+
+  coord_t labelWidth() const
+  {
+    if (!showValue()) return width();
+    coord_t w = width() - valueWidth() - PAD_TINY;
+    return w > 1 ? w : 1;
   }
 
   void setChannel()
@@ -114,6 +171,36 @@ class ChannelValue : public Window
     chanLabel.with([&](lv_obj_t* obj) { lv_label_set_text(obj, s); });
   }
 
+  coord_t barHeight() const
+  {
+    return barHeight(rowHeight);
+  }
+
+  static FontIndex labelFont(coord_t height)
+  {
+    return height <= 16 ? FONT_XXS_INDEX : FONT_XS_INDEX;
+  }
+
+  static coord_t barHeight(coord_t height)
+  {
+    coord_t h = height / 3;
+    if (h < 5) h = 5;
+    if (h > 10) h = 10;
+    return h;
+  }
+
+  static coord_t rowHeightFor(bool compact)
+  {
+    coord_t h = compact ? COMPACT_ROW_HEIGHT : ROW_HEIGHT;
+    for (uint8_t i = 0; i < 2; i += 1) {
+      coord_t fontH = getFontHeight(LcdFlags(labelFont(h)) << 8u);
+      coord_t needed = fontH + barHeight(h) + 1;
+      if (h >= needed) break;
+      h = needed;
+    }
+    return h;
+  }
+
   void refresh()
   {
     runWhenLoaded([&]() {
@@ -124,7 +211,8 @@ class ChannelValue : public Window
 
         std::string s;
         if (g_eeGeneral.ppmunit == PPM_US)
-          s = formatNumberAsString(PPM_CH_CENTER(channel) + value / 2, 0, 0, "", STR_US);
+          s = formatNumberAsString(PPM_CH_CENTER(channel) + value / 2, 0, 0, "",
+                                   STR_US);
         else if (g_eeGeneral.ppmunit == PPM_PERCENT_PREC1)
           s = formatNumberAsString(calcRESXto1000(value), PREC1, 0, "", "%");
         else
@@ -136,19 +224,23 @@ class ChannelValue : public Window
               [&](lv_obj_t* obj) { lv_label_set_text(obj, s.c_str()); });
         }
 
-        const int lim = (g_model.extendedLimits ? (1024 * LIMIT_EXT_PERCENT / 100) : 1024);
-        uint16_t w = width() - PAD_TINY;
-        int16_t scaledValue = divRoundClosest(w * limit<int16_t>(-lim, value, lim), lim * 2);
+        const int lim =
+            (g_model.extendedLimits ? (1024 * LIMIT_EXT_PERCENT / 100) : 1024);
+        uint16_t w = width();
+        int16_t scaledValue =
+            divRoundClosest(w * limit<int16_t>(-lim, value, lim), lim * 2);
 
         if (scaledValue != lastScaledValue) {
           lastScaledValue = scaledValue;
 
           uint16_t fillW = abs(scaledValue);
           uint16_t x = value > 0 ? w / 2 : w / 2 - fillW + 1;
+          coord_t bh = barHeight();
+          track.with([&](lv_obj_t* obj) { lv_obj_set_size(obj, w, bh); });
 
           bar.with([&](lv_obj_t* obj) {
             lv_obj_set_pos(obj, x, 0);
-            lv_obj_set_size(obj, fillW, ROW_HEIGHT - 1);
+            lv_obj_set_size(obj, fillW, bh);
           });
         }
       }
@@ -161,106 +253,175 @@ class ChannelValue : public Window
     });
   }
 
-  static LAYOUT_VAL_SCALED(ROW_HEIGHT, 16)
+  static LAYOUT_VAL_SCALED(ROW_HEIGHT, 18)
+  static LAYOUT_VAL_SCALED(COMPACT_ROW_HEIGHT, 15)
 
  protected:
   uint8_t channel;
   LcdFlags txtColor;
   LcdFlags barColor;
+  coord_t rowHeight;
   bool compactTopBar = false;
   int16_t lastValue = OUTPUT_INVALID_VALUE;
   int16_t lastScaledValue = OUTPUT_INVALID_VALUE;
   std::string lastText;
   bool chanHasName = false;
-  lv_style_t style;
+  RequiredLvObj rowBox;
   RequiredLvObj valueLabel;
   RequiredLvObj chanLabel;
-  lv_point_t divPoints[2];
+  RequiredLvObj track;
   RequiredLvObj bar;
   Messaging refreshMsg;
 };
 
-class OutputsWidget : public TrackedWidget
+class OutputsWidget : public NativeWidget
 {
  public:
-  OutputsWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
-                WidgetLocation location) :
-      TrackedWidget(factory, parent, rect, location, LoadMode::Immediate)
+  OutputsWidget(const WidgetFactory* factory, Window* parent,
+                const rect_t& rect, WidgetLocation location) :
+      NativeWidget(factory, parent, rect, location)
   {
-    padAll(PAD_ZERO);
-
-    lv_style_init(&style);
-    addStyle(&style, LV_PART_MAIN);
-
-    addStyle(styles->bg_opacity_transparent, LV_PART_MAIN);
-    addStyle(styles->bg_opacity_cover, LV_PART_MAIN | ETX_STATE_BG_FILL);
-
-    update();
   }
 
-  void onUpdate() override
+  void createContent(lv_obj_t* parent) override
+  {
+    (void)parent;
+    initRequiredLvObj(
+        fallbackTitle,
+        [](lv_obj_t* parent) { return etx_label_create(parent); },
+        [&](lv_obj_t* obj) {
+          lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
+          lv_label_set_text(obj, "Outputs");
+        });
+    initRequiredLvObj(
+        fallbackHint,
+        [](lv_obj_t* parent) {
+          return etx_label_create(parent, FONT_XXS_INDEX);
+        },
+        [&](lv_obj_t* obj) {
+          lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
+          lv_label_set_text(obj, "Need larger zone");
+        });
+  }
+
+  void layoutContent(const rect_t& content) override
   {
     auto widgetData = getPersistentData();
 
-    // get background color from options[3]
-    withLive([&](LiveWindow& live) {
-      etx_bg_color_from_flags(live.lvobj(),
-                              widgetData->options[3].value.unsignedValue);
-
-      // Set background opacity from options[2]
-      if (widgetData->options[2].value.boolValue)
-        lv_obj_add_state(live.lvobj(), ETX_STATE_BG_FILL);
-      else
-        lv_obj_clear_state(live.lvobj(), ETX_STATE_BG_FILL);
-    });
-
     bool compact = isCompactTopBarWidget();
-    if ((!compact && (height() <= SHOW_MIN_H || width() <= SHOW_MIN_W)) ||
-        (compact && (height() < ChannelValue::ROW_HEIGHT || width() <= COMPACT_SHOW_MIN_W)))
+    if ((!compact && (content.h <= SHOW_MIN_H || content.w <= SHOW_MIN_W)) ||
+        (compact && (height() < ChannelValue::ROW_HEIGHT ||
+                     width() <= COMPACT_SHOW_MIN_W)))
       return;
+
+    bool tooSmall = usesCardChrome() && content.h < MIN_USEFUL_H;
+    fallbackTitle.with([&](lv_obj_t* obj) { setObjVisible(obj, tooSmall); });
+    fallbackHint.with([&](lv_obj_t* obj) { setObjVisible(obj, tooSmall); });
+    if (tooSmall) {
+      clearRows();
+      fallbackTitle.with([&](lv_obj_t* obj) {
+        layoutText(obj, content, FONT_BOLD_INDEX, primaryTextColor(),
+                   LV_TEXT_ALIGN_CENTER);
+      });
+      fallbackHint.with([&](lv_obj_t* obj) {
+        rect_t hint = content;
+        hint.y = content.y + content.h / 2;
+        hint.h = content.h / 2;
+        layoutText(obj, hint, FONT_XXS_INDEX, mutedTextColor(),
+                   LV_TEXT_ALIGN_CENTER);
+      });
+      return;
+    }
+    fallbackTitle.with([&](lv_obj_t* obj) { setObjVisible(obj, false); });
+    fallbackHint.with([&](lv_obj_t* obj) { setObjVisible(obj, false); });
 
     bool changed = false;
 
-    // Colors
-    LcdFlags f = widgetData->options[4].value.unsignedValue;
+    // Native cards use the design-system text color, not legacy theme whites.
+    LcdFlags f = compact ? widgetData->options[4].value.unsignedValue
+                         : COLOR2FLAGS(COLOR_BLACK_INDEX);
     if (compact && f == COLOR2FLAGS(COLOR_THEME_PRIMARY1_INDEX))
       f = COLOR2FLAGS(COLOR_THEME_PRIMARY2_INDEX);
-    if (f != txtColor) { txtColor = f; changed = true; }
+    if (f != txtColor) {
+      txtColor = f;
+      changed = true;
+    }
     f = widgetData->options[5].value.unsignedValue;
     if (compact && f == COLOR2FLAGS(COLOR_THEME_SECONDARY1_INDEX))
       f = COLOR2FLAGS(COLOR_THEME_SECONDARY2_INDEX);
-    if (f != barColor) { barColor = f; changed = true; }
+    if (f != barColor) {
+      barColor = f;
+      changed = true;
+    }
 
     // Setup channels
     uint8_t chan = widgetData->options[0].value.unsignedValue;
-    if (chan != firstChan) { firstChan = chan; changed = true; }
+    if (chan != firstChan) {
+      firstChan = chan;
+      changed = true;
+    }
     chan = widgetData->options[1].value.unsignedValue;
-    if (chan != lastChan) { lastChan = chan; changed = true; }
+    if (chan != lastChan) {
+      lastChan = chan;
+      changed = true;
+    }
 
     // Get size
-    if (width() != lastWidth) { lastWidth = width(); changed = true; }
-    if (height() != lastHeight) { lastHeight = height(); changed = true; }
-    uint8_t n = lastHeight / ChannelValue::ROW_HEIGHT;
-    if (n != rows) { rows = n; changed = true; }
-    n = (compact || lastWidth <= COLS_MIN_W) ? 1 : 2;
-    if (n != cols) { cols = n; changed = true; }
+    if (content.w != lastWidth) {
+      lastWidth = content.w;
+      changed = true;
+    }
+    if (content.h != lastHeight) {
+      lastHeight = content.h;
+      changed = true;
+    }
+    bool shortCard = usesCardChrome() && content.h < 58;
+    coord_t rowH = ChannelValue::rowHeightFor(compact || shortCard);
+    coord_t rowGap = compact ? 0 : (shortCard ? 1 : PAD_TINY);
+    coord_t rowStep = rowH + rowGap;
+    uint8_t n = 0;
+    if (shortCard) {
+      n = content.h >= 2 * rowH + rowGap ? 2 : 1;
+    } else {
+      n = rowStep > 0 ? lastHeight / rowStep : 0;
+      if (n == 0 && lastHeight >= ChannelValue::ROW_HEIGHT) n = 1;
+    }
+    if (n != rows) {
+      rows = n;
+      changed = true;
+    }
+    n = (!compact && lastWidth >= SHORT_COLS_MIN_W && rows <= 2) ? 2 : 1;
+    if (!shortCard)
+      n = (compact || lastWidth <= COLS_MIN_W || rows < 3) ? 1 : 2;
+    if (n != cols) {
+      cols = n;
+      changed = true;
+    }
 
     if (changed) {
-      clear();
+      clearRows();
       coord_t colWidth = lastWidth / cols;
       uint8_t chan = firstChan;
       for (uint8_t c = 0; c < cols && chan <= lastChan; c += 1) {
-        for (uint8_t r = 0; r < rows && chan <= lastChan;
-             r += 1, chan += 1) {
-          new (std::nothrow) ChannelValue(this, c, r, colWidth, chan - 1, txtColor, barColor);
+        for (uint8_t r = 0; r < rows && chan <= lastChan; r += 1, chan += 1) {
+          rect_t rowRect = {
+              static_cast<coord_t>(content.x + c * colWidth),
+              static_cast<coord_t>(content.y + r * rowStep),
+              static_cast<coord_t>(colWidth - (cols > 1 ? PAD_SMALL : 0)),
+              rowH};
+          if (channelWidgetCount < MAX_OUTPUT_CHANNELS) {
+            channelWidgets[channelWidgetCount] = new (std::nothrow)
+                ChannelValue(this, rowRect, chan - 1, txtColor, barColor, rowH);
+            if (channelWidgets[channelWidgetCount]) channelWidgetCount += 1;
+          }
         }
       }
     }
 
-    requireRefresh();
+    invalidateNativeRefresh();
   }
 
-  uint32_t refreshKey() override
+  uint32_t contentRefreshKey() override
   {
     auto widgetData = getPersistentData();
     uint8_t first = widgetData->options[0].value.unsignedValue;
@@ -270,19 +431,19 @@ class OutputsWidget : public TrackedWidget
 
     WidgetRefreshKey key;
     key.add((uint32_t)first)
-       .add((uint32_t)last)
-       .add((uint32_t)g_eeGeneral.ppmunit)
-       .add((bool)g_model.extendedLimits);
+        .add((uint32_t)last)
+        .add((uint32_t)g_eeGeneral.ppmunit)
+        .add((bool)g_model.extendedLimits);
 
     for (uint8_t channel = first; channel <= last; channel += 1) {
       key.add((int32_t)getChannelOutput(channel - 1))
-         .addBytes(g_model.limitData[channel - 1].name, LEN_CHANNEL_NAME);
+          .addBytes(g_model.limitData[channel - 1].name, LEN_CHANNEL_NAME);
     }
 
     return key.value();
   }
 
-  void refresh() override
+  void refreshContent() override
   {
     Messaging::send(Messaging::REFRESH_OUTPUTS_WIDGET);
   }
@@ -298,30 +459,51 @@ class OutputsWidget : public TrackedWidget
   uint8_t rows = 0;
   LcdFlags txtColor = 0;
   LcdFlags barColor = 0;
-  lv_style_t style;
+  RequiredLvObj fallbackTitle;
+  RequiredLvObj fallbackHint;
+  ChannelValue* channelWidgets[MAX_OUTPUT_CHANNELS] = {};
+  uint8_t channelWidgetCount = 0;
 
-  static LAYOUT_VAL_SCALED(SHOW_MIN_W, 100)
-  static LAYOUT_VAL_SCALED(SHOW_MIN_H, 20)
-  static LAYOUT_VAL_SCALED(COMPACT_SHOW_MIN_W, 36)
-  static LAYOUT_VAL_SCALED(COLS_MIN_W, 300)
+  void clearRows()
+  {
+    for (uint8_t i = 0; i < channelWidgetCount; i += 1) {
+      if (channelWidgets[i]) channelWidgets[i]->deleteLater();
+      channelWidgets[i] = nullptr;
+    }
+    channelWidgetCount = 0;
+  }
+
+  static LAYOUT_VAL_SCALED(SHOW_MIN_W, 100) static LAYOUT_VAL_SCALED(SHOW_MIN_H, 20) static LAYOUT_VAL_SCALED(
+      COMPACT_SHOW_MIN_W,
+      36) static LAYOUT_VAL_SCALED(COLS_MIN_W,
+                                   300) static LAYOUT_VAL_SCALED(SHORT_COLS_MIN_W,
+                                                                 150) static LAYOUT_VAL_SCALED(MIN_USEFUL_H,
+                                                                                               24)
 };
 
 const WidgetOption OutputsWidget::options[] = {
     {STR_FIRST_CHANNEL, WidgetOption::Integer, {1}, {1}, {MAX_OUTPUT_CHANNELS}},
-    {STR_LAST_CHANNEL, WidgetOption::Integer, {MAX_OUTPUT_CHANNELS}, {1}, {MAX_OUTPUT_CHANNELS}},
+    {STR_LAST_CHANNEL,
+     WidgetOption::Integer,
+     {MAX_OUTPUT_CHANNELS},
+     {1},
+     {MAX_OUTPUT_CHANNELS}},
     {STR_FILL_BACKGROUND, WidgetOption::Bool, false},
-    {STR_BG_COLOR, WidgetOption::Color, COLOR2FLAGS(COLOR_THEME_SECONDARY3_INDEX)},
-    {STR_TEXT_COLOR, WidgetOption::Color, COLOR2FLAGS(COLOR_THEME_PRIMARY1_INDEX)},
+    {STR_BG_COLOR, WidgetOption::Color,
+     COLOR2FLAGS(COLOR_THEME_SECONDARY3_INDEX)},
+    {STR_TEXT_COLOR, WidgetOption::Color,
+     COLOR2FLAGS(COLOR_THEME_PRIMARY1_INDEX)},
     {STR_COLOR, WidgetOption::Color, COLOR2FLAGS(COLOR_THEME_SECONDARY1_INDEX)},
     {nullptr, WidgetOption::Bool}};
 
-// Note: Must be a template class otherwise the linker will discard the 'outputsWidget' object
+// Note: Must be a template class otherwise the linker will discard the
+// 'outputsWidget' object
 template <class T>
 class OutputsWidgetFactory : public WidgetFactory
 {
  public:
   OutputsWidgetFactory(const char* name, const WidgetOption* options,
-                    const char* displayName = nullptr) :
+                       const char* displayName = nullptr) :
       WidgetFactory(name, options, displayName)
   {
   }
@@ -353,5 +535,5 @@ class OutputsWidgetFactory : public WidgetFactory
 };
 
 OutputsWidgetFactory<OutputsWidget> outputsWidget("Outputs",
-                                               OutputsWidget::options,
-                                               STR_WIDGET_OUTPUTS);
+                                                  OutputsWidget::options,
+                                                  STR_WIDGET_OUTPUTS);

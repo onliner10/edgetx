@@ -19,17 +19,18 @@
  * GNU General Public License for more details.
  */
 
-#include "widget.h"
+#include <stdio.h>
+
+#include <new>
 
 #include "edgetx.h"
 #include "hal/usb_driver.h"
 #include "layout.h"
 #include "theme_manager.h"
+#include "widget.h"
 
-#include <new>
-#include <stdio.h>
-
-namespace {
+namespace
+{
 
 constexpr uint8_t LINK_BARS = 5;
 const uint8_t linkBarThresholds[LINK_BARS] = {30, 40, 50, 60, 80};
@@ -54,7 +55,7 @@ coord_t clampCoord(coord_t value, coord_t low, coord_t high)
 FontIndex textFontForBox(const char* text, coord_t width, coord_t height)
 {
   static const FontIndex candidates[] = {
-      FONT_XXL_INDEX, FONT_LXL_INDEX, FONT_XL_INDEX, FONT_L_INDEX,
+      FONT_XXL_INDEX,  FONT_LXL_INDEX, FONT_XL_INDEX, FONT_L_INDEX,
       FONT_BOLD_INDEX, FONT_STD_INDEX, FONT_XS_INDEX, FONT_XXS_INDEX};
 
   for (auto font : candidates) {
@@ -70,8 +71,8 @@ FontIndex textFontForBox(const char* text, coord_t width, coord_t height)
 
 FontIndex chipTextFontForBox(const char* text, coord_t width, coord_t height)
 {
-  static const FontIndex candidates[] = {
-      FONT_BOLD_INDEX, FONT_STD_INDEX, FONT_XS_INDEX, FONT_XXS_INDEX};
+  static const FontIndex candidates[] = {FONT_BOLD_INDEX, FONT_STD_INDEX,
+                                         FONT_XS_INDEX, FONT_XXS_INDEX};
 
   for (auto font : candidates) {
     LcdFlags flags = LcdFlags(font) << 8u;
@@ -88,12 +89,10 @@ constexpr coord_t TOPBAR_CONTENT_PAD = PAD_TINY;
 
 StatusContentBox topbarContentBox(coord_t w, coord_t h)
 {
-  coord_t contentW = w > 2 * TOPBAR_CONTENT_PAD
-                         ? w - 2 * TOPBAR_CONTENT_PAD
-                         : maxCoord(w, (coord_t)1);
-  coord_t contentH = h > 2 * TOPBAR_CONTENT_PAD
-                         ? h - 2 * TOPBAR_CONTENT_PAD
-                         : maxCoord(h, (coord_t)1);
+  coord_t contentW = w > 2 * TOPBAR_CONTENT_PAD ? w - 2 * TOPBAR_CONTENT_PAD
+                                                : maxCoord(w, (coord_t)1);
+  coord_t contentH = h > 2 * TOPBAR_CONTENT_PAD ? h - 2 * TOPBAR_CONTENT_PAD
+                                                : maxCoord(h, (coord_t)1);
   return {TOPBAR_CONTENT_PAD, TOPBAR_CONTENT_PAD, contentW, contentH};
 }
 
@@ -182,12 +181,9 @@ uint8_t speakerVolumeLevel()
 #if defined(AUDIO)
   if (requiredSpeakerVolume == 0 || g_eeGeneral.beepMode == e_mode_quiet)
     return 0;
-  if (requiredSpeakerVolume < 7)
-    return 1;
-  if (requiredSpeakerVolume < 13)
-    return 2;
-  if (requiredSpeakerVolume < 19)
-    return 3;
+  if (requiredSpeakerVolume < 7) return 1;
+  if (requiredSpeakerVolume < 13) return 2;
+  if (requiredSpeakerVolume < 19) return 3;
   return 4;
 #else
   return 0;
@@ -198,7 +194,8 @@ uint8_t speakerVolumePercent()
 {
 #if defined(AUDIO)
   if (g_eeGeneral.beepMode == e_mode_quiet) return 0;
-  return divRoundClosest((uint16_t)requiredSpeakerVolume * 100, VOLUME_LEVEL_MAX);
+  return divRoundClosest((uint16_t)requiredSpeakerVolume * 100,
+                         VOLUME_LEVEL_MAX);
 #else
   return 0;
 #endif
@@ -269,8 +266,8 @@ class LinkStatusWidget : public Widget
 
         setStatusLabel(title, "LINK", COLOR_THEME_PRIMARY1_INDEX,
                        FONT_XXS_INDEX, textX, textY, textAreaW, titleH);
-        setStatusLabel(value, "--", statusPrimaryColor(false), valueFont,
-                       textX, textY + titleH, textAreaW, valueH);
+        setStatusLabel(value, "--", statusPrimaryColor(false), valueFont, textX,
+                       textY + titleH, textAreaW, valueH);
       } else {
         setLvVisible(title, false);
         setLvVisible(value, false);
@@ -305,8 +302,8 @@ class LinkStatusWidget : public Widget
     bool topbar = isCompactTopBarWidget();
     bool warning = linkWarning(rssi);
     uint8_t active = activeLinkBars(rssi);
-    LcdColorIndex activeColor = warning ? COLOR_THEME_WARNING_INDEX
-                                        : statusPrimaryColor(topbar);
+    LcdColorIndex activeColor =
+        warning ? COLOR_THEME_WARNING_INDEX : statusPrimaryColor(topbar);
     LcdColorIndex mutedColor = statusMutedColor(topbar);
 
     for (uint8_t i = 0; i < LINK_BARS; i += 1) {
@@ -322,11 +319,11 @@ class LinkStatusWidget : public Widget
 
       FontIndex font = responsiveTextFont(height() - 2 * PAD_SMALL -
                                           EdgeTxStyles::STD_FONT_HEIGHT / 2);
-      setStatusLabel(value, text,
-                     warning ? COLOR_THEME_WARNING_INDEX
-                             : statusPrimaryColor(false),
-                     font, lv_obj_get_x(value), lv_obj_get_y(value),
-                     lv_obj_get_width(value), lv_obj_get_height(value));
+      setStatusLabel(
+          value, text,
+          warning ? COLOR_THEME_WARNING_INDEX : statusPrimaryColor(false), font,
+          lv_obj_get_x(value), lv_obj_get_y(value), lv_obj_get_width(value),
+          lv_obj_get_height(value));
     }
   }
 
@@ -443,8 +440,8 @@ class TxBatteryStatusWidget : public Widget
     bool topbar = isCompactTopBarWidget();
     bool warning = IS_TXBATT_WARNING() || txBatteryPercent(g_vbat100mV) < 30;
     uint8_t bars = GET_TXBATT_BARS(fillMaxW);
-    LcdColorIndex color = warning ? COLOR_THEME_WARNING_INDEX
-                                  : statusPrimaryColor(topbar);
+    LcdColorIndex color =
+        warning ? COLOR_THEME_WARNING_INDEX : statusPrimaryColor(topbar);
 
     setStatusPartBorder(shell, color, 2);
     setStatusPartColor(cap, color);
@@ -536,14 +533,11 @@ class VolumeStatusWidget : public Widget
     setLvVisible(track, true);
     setLvVisible(fill, true);
 
-    StatusContentBox box = topbar ? topbarContentBox(width(), height())
-                                  : StatusContentBox{pad, pad,
-                                                     width() > 2 * pad
-                                                         ? width() - 2 * pad
-                                                         : width(),
-                                                     height() > 2 * pad
-                                                         ? height() - 2 * pad
-                                                         : height()};
+    StatusContentBox box =
+        topbar ? topbarContentBox(width(), height())
+               : StatusContentBox{
+                     pad, pad, width() > 2 * pad ? width() - 2 * pad : width(),
+                     height() > 2 * pad ? height() - 2 * pad : height()};
 
     coord_t trackX = box.x;
     coord_t trackRight = box.x + box.w;
@@ -559,10 +553,9 @@ class VolumeStatusWidget : public Widget
 
     trackMaxW = trackRight > trackX ? trackRight - trackX : 1;
     trackH = topbar ? clampCoord((coord_t)(box.h / 4), PAD_THREE, PAD_LARGE)
-                    : clampCoord((coord_t)(box.h / 5), PAD_LARGE,
-                                 (coord_t)18);
-    coord_t trackY = topbar ? box.y + box.h - trackH
-                            : box.y + (box.h - trackH) / 2;
+                    : clampCoord((coord_t)(box.h / 5), PAD_LARGE, (coord_t)18);
+    coord_t trackY =
+        topbar ? box.y + box.h - trackH : box.y + (box.h - trackH) / 2;
 
     if (track) {
       lv_obj_set_pos(track, trackX, trackY);
@@ -579,9 +572,8 @@ class VolumeStatusWidget : public Widget
       lv_obj_set_size(fill, fillMaxW, fillH);
     }
     if (topbar && capsuleLabel) {
-      coord_t textW = trackMaxW > 2 * PAD_TINY
-                          ? trackMaxW - 2 * PAD_TINY
-                          : trackMaxW;
+      coord_t textW =
+          trackMaxW > 2 * PAD_TINY ? trackMaxW - 2 * PAD_TINY : trackMaxW;
       coord_t textX = trackX + PAD_TINY;
       coord_t labelAreaH = trackY > box.y ? trackY - box.y : box.h;
       FontIndex font = chipTextFontForBox("VOL", textW, labelAreaH);
@@ -606,10 +598,10 @@ class VolumeStatusWidget : public Widget
         coord_t textY = (height() - textBlockH) / 2;
         coord_t textW = textRight - textX;
 
-        setStatusLabel(title, "VOL", COLOR_THEME_PRIMARY1_INDEX,
-                       FONT_XXS_INDEX, textX, textY, textW, titleH);
-        setStatusLabel(value, "", statusPrimaryColor(false), valueFont,
-                       textX, textY + titleH, textW, valueH);
+        setStatusLabel(title, "VOL", COLOR_THEME_PRIMARY1_INDEX, FONT_XXS_INDEX,
+                       textX, textY, textW, titleH);
+        setStatusLabel(value, "", statusPrimaryColor(false), valueFont, textX,
+                       textY + titleH, textW, valueH);
       } else {
         setLvVisible(title, false);
         setLvVisible(value, false);
@@ -635,11 +627,11 @@ class VolumeStatusWidget : public Widget
 
     setStatusPartColor(track, statusMutedColor(topbar));
 
-    coord_t fillW = percent > 0
-                        ? maxCoord((coord_t)1,
-                                   (coord_t)divRoundClosest(
+    coord_t fillW =
+        percent > 0
+            ? maxCoord((coord_t)1, (coord_t)divRoundClosest(
                                        (uint16_t)fillMaxW * percent, 100))
-                        : 0;
+            : 0;
     if (fillW > fillMaxW) fillW = fillMaxW;
 
     setLvVisible(fill, level > 0 && fillW > 0);
@@ -657,13 +649,13 @@ class VolumeStatusWidget : public Widget
       else
         snprintf(text, sizeof(text), "%u%%", percent);
 
-      setStatusLabel(value, text,
-                     level == 0 ? COLOR_THEME_DISABLED_INDEX
-                                : statusPrimaryColor(false),
-                     responsiveTextFont(height() - 2 * PAD_SMALL -
-                                        EdgeTxStyles::STD_FONT_HEIGHT / 2),
-                     lv_obj_get_x(value), lv_obj_get_y(value),
-                     lv_obj_get_width(value), lv_obj_get_height(value));
+      setStatusLabel(
+          value, text,
+          level == 0 ? COLOR_THEME_DISABLED_INDEX : statusPrimaryColor(false),
+          responsiveTextFont(height() - 2 * PAD_SMALL -
+                             EdgeTxStyles::STD_FONT_HEIGHT / 2),
+          lv_obj_get_x(value), lv_obj_get_y(value), lv_obj_get_width(value),
+          lv_obj_get_height(value));
     }
   }
 
@@ -689,8 +681,8 @@ BaseWidgetFactory<VolumeStatusWidget> volumeStatusWidget("Volume", nullptr,
 class RadioInfoWidget : public Widget
 {
  public:
-  RadioInfoWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
-                  WidgetLocation location) :
+  RadioInfoWidget(const WidgetFactory* factory, Window* parent,
+                  const rect_t& rect, WidgetLocation location) :
       Widget(factory, parent, rect, location)
   {
     bool compact = isCompactTopBarWidget();
@@ -700,21 +692,19 @@ class RadioInfoWidget : public Widget
                                              COLOR_THEME_PRIMARY2_INDEX);
     if (logsIcon) logsIcon->hide();
 
-    usbIcon =
-        new (std::nothrow) StaticIcon(this, W_USB_X, W_USB_Y, ICON_TOPMENU_USB,
-                                      COLOR_THEME_PRIMARY2_INDEX);
+    usbIcon = new (std::nothrow) StaticIcon(
+        this, W_USB_X, W_USB_Y, ICON_TOPMENU_USB, COLOR_THEME_PRIMARY2_INDEX);
     if (usbIcon) usbIcon->hide();
 
 #if defined(AUDIO)
     if (!compact) {
-      audioScale = new (std::nothrow) StaticIcon(this, W_AUDIO_SCALE_X, PAD_TINY,
-                                                 ICON_TOPMENU_VOLUME_SCALE,
-                                                 COLOR_THEME_SECONDARY2_INDEX);
+      audioScale = new (std::nothrow)
+          StaticIcon(this, W_AUDIO_SCALE_X, PAD_TINY, ICON_TOPMENU_VOLUME_SCALE,
+                     COLOR_THEME_SECONDARY2_INDEX);
 
       for (int i = 0; i < 5; i += 1) {
         audioVol[i] = new (std::nothrow) StaticIcon(
-            this, W_AUDIO_X, PAD_TINY,
-           (EdgeTxIcon)(ICON_TOPMENU_VOLUME_0 + i),
+            this, W_AUDIO_X, PAD_TINY, (EdgeTxIcon)(ICON_TOPMENU_VOLUME_0 + i),
             COLOR_THEME_PRIMARY2_INDEX);
         if (audioVol[i]) audioVol[i]->hide();
       }
@@ -723,15 +713,15 @@ class RadioInfoWidget : public Widget
 #endif
 
     if (!compact) {
-      batteryIcon = new (std::nothrow) StaticIcon(this, W_AUDIO_X, W_BATT_Y,
-                                                  ICON_TOPMENU_TXBATT,
-                                                  COLOR_THEME_PRIMARY2_INDEX);
+      batteryIcon = new (std::nothrow)
+          StaticIcon(this, W_AUDIO_X, W_BATT_Y, ICON_TOPMENU_TXBATT,
+                     COLOR_THEME_PRIMARY2_INDEX);
     }
 #if defined(USB_CHARGER)
     if (!compact) {
-      batteryChargeIcon = new (std::nothrow) StaticIcon(
-          this, W_BATT_CHG_X, W_BATT_CHG_Y,
-          ICON_TOPMENU_TXBATT_CHARGE, COLOR_THEME_PRIMARY2_INDEX);
+      batteryChargeIcon = new (std::nothrow)
+          StaticIcon(this, W_BATT_CHG_X, W_BATT_CHG_Y,
+                     ICON_TOPMENU_TXBATT_CHARGE, COLOR_THEME_PRIMARY2_INDEX);
       if (batteryChargeIcon) batteryChargeIcon->hide();
     }
 #endif
@@ -744,9 +734,8 @@ class RadioInfoWidget : public Widget
           lv_obj_set_style_bg_opa(batteryShell, LV_OPA_TRANSP, LV_PART_MAIN);
           lv_obj_set_style_border_width(batteryShell, 2, LV_PART_MAIN);
           lv_obj_set_style_border_opa(batteryShell, LV_OPA_COVER, LV_PART_MAIN);
-          lv_obj_set_style_border_color(batteryShell,
-                                        makeLvColor(COLOR_THEME_PRIMARY2),
-                                        LV_PART_MAIN);
+          lv_obj_set_style_border_color(
+              batteryShell, makeLvColor(COLOR_THEME_PRIMARY2), LV_PART_MAIN);
           lv_obj_set_style_radius(batteryShell, 2, LV_PART_MAIN);
         }
         batteryCap = lv_obj_create(live.lvobj());
@@ -759,9 +748,9 @@ class RadioInfoWidget : public Widget
 
 #if defined(INTERNAL_MODULE_PXX1) && defined(EXTERNAL_ANTENNA)
     if (!compact) {
-      extAntenna = new (std::nothrow) StaticIcon(this, W_RSSI_X - PAD_SMALL, 1,
-                                                 ICON_TOPMENU_ANTENNA,
-                                                 COLOR_THEME_PRIMARY2_INDEX);
+      extAntenna = new (std::nothrow)
+          StaticIcon(this, W_RSSI_X - PAD_SMALL, 1, ICON_TOPMENU_ANTENNA,
+                     COLOR_THEME_PRIMARY2_INDEX);
       if (extAntenna) extAntenna->hide();
     }
 #endif
@@ -780,7 +769,8 @@ class RadioInfoWidget : public Widget
         rssiBars[i] = lv_obj_create(live.lvobj());
         if (rssiBars[i]) {
           etx_solid_bg(rssiBars[i], COLOR_THEME_SECONDARY2_INDEX);
-          etx_bg_color(rssiBars[i], COLOR_THEME_PRIMARY2_INDEX, LV_STATE_USER_1);
+          etx_bg_color(rssiBars[i], COLOR_THEME_PRIMARY2_INDEX,
+                       LV_STATE_USER_1);
         }
       }
     });
@@ -797,9 +787,14 @@ class RadioInfoWidget : public Widget
     layoutStatus();
 
     // get colors from options
-    etx_bg_color_from_flags(batteryFill, widgetData->options[2].value.unsignedValue, LV_PART_MAIN);
-    etx_bg_color_from_flags(batteryFill, widgetData->options[1].value.unsignedValue, LV_STATE_USER_1);
-    etx_bg_color_from_flags(batteryFill, widgetData->options[0].value.unsignedValue, LV_STATE_USER_2);
+    etx_bg_color_from_flags(
+        batteryFill, widgetData->options[2].value.unsignedValue, LV_PART_MAIN);
+    etx_bg_color_from_flags(batteryFill,
+                            widgetData->options[1].value.unsignedValue,
+                            LV_STATE_USER_1);
+    etx_bg_color_from_flags(batteryFill,
+                            widgetData->options[0].value.unsignedValue,
+                            LV_STATE_USER_2);
   }
 
   void onForeground() override
@@ -807,14 +802,15 @@ class RadioInfoWidget : public Widget
     bool compact = isCompactTopBarWidget();
 
     if (usbIcon) usbIcon->show(!compact && usbPlugged());
-    if (getSelectedUsbMode() == USB_UNSELECTED_MODE)
-      { if (usbIcon) usbIcon->setColor(COLOR_THEME_SECONDARY2_INDEX); }
-    else
-      { if (usbIcon) usbIcon->setColor(COLOR_THEME_PRIMARY2_INDEX); }
+    if (getSelectedUsbMode() == USB_UNSELECTED_MODE) {
+      if (usbIcon) usbIcon->setColor(COLOR_THEME_SECONDARY2_INDEX);
+    } else {
+      if (usbIcon) usbIcon->setColor(COLOR_THEME_PRIMARY2_INDEX);
+    }
 
     if (logsIcon) {
-      logsIcon->show(!compact && !usbPlugged() && isFunctionActive(FUNCTION_LOGS) &&
-                     BLINK_ON_PHASE);
+      logsIcon->show(!compact && !usbPlugged() &&
+                     isFunctionActive(FUNCTION_LOGS) && BLINK_ON_PHASE);
     }
 
 #if defined(AUDIO)
@@ -869,8 +865,7 @@ class RadioInfoWidget : public Widget
     if (rssi != lastRSSI) {
       lastRSSI = rssi;
       for (unsigned int i = 0; i < DIM(rssiBarsValue); i++) {
-        if (!rssiBars[i])
-          continue;
+        if (!rssiBars[i]) continue;
         if (rssi >= rssiBarsValue[i])
           lv_obj_add_state(rssiBars[i], LV_STATE_USER_1);
         else
@@ -882,32 +877,20 @@ class RadioInfoWidget : public Widget
   static const WidgetOption options[];
 
   static constexpr coord_t W_AUDIO_X = 0;
-  static LAYOUT_VAL_SCALED(W_AUDIO_SCALE_X, 15)
-  static LAYOUT_VAL_SCALED(W_USB_X, 32)
-  static LAYOUT_VAL_SCALED(W_USB_Y, 5)
-  static constexpr coord_t W_LOG_X = W_USB_X;
-  static LAYOUT_VAL_SCALED(W_RSSI_X, 37)
-  static LAYOUT_VAL_SCALED(W_RSSI_BAR_W, 5)
-  static LAYOUT_VAL_SCALED(W_RSSI_BAR_H, 36)
-  static LAYOUT_VAL_SCALED(W_RSSI_BAR_SZ, 7)
-  static LAYOUT_VAL_SCALED(W_BATT_Y, 25)
-  static LAYOUT_VAL_SCALED(W_BATT_FILL_W, 20)
-  static LAYOUT_VAL_SCALED(W_BATT_FILL_H, 10)
-  static LAYOUT_VAL_SCALED(W_BATT_FILL_GRN, 12)
-  static LAYOUT_VAL_SCALED(W_BATT_FILL_ORA, 5)
-  static LAYOUT_VAL_SCALED(W_BATT_HUD_X, 2)
-  static LAYOUT_VAL_SCALED(W_BATT_HUD_W, 29)
-  static LAYOUT_VAL_SCALED(W_BATT_HUD_H, 13)
-  static LAYOUT_VAL_SCALED(W_BATT_HUD_FILL_W, 25)
-  static LAYOUT_VAL_SCALED(W_BATT_HUD_FILL_H, 9)
-  static LAYOUT_VAL_SCALED(W_BATT_HUD_FILL_GRN, 14)
-  static LAYOUT_VAL_SCALED(W_BATT_HUD_FILL_ORA, 6)
-  static LAYOUT_VAL_SCALED(W_BATT_CHG_X, 25)
-  static LAYOUT_VAL_SCALED(W_BATT_CHG_Y, 23)
-  static LAYOUT_VAL_SCALED(W_RSSI_HUD_BAR_W, 5)
-  static LAYOUT_VAL_SCALED(W_RSSI_HUD_BAR_SZ, 7)
+  static LAYOUT_VAL_SCALED(W_AUDIO_SCALE_X, 15) static LAYOUT_VAL_SCALED(
+      W_USB_X, 32) static LAYOUT_VAL_SCALED(W_USB_Y, 5) static constexpr coord_t
+      W_LOG_X = W_USB_X;
+  static LAYOUT_VAL_SCALED(W_RSSI_X, 37) static LAYOUT_VAL_SCALED(W_RSSI_BAR_W,
+                                                                  5) static LAYOUT_VAL_SCALED(W_RSSI_BAR_H, 36) static LAYOUT_VAL_SCALED(W_RSSI_BAR_SZ, 7) static LAYOUT_VAL_SCALED(W_BATT_Y, 25) static LAYOUT_VAL_SCALED(W_BATT_FILL_W, 20) static LAYOUT_VAL_SCALED(W_BATT_FILL_H, 10) static LAYOUT_VAL_SCALED(W_BATT_FILL_GRN,
+                                                                                                                                                                                                                                                                                                                   12) static LAYOUT_VAL_SCALED(W_BATT_FILL_ORA, 5) static LAYOUT_VAL_SCALED(W_BATT_HUD_X,
+                                                                                                                                                                                                                                                                                                                                                                                             2) static LAYOUT_VAL_SCALED(W_BATT_HUD_W,
+                                                                                                                                                                                                                                                                                                                                                                                                                         29) static LAYOUT_VAL_SCALED(W_BATT_HUD_H, 13) static LAYOUT_VAL_SCALED(W_BATT_HUD_FILL_W, 25) static LAYOUT_VAL_SCALED(W_BATT_HUD_FILL_H, 9) static LAYOUT_VAL_SCALED(W_BATT_HUD_FILL_GRN, 14) static LAYOUT_VAL_SCALED(W_BATT_HUD_FILL_ORA,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  6) static LAYOUT_VAL_SCALED(W_BATT_CHG_X,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              25) static LAYOUT_VAL_SCALED(W_BATT_CHG_Y, 23) static LAYOUT_VAL_SCALED(W_RSSI_HUD_BAR_W,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      5) static LAYOUT_VAL_SCALED(W_RSSI_HUD_BAR_SZ,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  7)
 
-  coord_t batteryFillX() const
+      coord_t batteryFillX() const
   {
     return isCompactTopBarWidget() ? W_BATT_HUD_X + 2 : W_AUDIO_X + 1;
   }
@@ -988,10 +971,7 @@ class RadioInfoWidget : public Widget
   StaticIcon* extAntenna = nullptr;
 #endif
 
-  coord_t batteryShellY() const
-  {
-    return height() - W_BATT_HUD_H - PAD_TINY;
-  }
+  coord_t batteryShellY() const { return height() - W_BATT_HUD_H - PAD_TINY; }
 
   coord_t rssiClusterWidth() const
   {
@@ -1017,11 +997,9 @@ class RadioInfoWidget : public Widget
 
     coord_t rssiBh = rssiBarHeight();
     const uint8_t rssiBarsHeight[] = {
-      (uint8_t)((rssiBh * 5 + 15) / 31),
-      (uint8_t)((rssiBh * 10 + 15) / 31),
-      (uint8_t)((rssiBh * 15 + 15) / 31),
-      (uint8_t)((rssiBh * 21 + 15) / 31),
-      (uint8_t)rssiBh};
+        (uint8_t)((rssiBh * 5 + 15) / 31), (uint8_t)((rssiBh * 10 + 15) / 31),
+        (uint8_t)((rssiBh * 15 + 15) / 31), (uint8_t)((rssiBh * 21 + 15) / 31),
+        (uint8_t)rssiBh};
     for (unsigned int i = 0; i < DIM(rssiBars); i++) {
       if (!rssiBars[i]) continue;
       uint8_t height = rssiBarsHeight[i];
@@ -1038,14 +1016,11 @@ const WidgetOption RadioInfoWidget::options[] = {
     {STR_HIGH_BATT_COLOR, WidgetOption::Color, RGB2FLAGS(0x4C, 0xAF, 0x50)},
     {nullptr, WidgetOption::Bool}};
 
-BaseWidgetFactory<RadioInfoWidget> RadioInfoWidget("Radio Info", RadioInfoWidget::options,
-                                                   STR_RADIO_INFO_WIDGET);
-
 class DateTimeWidget : public Widget
 {
  public:
-  DateTimeWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
-                 WidgetLocation location) :
+  DateTimeWidget(const WidgetFactory* factory, Window* parent,
+                 const rect_t& rect, WidgetLocation location) :
       Widget(factory, parent, rect, location)
   {
     coord_t x = isCompactTopBarWidget()
@@ -1060,10 +1035,7 @@ class DateTimeWidget : public Widget
     update();
   }
 
-  void onForeground() override
-  {
-    Widget::checkEvents();
-  }
+  void onForeground() override { Widget::checkEvents(); }
 
   void onUpdate() override
   {
@@ -1080,9 +1052,9 @@ class DateTimeWidget : public Widget
         compact ? maxCoord((coord_t)(width() - 2 * pad), (coord_t)1)
                 : HeaderDateTime::HDR_DATE_WIDTH;
     coord_t x = compact ? pad : width() - displayWidth - DT_XO;
-    coord_t y = compact ? maxCoord((height() - dateTime->height()) / 2,
-                                   (coord_t)0)
-                        : PAD_THREE;
+    coord_t y = compact
+                    ? maxCoord((height() - dateTime->height()) / 2, (coord_t)0)
+                    : PAD_THREE;
     dateTime->setDisplayWidth(displayWidth);
     dateTime->setTextAlign(LV_TEXT_ALIGN_LEFT);
     dateTime->setPos(x, y);
@@ -1093,7 +1065,8 @@ class DateTimeWidget : public Widget
 
   static const WidgetOption options[];
 
-  // Adjustment to make main view date/time align with model/radio settings views
+  // Adjustment to make main view date/time align with model/radio settings
+  // views
   static LAYOUT_VAL_SCALED(DT_XO, 1)
 };
 
@@ -1113,11 +1086,13 @@ class DateTextWidget : public Widget
   DateTextWidget(const WidgetFactory* factory, Window* parent,
                  const rect_t& rect, WidgetLocation location,
                  DateTextKind kind) :
-      Widget(factory, parent, rect, location),
-      kind(kind)
+      Widget(factory, parent, rect, location), kind(kind)
   {
     initRequiredLvObj(
-        label, [](lv_obj_t* parent) { return etx_label_create(parent, FONT_XS_INDEX); },
+        label,
+        [](lv_obj_t* parent) {
+          return etx_label_create(parent, FONT_XS_INDEX);
+        },
         [](lv_obj_t* obj) { lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT); });
 
     update();
@@ -1152,8 +1127,7 @@ class DateTextWidget : public Widget
     if (topbar) {
       textBox = topbarContentBox(width(), height());
     } else {
-      textBox = {pad, pad,
-                 width() > 2 * pad ? width() - 2 * pad : width(),
+      textBox = {pad, pad, width() > 2 * pad ? width() - 2 * pad : width(),
                  height() > 2 * pad ? height() - 2 * pad : height()};
     }
 
@@ -1202,8 +1176,7 @@ class DateTextWidget : public Widget
     else
       etx_txt_color_from_flags(obj, color);
     lv_obj_set_style_text_align(
-        obj, topbar ? LV_TEXT_ALIGN_CENTER : LV_TEXT_ALIGN_LEFT,
-        LV_PART_MAIN);
+        obj, topbar ? LV_TEXT_ALIGN_CENTER : LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
     lv_obj_set_pos(obj, textBox.x, labelY);
     lv_obj_set_size(obj, textBox.w, labelH);
   }
@@ -1251,13 +1224,13 @@ BaseWidgetFactory<TodayWidget> todayWidget("Today", DateTextWidget::options,
 class InternalGPSWidget : public Widget
 {
  public:
-  InternalGPSWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
-                    WidgetLocation location) :
+  InternalGPSWidget(const WidgetFactory* factory, Window* parent,
+                    const rect_t& rect, WidgetLocation location) :
       Widget(factory, parent, rect, location)
   {
-    icon =
-        new (std::nothrow) StaticIcon(this, width() / 2 - PAD_LARGE - PAD_TINY, ICON_H,
-                                      ICON_TOPMENU_GPS, COLOR_THEME_SECONDARY2_INDEX);
+    icon = new (std::nothrow)
+        StaticIcon(this, width() / 2 - PAD_LARGE - PAD_TINY, ICON_H,
+                   ICON_TOPMENU_GPS, COLOR_THEME_SECONDARY2_INDEX);
 
     numSats = new (std::nothrow) DynamicNumber<uint16_t>(
         this, {0, 1, width(), SATS_H}, [=] { return gpsData.numSat; },
@@ -1283,8 +1256,7 @@ class InternalGPSWidget : public Widget
   StaticIcon* icon = nullptr;
   DynamicNumber<uint16_t>* numSats = nullptr;
 
-  static LAYOUT_VAL_SCALED(ICON_H, 19)
-  static LAYOUT_VAL_SCALED(SATS_H, 12)
+  static LAYOUT_VAL_SCALED(ICON_H, 19) static LAYOUT_VAL_SCALED(SATS_H, 12)
 };
 
 BaseWidgetFactory<InternalGPSWidget> InternalGPSWidget("Internal GPS", nullptr,

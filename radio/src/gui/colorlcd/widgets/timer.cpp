@@ -19,11 +19,10 @@
  * GNU General Public License for more details.
  */
 
-#include "widget.h"
-
 #include "bitmaps.h"
 #include "edgetx.h"
 #include "static.h"
+#include "widget.h"
 
 #define ETX_STATE_BG_WARNING LV_STATE_USER_1
 #define EXT_NAME_ALIGN_RIGHT LV_STATE_USER_1
@@ -31,22 +30,31 @@
 #define ETX_NAME_COLOR_WHITE LV_STATE_USER_3
 #define ETX_VALUE_SMALL_FONT LV_STATE_USER_1
 
-class TimerWidget : public TrackedWidget
+class TimerWidget : public NativeWidget
 {
  public:
   TimerWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
               WidgetLocation location) :
-      TrackedWidget(factory, parent, rect, location, LoadMode::Delayed)
+      NativeWidget(factory, parent, rect, location)
   {
   }
 
-  void delayedInit() override
+  void createContent(lv_obj_t* parent) override
   {
+    (void)parent;
+
     solidBg(COLOR_THEME_WARNING_INDEX, LV_PART_MAIN | ETX_STATE_BG_WARNING);
 
     lv_style_init(&style);
     lv_style_set_width(&style, lv_pct(100));
     lv_style_set_height(&style, LV_SIZE_CONTENT);
+
+    initRequiredLvObj(
+        smallBox,
+        [](lv_obj_t* parent) {
+          return createFlexBox(parent, LV_FLEX_FLOW_COLUMN);
+        },
+        [](lv_obj_t* obj) { lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN); });
 
     if (!initRequiredWindow(timerBg, this, 0, 0, ICON_TIMER_BG,
                             COLOR_THEME_PRIMARY2_INDEX))
@@ -58,7 +66,9 @@ class TimerWidget : public TrackedWidget
     // Timer name
     initRequiredLvObj(
         nameLabel,
-        [](lv_obj_t* parent) { return etx_label_create(parent, FONT_XS_INDEX); },
+        [](lv_obj_t* parent) {
+          return etx_label_create(parent, FONT_XS_INDEX);
+        },
         [&](lv_obj_t* obj) {
           lv_label_set_text(obj, "");
           lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
@@ -114,12 +124,9 @@ class TimerWidget : public TrackedWidget
           etx_arc_color(obj, COLOR_THEME_SECONDARY1_INDEX, LV_PART_INDICATOR);
           lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
         });
-
-    update();
-    foreground();
   }
 
-  uint32_t refreshKey() override
+  uint32_t contentRefreshKey() override
   {
     auto widgetData = getPersistentData();
     uint32_t index = widgetData->options[0].value.unsignedValue;
@@ -128,13 +135,13 @@ class TimerWidget : public TrackedWidget
 
     WidgetRefreshKey key;
     key.add((uint32_t)index)
-       .add((uint32_t)timerData.start)
-       .add((bool)timerData.showElapsed)
-       .add((int32_t)timerValue);
+        .add((uint32_t)timerData.start)
+        .add((bool)timerData.showElapsed)
+        .add((int32_t)timerValue);
     return key.value();
   }
 
-  void refresh() override
+  void refreshContent() override
   {
     auto widgetData = getPersistentData();
 
@@ -176,8 +183,9 @@ class TimerWidget : public TrackedWidget
         unit1.with([&](lv_obj_t* obj) { lv_label_set_text(obj, sUnit1); });
 
         if (lastValue > 0 && lastStartValue > 0) {
-          timerArc.with(
-              [](lv_obj_t* obj) { lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN); });
+          timerArc.with([](lv_obj_t* obj) {
+            lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
+          });
           timerIcon->hide();
         } else {
           timerArc.with(
@@ -208,16 +216,21 @@ class TimerWidget : public TrackedWidget
       // Set colors if timer has elapsed.
       if (lastValue < 0 && lastValue % 2) {
         if (isLarge) {
-          nameLabel.with(
-              [](lv_obj_t* obj) { lv_obj_add_state(obj, ETX_NAME_TXT_WARNING); });
-          digits0.with(
-              [](lv_obj_t* obj) { lv_obj_add_state(obj, ETX_NAME_TXT_WARNING); });
-          digits1.with(
-              [](lv_obj_t* obj) { lv_obj_add_state(obj, ETX_NAME_TXT_WARNING); });
-          unit0.with(
-              [](lv_obj_t* obj) { lv_obj_add_state(obj, ETX_NAME_TXT_WARNING); });
-          unit1.with(
-              [](lv_obj_t* obj) { lv_obj_add_state(obj, ETX_NAME_TXT_WARNING); });
+          nameLabel.with([](lv_obj_t* obj) {
+            lv_obj_add_state(obj, ETX_NAME_TXT_WARNING);
+          });
+          digits0.with([](lv_obj_t* obj) {
+            lv_obj_add_state(obj, ETX_NAME_TXT_WARNING);
+          });
+          digits1.with([](lv_obj_t* obj) {
+            lv_obj_add_state(obj, ETX_NAME_TXT_WARNING);
+          });
+          unit0.with([](lv_obj_t* obj) {
+            lv_obj_add_state(obj, ETX_NAME_TXT_WARNING);
+          });
+          unit1.with([](lv_obj_t* obj) {
+            lv_obj_add_state(obj, ETX_NAME_TXT_WARNING);
+          });
           clearState(ETX_STATE_BG_WARNING);
           timerBg->setColor(COLOR_THEME_WARNING_INDEX);
           timerIcon->setColor(COLOR_THEME_SECONDARY2_INDEX);
@@ -251,33 +264,23 @@ class TimerWidget : public TrackedWidget
 
   static const WidgetOption options[];
 
-  static LAYOUT_VAL_SCALED(SMALL_TXT_MAX_W, 100)
-  static LAYOUT_VAL_SCALED(SMALL_TXT_MAX_H, 40)
-  static LAYOUT_VAL_SCALED(VAL_LBL_Y, 20)
-  static LAYOUT_VAL_SCALED(COMPACT_VAL_LBL_Y, 14)
-  static LAYOUT_VAL_SCALED(TMR_LRG_W, 180)
-  static LAYOUT_VAL_SCALED(TMR_LRG_H, 70)
-  static LAYOUT_VAL_SCALED(TMR_ARC_SZ, 64)
-  static LAYOUT_VAL_SCALED(TMR_ARC_W, 10)
-  static LAYOUT_VAL_SCALED(NM_LRG_X, 78)
-  static LAYOUT_VAL_SCALED(NM_LRG_Y, 19)
-  static LAYOUT_VAL_SCALED(NM_LRG_W, 93)
-  static LAYOUT_VAL_SCALED(U0_X, 111)
-  static LAYOUT_VAL_SCALED(U0_Y, 33)
-  static LAYOUT_VAL_SCALED(U1_X, 162)
-  static LAYOUT_VAL_SCALED(U1_Y, 33)
-  static LAYOUT_VAL_SCALED(D0_X, 74)
-  static LAYOUT_VAL_SCALED(D0_Y, 31)
-  static LAYOUT_VAL_SCALED(D1_X, 125)
-  static LAYOUT_VAL_SCALED(D1_Y, 31)
+ static LAYOUT_VAL_SCALED(SMALL_TXT_MAX_W, 100) static LAYOUT_VAL_SCALED(
+     SMALL_TXT_MAX_H,
+     40) static LAYOUT_VAL_SCALED(VAL_LBL_Y,
+                                  20) static LAYOUT_VAL_SCALED(COMPACT_VAL_LBL_Y, 14) static LAYOUT_VAL_SCALED(TMR_LRG_W, 180) static LAYOUT_VAL_SCALED(TMR_LRG_H, 70) static LAYOUT_VAL_SCALED(TMR_ARC_SZ,
+                                                                                                                                                                                                64) static LAYOUT_VAL_SCALED(TMR_ARC_W, 10) static LAYOUT_VAL_SCALED(NM_LRG_X, 78) static LAYOUT_VAL_SCALED(NM_LRG_Y,
+                                                                                                                                                                                                                                                                                                            19) static LAYOUT_VAL_SCALED(NM_LRG_W, 93) static LAYOUT_VAL_SCALED(U0_X, 111) static LAYOUT_VAL_SCALED(U0_Y, 33) static LAYOUT_VAL_SCALED(U1_X, 162) static LAYOUT_VAL_SCALED(U1_Y, 33) static LAYOUT_VAL_SCALED(D0_X,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              74) static LAYOUT_VAL_SCALED(D0_Y,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           31) static LAYOUT_VAL_SCALED(D1_X, 125) static LAYOUT_VAL_SCALED(D1_Y,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            31)
 
- protected:
-  tmrval_t lastValue = 0;
+     protected : tmrval_t lastValue = 0;
   uint32_t lastStartValue = -1;
   bool isLarge = false;
   lv_style_t style;
   RequiredLvObj nameLabel;
   RequiredLvObj valLabel;
+  RequiredLvObj smallBox;
   RequiredLvObj digits0;
   RequiredLvObj digits1;
   RequiredLvObj unit0;
@@ -286,7 +289,7 @@ class TimerWidget : public TrackedWidget
   StaticIcon* timerBg = nullptr;
   StaticIcon* timerIcon = nullptr;
 
-  void onUpdate() override
+  void layoutContent(const rect_t& content) override
   {
     auto widgetData = getPersistentData();
 
@@ -299,8 +302,24 @@ class TimerWidget : public TrackedWidget
     bool hasName = ZLEN(timerData.name) > 0;
     bool compact = isCompactTopBarWidget();
 
-    if (width() >= TMR_LRG_W && height() >= TMR_LRG_H) {
+    if (!usesCardChrome() && content.w >= TMR_LRG_W &&
+        content.h >= TMR_LRG_H) {
       isLarge = true;
+      smallBox.with([&](lv_obj_t* obj) { setObjVisible(obj, false); });
+      nameLabel.with([&](lv_obj_t* obj) {
+        withLive(
+            [&](LiveWindow& live) { lv_obj_set_parent(obj, live.lvobj()); });
+      });
+      valLabel.with([&](lv_obj_t* obj) {
+        withLive(
+            [&](LiveWindow& live) { lv_obj_set_parent(obj, live.lvobj()); });
+      });
+      if (timerBg) timerBg->setPos(content.x, content.y);
+      if (timerIcon)
+        timerIcon->setPos(content.x + PAD_THREE, content.y + PAD_SMALL);
+      timerArc.with([&](lv_obj_t* obj) {
+        lv_obj_set_pos(obj, content.x + PAD_TINY, content.y + PAD_THREE);
+      });
       nameLabel.with([&](lv_obj_t* obj) {
         etx_font(obj, FONT_XS_INDEX);
         lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
@@ -308,7 +327,7 @@ class TimerWidget : public TrackedWidget
           lv_obj_clear_state(obj, EXT_NAME_ALIGN_RIGHT);
         else
           lv_obj_add_state(obj, EXT_NAME_ALIGN_RIGHT);
-        lv_obj_set_pos(obj, NM_LRG_X, NM_LRG_Y);
+        lv_obj_set_pos(obj, content.x + NM_LRG_X, content.y + NM_LRG_Y);
         lv_obj_set_width(obj, NM_LRG_W);
         lv_obj_clear_state(obj, ETX_NAME_COLOR_WHITE);
       });
@@ -317,35 +336,94 @@ class TimerWidget : public TrackedWidget
         lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
         lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
       });
-      digits0.with(
-          [](lv_obj_t* obj) { lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN); });
-      digits1.with(
-          [](lv_obj_t* obj) { lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN); });
-      unit0.with(
-          [](lv_obj_t* obj) { lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN); });
-      unit1.with(
-          [](lv_obj_t* obj) { lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN); });
+      digits0.with([&](lv_obj_t* obj) {
+        lv_obj_set_pos(obj, content.x + D0_X, content.y + D0_Y);
+        lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
+      });
+      digits1.with([&](lv_obj_t* obj) {
+        lv_obj_set_pos(obj, content.x + D1_X, content.y + D1_Y);
+        lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
+      });
+      unit0.with([&](lv_obj_t* obj) {
+        lv_obj_set_pos(obj, content.x + U0_X, content.y + U0_Y);
+        lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
+      });
+      unit1.with([&](lv_obj_t* obj) {
+        lv_obj_set_pos(obj, content.x + U1_X, content.y + U1_Y);
+        lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
+      });
       timerBg->show();
     } else {
       isLarge = false;
       coord_t labelPad = PAD_TINY;
-      coord_t labelWidth = width() > 2 * labelPad ? width() - 2 * labelPad : width();
+      if (timerIcon)
+        timerIcon->setPos(content.x + PAD_THREE, content.y + PAD_SMALL);
+      coord_t labelWidth =
+          content.w > 2 * labelPad ? content.w - 2 * labelPad : content.w;
       nameLabel.with([&](lv_obj_t* obj) {
-        etx_font(obj, compact ? FONT_XXS_INDEX : FONT_XS_INDEX);
+        etx_font(obj, usesCardChrome()
+                          ? cardTitleFont(content)
+                          : (compact ? FONT_XXS_INDEX : FONT_XS_INDEX));
         lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
         lv_obj_clear_state(obj, EXT_NAME_ALIGN_RIGHT);
-        lv_obj_set_pos(obj, labelPad, 0);
-        lv_obj_set_width(obj, labelWidth);
-        lv_obj_add_state(obj, ETX_NAME_COLOR_WHITE);
+        if (usesCardChrome()) {
+          smallBox.with([&](lv_obj_t* box) { lv_obj_set_parent(obj, box); });
+          lv_obj_clear_state(obj, ETX_NAME_COLOR_WHITE);
+          lv_obj_set_style_text_color(obj, mutedTextColor(), LV_PART_MAIN);
+        } else {
+          withLive(
+              [&](LiveWindow& live) { lv_obj_set_parent(obj, live.lvobj()); });
+          lv_obj_set_pos(obj, content.x + labelPad, content.y);
+          lv_obj_set_width(obj, labelWidth);
+          lv_obj_add_state(obj, ETX_NAME_COLOR_WHITE);
+        }
       });
       valLabel.with([&](lv_obj_t* obj) {
-        etx_font(obj, compact ? FONT_BOLD_INDEX : FONT_STD_INDEX);
-        lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
-        lv_obj_set_width(obj, labelWidth);
-        lv_obj_set_pos(obj, compact ? labelPad : PAD_THREE,
-                       compact ? COMPACT_VAL_LBL_Y : VAL_LBL_Y);
+        etx_font(obj, usesCardChrome()
+                          ? cardValueFont(content)
+                          : (compact ? FONT_BOLD_INDEX
+                                     : (content.h < 58 ? FONT_BOLD_INDEX
+                                                       : FONT_STD_INDEX)));
+        coord_t fh =
+            getFontHeight(LcdFlags(compact ? FONT_BOLD_INDEX
+                                           : (content.h < 58 ? FONT_BOLD_INDEX
+                                                             : FONT_STD_INDEX))
+                          << 8u);
+        if (usesCardChrome()) {
+          smallBox.with([&](lv_obj_t* box) { lv_obj_set_parent(obj, box); });
+          lv_obj_set_style_text_color(obj, primaryTextColor(), LV_PART_MAIN);
+        } else {
+          lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+          withLive(
+              [&](LiveWindow& live) { lv_obj_set_parent(obj, live.lvobj()); });
+          lv_obj_set_width(obj, labelWidth);
+          coord_t valueY = content.y + (compact ? COMPACT_VAL_LBL_Y
+                                                : content.h - fh - PAD_TINY);
+          lv_obj_set_pos(obj, content.x + (compact ? labelPad : PAD_TINY),
+                         valueY);
+        }
         lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
       });
+      if (usesCardChrome()) {
+        if (timerIcon) timerIcon->hide();
+        int val = getTimerStateValue(index);
+        if (timerData.start && timerData.showElapsed &&
+            (int)timerData.start != val)
+          val = (int)timerData.start - val;
+        TimerOptions timerOptions;
+        timerOptions.options = (abs(val) >= 3600) ? SHOW_TIME : SHOW_TIMER;
+        char valueText[LEN_TIMER_STRING];
+        getTimerString(valueText, abs(val), timerOptions);
+        valLabel.with([&](lv_obj_t* obj) { lv_label_set_text(obj, valueText); });
+        smallBox.with([&](lv_obj_t* obj) {
+          setObjVisible(obj, true);
+          nameLabel.with([&](lv_obj_t* title) {
+            valLabel.with([&](lv_obj_t* value) {
+              layoutCardStack(obj, title, value, content);
+            });
+          });
+        });
+      }
       digits0.with(
           [](lv_obj_t* obj) { lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN); });
       digits1.with(
@@ -367,7 +445,7 @@ class TimerWidget : public TrackedWidget
 
     lastValue = 0;
     lastStartValue = -1;
-    requireRefresh();
+    invalidateNativeRefresh();
   }
 
   bool createUnitLabel(RequiredLvObj& label)
@@ -392,8 +470,7 @@ class TimerWidget : public TrackedWidget
 };
 
 const WidgetOption TimerWidget::options[] = {
-    {STR_TIMER_SOURCE, WidgetOption::Timer, 0},
-    {nullptr, WidgetOption::Bool}};
+    {STR_TIMER_SOURCE, WidgetOption::Timer, 0}, {nullptr, WidgetOption::Bool}};
 
 BaseWidgetFactory<TimerWidget> timerWidget("Timer", TimerWidget::options,
                                            STR_WIDGET_TIMER);

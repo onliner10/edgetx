@@ -23,15 +23,16 @@
 
 #include <stdint.h>
 #include <string.h>
+
 #include <functional>
 #include <new>
 #include <utility>
 #include <vector>
 
 #include "button.h"
-#include "widgets_container.h"
 #include "storage/yaml/yaml_defs.h"
 #include "datastructs_screen.h"
+#include "widgets_container.h"
 
 class WidgetFactory;
 
@@ -44,15 +45,9 @@ class WidgetRefreshKey
     return *this;
   }
 
-  WidgetRefreshKey& add(int32_t value)
-  {
-    return add((uint32_t)value);
-  }
+  WidgetRefreshKey& add(int32_t value) { return add((uint32_t)value); }
 
-  WidgetRefreshKey& add(bool value)
-  {
-    return add((uint32_t)value);
-  }
+  WidgetRefreshKey& add(bool value) { return add((uint32_t)value); }
 
   WidgetRefreshKey& addBytes(const char* data, size_t len)
   {
@@ -72,22 +67,17 @@ class WidgetRefreshKey
 
   uint32_t state = FNV_OFFSET;
 
-  void mix(uint32_t value)
-  {
-    addBytes((const char*)&value, sizeof(value));
-  }
+  void mix(uint32_t value) { addBytes((const char*)&value, sizeof(value)); }
 };
 
 //-----------------------------------------------------------------------------
 
-struct MainViewWidgetLocation
-{
+struct MainViewWidgetLocation {
   uint8_t screen;
   uint8_t zone;
 };
 
-struct TopBarWidgetLocation
-{
+struct TopBarWidgetLocation {
   uint8_t zone;
 };
 
@@ -109,9 +99,7 @@ class WidgetLocation
   }
 
   explicit WidgetLocation(TopBarWidgetLocation location) :
-      placement_(Placement::TopBar),
-      screen_(0),
-      zone_(location.zone)
+      placement_(Placement::TopBar), screen_(0), zone_(location.zone)
   {
   }
 
@@ -128,8 +116,7 @@ class WidgetLocation
 
 //-----------------------------------------------------------------------------
 
-struct WidgetOption
-{
+struct WidgetOption {
   // First two entries must match luaScriptInputType enum
   // TODO: should be cleaned up
   enum Type {
@@ -147,12 +134,12 @@ struct WidgetOption
     File,
   };
 
-  const char * name;
+  const char* name;
   Type type;
   WidgetOptionValue deflt;
   WidgetOptionValue min;
   WidgetOptionValue max;
-  const char * displayName;
+  const char* displayName;
   std::string fileSelectPath;
 #if !defined(BACKUP)
   std::vector<std::string> choiceValues;
@@ -164,7 +151,6 @@ struct WidgetOption
 class Widget : public ButtonBase
 {
  public:
-
   Widget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
          WidgetLocation location);
 
@@ -173,7 +159,10 @@ class Widget : public ButtonBase
   const WidgetFactory* getFactory() const { return factory; }
 
   const WidgetOption* getOptionDefinitions() const;
-  bool hasOptions() const { return getOptionDefinitions() && getOptionDefinitions()->name; }
+  bool hasOptions() const
+  {
+    return getOptionDefinitions() && getOptionDefinitions()->name;
+  }
   bool isTopBarWidget() const { return location.isTopBar(); }
   bool isMainViewWidget() const { return location.isMainView(); }
   bool isCompactTopBarWidget() const
@@ -256,17 +245,84 @@ class Widget : public ButtonBase
 
 //-----------------------------------------------------------------------------
 
+class NativeWidget : public Widget
+{
+ public:
+  NativeWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
+               WidgetLocation location);
+
+ protected:
+  static constexpr coord_t CARD_RADIUS = 6;
+  static constexpr coord_t PILL_RADIUS = 0;
+
+  rect_t cardRect() const;
+  rect_t contentRect() const;
+  bool usesCardChrome() const;
+  void invalidateNativeRefresh() { refreshPending = true; }
+
+  static void setObjRect(lv_obj_t* obj, coord_t x, coord_t y, coord_t w,
+                         coord_t h);
+  static void setObjVisible(lv_obj_t* obj, bool visible);
+  static lv_obj_t* createFlexBox(lv_obj_t* parent, lv_flex_flow_t flow);
+  static void layoutFlexBox(lv_obj_t* obj, const rect_t& rect,
+                            lv_flex_flow_t flow, coord_t gap = PAD_TINY,
+                            lv_flex_align_t main = LV_FLEX_ALIGN_START,
+                            lv_flex_align_t cross = LV_FLEX_ALIGN_CENTER,
+                            lv_flex_align_t track = LV_FLEX_ALIGN_START);
+  static void setFlexChild(lv_obj_t* obj, coord_t width, coord_t height,
+                           uint8_t grow = 0);
+  static FontIndex cardTitleFont(const rect_t& content);
+  static FontIndex cardValueFont(const rect_t& content);
+  static FontIndex cardStackTitleFont(const rect_t& content);
+  static FontIndex cardStackValueFont(const rect_t& content);
+  static coord_t cardHeaderHeight(const rect_t& content);
+  static coord_t cardGap(const rect_t& content);
+  static coord_t cardBarHeight(const rect_t& content);
+  static void layoutCardHeader(lv_obj_t* row, lv_obj_t* title, lv_obj_t* value,
+                               const rect_t& rect, coord_t valueWidth = 0);
+  static void layoutCardStack(lv_obj_t* column, lv_obj_t* title,
+                              lv_obj_t* value, const rect_t& rect);
+  static rect_t insetRect(const rect_t& rect, coord_t inset);
+  static FontIndex fitTextFont(const char* text, coord_t width, coord_t height,
+                               const FontIndex* fonts, uint8_t fontCount);
+  static void layoutText(lv_obj_t* obj, const rect_t& rect, FontIndex font,
+                         lv_color_t color, lv_text_align_t align);
+  static void layoutInlineMetric(lv_obj_t* label, lv_obj_t* value,
+                                 const rect_t& rect, coord_t valueWidth,
+                                 FontIndex font);
+  static void layoutPillBar(lv_obj_t* track, lv_obj_t* fill, const rect_t& rect,
+                            uint8_t percent, lv_color_t fillColor);
+  static lv_color_t cardColor();
+  static lv_color_t borderColor();
+  static lv_color_t pillColor();
+  static lv_color_t trackColor();
+  static lv_color_t primaryTextColor();
+  static lv_color_t mutedTextColor();
+
+  virtual void createContent(lv_obj_t* parent) = 0;
+  virtual void layoutContent(const rect_t& content) = 0;
+  virtual uint32_t contentRefreshKey() { return 0; }
+  virtual void refreshContent() {}
+
+ private:
+  RequiredLvObj card;
+  uint32_t lastRefreshKey = 0;
+  bool refreshPending = true;
+
+  void delayedInit() final;
+  void onUpdate() final;
+  void onForeground() final;
+};
+
+//-----------------------------------------------------------------------------
+
 class TrackedWidget : public Widget
 {
  public:
-  enum class LoadMode {
-    Immediate,
-    Delayed
-  };
+  enum class LoadMode { Immediate, Delayed };
 
   TrackedWidget(const WidgetFactory* factory, Window* parent,
-                const rect_t& rect, WidgetLocation location,
-                LoadMode loadMode);
+                const rect_t& rect, WidgetLocation location, LoadMode loadMode);
 
  protected:
   void requireRefresh() { refreshPending = true; }
@@ -288,7 +344,8 @@ class WidgetFactory
   using RegisteredWidgets =
       std::vector<std::reference_wrapper<const WidgetFactory>>;
 
-  explicit WidgetFactory(const char* name, const WidgetOption* options = nullptr,
+  explicit WidgetFactory(const char* name,
+                         const WidgetOption* options = nullptr,
                          const char* displayName = nullptr) :
       name(name), displayName(displayName), options(options)
   {
@@ -308,8 +365,8 @@ class WidgetFactory
     return displayName ? displayName : name;
   }
 
-  Widget* create(Window* parent, const rect_t& rect,
-                 WidgetLocation location, bool init = true) const;
+  Widget* create(Window* parent, const rect_t& rect, WidgetLocation location,
+                 bool init = true) const;
 
   virtual Widget* createNew(Window* parent, const rect_t& rect,
                             WidgetLocation location) const = 0;

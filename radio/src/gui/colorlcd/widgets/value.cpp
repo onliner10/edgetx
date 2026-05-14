@@ -26,17 +26,19 @@
 #define ETX_STATE_TELEM_STALE LV_STATE_USER_2
 #define ETX_STATE_LARGE_FONT LV_STATE_USER_3
 
-class ValueWidget : public TrackedWidget
+class ValueWidget : public NativeWidget
 {
  public:
   ValueWidget(const WidgetFactory* factory, Window* parent, const rect_t& rect,
               WidgetLocation location) :
-      TrackedWidget(factory, parent, rect, location, LoadMode::Delayed)
+      NativeWidget(factory, parent, rect, location)
   {
   }
 
-  void delayedInit() override
+  void createContent(lv_obj_t* parent) override
   {
+    (void)parent;
+
     lv_style_init(&labelStyle);
     lv_style_set_width(&labelStyle, lv_pct(100));
     lv_style_set_height(&labelStyle, lv_pct(100));
@@ -44,6 +46,13 @@ class ValueWidget : public TrackedWidget
     lv_style_init(&valueStyle);
     lv_style_set_width(&valueStyle, lv_pct(100));
     lv_style_set_height(&valueStyle, lv_pct(100));
+
+    initRequiredLvObj(
+        contentBox,
+        [](lv_obj_t* parent) {
+          return createFlexBox(parent, LV_FLEX_FLOW_COLUMN);
+        },
+        [](lv_obj_t*) {});
 
     initRequiredLvObj(
         labelShadow, [](lv_obj_t* parent) { return etx_label_create(parent); },
@@ -55,7 +64,11 @@ class ValueWidget : public TrackedWidget
         });
 
     initRequiredLvObj(
-        label, [](lv_obj_t* parent) { return etx_label_create(parent); },
+        label,
+        [&](lv_obj_t* parent) {
+          contentBox.with([&](lv_obj_t* obj) { parent = obj; });
+          return etx_label_create(parent);
+        },
         [&](lv_obj_t* obj) {
           lv_obj_add_style(obj, &labelStyle, LV_PART_MAIN);
           etx_txt_color(obj, COLOR_THEME_WARNING_INDEX,
@@ -78,7 +91,10 @@ class ValueWidget : public TrackedWidget
 
     initRequiredLvObj(
         value,
-        [](lv_obj_t* parent) { return etx_label_create(parent, FONT_L_INDEX); },
+        [&](lv_obj_t* parent) {
+          contentBox.with([&](lv_obj_t* obj) { parent = obj; });
+          return etx_label_create(parent, FONT_L_INDEX);
+        },
         [&](lv_obj_t* obj) {
           lv_obj_add_style(obj, &valueStyle, LV_PART_MAIN);
           etx_txt_color(obj, COLOR_THEME_WARNING_INDEX,
@@ -88,12 +104,9 @@ class ValueWidget : public TrackedWidget
           lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
           lv_label_set_text(obj, "");
         });
-
-    update();
-    foreground();
   }
 
-  uint32_t refreshKey() override
+  uint32_t contentRefreshKey() override
   {
     auto widgetData = getPersistentData();
     mixsrc_t field = widgetData->options[0].value.unsignedValue;
@@ -112,7 +125,7 @@ class ValueWidget : public TrackedWidget
     return key.value();
   }
 
-  void refresh() override
+  void refreshContent() override
   {
     bool changed = false;
 
@@ -142,10 +155,12 @@ class ValueWidget : public TrackedWidget
     if (changed) {
       // Set color to option value
       label.with([](lv_obj_t* obj) {
-        lv_obj_clear_state(obj, ETX_STATE_TIMER_ELAPSED | ETX_STATE_TELEM_STALE);
+        lv_obj_clear_state(obj,
+                           ETX_STATE_TIMER_ELAPSED | ETX_STATE_TELEM_STALE);
       });
       value.with([](lv_obj_t* obj) {
-        lv_obj_clear_state(obj, ETX_STATE_TIMER_ELAPSED | ETX_STATE_TELEM_STALE);
+        lv_obj_clear_state(obj,
+                           ETX_STATE_TIMER_ELAPSED | ETX_STATE_TELEM_STALE);
       });
 
       // Check for disabled or warning color states
@@ -164,10 +179,12 @@ class ValueWidget : public TrackedWidget
             telemetryItems[(field - MIXSRC_FIRST_TELEM) / 3];
         if (!telemetryItem.isAvailable() || telemetryItem.isOld()) {
           // Set disabled color
-          label.with(
-              [](lv_obj_t* obj) { lv_obj_add_state(obj, ETX_STATE_TELEM_STALE); });
-          value.with(
-              [](lv_obj_t* obj) { lv_obj_add_state(obj, ETX_STATE_TELEM_STALE); });
+          label.with([](lv_obj_t* obj) {
+            lv_obj_add_state(obj, ETX_STATE_TELEM_STALE);
+          });
+          value.with([](lv_obj_t* obj) {
+            lv_obj_add_state(obj, ETX_STATE_TELEM_STALE);
+          });
         }
       }
 
@@ -186,17 +203,17 @@ class ValueWidget : public TrackedWidget
       } else if (field >= MIXSRC_FIRST_TIMER && field <= MIXSRC_LAST_TIMER) {
         TimerOptions timerOptions;
         timerOptions.options = SHOW_TIMER;
-        valueTxt = getTimerString(abs(getTimerStateValue(field - MIXSRC_FIRST_TIMER)), timerOptions);
+        valueTxt = getTimerString(
+            abs(getTimerStateValue(field - MIXSRC_FIRST_TIMER)), timerOptions);
       } else if (field >= MIXSRC_FIRST_TELEM) {
         std::string getSensorCustomValue(uint8_t sensor, int32_t value,
                                          LcdFlags flags);
         valueTxt = getSensorCustomValue((field - MIXSRC_FIRST_TELEM) / 3,
                                         getValue(field), valueFlags);
 #if defined(LUA_INPUTS)
-      }
-      else if (field >= MIXSRC_FIRST_LUA && field <= MIXSRC_LAST_LUA) {
-        valueTxt =
-            getSourceCustomValueString(field, calcRESXto1000(getValue(field)), valueFlags | PREC1);
+      } else if (field >= MIXSRC_FIRST_LUA && field <= MIXSRC_LAST_LUA) {
+        valueTxt = getSourceCustomValueString(
+            field, calcRESXto1000(getValue(field)), valueFlags | PREC1);
 #endif
       } else {
         valueTxt =
@@ -221,15 +238,15 @@ class ValueWidget : public TrackedWidget
   RequiredLvObj labelShadow;
   RequiredLvObj value;
   RequiredLvObj valueShadow;
+  RequiredLvObj contentBox;
   LcdFlags valueFlags = 0;
 
-  static LAYOUT_VAL_SCALED(VAL_Y1, 14)
-  static LAYOUT_VAL_SCALED(VAL_Y2, 18)
-  static LAYOUT_VAL_SCALED(COMPACT_VAL_Y, 14)
-  static LAYOUT_VAL_SCALED(H_CHK, 50)
-  static LAYOUT_VAL_SCALED(W_CHK, 120)
+  static LAYOUT_VAL_SCALED(VAL_Y1, 14) static LAYOUT_VAL_SCALED(VAL_Y2, 18) static LAYOUT_VAL_SCALED(
+      COMPACT_VAL_Y,
+      14) static LAYOUT_VAL_SCALED(H_CHK, 50) static LAYOUT_VAL_SCALED(W_CHK,
+                                                                       120)
 
-  void onUpdate() override
+      void layoutContent(const rect_t& content) override
   {
     auto widgetData = getPersistentData();
 
@@ -237,11 +254,20 @@ class ValueWidget : public TrackedWidget
     mixsrc_t field = widgetData->options[0].value.unsignedValue;
 
     // get color from options[1]
+    bool nativeCard = usesCardChrome();
     label.with([&](lv_obj_t* obj) {
-      etx_txt_color_from_flags(obj, widgetData->options[1].value.unsignedValue);
+      if (nativeCard)
+        lv_obj_set_style_text_color(obj, mutedTextColor(), LV_PART_MAIN);
+      else
+        etx_txt_color_from_flags(obj,
+                                 widgetData->options[1].value.unsignedValue);
     });
     value.with([&](lv_obj_t* obj) {
-      etx_txt_color_from_flags(obj, widgetData->options[1].value.unsignedValue);
+      if (nativeCard)
+        lv_obj_set_style_text_color(obj, primaryTextColor(), LV_PART_MAIN);
+      else
+        etx_txt_color_from_flags(obj,
+                                 widgetData->options[1].value.unsignedValue);
     });
 
     // get label alignment from options[3]
@@ -250,11 +276,58 @@ class ValueWidget : public TrackedWidget
     // get value alignment from options[4]
     LcdFlags valAlign = widgetData->options[4].value.unsignedValue;
 
-    lv_coord_t labelX = 0;
-    lv_coord_t labelY = 0;
-    lv_coord_t valueX = 0;
-    lv_coord_t valueY = VAL_Y1;
     bool compact = isCompactTopBarWidget();
+    bool shortCard = !compact && content.h < H_CHK;
+
+    if (usesCardChrome()) {
+      labelShadow.with([&](lv_obj_t* obj) { setObjVisible(obj, false); });
+      valueShadow.with([&](lv_obj_t* obj) { setObjVisible(obj, false); });
+      char* labelTxt = getSourceString(field);
+      label.with([&](lv_obj_t* obj) {
+        lv_label_set_text(obj, labelTxt);
+        lv_obj_clear_state(obj, ETX_STATE_LARGE_FONT);
+      });
+      value.with([&](lv_obj_t* obj) {
+        lv_obj_clear_state(obj, ETX_STATE_LARGE_FONT);
+      });
+
+      coord_t minLabelH = getFontHeight(LcdFlags(cardTitleFont(content)) << 8u);
+      bool showLabel = content.w >= 36 && content.h >= minLabelH * 2;
+      label.with([&](lv_obj_t* obj) { setObjVisible(obj, showLabel); });
+      contentBox.with([&](lv_obj_t* obj) {
+        layoutFlexBox(
+            obj, content, showLabel ? LV_FLEX_FLOW_COLUMN : LV_FLEX_FLOW_ROW,
+            cardGap(content), LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+      });
+      if (showLabel)
+        contentBox.with([&](lv_obj_t* row) {
+          label.with([&](lv_obj_t* title) {
+            value.with([&](lv_obj_t* val) {
+              layoutCardStack(row, title, val, content);
+            });
+          });
+        });
+      else
+        value.with([&](lv_obj_t* obj) {
+          etx_font(obj, cardStackValueFont(content));
+          lv_obj_set_style_text_color(obj, primaryTextColor(), LV_PART_MAIN);
+          lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+          setFlexChild(obj, content.w, content.h, 1);
+        });
+
+      lastValue = -10000;
+      invalidateNativeRefresh();
+      return;
+    }
+
+    lv_coord_t labelX = content.x;
+    lv_coord_t labelY = content.y;
+    lv_coord_t valueX = content.x;
+    lv_coord_t valueY = content.y;
+    lv_coord_t labelW = content.w;
+    lv_coord_t valueW = content.w;
+    lv_coord_t labelH = getFontHeight(LcdFlags(FONT_XXS_INDEX) << 8u);
+    lv_coord_t valueH = getFontHeight(LcdFlags(FONT_L_INDEX) << 8u);
 
     label.with([](lv_obj_t* obj) { etx_font(obj, FONT_STD_INDEX); });
     labelShadow.with([](lv_obj_t* obj) { etx_font(obj, FONT_STD_INDEX); });
@@ -271,47 +344,76 @@ class ValueWidget : public TrackedWidget
     if (compact) {
       lblAlign = ALIGN_LEFT;
       valAlign = ALIGN_LEFT;
-      labelX = PAD_TINY;
-      labelY = 0;
-      valueX = PAD_TINY;
-      valueY = COMPACT_VAL_Y;
+      labelX = content.x;
+      labelY = content.y;
+      valueX = content.x;
+      valueY = content.y + COMPACT_VAL_Y;
       label.with([](lv_obj_t* obj) { etx_font(obj, FONT_XXS_INDEX); });
       labelShadow.with([](lv_obj_t* obj) { etx_font(obj, FONT_XXS_INDEX); });
       value.with([](lv_obj_t* obj) { etx_font(obj, FONT_BOLD_INDEX); });
       valueShadow.with([](lv_obj_t* obj) { etx_font(obj, FONT_BOLD_INDEX); });
-    } else if (height() < H_CHK) {
-      if (width() >= W_CHK) {
-        lblAlign = ALIGN_LEFT;
-        valAlign = ALIGN_RIGHT;
-        labelX = PAD_SMALL;
-        labelY = PAD_TINY;
-        valueX = -PAD_SMALL;
-        valueY = -PAD_TINY;
+      labelH = getFontHeight(LcdFlags(FONT_XXS_INDEX) << 8u);
+      valueH = getFontHeight(LcdFlags(FONT_BOLD_INDEX) << 8u);
+    } else if (shortCard) {
+      bool showLabel = content.w >= W_CHK;
+      char* labelTxt = getSourceString(field);
+      label.with([&](lv_obj_t* obj) { lv_label_set_text(obj, labelTxt); });
+      lblAlign = ALIGN_LEFT;
+      valAlign = showLabel ? ALIGN_RIGHT : ALIGN_CENTER;
+      label.with([&](lv_obj_t* obj) { setObjVisible(obj, showLabel); });
+      if (showLabel) {
+        label.with([&](lv_obj_t* obj) {
+          layoutInlineMetric(obj, nullptr, content, content.w / 3,
+                             FONT_STD_INDEX);
+        });
+        value.with([&](lv_obj_t* obj) {
+          layoutInlineMetric(nullptr, obj, content, content.w / 3,
+                             FONT_STD_INDEX);
+        });
+        lastValue = -10000;
+        invalidateNativeRefresh();
+        return;
       }
+      value.with([&](lv_obj_t* obj) {
+        layoutText(obj, content, FONT_STD_INDEX, primaryTextColor(),
+                   LV_TEXT_ALIGN_CENTER);
+      });
+      lastValue = -10000;
+      invalidateNativeRefresh();
+      return;
     } else {
-      labelX = (lblAlign == ALIGN_LEFT)     ? PAD_SMALL
-               : (lblAlign == ALIGN_CENTER) ? -PAD_THREE
-                                            : -PAD_SMALL;
-      labelY = 2;
-      valueX = (valAlign == ALIGN_LEFT)     ? PAD_SMALL
-               : (valAlign == ALIGN_CENTER) ? 1
-                                            : -PAD_SMALL;
-      valueY = VAL_Y2;
-      if (field >= MIXSRC_FIRST_TELEM) {
+      labelX = content.x;
+      labelY = content.y;
+      valueX = content.x;
+      valueY = content.y + labelH + PAD_SMALL;
+      valueH = content.h > labelH + PAD_SMALL ? content.h - labelH - PAD_SMALL
+                                              : content.h;
+      FontIndex valueFont = content.h >= 70 ? FONT_L_INDEX : FONT_BOLD_INDEX;
+      value.with([&](lv_obj_t* obj) { etx_font(obj, valueFont); });
+      valueShadow.with([&](lv_obj_t* obj) { etx_font(obj, valueFont); });
+      valueH = getFontHeight(LcdFlags(valueFont) << 8u);
+      valueY = content.y + labelH + PAD_SMALL +
+               ((content.h - labelH - PAD_SMALL - valueH) > 0
+                    ? (content.h - labelH - PAD_SMALL - valueH) / 2
+                    : 0);
+      if (!nativeCard && field >= MIXSRC_FIRST_TELEM) {
         int8_t sensor = 1 + (field - MIXSRC_FIRST_TELEM) / 3;
-        if (!isGPSSensor(sensor) && !isSensorUnit(sensor, UNIT_DATETIME) && !isSensorUnit(sensor, UNIT_TEXT)) {
+        if (!isGPSSensor(sensor) && !isSensorUnit(sensor, UNIT_DATETIME) &&
+            !isSensorUnit(sensor, UNIT_TEXT)) {
           // Set font to XL
-          value.with(
-              [](lv_obj_t* obj) { lv_obj_add_state(obj, ETX_STATE_LARGE_FONT); });
-          valueShadow.with(
-              [](lv_obj_t* obj) { lv_obj_add_state(obj, ETX_STATE_LARGE_FONT); });
+          value.with([](lv_obj_t* obj) {
+            lv_obj_add_state(obj, ETX_STATE_LARGE_FONT);
+          });
+          valueShadow.with([](lv_obj_t* obj) {
+            lv_obj_add_state(obj, ETX_STATE_LARGE_FONT);
+          });
         }
       }
 #if defined(INTERNAL_GPS)
       else if (field == MIXSRC_TX_GPS) {
       }
 #endif
-      else {
+      else if (!nativeCard) {
         // Set font to XL
         value.with(
             [](lv_obj_t* obj) { lv_obj_add_state(obj, ETX_STATE_LARGE_FONT); });
@@ -338,29 +440,38 @@ class ValueWidget : public TrackedWidget
     // Set label and value positions.
     labelShadow.with([&](lv_obj_t* obj) {
       lv_obj_set_pos(obj, labelX + 1, labelY + 1);
+      lv_obj_set_size(obj, labelW, labelH);
     });
-    label.with([&](lv_obj_t* obj) { lv_obj_set_pos(obj, labelX, labelY); });
+    label.with([&](lv_obj_t* obj) {
+      lv_obj_set_pos(obj, labelX, labelY);
+      lv_obj_set_size(obj, labelW, labelH);
+      if (!shortCard) setObjVisible(obj, true);
+    });
     valueShadow.with([&](lv_obj_t* obj) {
       lv_obj_set_pos(obj, valueX + 1, valueY + 1);
+      lv_obj_set_size(obj, valueW, valueH);
     });
-    value.with([&](lv_obj_t* obj) { lv_obj_set_pos(obj, valueX, valueY); });
+    value.with([&](lv_obj_t* obj) {
+      lv_obj_set_pos(obj, valueX, valueY);
+      lv_obj_set_size(obj, valueW, valueH);
+    });
 
     // Show / hide shadow
     labelShadow.with([&](lv_obj_t* obj) {
-      if (widgetData->options[2].value.boolValue)
+      if (!usesCardChrome() && widgetData->options[2].value.boolValue)
         lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
       else
         lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
     });
     valueShadow.with([&](lv_obj_t* obj) {
-      if (widgetData->options[2].value.boolValue)
+      if (!usesCardChrome() && widgetData->options[2].value.boolValue)
         lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
       else
         lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
     });
 
     lastValue = -10000;
-    requireRefresh();
+    invalidateNativeRefresh();
   }
 };
 

@@ -12,7 +12,7 @@
 #include "telemetry/battery_monitor.h"
 #include "widget.h"
 
-class BatteryMonitorWidget : public TrackedWidget
+class BatteryMonitorWidget : public NativeWidget
 {
   struct BmsData {
     char pack[32];
@@ -32,35 +32,32 @@ class BatteryMonitorWidget : public TrackedWidget
  public:
   BatteryMonitorWidget(const WidgetFactory* factory, Window* parent,
                        const rect_t& rect, WidgetLocation location) :
-      TrackedWidget(factory, parent, rect, location, LoadMode::Delayed)
+      NativeWidget(factory, parent, rect, location)
   {
   }
 
-  void delayedInit() override
+  void createContent(lv_obj_t* parent) override
   {
+    (void)parent;
+
     lv_style_init(&trackStyle);
-    lv_style_set_radius(&trackStyle, LV_RADIUS_CIRCLE);
+    lv_style_set_radius(&trackStyle, PILL_RADIUS);
 
     lv_style_init(&fillStyle);
-    lv_style_set_radius(&fillStyle, LV_RADIUS_CIRCLE);
+    lv_style_set_radius(&fillStyle, PILL_RADIUS);
 
     initRequiredLvObj(
-        card,
+        compactBox,
         [](lv_obj_t* parent) {
-          auto obj = lv_obj_create(parent);
-          if (obj) {
-            lv_obj_remove_style_all(obj);
-            lv_obj_clear_flag(obj,
-                              LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
-            lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_PART_MAIN);
-            lv_obj_set_style_bg_color(obj, lv_color_make(248, 251, 255),
-                                      LV_PART_MAIN);
-            lv_obj_set_style_border_width(obj, 1, LV_PART_MAIN);
-            lv_obj_set_style_border_color(obj, lv_color_make(182, 202, 219),
-                                          LV_PART_MAIN);
-            lv_obj_set_style_radius(obj, 18, LV_PART_MAIN);
-          }
-          return obj;
+          return createFlexBox(parent, LV_FLEX_FLOW_COLUMN);
+        },
+        [](lv_obj_t* obj) { lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN); });
+
+    initRequiredLvObj(
+        compactHeader,
+        [&](lv_obj_t* parent) {
+          compactBox.with([&](lv_obj_t* obj) { parent = obj; });
+          return createFlexBox(parent, LV_FLEX_FLOW_ROW);
         },
         [](lv_obj_t*) {});
 
@@ -73,9 +70,8 @@ class BatteryMonitorWidget : public TrackedWidget
             lv_obj_clear_flag(obj,
                               LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
             lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_PART_MAIN);
-            lv_obj_set_style_bg_color(obj, lv_color_make(226, 238, 247),
-                                      LV_PART_MAIN);
-            lv_obj_set_style_radius(obj, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+            lv_obj_set_style_bg_color(obj, pillColor(), LV_PART_MAIN);
+            lv_obj_set_style_radius(obj, PILL_RADIUS, LV_PART_MAIN);
           }
           return obj;
         },
@@ -120,10 +116,9 @@ class BatteryMonitorWidget : public TrackedWidget
             lv_obj_clear_flag(obj,
                               LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
             lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_PART_MAIN);
-            lv_obj_set_style_bg_color(obj, lv_color_make(215, 228, 238),
-                                      LV_PART_MAIN);
+            lv_obj_set_style_bg_color(obj, trackColor(), LV_PART_MAIN);
             lv_obj_set_style_border_width(obj, 0, LV_PART_MAIN);
-            lv_obj_set_style_radius(obj, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+            lv_obj_set_style_radius(obj, PILL_RADIUS, LV_PART_MAIN);
           }
           return obj;
         },
@@ -138,7 +133,7 @@ class BatteryMonitorWidget : public TrackedWidget
             lv_obj_clear_flag(obj,
                               LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
             lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_PART_MAIN);
-            lv_obj_set_style_radius(obj, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+            lv_obj_set_style_radius(obj, PILL_RADIUS, LV_PART_MAIN);
           }
           return obj;
         },
@@ -177,9 +172,8 @@ class BatteryMonitorWidget : public TrackedWidget
             lv_obj_clear_flag(obj,
                               LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
             lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_PART_MAIN);
-            lv_obj_set_style_bg_color(obj, lv_color_make(226, 238, 247),
-                                      LV_PART_MAIN);
-            lv_obj_set_style_radius(obj, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+            lv_obj_set_style_bg_color(obj, pillColor(), LV_PART_MAIN);
+            lv_obj_set_style_radius(obj, PILL_RADIUS, LV_PART_MAIN);
           }
           return obj;
         },
@@ -196,8 +190,6 @@ class BatteryMonitorWidget : public TrackedWidget
           lv_obj_set_style_text_color(obj, lv_color_make(24, 57, 84),
                                       LV_PART_MAIN);
         });
-
-    update();
   }
 
   static const WidgetOption options[];
@@ -205,7 +197,6 @@ class BatteryMonitorWidget : public TrackedWidget
  protected:
   lv_style_t trackStyle;
   lv_style_t fillStyle;
-  RequiredLvObj card;
   RequiredLvObj headerPill;
   RequiredLvObj packLabel;
   RequiredLvObj percentLabel;
@@ -216,6 +207,8 @@ class BatteryMonitorWidget : public TrackedWidget
   RequiredLvObj deltaLabel;
   RequiredLvObj statusPill;
   RequiredLvObj statusLabel;
+  RequiredLvObj compactBox;
+  RequiredLvObj compactHeader;
 
   uint8_t lastRemainingPct = 255;
   uint8_t lastWarningLevel = 255;
@@ -247,14 +240,7 @@ class BatteryMonitorWidget : public TrackedWidget
     snprintf(buf, len, "%d.%02u%s", cv / 100, (unsigned)(cv % 100), suffix);
   }
 
-  void setVis(lv_obj_t* obj, bool vis)
-  {
-    if (!obj) return;
-    if (vis)
-      lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
-    else
-      lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
-  }
+  void setVis(lv_obj_t* obj, bool vis) { setObjVisible(obj, vis); }
 
   void setObjRect(lv_obj_t* obj, coord_t x, coord_t y, coord_t w, coord_t h)
   {
@@ -492,7 +478,7 @@ class BatteryMonitorWidget : public TrackedWidget
     }
   }
 
-  uint32_t refreshKey() override
+  uint32_t contentRefreshKey() override
   {
     WidgetRefreshKey key;
     key.add((uint32_t)flightBatterySessionState(0));
@@ -509,26 +495,31 @@ class BatteryMonitorWidget : public TrackedWidget
     return key.value();
   }
 
-  void onUpdate() override
+  void layoutContent(const rect_t& content) override
   {
     const bool compact = isCompactTopBarWidget();
-    const coord_t h = height();
-    const coord_t w = width();
+    const coord_t h = compact ? height() : content.h;
+    const coord_t w = compact ? width() : content.w;
+    const coord_t ox = compact ? 0 : content.x;
+    const coord_t oy = compact ? 0 : content.y;
 
-    // Card visibility and sizing
-    card.with([&](lv_obj_t* obj) { setVis(obj, !compact); });
+    auto moveToRoot = [&](auto& handle) {
+      handle.with([&](lv_obj_t* obj) {
+        withLive(
+            [&](LiveWindow& live) { lv_obj_set_parent(obj, live.lvobj()); });
+      });
+    };
+
     headerPill.with([&](lv_obj_t* obj) { setVis(obj, !compact); });
     statusPill.with([&](lv_obj_t* obj) { setVis(obj, !compact); });
-    if (!compact) {
-      card.with([&](lv_obj_t* obj) {
-        lv_obj_set_pos(obj, 0, 0);
-        lv_obj_set_size(obj, w, h);
-      });
-    }
 
     if (compact) {
       // Topbar compact: bar + percent inside
       percentInMainRow = false;
+      compactBox.with([&](lv_obj_t* obj) { setVis(obj, false); });
+      moveToRoot(track);
+      moveToRoot(fill);
+      moveToRoot(percentLabel);
       headerPill.with([&](lv_obj_t* obj) { setVis(obj, false); });
       packLabel.with([&](lv_obj_t* obj) { setVis(obj, false); });
       cellVoltageLabel.with([&](lv_obj_t* obj) { setVis(obj, false); });
@@ -560,15 +551,112 @@ class BatteryMonitorWidget : public TrackedWidget
     // -- Non-compact layout --
 
     percentInMainRow = true;
-    const coord_t pad = PAD_MEDIUM;
-    const coord_t cx = pad;
-    const coord_t cy = pad;
-    const coord_t cw = (w > 2 * pad) ? (w - 2 * pad) : w;
-    const coord_t ch = (h > 2 * pad) ? (h - 2 * pad) : h;
+    const coord_t cx = ox;
+    const coord_t cy = oy;
+    const coord_t cw = w;
+    const coord_t ch = h;
+
+    if (usesCardChrome() && h < 58) {
+      headerPill.with([&](lv_obj_t* obj) { setVis(obj, false); });
+      statusPill.with([&](lv_obj_t* obj) { setVis(obj, false); });
+      statusLabel.with([&](lv_obj_t* obj) { setVis(obj, false); });
+      packLabel.with([&](lv_obj_t* obj) { setVis(obj, true); });
+      percentLabel.with([&](lv_obj_t* obj) { setVis(obj, true); });
+      const bool showShortMetrics = cw >= 110 && h >= 40;
+      const bool showShortVoltage = showShortMetrics && cw >= 170;
+      cellVoltageLabel.with(
+          [&](lv_obj_t* obj) { setVis(obj, showShortVoltage); });
+      consumedLabel.with([&](lv_obj_t* obj) { setVis(obj, showShortMetrics); });
+      deltaLabel.with([&](lv_obj_t* obj) { setVis(obj, showShortMetrics); });
+
+      compactBox.with([&](lv_obj_t* obj) { setVis(obj, false); });
+      moveToRoot(packLabel);
+      moveToRoot(percentLabel);
+      moveToRoot(track);
+      moveToRoot(cellVoltageLabel);
+      moveToRoot(consumedLabel);
+      moveToRoot(deltaLabel);
+
+      FontIndex smallFont = FONT_XXS_INDEX;
+      coord_t headerH = getFontHeight(LcdFlags(smallFont) << 8u);
+      coord_t metricH = showShortMetrics ? headerH : 0;
+      coord_t gap = cardGap(content);
+      coord_t metricY = cy + ch - metricH;
+      coord_t barY = cy + headerH + gap;
+      coord_t barBottom = showShortMetrics ? metricY - gap : cy + ch;
+      coord_t barH = barBottom > barY ? barBottom - barY : cardBarHeight(content);
+      if (barH < cardBarHeight(content)) barH = cardBarHeight(content);
+
+      coord_t pctW = 54;
+      if (pctW > cw / 2) pctW = cw / 2;
+      packLabel.with([&](lv_obj_t* obj) {
+        etx_font(obj, smallFont);
+        lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+        setObjRect(obj, cx, cy, cw - pctW, headerH);
+      });
+      percentLabel.with([&](lv_obj_t* obj) {
+        etx_font(obj, smallFont);
+        lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+        setObjRect(obj, cx + cw - pctW, cy, pctW, headerH);
+      });
+      track.with([&](lv_obj_t* obj) {
+        setObjRect(obj, cx, barY, cw, barH);
+      });
+      fill.with([&](lv_obj_t* obj) {
+        track.with([&](lv_obj_t* t) { lv_obj_set_parent(obj, t); });
+        lv_obj_set_pos(obj, 0, 0);
+        lv_obj_set_size(obj, cw, barH);
+      });
+      if (showShortMetrics) {
+        if (showShortVoltage) {
+          coord_t usedW = cw / 3;
+          coord_t deltaW = cw / 3;
+          coord_t voltageW = cw - usedW - deltaW;
+          cellVoltageLabel.with([&](lv_obj_t* obj) {
+            etx_font(obj, smallFont);
+            lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+            setObjRect(obj, cx, metricY, voltageW, metricH);
+          });
+          consumedLabel.with([&](lv_obj_t* obj) {
+            etx_font(obj, smallFont);
+            lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER,
+                                        LV_PART_MAIN);
+            setObjRect(obj, cx + voltageW, metricY, usedW, metricH);
+          });
+          deltaLabel.with([&](lv_obj_t* obj) {
+            etx_font(obj, smallFont);
+            lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_RIGHT,
+                                        LV_PART_MAIN);
+            setObjRect(obj, cx + voltageW + usedW, metricY, deltaW, metricH);
+          });
+        } else {
+          coord_t halfW = cw / 2;
+          consumedLabel.with([&](lv_obj_t* obj) {
+            etx_font(obj, smallFont);
+            lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+            setObjRect(obj, cx, metricY, halfW, metricH);
+          });
+          deltaLabel.with([&](lv_obj_t* obj) {
+            etx_font(obj, smallFont);
+            lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_RIGHT,
+                                        LV_PART_MAIN);
+            setObjRect(obj, cx + halfW, metricY, cw - halfW, metricH);
+          });
+        }
+      }
+      lastRemainingPct = 255;
+      return;
+    }
+
+    compactBox.with([&](lv_obj_t* obj) { setVis(obj, false); });
+    moveToRoot(packLabel);
+    moveToRoot(percentLabel);
+    moveToRoot(track);
+    moveToRoot(fill);
 
     // Determine what to show. The fuel gauge is the primary object; labels
     // only stay if they help the pilot make a quick pack decision.
-    bool showPack = (h >= 46);
+    bool showPack = (h >= 38);
     bool showVoltage = (h >= 76);
     bool showMetrics = (h >= 76);
     bool showThreeMetrics = showMetrics && showVoltage && (cw >= 150);
@@ -590,8 +678,8 @@ class BatteryMonitorWidget : public TrackedWidget
       lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     });
 
-    coord_t headerH = showPack ? 18 : 0;
-    coord_t headerGap = showPack ? 6 : 0;
+    coord_t headerH = showPack ? (h < 58 ? 14 : 18) : 0;
+    coord_t headerGap = showPack ? (h < 58 ? 3 : 6) : 0;
     coord_t metricH = showMetrics ? 16 : 0;
     coord_t metricGap = showMetrics ? (h >= 108 ? 8 : 6) : 0;
     coord_t secondaryH = showSecondaryVoltage ? 15 : 0;
@@ -605,10 +693,11 @@ class BatteryMonitorWidget : public TrackedWidget
     if (!showMetrics) fuelBottom = cy + ch;
 
     coord_t fuelSpace = fuelBottom - fuelTop;
-    if (fuelSpace < 24) fuelSpace = 24;
+    coord_t minBarH = h < 58 ? 14 : 24;
+    if (fuelSpace < minBarH) fuelSpace = minBarH;
     coord_t barH = fuelSpace / 2;
-    if (barH < 24) barH = 24;
-    if (barH > 54) barH = 54;
+    if (barH < minBarH) barH = minBarH;
+    if (barH > (h < 58 ? 24 : 54)) barH = (h < 58 ? 24 : 54);
     if (barH > fuelSpace) barH = fuelSpace;
     coord_t barY = fuelTop + (fuelSpace - barH) / 2;
 
@@ -641,7 +730,9 @@ class BatteryMonitorWidget : public TrackedWidget
     }
 
     // Hero fuel gauge: the bar conveys remaining energy, percent annotates it.
-    FontIndex pctFont = (barH >= 36) ? FONT_L_INDEX : FONT_BOLD_INDEX;
+    FontIndex pctFont = (barH >= 36)
+                            ? FONT_L_INDEX
+                            : (barH >= 18 ? FONT_BOLD_INDEX : FONT_STD_INDEX);
     coord_t pctFh = getFontHeight(LcdFlags(pctFont) << 8u);
     coord_t pctY = barY + (barH - pctFh) / 2;
 
@@ -711,7 +802,7 @@ class BatteryMonitorWidget : public TrackedWidget
     lastRemainingPct = 255;
   }
 
-  void refresh() override
+  void refreshContent() override
   {
     BmsData d;
     collectData(d);
@@ -744,7 +835,10 @@ class BatteryMonitorWidget : public TrackedWidget
     snprintf(pctBuf, sizeof(pctBuf), "%u%%", d.remainingPct);
     percentLabel.with([&](lv_obj_t* obj) {
       lv_label_set_text(obj, pctBuf);
-      etx_txt_color(obj, COLOR_BLACK_INDEX);
+      if (usesCardChrome())
+        lv_obj_set_style_text_color(obj, primaryTextColor(), LV_PART_MAIN);
+      else
+        etx_txt_color(obj, COLOR_BLACK_INDEX);
     });
 
     statusPill.with([&](lv_obj_t* obj) {
