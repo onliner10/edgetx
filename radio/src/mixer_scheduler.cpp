@@ -112,6 +112,8 @@ void mixerSchedulerISRTrigger()
 {
   BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
+  mixerTaskSetRunPending();
+
   /* At this point xTaskToNotify should not be NULL as
      a transmission was in progress. */
   configASSERT( mixerTaskId._rtos_handle != NULL );

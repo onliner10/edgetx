@@ -54,6 +54,7 @@ static mutex_handle_t mixerMutex;
 // mixerTaskStart() has been called.
 static std::atomic<bool> _mixer_started = false;
 static std::atomic<bool> _mixer_running = false;
+static std::atomic<bool> _mixer_run_pending = false;
 
 void mixerTaskLock()
 {
@@ -64,6 +65,21 @@ void mixerTaskLock()
 bool mixerTaskTryLock()
 {
   return mutex_trylock(&mixerMutex);
+}
+
+void mixerTaskSetRunPending()
+{
+  _mixer_run_pending.store(true, std::memory_order_release);
+}
+
+void mixerTaskClearRunPending()
+{
+  _mixer_run_pending.store(false, std::memory_order_release);
+}
+
+bool mixerTaskRunPending()
+{
+  return _mixer_run_pending.load(std::memory_order_acquire);
 }
 
 void mixerTaskUnlock()
@@ -171,6 +187,7 @@ void mixerTask()
     // Emergency power OFF: in case the UI is not functional anymore
     // or maybe locked, this will effectively shutdown and cut power.
     if (isForcePowerOffRequested()) {
+      mixerTaskClearRunPending();
       boardOff();
     }
 #endif
@@ -181,6 +198,7 @@ void mixerTask()
 
       DEBUG_TIMER_START(debugTimerMixer);
       mixerTaskLock();
+      mixerTaskClearRunPending();
 
       doMixerCalculations();
       pulsesSendChannels();
@@ -204,6 +222,9 @@ void mixerTask()
       WDG_RESET();
 
       updateMaxMixerDuration(timersGetUsTick() - t0);
+    }
+    else {
+      mixerTaskClearRunPending();
     }
   }
 }

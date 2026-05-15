@@ -71,6 +71,10 @@ void mixerTaskUnlock();
 // returns true if the lock could be acquired
 bool mixerTaskTryLock();
 
+void mixerTaskSetRunPending();
+void mixerTaskClearRunPending();
+bool mixerTaskRunPending();
+
 class MixerTaskLockGuard
 {
  public:

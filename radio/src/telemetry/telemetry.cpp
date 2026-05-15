@@ -399,40 +399,53 @@ static AsyncExclusiveFlag _poll_frame_queued[NUM_MODULES];
 static void _poll_frame(void *pvParameter1, uint32_t ulParameter2)
 {
   TelemetryPollingGuard polling;
-  MixerTaskLockGuard mixerLock;
-
   auto drv = (const etx_proto_driver_t*)pvParameter1;
   auto module = (uint8_t)ulParameter2;
   _poll_frame_queued[module].clear();
 
-  auto mod = pulsesGetModuleDriver(module);
-  if (!mod || !mod->drv || !mod->ctx || (drv != mod->drv))
+  if (mixerTaskRunPending()) {
+    // Keep the ISR-triggered frame poll pending, but let the mixer take the
+    // mutex first. Dropping it here can leave telemetry bytes unprocessed.
+    async_call(_poll_frame, &_poll_frame_queued[module], (void*)drv, module);
     return;
-
-  auto ctx = mod->ctx;
-  auto mod_st = (etx_module_state_t*)ctx;
-  auto serial_drv = modulePortGetSerialDrv(mod_st->rx);
-  auto serial_ctx = modulePortGetCtx(mod_st->rx);
-
-  if (!serial_drv || !serial_ctx || !serial_drv->copyRxBuffer)
-    return;
-
-  uint8_t frame[TELEMETRY_RX_PACKET_SIZE];
-
-  int frame_len = serial_drv->copyRxBuffer(serial_ctx, frame, TELEMETRY_RX_PACKET_SIZE);
-  if (frame_len > 0) {
-
-    LOG_TELEMETRY_WRITE_START();
-    for (int i = 0; i < frame_len; i++) {
-      telemetryMirrorSend(frame[i]);
-      LOG_TELEMETRY_WRITE_BYTE(frame[i]);
-    }
-
-    uint8_t* rxBuffer = getTelemetryRxBuffer(module);
-    uint8_t& rxBufferCount = getTelemetryRxBufferCount(module);
-    drv->processFrame(ctx, frame, frame_len, rxBuffer, &rxBufferCount);
   }
 
+  {
+    MixerTaskLockGuard mixerLock;
+    if (!mixerTaskRunPending()) {
+      auto mod = pulsesGetModuleDriver(module);
+      if (!mod || !mod->drv || !mod->ctx || (drv != mod->drv))
+        return;
+
+      auto ctx = mod->ctx;
+      auto mod_st = (etx_module_state_t*)ctx;
+      auto serial_drv = modulePortGetSerialDrv(mod_st->rx);
+      auto serial_ctx = modulePortGetCtx(mod_st->rx);
+
+      if (!serial_drv || !serial_ctx || !serial_drv->copyRxBuffer)
+        return;
+
+      uint8_t frame[TELEMETRY_RX_PACKET_SIZE];
+
+      int frame_len = serial_drv->copyRxBuffer(serial_ctx, frame, TELEMETRY_RX_PACKET_SIZE);
+      if (frame_len > 0) {
+
+        LOG_TELEMETRY_WRITE_START();
+        for (int i = 0; i < frame_len; i++) {
+          telemetryMirrorSend(frame[i]);
+          LOG_TELEMETRY_WRITE_BYTE(frame[i]);
+        }
+
+        uint8_t* rxBuffer = getTelemetryRxBuffer(module);
+        uint8_t& rxBufferCount = getTelemetryRxBufferCount(module);
+        drv->processFrame(ctx, frame, frame_len, rxBuffer, &rxBufferCount);
+      }
+
+      return;
+    }
+  }
+
+  async_call(_poll_frame, &_poll_frame_queued[module], (void*)drv, module);
 }
 
 void telemetryFrameTrigger_ISR(uint8_t module, const etx_proto_driver_t* drv)
@@ -456,19 +469,24 @@ inline bool isBadAntennaDetected()
   return false;
 }
 
-static inline void pollTelemetry(uint8_t module, const etx_proto_driver_t* drv, void* ctx)
+static constexpr uint8_t TELEMETRY_POLL_BYTE_BUDGET = TELEMETRY_RX_PACKET_SIZE;
+
+static inline bool pollTelemetry(uint8_t module, const etx_proto_driver_t* drv,
+                                 void* ctx, uint8_t& byteBudget)
 {
-  if (!drv || !drv->processData) return;
+  if (!drv || !drv->processData || byteBudget == 0) return true;
 
   auto mod_st = (etx_module_state_t*)ctx;
   auto serial_drv = modulePortGetSerialDrv(mod_st->rx);
   auto serial_ctx = modulePortGetCtx(mod_st->rx);
 
   if (!serial_drv  || !serial_ctx || !serial_drv->getByte)
-    return;
+    return true;
 
   uint8_t* rxBuffer = getTelemetryRxBuffer(module);
   uint8_t& rxBufferCount = getTelemetryRxBufferCount(module);
+
+  if (mixerTaskRunPending()) return false;
 
   uint8_t data;
   if (serial_drv->getByte(serial_ctx, &data) > 0) {
@@ -477,8 +495,15 @@ static inline void pollTelemetry(uint8_t module, const etx_proto_driver_t* drv, 
       telemetryMirrorSend(data);
       drv->processData(ctx, data, rxBuffer, &rxBufferCount);
       LOG_TELEMETRY_WRITE_BYTE(data);
+      --byteBudget;
+
+      // processData() is a stream parser backed by rxBuffer/rxBufferCount, so
+      // stopping here preserves any partial packet for the next wakeup.
+      if (byteBudget == 0 || mixerTaskRunPending()) return false;
     } while (serial_drv->getByte(serial_ctx, &data) > 0);
   }
+
+  return true;
 }
 
 void telemetryWakeup()
@@ -489,10 +514,11 @@ void telemetryWakeup()
   {
     TelemetryPollingGuard polling;
     MixerTaskLockGuard mixerLock;
+    uint8_t byteBudget = TELEMETRY_POLL_BYTE_BUDGET;
     for (uint8_t i = 0; i < MAX_MODULES; i++) {
       auto mod = pulsesGetModuleDriver(i);
       if (!mod) continue;
-      pollTelemetry(i, mod->drv, mod->ctx);
+      if (!pollTelemetry(i, mod->drv, mod->ctx, byteBudget)) break;
     }
   }
 
