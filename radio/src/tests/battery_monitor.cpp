@@ -13,6 +13,58 @@ static void setFlightBatteryVoltageSensor(uint8_t index, int32_t centivolts)
   telemetryItems[index].value = centivolts;
   telemetryItems[index].setFresh();
   g_model.batteryMonitors[0].sourceIndex = index + 1;
+  telemetryStreaming = TELEMETRY_TIMEOUT10ms;
+}
+
+static void setFlightBatteryCapacitySensor(uint8_t index, int32_t mah)
+{
+  g_model.telemetrySensors[index].init("Capa", UNIT_MAH, 0);
+  telemetryItems[index].value = mah;
+  telemetryItems[index].setFresh();
+  g_model.batteryMonitors[0].currentIndex = index + 1;
+  telemetryStreaming = TELEMETRY_TIMEOUT10ms;
+}
+
+static void setFlightBatteryTelemetryLost()
+{
+  telemetryStreaming = 0;
+  for (auto& item : telemetryItems) {
+    if (item.isAvailable()) item.setOld();
+  }
+}
+
+static void setupValidManualBatteryMonitor()
+{
+  g_model.batteryMonitors[0].enabled = true;
+  g_model.batteryMonitors[0].batteryType = BATTERY_TYPE_LIPO;
+  g_model.batteryMonitors[0].cellCount = 3;
+  g_model.batteryMonitors[0].capacity = 2200;
+}
+
+static void updateFlightBatterySessionsForSeconds(uint8_t seconds)
+{
+  for (uint8_t i = 0; i < seconds; i++) {
+    updateFlightBatterySessions();
+  }
+}
+
+static bool armModelForBatteryTest()
+{
+  g_model.armingEnabled = true;
+  g_model.armingThrottleChannel = 0;
+  s_mixer_first_run_done = true;
+
+  int sfIdx = switchLookupIdx("SF", 2);
+  int shIdx = switchLookupIdx("SH", 2);
+  if (sfIdx < 0 || shIdx < 0) return false;
+
+  simuSetSwitch(sfIdx, 1);
+  testUpdateArmingState();
+  simuSetSwitch(shIdx, 1);
+  testUpdateArmingState();
+  simuSetSwitch(shIdx, -1);
+  testUpdateArmingState();
+  return isModelArmedState();
 }
 
 class BatteryMonitorPolicyTest : public EdgeTxTest {};
@@ -56,6 +108,8 @@ TEST_F(BatteryMonitorPolicyTest, LipoMatchConstants)
   EXPECT_EQ(435, FLIGHT_BATTERY_LIPO_MATCH_MAX_PER_CELL_CV);
   EXPECT_EQ(2, FLIGHT_BATTERY_PRESENT_DEBOUNCE_SECONDS);
   EXPECT_EQ(3, FLIGHT_BATTERY_NO_BATTERY_DEBOUNCE_SECONDS);
+  EXPECT_EQ(5, FLIGHT_BATTERY_TELEMETRY_LOSS_SWAP_SECONDS);
+  EXPECT_EQ(400, FLIGHT_BATTERY_NEW_PACK_MIN_PER_CELL_CV);
 }
 
 TEST_F(BatteryMonitorPolicyTest, Lipo3SAt1140CvMatches3SNot4S)
@@ -415,6 +469,155 @@ TEST_F(BatteryRuntimeTest, ConfirmationAcceptsValidManual)
   EXPECT_EQ(FlightBatterySessionState::Confirmed, flightBatterySessionState(0));
 }
 
+TEST_F(BatteryRuntimeTest, DisarmedTelemetryLossWaitsForHighVoltageReplug)
+{
+  resetFlightBatteryRuntimeState();
+  setupValidManualBatteryMonitor();
+  g_model.batteryMonitors[0].capAlertEnabled = 1;
+  setFlightBatteryVoltageSensor(0, 1140);
+  setFlightBatteryCapacitySensor(1, 500);
+  flightBatteryRuntimeState[0].state = FlightBatterySessionState::NeedsConfirmation;
+  EXPECT_TRUE(confirmFlightBatteryPack(0, 0));
+
+  flightBatteryRuntimeState[0].consumedSessionMah = 300;
+  flightBatteryRuntimeState[0].consumedLastMah = 800;
+  flightBatteryRuntimeState[0].capacityMask = 0x0f;
+  flightBatteryRuntimeState[0].voltageAlerted = true;
+  setFlightBatteryTelemetryLost();
+
+  updateFlightBatterySessionsForSeconds(
+      FLIGHT_BATTERY_TELEMETRY_LOSS_SWAP_SECONDS);
+  EXPECT_EQ(FlightBatterySessionState::ConfirmedWaitingForVoltage,
+            flightBatterySessionState(0));
+  EXPECT_EQ(500, flightBatteryRuntimeState[0].consumedBaselineMah);
+  EXPECT_EQ(300, flightBatteryRuntimeState[0].consumedSessionMah);
+  EXPECT_EQ(0x0f, flightBatteryRuntimeState[0].capacityMask);
+  EXPECT_TRUE(flightBatteryRuntimeState[0].voltageAlerted);
+
+  setFlightBatteryVoltageSensor(0, 1200);
+  setFlightBatteryCapacitySensor(1, 20);
+  updateFlightBatterySessions();
+  EXPECT_EQ(FlightBatterySessionState::Confirmed, flightBatterySessionState(0));
+  EXPECT_EQ(500, flightBatteryRuntimeState[0].consumedBaselineMah);
+  EXPECT_EQ(300, updateFlightBatterySessionConsumed(0, 20));
+  EXPECT_EQ(0x0f, flightBatteryRuntimeState[0].capacityMask);
+  EXPECT_TRUE(flightBatteryRuntimeState[0].voltageAlerted);
+}
+
+TEST_F(BatteryRuntimeTest, TemporarySensorLossWhileTelemetryStreamsDoesNotResetSession)
+{
+  resetFlightBatteryRuntimeState();
+  setupValidManualBatteryMonitor();
+  setFlightBatteryVoltageSensor(0, 1140);
+  setFlightBatteryCapacitySensor(1, 500);
+  flightBatteryRuntimeState[0].state = FlightBatterySessionState::NeedsConfirmation;
+  EXPECT_TRUE(confirmFlightBatteryPack(0, 0));
+
+  telemetryItems[0].setOld();
+  telemetryStreaming = TELEMETRY_TIMEOUT10ms;
+  updateFlightBatterySessionsForSeconds(
+      FLIGHT_BATTERY_TELEMETRY_LOSS_SWAP_SECONDS + 1);
+
+  EXPECT_EQ(FlightBatterySessionState::ConfirmedWaitingForVoltage,
+            flightBatterySessionState(0));
+  EXPECT_EQ(500, flightBatteryRuntimeState[0].consumedBaselineMah);
+  EXPECT_EQ(0, flightBatteryRuntimeState[0].telemetryLostSeconds);
+
+  setFlightBatteryVoltageSensor(0, 1140);
+  updateFlightBatterySessions();
+  EXPECT_EQ(FlightBatterySessionState::Confirmed, flightBatterySessionState(0));
+}
+
+TEST_F(BatteryRuntimeTest, ArmedTelemetryLossDoesNotResetConfirmedSession)
+{
+  resetFlightBatteryRuntimeState();
+  setupValidManualBatteryMonitor();
+  setFlightBatteryVoltageSensor(0, 1140);
+  setFlightBatteryCapacitySensor(1, 500);
+  flightBatteryRuntimeState[0].state = FlightBatterySessionState::NeedsConfirmation;
+  EXPECT_TRUE(confirmFlightBatteryPack(0, 0));
+  ASSERT_TRUE(armModelForBatteryTest());
+
+  setFlightBatteryTelemetryLost();
+  updateFlightBatterySessionsForSeconds(
+      FLIGHT_BATTERY_TELEMETRY_LOSS_SWAP_SECONDS + 1);
+
+  EXPECT_EQ(FlightBatterySessionState::Confirmed, flightBatterySessionState(0));
+  EXPECT_EQ(500, flightBatteryRuntimeState[0].consumedBaselineMah);
+  EXPECT_EQ(0, flightBatteryRuntimeState[0].telemetryLostSeconds);
+}
+
+TEST_F(BatteryRuntimeTest, HighVoltageReplugAfterTelemetryLossAutoConfirmsNewPack)
+{
+  resetFlightBatteryRuntimeState();
+  g_eeGeneral.batteryPacks[0].active = true;
+  g_eeGeneral.batteryPacks[0].batteryType = BATTERY_TYPE_LIPO;
+  g_eeGeneral.batteryPacks[0].cellCount = 3;
+  g_eeGeneral.batteryPacks[0].capacity = 2200;
+  g_model.batteryMonitors[0].enabled = true;
+  g_model.batteryMonitors[0].compatiblePackMask = 0x01;
+  setFlightBatteryVoltageSensor(0, 1140);
+  setFlightBatteryCapacitySensor(1, 500);
+
+  updateFlightBatterySessionsForSeconds(FLIGHT_BATTERY_PRESENT_DEBOUNCE_SECONDS);
+  EXPECT_EQ(FlightBatterySessionState::Confirmed, flightBatterySessionState(0));
+  EXPECT_EQ(500, flightBatteryRuntimeState[0].consumedBaselineMah);
+
+  setFlightBatteryTelemetryLost();
+  updateFlightBatterySessionsForSeconds(
+      FLIGHT_BATTERY_TELEMETRY_LOSS_SWAP_SECONDS);
+  EXPECT_EQ(FlightBatterySessionState::ConfirmedWaitingForVoltage,
+            flightBatterySessionState(0));
+  EXPECT_EQ(500, flightBatteryRuntimeState[0].consumedBaselineMah);
+
+  setFlightBatteryVoltageSensor(0, 1240);
+  setFlightBatteryCapacitySensor(1, 20);
+  updateFlightBatterySessions();
+
+  EXPECT_EQ(FlightBatterySessionState::Confirmed, flightBatterySessionState(0));
+  EXPECT_EQ(1, g_model.batteryMonitors[0].selectedPackSlot);
+  EXPECT_EQ(20, flightBatteryRuntimeState[0].consumedBaselineMah);
+  EXPECT_EQ(0, flightBatteryRuntimeState[0].consumedSessionMah);
+  EXPECT_EQ(20, flightBatteryRuntimeState[0].consumedLastMah);
+}
+
+TEST_F(BatteryRuntimeTest, FullLowerCellPackReplugDoesNotKeepOldHigherCellSession)
+{
+  resetFlightBatteryRuntimeState();
+  g_eeGeneral.batteryPacks[0].active = true;
+  g_eeGeneral.batteryPacks[0].batteryType = BATTERY_TYPE_LIPO;
+  g_eeGeneral.batteryPacks[0].cellCount = 3;
+  g_eeGeneral.batteryPacks[0].capacity = 2200;
+  g_eeGeneral.batteryPacks[1].active = true;
+  g_eeGeneral.batteryPacks[1].batteryType = BATTERY_TYPE_LIPO;
+  g_eeGeneral.batteryPacks[1].cellCount = 4;
+  g_eeGeneral.batteryPacks[1].capacity = 2200;
+  g_model.batteryMonitors[0].enabled = true;
+  g_model.batteryMonitors[0].compatiblePackMask = 0x03;
+  setFlightBatteryVoltageSensor(0, 1520);
+  setFlightBatteryCapacitySensor(1, 500);
+
+  updateFlightBatterySessionsForSeconds(FLIGHT_BATTERY_PRESENT_DEBOUNCE_SECONDS);
+  EXPECT_EQ(FlightBatterySessionState::Confirmed, flightBatterySessionState(0));
+  EXPECT_EQ(2, g_model.batteryMonitors[0].selectedPackSlot);
+
+  setFlightBatteryTelemetryLost();
+  updateFlightBatterySessionsForSeconds(
+      FLIGHT_BATTERY_TELEMETRY_LOSS_SWAP_SECONDS);
+
+  setFlightBatteryVoltageSensor(0, 1240);
+  setFlightBatteryCapacitySensor(1, 20);
+  updateFlightBatterySessions();
+
+  EXPECT_EQ(FlightBatterySessionState::NeedsConfirmation,
+            flightBatterySessionState(0));
+  EXPECT_EQ(0x03, flightBatteryPromptPackMask(0));
+  EXPECT_EQ(20, flightBatteryRuntimeState[0].consumedBaselineMah);
+  EXPECT_EQ(20, flightBatteryRuntimeState[0].consumedLastMah);
+  EXPECT_EQ(0, flightBatteryRuntimeState[0].consumedSessionMah);
+  EXPECT_EQ(0, updateFlightBatterySessionConsumed(0, 20));
+}
+
 TEST_F(BatteryRuntimeTest, CapacityAlertOnlyFiresAfterConfirmation)
 {
   resetFlightBatteryRuntimeState();
@@ -452,4 +655,59 @@ TEST_F(BatteryRuntimeTest, CapacityAlertWithSensorResetUsesCurrentAsBaseline)
   EXPECT_FALSE(checkFlightBatteryCapacityAlert(0, g_model.batteryMonitors[0], 300));
 
   EXPECT_TRUE(checkFlightBatteryCapacityAlert(0, g_model.batteryMonitors[0], 1930));
+}
+
+TEST_F(BatteryRuntimeTest, CapacityAccountingPreservesSessionAcrossSensorReset)
+{
+  resetFlightBatteryRuntimeState();
+  flightBatteryRuntimeState[0].state = FlightBatterySessionState::Confirmed;
+  flightBatteryRuntimeState[0].consumedBaselineMah = 500;
+  flightBatteryRuntimeState[0].consumedLastMah = 500;
+  g_model.batteryMonitors[0].capacity = 2200;
+  g_model.batteryMonitors[0].capAlertEnabled = 1;
+
+  EXPECT_FALSE(checkFlightBatteryCapacityAlert(0, g_model.batteryMonitors[0], 800));
+  EXPECT_EQ(300, flightBatteryRuntimeState[0].consumedSessionMah);
+
+  EXPECT_FALSE(checkFlightBatteryCapacityAlert(0, g_model.batteryMonitors[0], 20));
+  EXPECT_EQ(300, flightBatteryRuntimeState[0].consumedSessionMah);
+
+  EXPECT_FALSE(checkFlightBatteryCapacityAlert(0, g_model.batteryMonitors[0], 1149));
+  EXPECT_EQ(1429, flightBatteryRuntimeState[0].consumedSessionMah);
+
+  EXPECT_TRUE(checkFlightBatteryCapacityAlert(0, g_model.batteryMonitors[0], 1150));
+  EXPECT_EQ(1430, flightBatteryRuntimeState[0].consumedSessionMah);
+}
+
+TEST_F(BatteryRuntimeTest, CapacityAccountingUpdatesWhenAlertsDisabled)
+{
+  resetFlightBatteryRuntimeState();
+  flightBatteryRuntimeState[0].state = FlightBatterySessionState::Confirmed;
+  flightBatteryRuntimeState[0].consumedBaselineMah = 500;
+  flightBatteryRuntimeState[0].consumedLastMah = 500;
+  g_model.batteryMonitors[0].capacity = 2200;
+  g_model.batteryMonitors[0].capAlertEnabled = 0;
+
+  EXPECT_FALSE(checkFlightBatteryCapacityAlert(0, g_model.batteryMonitors[0], 800));
+  EXPECT_EQ(300, flightBatteryRuntimeState[0].consumedSessionMah);
+
+  EXPECT_FALSE(checkFlightBatteryCapacityAlert(0, g_model.batteryMonitors[0], 20));
+  EXPECT_EQ(300, flightBatteryRuntimeState[0].consumedSessionMah);
+
+  EXPECT_FALSE(checkFlightBatteryCapacityAlert(0, g_model.batteryMonitors[0], 50));
+  EXPECT_EQ(330, flightBatteryRuntimeState[0].consumedSessionMah);
+  EXPECT_EQ(0, flightBatteryRuntimeState[0].capacityMask);
+}
+
+TEST_F(BatteryRuntimeTest, BatteryAlertsIgnoreTelemetryWarningDisable)
+{
+  resetFlightBatteryRuntimeState();
+  setupValidManualBatteryMonitor();
+  g_model.batteryMonitors[0].capAlertEnabled = 1;
+  flightBatteryRuntimeState[0].state = FlightBatterySessionState::Confirmed;
+  setFlightBatteryCapacitySensor(1, 1430);
+  g_model.disableTelemetryWarning = 1;
+
+  EXPECT_TRUE(checkFlightBatteryAlerts());
+  EXPECT_EQ(1, flightBatteryRuntimeState[0].capacityMask & 1);
 }

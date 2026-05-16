@@ -27,6 +27,7 @@ class BatteryMonitorWidget : public NativeWidget
     bool hasVoltage;
     bool hasCellDelta;
     bool hasConsumed;
+    bool hasRemaining;
   };
 
  public:
@@ -253,12 +254,13 @@ class BatteryMonitorWidget : public NativeWidget
 
   void collectData(BmsData& d)
   {
-    d.remainingPct = 100;
+    d.remainingPct = 0;
     d.warningLevel = 0;
     d.deltaLevel = 0;
     d.hasVoltage = false;
     d.hasCellDelta = false;
     d.hasConsumed = false;
+    d.hasRemaining = false;
     d.cellVoltageStr[0] = '\0';
     d.consumedStr[0] = '\0';
     d.deltaStr[0] = '\0';
@@ -316,8 +318,10 @@ class BatteryMonitorWidget : public NativeWidget
         snprintf(d.status, sizeof(d.status), "Needs config");
         break;
       case FlightBatterySessionState::Confirmed:
-      case FlightBatterySessionState::ConfirmedWaitingForVoltage:
         snprintf(d.status, sizeof(d.status), "Confirmed");
+        break;
+      case FlightBatterySessionState::ConfirmedWaitingForVoltage:
+        snprintf(d.status, sizeof(d.status), "Telemetry lost");
         break;
     }
 
@@ -400,12 +404,7 @@ class BatteryMonitorWidget : public NativeWidget
             !curItem.isOld() && curSensor.unit == UNIT_MAH) {
           d.hasConsumed = true;
           int32_t raw = curItem.value;
-
-          int32_t session = raw;
-          if (runtime.consumedBaselineMah > 0 &&
-              raw > runtime.consumedBaselineMah)
-            session = raw - runtime.consumedBaselineMah;
-          if (session < 0) session = 0;
+          int32_t session = flightBatterySessionConsumedFromRaw(runtime, raw);
 
           if (session > 0)
             snprintf(d.consumedStr, sizeof(d.consumedStr), "%ld mAh",
@@ -419,6 +418,7 @@ class BatteryMonitorWidget : public NativeWidget
             if (pct < 0) pct = 0;
           }
           d.remainingPct = (uint8_t)pct;
+          d.hasRemaining = true;
 
           int consumed = 100 - d.remainingPct;
           if (consumed >= 80)
@@ -464,6 +464,7 @@ class BatteryMonitorWidget : public NativeWidget
           if (pct < 0) pct = 0;
           if (pct > 100) pct = 100;
           d.remainingPct = (uint8_t)pct;
+          d.hasRemaining = true;
 
           if (d.remainingPct <= 20)
             d.warningLevel = 2;
@@ -486,11 +487,19 @@ class BatteryMonitorWidget : public NativeWidget
     auto& config = g_model.batteryMonitors[0];
     if (config.currentIndex > 0) {
       int idx = config.currentIndex - 1;
-      if (idx < MAX_TELEMETRY_SENSORS) key.add(telemetryItems[idx].value);
+      if (idx < MAX_TELEMETRY_SENSORS) {
+        key.add(telemetryItems[idx].value)
+            .add(telemetryItems[idx].isAvailable())
+            .add(telemetryItems[idx].isOld());
+      }
     }
     if (config.sourceIndex > 0) {
       int idx = config.sourceIndex - 1;
-      if (idx < MAX_TELEMETRY_SENSORS) key.add(telemetryItems[idx].value);
+      if (idx < MAX_TELEMETRY_SENSORS) {
+        key.add(telemetryItems[idx].value)
+            .add(telemetryItems[idx].isAvailable())
+            .add(telemetryItems[idx].isOld());
+      }
     }
     return key.value();
   }
@@ -832,7 +841,10 @@ class BatteryMonitorWidget : public NativeWidget
 
     // Percent text (always update in case position changed)
     char pctBuf[5];
-    snprintf(pctBuf, sizeof(pctBuf), "%u%%", d.remainingPct);
+    if (d.hasRemaining)
+      snprintf(pctBuf, sizeof(pctBuf), "%u%%", d.remainingPct);
+    else
+      snprintf(pctBuf, sizeof(pctBuf), "--%%");
     percentLabel.with([&](lv_obj_t* obj) {
       lv_label_set_text(obj, pctBuf);
       if (usesCardChrome())
@@ -873,7 +885,9 @@ class BatteryMonitorWidget : public NativeWidget
       coord_t barH = 1;
       track.with([&](lv_obj_t* obj) { barH = lv_obj_get_height(obj); });
 
-      coord_t fillW = (coord_t)((int)tw * d.remainingPct / 100);
+      coord_t fillW = d.hasRemaining
+                          ? (coord_t)((int)tw * d.remainingPct / 100)
+                          : 0;
 
       LcdColorIndex fc;
       if (d.warningLevel == 2)

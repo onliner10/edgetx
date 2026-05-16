@@ -76,7 +76,6 @@ struct telemetry_buffer {
   uint8_t length;
 };
 
-static bool checkFlightBatteryAlerts();
 static void checkFlightBatteryMissingTelemetryAfterArming();
 static bool isValidManualLipoConfig(const BatteryMonitorData& config);
 
@@ -540,9 +539,7 @@ void telemetryWakeup()
     flightBatteryCheckTime = get_tmr10ms() + 100;
     updateFlightBatterySessions();
     checkFlightBatteryMissingTelemetryAfterArming();
-    if (!g_model.disableTelemetryWarning) {
-      checkFlightBatteryAlerts();
-    }
+    checkFlightBatteryAlerts();
   }
 
   static tmr10ms_t alarmsCheckTime = 0;
@@ -954,8 +951,8 @@ static uint8_t firstPackSlotFromMask(uint16_t mask)
 }
 
 static bool confirmedPackMatchesVoltage(const BatteryMonitorData& config,
-                                        const FlightBatteryRuntimeState& runtime,
-                                        uint16_t packVoltageCv)
+                                         const FlightBatteryRuntimeState& runtime,
+                                         uint16_t packVoltageCv)
 {
   if (runtime.confirmedPackSlot > 0) {
     const uint8_t slot = runtime.confirmedPackSlot - 1;
@@ -969,6 +966,44 @@ static bool confirmedPackMatchesVoltage(const BatteryMonitorData& config,
   return isValidManualLipoConfig(config) &&
          flightBatteryPackMatchesLipo(packVoltageCv, config.cellCount,
                                       (BatteryType)config.batteryType);
+}
+
+static bool packVoltageLooksLikeNewFlightBattery(uint16_t packVoltageCv,
+                                                 uint8_t cellCount,
+                                                 BatteryType type)
+{
+  if (cellCount == 0) return false;
+
+  if (!flightBatteryPackMatchesLipo(packVoltageCv, cellCount, type)) {
+    return false;
+  }
+
+  return packVoltageCv >
+         uint16_t(FLIGHT_BATTERY_NEW_PACK_MIN_PER_CELL_CV * cellCount);
+}
+
+static bool replugVoltageLooksLikeNewFlightBattery(
+    const BatteryMonitorData& config, uint16_t packVoltageCv)
+{
+  if (config.compatiblePackMask != 0) {
+    for (uint8_t slot = 0; slot < MAX_BATTERY_PACKS; slot++) {
+      const uint16_t slotBit = uint16_t(1u << slot);
+      if ((config.compatiblePackMask & slotBit) == 0) continue;
+
+      const BatteryPackData& pack = g_eeGeneral.batteryPacks[slot];
+      if (!pack.active) continue;
+
+      if (packVoltageLooksLikeNewFlightBattery(
+              packVoltageCv, pack.cellCount, (BatteryType)pack.batteryType)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  return isValidManualLipoConfig(config) &&
+         packVoltageLooksLikeNewFlightBattery(
+             packVoltageCv, config.cellCount, (BatteryType)config.batteryType);
 }
 
 void resetFlightBatteryRuntimeState()
@@ -1008,9 +1043,29 @@ void invalidateFlightBatteryPackSlot(uint8_t slot)
 
 static void confirmFlightBatteryPackImpl(uint8_t monitor, uint8_t selectedPackSlot);
 
+static void resetFlightBatterySessionToNoBatteryObserved(uint8_t monitor)
+{
+  flightBatteryRuntimeState[monitor] = FlightBatteryRuntimeState();
+  flightBatteryRuntimeState[monitor].state =
+      FlightBatterySessionState::NoBatteryObserved;
+}
+
+static void resetFlightBatterySessionForNewPackReplug(
+    uint8_t monitor, const BatteryMonitorData& config)
+{
+  flightBatteryRuntimeState[monitor] = FlightBatteryRuntimeState();
+
+  int8_t capSensorIdx = findFlightBatteryCapacitySensor(config);
+  if (capSensorIdx >= 0 && isUsableTelemetrySensor(capSensorIdx)) {
+    const int32_t baseline = telemetrySensorValue(capSensorIdx, UNIT_MAH, 0);
+    flightBatteryRuntimeState[monitor].consumedBaselineMah = baseline;
+    flightBatteryRuntimeState[monitor].consumedLastMah = baseline;
+  }
+}
+
 static void classifyPresentFlightBattery(uint8_t monitorIndex,
-                                         const BatteryMonitorData& config,
-                                         uint16_t packVoltageCv)
+                                          const BatteryMonitorData& config,
+                                          uint16_t packVoltageCv)
 {
   FlightBatteryRuntimeState& runtime = flightBatteryRuntimeState[monitorIndex];
 
@@ -1065,6 +1120,7 @@ void updateFlightBatterySessions()
     uint16_t packVoltageCv = 0;
     const bool voltageFresh = readFlightBatteryVoltage(config, packVoltageCv);
     const bool isArmed = isModelArmedState();
+    const bool telemetryLost = !TELEMETRY_STREAMING();
 
     if (currentState == FlightBatterySessionState::Unknown ||
         currentState == FlightBatterySessionState::WaitingForVoltage) {
@@ -1075,11 +1131,11 @@ void updateFlightBatterySessions()
         runtime.presentSeconds = 0;
         runtime.absentSeconds++;
         if (runtime.absentSeconds >= FLIGHT_BATTERY_NO_BATTERY_DEBOUNCE_SECONDS) {
-          runtime = FlightBatteryRuntimeState();
-          runtime.state = FlightBatterySessionState::NoBatteryObserved;
+          resetFlightBatterySessionToNoBatteryObserved(monitorIndex);
         }
       } else {
         runtime.absentSeconds = 0;
+        runtime.telemetryLostSeconds = 0;
         runtime.presentSeconds++;
         if (runtime.presentSeconds >= FLIGHT_BATTERY_PRESENT_DEBOUNCE_SECONDS) {
           classifyPresentFlightBattery(monitorIndex, config, packVoltageCv);
@@ -1090,18 +1146,39 @@ void updateFlightBatterySessions()
       if (!voltageFresh) {
         if (!isArmed) {
           runtime.state = FlightBatterySessionState::ConfirmedWaitingForVoltage;
+          if (telemetryLost) {
+            if (runtime.telemetryLostSeconds <
+                FLIGHT_BATTERY_TELEMETRY_LOSS_SWAP_SECONDS) {
+              runtime.telemetryLostSeconds++;
+            }
+          } else {
+            runtime.telemetryLostSeconds = 0;
+          }
+        } else {
+          runtime.telemetryLostSeconds = 0;
         }
       } else if (packVoltageCv < FLIGHT_BATTERY_NO_BATTERY_MAX_CV) {
         runtime.presentSeconds = 0;
         runtime.absentSeconds++;
         if (runtime.absentSeconds >= FLIGHT_BATTERY_NO_BATTERY_DEBOUNCE_SECONDS && !isArmed) {
-          runtime = FlightBatteryRuntimeState();
-          runtime.state = FlightBatterySessionState::NoBatteryObserved;
+          resetFlightBatterySessionToNoBatteryObserved(monitorIndex);
         }
       } else {
+        const bool possibleBatterySwap =
+            !isArmed && runtime.telemetryLostSeconds >=
+                            FLIGHT_BATTERY_TELEMETRY_LOSS_SWAP_SECONDS;
+        const bool newBatteryAfterReplug =
+            possibleBatterySwap &&
+            replugVoltageLooksLikeNewFlightBattery(config, packVoltageCv);
         runtime.presentSeconds = 0;
         runtime.absentSeconds = 0;
-        if (!isArmed && !confirmedPackMatchesVoltage(config, runtime, packVoltageCv)) {
+        runtime.telemetryLostSeconds = 0;
+        if (newBatteryAfterReplug) {
+          resetFlightBatterySessionForNewPackReplug(monitorIndex, config);
+          classifyPresentFlightBattery(monitorIndex, config, packVoltageCv);
+        } else if (!isArmed &&
+                   !confirmedPackMatchesVoltage(config, runtime,
+                                                packVoltageCv)) {
           runtime.state = FlightBatterySessionState::VoltageMismatch;
         } else {
           runtime.state = FlightBatterySessionState::Confirmed;
@@ -1128,12 +1205,12 @@ void updateFlightBatterySessions()
         runtime.presentSeconds = 0;
         runtime.absentSeconds++;
         if (runtime.absentSeconds >= FLIGHT_BATTERY_NO_BATTERY_DEBOUNCE_SECONDS) {
-          runtime = FlightBatteryRuntimeState();
-          runtime.state = FlightBatterySessionState::NoBatteryObserved;
+          resetFlightBatterySessionToNoBatteryObserved(monitorIndex);
         }
       } else {
         runtime.presentSeconds = 0;
         runtime.absentSeconds = 0;
+        runtime.telemetryLostSeconds = 0;
         classifyPresentFlightBattery(monitorIndex, config, packVoltageCv);
       }
     }
@@ -1171,6 +1248,8 @@ static void confirmFlightBatteryPackImpl(uint8_t monitor, uint8_t selectedPackSl
     baseline = telemetrySensorValue(capSensorIdx, UNIT_MAH, 0);
   }
   runtime.consumedBaselineMah = baseline;
+  runtime.consumedLastMah = baseline;
+  runtime.consumedSessionMah = 0;
 
   runtime.state = FlightBatterySessionState::Confirmed;
   runtime.capacityMask = 0;
@@ -1293,7 +1372,7 @@ bool checkFlightBatteryCapacityAlert(uint8_t monitorIndex,
                                      const BatteryMonitorData& config,
                                      int32_t consumed)
 {
-  if (!config.capAlertEnabled || config.capacity <= 0) return false;
+  if (config.capacity <= 0) return false;
 
   auto& runtime = flightBatteryRuntimeState[monitorIndex];
   if (runtime.state != FlightBatterySessionState::Confirmed &&
@@ -1301,14 +1380,10 @@ bool checkFlightBatteryCapacityAlert(uint8_t monitorIndex,
     return false;
   }
 
-  int32_t sessionConsumed = consumed;
-  if (runtime.consumedBaselineMah > 0 && consumed > runtime.consumedBaselineMah) {
-    sessionConsumed = consumed - runtime.consumedBaselineMah;
-  } else if (runtime.consumedBaselineMah > 0) {
-    sessionConsumed = consumed;
-  }
+  int32_t sessionConsumed =
+      updateFlightBatterySessionConsumed(monitorIndex, consumed);
 
-  if (sessionConsumed <= 0) return false;
+  if (!config.capAlertEnabled || sessionConsumed <= 0) return false;
 
   for (size_t i = 0; i < FLIGHT_BATTERY_CAPACITY_THRESHOLDS_SIZE; i++) {
     const uint8_t threshold = FLIGHT_BATTERY_CAPACITY_THRESHOLDS[i];
@@ -1321,6 +1396,20 @@ bool checkFlightBatteryCapacityAlert(uint8_t monitorIndex,
     }
   }
   return false;
+}
+
+int32_t updateFlightBatterySessionConsumed(uint8_t monitorIndex,
+                                           int32_t consumed)
+{
+  if (monitorIndex >= MAX_BATTERY_MONITORS) return 0;
+  if (consumed < 0) consumed = 0;
+
+  auto& runtime = flightBatteryRuntimeState[monitorIndex];
+  const int32_t sessionConsumed =
+      flightBatterySessionConsumedFromRaw(runtime, consumed);
+  runtime.consumedSessionMah = sessionConsumed;
+  runtime.consumedLastMah = consumed;
+  return sessionConsumed;
 }
 
 static bool checkFlightBatteryVoltageAlert(uint8_t monitorIndex,
@@ -1371,7 +1460,7 @@ static bool checkFlightBatteryVoltageAlert(uint8_t monitorIndex,
   return true;
 }
 
-static bool checkFlightBatteryAlerts()
+bool checkFlightBatteryAlerts()
 {
   for (uint8_t i = 0; i < MAX_BATTERY_MONITORS; i++) {
     const auto& config = g_model.batteryMonitors[i];
