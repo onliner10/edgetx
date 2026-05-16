@@ -578,12 +578,26 @@ void telemetryWakeup()
     }
 #endif
 
+    TelemetryRfAlarmLevel rfAlarmLevel = TELEMETRY_RF_ALARM_NONE;
+    if (TELEMETRY_STREAMING()) {
+      rfAlarmLevel = telemetryConsumeRfAlarm();
+    }
+
     if (!g_model.disableTelemetryWarning) {
       if (TELEMETRY_STREAMING()) {
-        if (TELEMETRY_RSSI() < g_model.rfAlarms.critical) {
+        if (TELEMETRY_RSSI_AVAILABLE()) {
+          if (TELEMETRY_RSSI() < g_model.rfAlarms.critical) {
+            rfAlarmLevel = TELEMETRY_RF_ALARM_CRITICAL;
+          } else if (TELEMETRY_RSSI() < g_model.rfAlarms.warning &&
+                     rfAlarmLevel < TELEMETRY_RF_ALARM_WARNING) {
+            rfAlarmLevel = TELEMETRY_RF_ALARM_WARNING;
+          }
+        }
+
+        if (rfAlarmLevel >= TELEMETRY_RF_ALARM_CRITICAL) {
           AUDIO_RSSI_RED();
           SCHEDULE_NEXT_ALARMS_CHECK(10 /*seconds*/);
-        } else if (TELEMETRY_RSSI() < g_model.rfAlarms.warning) {
+        } else if (rfAlarmLevel >= TELEMETRY_RF_ALARM_WARNING) {
           AUDIO_RSSI_ORANGE();
           SCHEDULE_NEXT_ALARMS_CHECK(10 /*seconds*/);
         }
@@ -648,6 +662,7 @@ void telemetryInterrupt10ms()
 #if !defined(SIMU)
     telemetryData.rssi.reset();
 #endif
+    telemetryClearRfAlarm();
     for (auto & telemetryItem: telemetryItems) {
       if (telemetryItem.isAvailable()) {
         telemetryItem.setOld();

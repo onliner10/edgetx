@@ -104,6 +104,7 @@ static uint32_t read_u32_le(const uint8_t* data)
 
 #define I2C_RPM                       0x7E  // RPM sensor
 #define I2C_QOS                       0x7F  // RxV + flight log data
+#define I2C_SHORT_RANGE               0x80  // Short-range telemetry source bit
 
 // GPS flags definitions:
 // Example:  B9 (1100 1001) = IS_NORTH, !IS_EAST, !GREATER_99, IS_FIX_VALID,
@@ -352,6 +353,8 @@ const SpektrumSensor spektrumSensors[] = {
   SS(I2C_RPM,          0,  uint16,    STR_DEF(STR_SENSOR_RPM),               UNIT_RPMS,       0), // microseconds between pulse leading edges
   SS(I2C_RPM,          2,  uint16,    STR_DEF(STR_SENSOR_A3),                UNIT_VOLTS,      2), // 0.01V increments (typically flight pack voltage)
   SS(I2C_RPM,          4,  int16,     STR_DEF(STR_SENSOR_TEMP2),             UNIT_FAHRENHEIT, 0), // Temperature in degrees F.
+  SS(I2C_RPM,          6,  int8,      STR_DEF(STR_SENSOR_RX_RSSI1),           UNIT_RAW,        0), // dBm, no data, or range percent
+  SS(I2C_RPM,          7,  int8,      STR_DEF(STR_SENSOR_RX_RSSI2),           UNIT_RAW,        0),
 
   // 0x7f, QoS DATA, also called Flight Log
   SS(I2C_QOS,          0,  uint16,    STR_DEF(STR_SENSOR_QOS_A),             UNIT_RAW,       0), // A - Antenna Fades on Receiver A
@@ -374,12 +377,59 @@ const SpektrumSensor spektrumSensors[] = {
 static uint8_t gpsAltHigh = 0;
 static bool varioTelemetry = false;
 static bool flightPackTelemetry = false;
+// Spektrum Flight Log / QoS packets define F as accumulated frame losses and
+// H as accumulated holds. Keep the last seen counters so alarms are based on
+// new control-link loss evidence, not on absolute lifetime totals.
+static uint16_t spektrumFrameLosses = 0;
+static uint16_t spektrumHolds = 0;
+static uint16_t spektrumFrameLossesSinceWarning = 0;
+static uint8_t spektrumFlightLogValid = 0;
+
+constexpr uint8_t SPEKTRUM_FLIGHT_LOG_F_VALID = 0x01;
+constexpr uint8_t SPEKTRUM_FLIGHT_LOG_H_VALID = 0x02;
+// A Spektrum hold is 45 consecutive lost frames; use the same count for the
+// generic low-RF warning before a hold occurs.
+constexpr uint16_t SPEKTRUM_FRAME_LOSS_WARNING_DELTA = 45;
 
 // Helper function declared later
 static void processAS3XPacket(const uint8_t *packet);
 static void processAlpha6Packet(const uint8_t *packet);
 static void adjustTimeFromUTC(uint8_t hour, uint8_t min, uint8_t sec,
                               struct gtm *tp);
+
+static void resetSpektrumFlightLogAlarmState()
+{
+  spektrumFrameLosses = 0;
+  spektrumHolds = 0;
+  spektrumFrameLossesSinceWarning = 0;
+  spektrumFlightLogValid = 0;
+}
+
+static bool isSpektrumFlightLogNoData(int32_t value)
+{
+  // Spektrum/LemonRX telemetry uses both markers for unavailable Flight Log
+  // fields in the wild: 0x7FFF for signed no-data and 0x8000 as an alternate
+  // unsigned/no-data sentinel seen in LemonRX QoS packets.
+  return value == 0x7FFF || value == 0x8000;
+}
+
+// Flight Log F/H are monotonically increasing counters for a telemetry session.
+// The first valid packet establishes the baseline; later packets contribute
+// only their positive delta so old losses do not replay warnings after reset.
+static uint16_t spektrumFlightLogCounterDelta(uint8_t validMask,
+                                              uint16_t &previous,
+                                              uint16_t value)
+{
+  if ((spektrumFlightLogValid & validMask) == 0) {
+    previous = value;
+    spektrumFlightLogValid |= validMask;
+    return 0;
+  }
+
+  uint16_t delta = value > previous ? value - previous : 0;
+  previous = value;
+  return delta;
+}
 
 #if TEST_CAPTURED_MESSAGE
 static uint8_t replaceForTestingPackage(const uint8_t *packet);
@@ -558,6 +608,7 @@ void processSpektrumPacket(const uint8_t *packet)
   setTelemetryValue(PROTOCOL_TELEMETRY_SPEKTRUM, I2C_PSEUDO_TX_RSSI, 0, 0,
                     packet[1], UNIT_RAW, 0);
   // highest bit indicates that TM1100 is in use, ignore it
+  bool shortRangeTelemetry = (packet[2] & I2C_SHORT_RANGE) != 0;
   uint8_t i2cAddress = (packet[2] & 0x7f);
 
   uint8_t instance = packet[3];
@@ -566,6 +617,7 @@ void processSpektrumPacket(const uint8_t *packet)
     gpsAltHigh = 0;
     varioTelemetry = false;
     flightPackTelemetry = false;
+    resetSpektrumFlightLogAlarmState();
   }
 
   if (i2cAddress == I2C_NODATA) {
@@ -730,9 +782,23 @@ void processSpektrumPacket(const uint8_t *packet)
       value = value * 196791 / 100000;
     } // I2C_HIGH_CURRENT
 
+    else if (i2cAddress == I2C_RPM) {
+      if (sensor->startByte == 6 || sensor->startByte == 7) {
+        if (value == 0 || value == -1) {
+          continue;
+        }
+
+        if (!shortRangeTelemetry && value > 0) {
+          uint8_t receiverRssi = value > 100 ? 100 : static_cast<uint8_t>(value);
+          telemetryData.rssi.set(receiverRssi);
+        }
+      }
+    } // I2C_RPM
+
     else if (i2cAddress == I2C_QOS) {
       if (sensor->startByte == 0) {  // FdeA
-        // Check if this looks like a LemonRX Transceiver, they use QoS Frame loss A as RSSI indicator(0-100)
+        // LemonRX transceivers repurpose QoS FdeA as 0-100 RSSI and mark the
+        // other Flight Log fields as unavailable with 0x8000/0x7FFF sentinels.
         // farzu: new G2s has different signature, but i think using the Cyrf chip strength is
         //        more consistent across brands
         if (spektrumGetValue(packet + 4, 2, uint16) == 0x8000 &&
@@ -741,16 +807,37 @@ void processSpektrumPacket(const uint8_t *packet)
             spektrumGetValue(packet + 4, 8, uint16) == 0x8000) {
           telemetryData.rssi.set(value);
         }
-        else {
-          // Otherwise use the received signal strength of the telemetry packet as indicator
-          // Range is 0-31, multiply by 3 to get an almost full reading for 0x1f, the maximum the cyrf chip reports
-          telemetryData.rssi.set(packet[1] * 3);
-        }
+        // Standard Spektrum packets do not expose control-link RSSI here;
+        // packet[1] is only the received strength of the telemetry return link.
         telemetryStreaming = TELEMETRY_TIMEOUT10ms; // Telemery Alive
       } // FdeA
       else if (sensor->startByte == 8 || sensor->startByte == 10) { // Flss and Hold
-        // Lemon-RX: F and H = 0x7FFF (alternative N0-DATA)
-        if (value == 0x7FFF) continue; 
+        // In Spektrum QoS layout, byte offset 8 is F (frame losses) and offset
+        // 10 is H (holds). A hold is the stronger control-link failure signal.
+        // Lemon-RX: F and H may use alternative NO-DATA markers.
+        if (isSpektrumFlightLogNoData(value)) continue;
+
+        uint16_t delta = 0;
+        if (sensor->startByte == 8) {
+          delta = spektrumFlightLogCounterDelta(
+              SPEKTRUM_FLIGHT_LOG_F_VALID, spektrumFrameLosses, value);
+          if (delta >= SPEKTRUM_FRAME_LOSS_WARNING_DELTA ||
+              spektrumFrameLossesSinceWarning >=
+                  SPEKTRUM_FRAME_LOSS_WARNING_DELTA - delta) {
+            spektrumFrameLossesSinceWarning = 0;
+            telemetryRaiseRfAlarm(TELEMETRY_RF_ALARM_WARNING);
+          }
+          else {
+            spektrumFrameLossesSinceWarning += delta;
+          }
+        }
+        else {
+          delta = spektrumFlightLogCounterDelta(
+              SPEKTRUM_FLIGHT_LOG_H_VALID, spektrumHolds, value);
+          if (delta > 0) {
+            telemetryRaiseRfAlarm(TELEMETRY_RF_ALARM_CRITICAL);
+          }
+        }
       }
     } // I2C_QOS
 

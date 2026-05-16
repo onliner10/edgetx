@@ -56,7 +56,8 @@ class TelemetryData {
     uint16_t xjtVersion;
     uint8_t varioHighPrecision:1;
     uint8_t telemetryValid:3;
-    uint8_t spare:4;
+    uint8_t rfAlarmLevel:2;
+    uint8_t spare:2;
 
     void setSwr(uint8_t module, uint8_t value)
     {
@@ -74,9 +75,45 @@ class TelemetryData {
 
 extern TelemetryData telemetryData;
 
+enum TelemetryRfAlarmLevel : uint8_t {
+  TELEMETRY_RF_ALARM_NONE = 0,
+  TELEMETRY_RF_ALARM_WARNING = 1,
+  TELEMETRY_RF_ALARM_CRITICAL = 2,
+};
+
 inline uint8_t TELEMETRY_RSSI()
 {
   return telemetryData.rssi.value();
+}
+
+inline bool TELEMETRY_RSSI_AVAILABLE()
+{
+  return telemetryData.rssi.isAvailable();
+}
+
+inline void telemetryRaiseRfAlarm(TelemetryRfAlarmLevel level)
+{
+  uint8_t value = static_cast<uint8_t>(level);
+  if (value > telemetryData.rfAlarmLevel) {
+    telemetryData.rfAlarmLevel = value;
+  }
+}
+
+inline TelemetryRfAlarmLevel telemetryRfAlarmLevel()
+{
+  return static_cast<TelemetryRfAlarmLevel>(telemetryData.rfAlarmLevel);
+}
+
+inline void telemetryClearRfAlarm()
+{
+  telemetryData.rfAlarmLevel = TELEMETRY_RF_ALARM_NONE;
+}
+
+inline TelemetryRfAlarmLevel telemetryConsumeRfAlarm()
+{
+  TelemetryRfAlarmLevel level = telemetryRfAlarmLevel();
+  telemetryClearRfAlarm();
+  return level;
 }
 
 constexpr uint8_t START_STOP    = 0x7E;

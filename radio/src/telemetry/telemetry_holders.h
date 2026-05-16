@@ -36,18 +36,26 @@ class TelemetryValue {
       return _value;
     }
 
+    bool isAvailable()
+    {
+      return _available;
+    }
+
     void set(uint8_t value)
     {
       _value = value;
+      _available = true;
     }
 
     void reset()
     {
-      set(0);
+      _value = 0;
+      _available = false;
     }
 
   protected:
     uint8_t _value;
+    bool _available;
 };
 
 template <class T>
@@ -57,7 +65,7 @@ class TelemetryFilterDecorator: public T {
     {
       if (value == 0 || this->_value == 0) {
         memset(values, value, TELEMETRY_AVERAGE_COUNT);
-        this->_value = value;
+        T::set(value);
       }
       else {
         // calculate the average from values[] and value
@@ -70,7 +78,7 @@ class TelemetryFilterDecorator: public T {
         }
         values[TELEMETRY_AVERAGE_COUNT-1] = value;
         sum += value;
-        this->_value = sum / (TELEMETRY_AVERAGE_COUNT+1);
+        T::set(sum / (TELEMETRY_AVERAGE_COUNT+1));
       }
     }
 
