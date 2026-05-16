@@ -21,6 +21,8 @@ constexpr uint16_t FLIGHT_BATTERY_LIPO_MATCH_MIN_PER_CELL_CV = 300;
 constexpr uint16_t FLIGHT_BATTERY_LIPO_MATCH_MAX_PER_CELL_CV = 435;
 constexpr uint8_t FLIGHT_BATTERY_PRESENT_DEBOUNCE_SECONDS = 2;
 constexpr uint8_t FLIGHT_BATTERY_NO_BATTERY_DEBOUNCE_SECONDS = 3;
+constexpr uint8_t FLIGHT_BATTERY_TELEMETRY_LOSS_SWAP_SECONDS = 5;
+constexpr uint16_t FLIGHT_BATTERY_NEW_PACK_MIN_PER_CELL_CV = 400;
 
 enum class FlightBatterySessionState : uint8_t {
   Unknown,
@@ -40,8 +42,11 @@ struct FlightBatteryRuntimeState {
   uint8_t confirmedPackSlot = 0;
   uint16_t promptPackMask = 0;
   int32_t consumedBaselineMah = 0;
+  int32_t consumedLastMah = -1;
+  int32_t consumedSessionMah = 0;
   uint8_t capacityMask = 0;
   uint8_t voltageLowSeconds = 0;
+  uint8_t telemetryLostSeconds = 0;
   bool voltageAlerted = false;
   bool promptShown = false;
 };
@@ -76,6 +81,9 @@ void invalidateFlightBatteryPackSlot(uint8_t slot);
 bool checkFlightBatteryCapacityAlert(uint8_t monitorIndex,
                                      const BatteryMonitorData& config,
                                      int32_t consumed);
+bool checkFlightBatteryAlerts();
+int32_t updateFlightBatterySessionConsumed(uint8_t monitorIndex,
+                                           int32_t consumed);
 
 enum class BatteryLipoMatchResult { None, Exact, Ambiguous };
 
@@ -187,4 +195,27 @@ inline bool flightBatteryCapacityThresholdReached(int32_t consumed,
   if (capacity <= 0 || consumed <= 0) return false;
 
   return int64_t(consumed) * 100 >= int64_t(capacity) * thresholdPercent;
+}
+
+inline int32_t flightBatterySessionConsumedFromRaw(
+    const FlightBatteryRuntimeState& runtime, int32_t consumed)
+{
+  int32_t sessionConsumed = runtime.consumedSessionMah;
+
+  if (runtime.consumedLastMah >= 0) {
+    if (consumed > runtime.consumedLastMah) {
+      const int64_t next = int64_t(sessionConsumed) +
+                           (int64_t(consumed) - runtime.consumedLastMah);
+      sessionConsumed = next > INT32_MAX ? INT32_MAX : int32_t(next);
+    }
+  } else {
+    int32_t initial = consumed;
+    if (runtime.consumedBaselineMah > 0 &&
+        consumed > runtime.consumedBaselineMah) {
+      initial = consumed - runtime.consumedBaselineMah;
+    }
+    if (initial > sessionConsumed) sessionConsumed = initial;
+  }
+
+  return sessionConsumed < 0 ? 0 : sessionConsumed;
 }
